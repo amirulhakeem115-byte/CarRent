@@ -1,0 +1,49 @@
+{
+  "project_info": {
+    "project_number": "469656910476",
+    "firebase_url": "https://car-rental-management-sy-22c7f-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "car-rental-management-sy-22c7f",
+    "storage_bucket": "car-rental-management-sy-22c7f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:469656910476:android:e6b4bf79c0140e47f159a9",
+        "android_client_info": {
+          "package_name": "com.example.carrent"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAtxnljKXp7xcAf5zEe3s23uB4Nlr6VTyU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:469656910476:android:e7fc58e652737571f159a9",
+        "android_client_info": {
+          "package_name": "com.example.carrent_system"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAtxnljKXp7xcAf5zEe3s23uB4Nlr6VTyU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
