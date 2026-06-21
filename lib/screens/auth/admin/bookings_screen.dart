@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../models/booking_model.dart';
 import '../../../services/booking_service.dart';
+import '../../../widgets/loading_widget.dart';
+import '../../../constants/colors.dart';
 
 class BookingsScreen extends StatefulWidget {
   const BookingsScreen({super.key});
@@ -16,6 +18,7 @@ class _BookingsScreenState extends State<BookingsScreen> {
   List<BookingModel> _bookings = [];
   bool _loading = true;
   String _selectedFilter = 'all';
+  String? _error;
 
   @override
   void initState() {
@@ -24,11 +27,24 @@ class _BookingsScreenState extends State<BookingsScreen> {
   }
 
   Future<void> _loadBookings() async {
-    setState(() => _loading = true);
-    _bookings = await _bookingService.getBookings();
-    // Sort bookings by date descending
-    _bookings.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    setState(() => _loading = false);
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      _bookings = await _bookingService.getBookings().timeout(const Duration(seconds: 10));
+      _bookings.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    } catch (e) {
+      debugPrint('Error loading bookings: $e');
+      setState(() {
+        _error = 'Failed to load booking records. Please try again.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
   }
 
   Future<void> _updateStatus(BookingModel booking, String status) async {
@@ -185,8 +201,44 @@ class _BookingsScreenState extends State<BookingsScreen> {
         ),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
+          ? const Center(child: LoadingWidget(message: 'Loading booking records...'))
+          : _error != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 64),
+                        const SizedBox(height: 16),
+                        Text(
+                          _error!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Color(0xFF1A237E),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton.icon(
+                          onPressed: _loadBookings,
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('Retry Loading'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryOrange,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : Column(
               children: [
                 // Horizontal scrollable filter chips
                 Container(

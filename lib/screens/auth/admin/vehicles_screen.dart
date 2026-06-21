@@ -4,6 +4,8 @@ import '../../../models/vehicle_model.dart';
 import '../../../models/branch_model.dart';
 import '../../../services/vehicle_service.dart';
 import '../../../services/branch_service.dart';
+import '../../../widgets/loading_widget.dart';
+import '../../../constants/colors.dart';
 
 class VehiclesScreen extends StatefulWidget {
   const VehiclesScreen({super.key});
@@ -19,6 +21,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
   List<VehicleModel> _vehicles = [];
   List<BranchModel> _branches = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -27,10 +30,24 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
   }
 
   Future<void> _loadVehiclesAndBranches() async {
-    setState(() => _loading = true);
-    _vehicles = await _vehicleService.getVehicles();
-    _branches = await _branchService.getBranches();
-    setState(() => _loading = false);
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      _vehicles = await _vehicleService.getVehicles().timeout(const Duration(seconds: 10));
+      _branches = await _branchService.getBranches().timeout(const Duration(seconds: 10));
+    } catch (e) {
+      debugPrint('Error loading vehicles/branches: $e');
+      setState(() {
+        _error = 'Failed to load vehicles list. Please check your connection.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
   }
 
   void _showAddEditVehicleDialog({VehicleModel? vehicle}) {
@@ -267,7 +284,43 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
         ),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: LoadingWidget(message: 'Loading fleet vehicles...'))
+          : _error != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 64),
+                        const SizedBox(height: 16),
+                        Text(
+                          _error!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Color(0xFF1A237E),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton.icon(
+                          onPressed: _loadVehiclesAndBranches,
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('Retry Loading'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryOrange,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
           : _vehicles.isEmpty
               ? Center(
                   child: Column(

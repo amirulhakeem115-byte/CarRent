@@ -12,6 +12,8 @@ import 'vehicle_details_screen.dart';
 import 'vehicle_list_screen.dart';
 import 'profile_screen.dart';
 import '../login_screen.dart';
+import '../../../widgets/loading_widget.dart';
+import '../../../constants/colors.dart';
 
 class CustomerHomeScreen extends StatefulWidget {
   const CustomerHomeScreen({super.key});
@@ -33,6 +35,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   List<VehicleModel> _vehicles = [];
   List<NotificationModel> _notifications = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -41,15 +44,60 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   }
 
   Future<void> _loadData() async {
-    setState(() => _loading = true);
-    final currentUser = _authService.currentUser;
-    if (currentUser != null) {
-      _user = await _databaseService.getUser(currentUser.uid);
-      _notifications = await _notificationService.getNotifications(currentUser.uid);
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final currentUser = _authService.currentUser;
+      if (currentUser != null) {
+        // Load user info
+        try {
+          _user = await _databaseService.getUser(currentUser.uid).timeout(const Duration(seconds: 4));
+        } catch (e) {
+          debugPrint('Error loading user details: $e');
+        }
+
+        // Load notifications
+        try {
+          _notifications = await _notificationService.getNotifications(currentUser.uid).timeout(const Duration(seconds: 4));
+        } catch (e) {
+          debugPrint('Error loading notifications: $e');
+          _notifications = [];
+        }
+      }
+
+      // Load branches
+      try {
+        _branches = await _branchService.getBranches().timeout(const Duration(seconds: 5));
+      } catch (e) {
+        debugPrint('Error loading branches: $e. Using defaults.');
+        _branches = _branchService.getDefaultBranches();
+      }
+
+      // Load vehicles
+      try {
+        _vehicles = await _vehicleService.getVehicles().timeout(const Duration(seconds: 5));
+      } catch (e) {
+        debugPrint('Error loading vehicles: $e. Using defaults.');
+        _vehicles = _vehicleService.getDefaultVehicles();
+      }
+
+      if (_branches.isNotEmpty) {
+        _selectedBranch = _branches.first;
+      }
+    } catch (e) {
+      debugPrint('Unexpected error loading customer home data: $e');
+      if (_branches.isEmpty) _branches = _branchService.getDefaultBranches();
+      if (_vehicles.isEmpty) _vehicles = _vehicleService.getDefaultVehicles();
+      if (_branches.isNotEmpty) _selectedBranch = _branches.first;
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
-    _branches = await _branchService.getBranches();
-    _vehicles = await _vehicleService.getVehicles();
-    setState(() => _loading = false);
   }
 
   void _showNotifications() {
@@ -172,8 +220,44 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
+          ? const Center(child: LoadingWidget(message: 'Loading customer dashboard...'))
+          : _error != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 64),
+                        const SizedBox(height: 16),
+                        Text(
+                          _error!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Color(0xFF1E3C72),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton.icon(
+                          onPressed: _loadData,
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('Retry Loading'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryOrange,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : RefreshIndicator(
               onRefresh: _loadData,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
@@ -345,7 +429,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                             onTap: () {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (context) => const ProfileScreen(initialTab: 1)),
+                                MaterialPageRoute(builder: (context) => const ProfileScreen()),
                               );
                             },
                           ),

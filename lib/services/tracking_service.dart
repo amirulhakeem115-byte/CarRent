@@ -20,7 +20,7 @@ class TrackingService {
   // Retrieve current static coordinates
   Future<TrackingModel?> getVehicleLocation(String vehicleId) async {
     try {
-      final snapshot = await _db.child(vehicleId).get();
+      final snapshot = await _db.child(vehicleId).get().timeout(const Duration(seconds: 5));
       if (snapshot.exists) {
         final data = snapshot.value as Map<dynamic, dynamic>;
         return TrackingModel.fromMap(vehicleId, data);

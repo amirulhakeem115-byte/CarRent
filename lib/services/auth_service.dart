@@ -6,9 +6,7 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final DatabaseService _databaseService = DatabaseService();
 
-  static MockUser? mockUser;
-
-  User? get currentUser => mockUser ?? _auth.currentUser;
+  User? get currentUser => _auth.currentUser;
 
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
@@ -29,7 +27,7 @@ class AuthService {
           await _auth.createUserWithEmailAndPassword(
         email: email.trim(),
         password: password.trim(),
-      );
+      ).timeout(const Duration(seconds: 15));
 
       final uid = userCredential.user!.uid;
       debugPrint('[AUTH] REGISTER SUCCESS — uid: $uid');
@@ -69,7 +67,7 @@ class AuthService {
           await _auth.signInWithEmailAndPassword(
         email: email.trim(),
         password: password.trim(),
-      );
+      ).timeout(const Duration(seconds: 15));
 
       debugPrint('[AUTH] AUTH SUCCESS — uid: ${userCredential.user?.uid}');
       return userCredential;
@@ -89,7 +87,7 @@ class AuthService {
     debugPrint('[AUTH] RESET PASSWORD STARTED — email: $email');
 
     try {
-      await _auth.sendPasswordResetEmail(email: email.trim());
+      await _auth.sendPasswordResetEmail(email: email.trim()).timeout(const Duration(seconds: 15));
       debugPrint('[AUTH] RESET PASSWORD SUCCESS — email: $email');
     } on FirebaseAuthException catch (e) {
       debugPrint('[AUTH] RESET PASSWORD FAILED — code: ${e.code}, message: ${e.message}');
@@ -105,7 +103,6 @@ class AuthService {
   // ─────────────────────────────────────────────────────────────
   Future<void> logout() async {
     debugPrint('[AUTH] LOGOUT');
-    mockUser = null;
     await _auth.signOut();
   }
 
@@ -147,7 +144,6 @@ class AuthService {
           'Your account has been disabled. Please contact our support team.',
         );
       case 'invalid-credential':
-        // Firebase Auth v10+ merges user-not-found and wrong-password into this
         return Exception(
           'Invalid email or password. Please check your credentials and try again.',
         );
@@ -162,10 +158,7 @@ class AuthService {
           'Too many failed attempts. Your account has been temporarily locked. Please try again in a few minutes or reset your password.',
         );
 
-      // ── Password reset errors ────────────────────────────────
-      // Note: 'user-not-found' is already handled above under login errors
-
-      // ── API key / config errors (the 401 cause) ──────────────
+      // ── API key / config errors ──────────────────────────────
       case 'api-key-not-valid.-please-pass-a-valid-api-key.':
       case 'invalid-api-key':
         return Exception(
@@ -179,20 +172,4 @@ class AuthService {
         );
     }
   }
-}
-
-// ─────────────────────────────────────────────────────────────
-//  MOCK USER (Dev-mode bypass only — does NOT call Firebase)
-// ─────────────────────────────────────────────────────────────
-class MockUser implements User {
-  @override
-  final String uid;
-
-  @override
-  final String email;
-
-  MockUser({required this.uid, required this.email});
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => null;
 }

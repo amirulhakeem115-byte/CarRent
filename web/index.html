@@ -41,6 +41,17 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
+  <script>
+    // Safeguard to prevent "Cannot read properties of null (reading 'removeChild')"
+    // caused by third-party scripts (like reCAPTCHA) during element cleanup or hot restarts.
+    const originalRemoveChild = Node.prototype.removeChild;
+    Node.prototype.removeChild = function(child) {
+      if (child && child.parentNode === this) {
+        return originalRemoveChild.call(this, child);
+      }
+      return child;
+    };
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

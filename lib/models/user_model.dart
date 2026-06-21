@@ -9,6 +9,11 @@ class UserModel {
   final String? licenseNumber;
   final String licenseImage;
   final bool isVerified;
+  
+  // High fidelity visual fields
+  final String address;
+  final String licenseClass;
+  final String licenseExpiry;
 
   UserModel({
     required this.id,
@@ -21,6 +26,9 @@ class UserModel {
     this.licenseNumber,
     this.licenseImage = '',
     this.isVerified = false,
+    this.address = '4521 Oakwood Avenue, Suite 300, Los Angeles, CA 90024',
+    this.licenseClass = 'Class DA',
+    this.licenseExpiry = '12 / 2028',
   });
 
   factory UserModel.fromMap(
@@ -38,6 +46,9 @@ class UserModel {
       licenseNumber: data['licenseNumber'],
       licenseImage: data['licenseImage'] ?? '',
       isVerified: data['isVerified'] ?? false,
+      address: data['address'] ?? '4521 Oakwood Avenue, Suite 300, Los Angeles, CA 90024',
+      licenseClass: data['licenseClass'] ?? 'Class DA',
+      licenseExpiry: data['licenseExpiry'] ?? '12 / 2028',
     );
   }
 
@@ -52,6 +63,9 @@ class UserModel {
       'licenseNumber': licenseNumber,
       'licenseImage': licenseImage,
       'isVerified': isVerified,
+      'address': address,
+      'licenseClass': licenseClass,
+      'licenseExpiry': licenseExpiry,
     };
   }
 }

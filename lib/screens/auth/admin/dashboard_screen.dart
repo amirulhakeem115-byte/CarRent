@@ -16,6 +16,7 @@ import 'customers_screen.dart';
 import 'branches_screen.dart';
 import 'admin_tracking_screen.dart';
 import '../login_screen.dart';
+import '../../../widgets/loading_widget.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -41,6 +42,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   List<VehicleModel> _vehicles = [];
   List<UserModel> _users = [];
   bool _loading = true;
+  String? _error;
 
   String _reportType = 'Revenue'; // 'Revenue', 'Vehicle', 'Customer'
   String _reportPeriod = 'Monthly'; // 'Daily', 'Weekly', 'Monthly'
@@ -52,12 +54,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Future<void> _loadDashboardData() async {
-    setState(() => _loading = true);
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
-      _users = await _databaseService.getUsers();
-      _vehicles = await _vehicleService.getVehicles();
-      _bookings = await _bookingService.getBookings();
-      _payments = await _paymentService.getPayments();
+      final results = await Future.wait([
+        _databaseService.getUsers(),
+        _vehicleService.getVehicles(),
+        _bookingService.getBookings(),
+        _paymentService.getPayments(),
+      ]).timeout(const Duration(seconds: 10));
+
+      _users = results[0] as List<UserModel>;
+      _vehicles = results[1] as List<VehicleModel>;
+      _bookings = results[2] as List<BookingModel>;
+      _payments = results[3] as List<PaymentModel>;
 
       _totalUsers = _users.where((u) => u.role == 'customer').length;
       _totalVehicles = _vehicles.length;
@@ -72,6 +85,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       _totalRevenue = revenue;
     } catch (e) {
       debugPrint('Dashboard loading error: $e');
+      setState(() {
+        _error = 'Failed to load dashboard statistics. Please try again.';
+      });
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -142,8 +158,44 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primaryOrange))
-          : SingleChildScrollView(
+          ? const Center(child: LoadingWidget(message: 'Loading administrator dashboard...'))
+          : _error != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 64),
+                        const SizedBox(height: 16),
+                        Text(
+                          _error!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: AppColors.secondaryBlue,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton.icon(
+                          onPressed: _loadDashboardData,
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('Retry Loading'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryOrange,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

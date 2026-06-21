@@ -9,6 +9,8 @@ import '../../../services/booking_service.dart';
 import '../../../services/payment_service.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/database_service.dart';
+import 'booking_confirmation_screen.dart';
+import '../../../widgets/loading_widget.dart';
 
 class BookingScreen extends StatefulWidget {
   final VehicleModel vehicle;
@@ -52,15 +54,19 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   Future<void> _loadUserProfile() async {
-    final user = _authService.currentUser;
-    if (user != null) {
-      final profile = await _databaseService.getUser(user.uid);
-      if (profile != null) {
-        setState(() {
-          _userName = profile.fullName;
-          _userPhone = profile.phone;
-        });
+    try {
+      final user = _authService.currentUser;
+      if (user != null) {
+        final profile = await _databaseService.getUser(user.uid).timeout(const Duration(seconds: 10));
+        if (profile != null) {
+          setState(() {
+            _userName = profile.fullName;
+            _userPhone = profile.phone;
+          });
+        }
       }
+    } catch (e) {
+      debugPrint('Error loading user profile in booking: $e');
     }
   }
 
@@ -410,37 +416,15 @@ class _BookingScreenState extends State<BookingScreen> {
 
       if (!mounted) return;
 
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.check_circle, color: Colors.green),
-              SizedBox(width: 8),
-              Text('Booking Successful'),
-            ],
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (context) => BookingConfirmationScreen(
+            booking: booking,
+            vehicle: widget.vehicle,
           ),
-          content: Text(
-            status == 'paid'
-                ? 'Your payment has been successfully authorized and your booking is approved. Drive safe!'
-                : 'Your booking has been reserved in pending verification status. Please check your alerts or pay at the branch counter.',
-          ),
-          actions: [
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.secondaryBlue,
-                foregroundColor: Colors.white,
-              ),
-              onPressed: () {
-                Navigator.pop(context); // close dialog
-                Navigator.pop(context); // close booking page
-                Navigator.pop(context); // close details page
-              },
-              child: const Text('OK'),
-            ),
-          ],
         ),
+        (route) => false,
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -479,7 +463,7 @@ class _BookingScreenState extends State<BookingScreen> {
         ),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primaryOrange))
+          ? const Center(child: LoadingWidget(message: 'Processing your reservation booking...'))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Column(

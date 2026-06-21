@@ -8,7 +8,7 @@ class ReviewService {
   Future<void> submitReview(ReviewModel review) async {
     try {
       final newRef = _db.push();
-      await newRef.set(review.toMap());
+      await newRef.set(review.toMap()).timeout(const Duration(seconds: 5));
     } catch (e) {
       debugPrint('Error submitting review: $e');
       rethrow;
@@ -18,7 +18,7 @@ class ReviewService {
   Future<List<ReviewModel>> getVehicleReviews(String vehicleId) async {
     List<ReviewModel> reviews = [];
     try {
-      final snapshot = await _db.orderByChild('vehicleId').equalTo(vehicleId).get();
+      final snapshot = await _db.orderByChild('vehicleId').equalTo(vehicleId).get().timeout(const Duration(seconds: 5));
       if (snapshot.exists) {
         final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
         data.forEach((key, value) {
@@ -45,7 +45,7 @@ class ReviewService {
   Future<List<ReviewModel>> getAllReviews() async {
     List<ReviewModel> reviews = [];
     try {
-      final snapshot = await _db.get();
+      final snapshot = await _db.get().timeout(const Duration(seconds: 5));
       if (snapshot.exists) {
         final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
         data.forEach((key, value) {

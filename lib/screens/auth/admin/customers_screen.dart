@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../../models/user_model.dart';
 import '../../../services/database_service.dart';
 import '../../../services/notification_service.dart';
+import '../../../widgets/loading_widget.dart';
+import '../../../constants/colors.dart';
 
 class CustomersScreen extends StatefulWidget {
   const CustomersScreen({super.key});
@@ -16,6 +18,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
   List<UserModel> _users = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -24,11 +27,24 @@ class _CustomersScreenState extends State<CustomersScreen> {
   }
 
   Future<void> _loadCustomers() async {
-    setState(() => _loading = true);
-    final allUsers = await _databaseService.getUsers();
-    // Filter to only display customers
-    _users = allUsers.where((u) => u.role == 'customer').toList();
-    setState(() => _loading = false);
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final allUsers = await _databaseService.getUsers().timeout(const Duration(seconds: 10));
+      _users = allUsers.where((u) => u.role == 'customer').toList();
+    } catch (e) {
+      debugPrint('Error loading customers: $e');
+      setState(() {
+        _error = 'Failed to load customer registry records.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
   }
 
   Future<void> _toggleLicenseVerification(UserModel user, bool isVerified) async {
@@ -131,7 +147,43 @@ class _CustomersScreenState extends State<CustomersScreen> {
         ),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: LoadingWidget(message: 'Loading customer registry...'))
+          : _error != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 64),
+                        const SizedBox(height: 16),
+                        Text(
+                          _error!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Color(0xFF1A237E),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton.icon(
+                          onPressed: _loadCustomers,
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('Retry Loading'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryOrange,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
           : _users.isEmpty
               ? Center(
                   child: Column(

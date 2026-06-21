@@ -28,7 +28,7 @@ class DatabaseService {
         'profileImage': '',
         'licenseImage': '',
         'licenseNumber': licenseNumber,
-      });
+      }).timeout(const Duration(seconds: 5));
 
       debugPrint('USER SAVED SUCCESSFULLY');
     } catch (e, stack) {
@@ -39,33 +39,8 @@ class DatabaseService {
   }
 
   Future<UserModel?> getUser(String uid) async {
-    if (uid == 'demo_customer') {
-      return UserModel(
-        id: 'demo_customer',
-        fullName: 'Demo Customer',
-        email: 'customer@demo.com',
-        phone: '+60123456789',
-        role: 'customer',
-        createdAt: DateTime.now().toIso8601String(),
-        isVerified: true,
-        licenseNumber: 'WQX123456',
-        licenseImage: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&q=80&w=600',
-      );
-    }
-    if (uid == 'demo_admin') {
-      return UserModel(
-        id: 'demo_admin',
-        fullName: 'Demo Admin',
-        email: 'admin@demo.com',
-        phone: '+60111122233',
-        role: 'admin',
-        createdAt: DateTime.now().toIso8601String(),
-        isVerified: true,
-      );
-    }
-
     try {
-      final snapshot = await _db.child('users').child(uid).get();
+      final snapshot = await _db.child('users').child(uid).get().timeout(const Duration(seconds: 5));
       if (snapshot.exists) {
         final data = snapshot.value as Map<dynamic, dynamic>;
         return UserModel.fromMap(uid, data);
@@ -78,7 +53,7 @@ class DatabaseService {
 
   Future<void> updateUser(String uid, Map<String, dynamic> data) async {
     try {
-      await _db.child('users').child(uid).update(data);
+      await _db.child('users').child(uid).update(data).timeout(const Duration(seconds: 5));
     } catch (e) {
       debugPrint('Error updating user: $e');
       rethrow;
@@ -88,7 +63,7 @@ class DatabaseService {
   Future<List<UserModel>> getUsers() async {
     List<UserModel> users = [];
     try {
-      final snapshot = await _db.child('users').get();
+      final snapshot = await _db.child('users').get().timeout(const Duration(seconds: 5));
       if (snapshot.exists) {
         final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
         data.forEach((key, value) {
@@ -105,14 +80,14 @@ class DatabaseService {
     try {
       await _db.child('users').child(uid).update({
         'isVerified': isVerified,
-      });
+      }).timeout(const Duration(seconds: 5));
       
       // Seed a record in license_verifications/
       await _db.child('license_verifications').child(uid).set({
         'userId': uid,
         'status': isVerified ? 'approved' : 'rejected',
         'updatedAt': DateTime.now().toIso8601String(),
-      });
+      }).timeout(const Duration(seconds: 5));
     } catch (e) {
       debugPrint('Error verifying license: $e');
       rethrow;

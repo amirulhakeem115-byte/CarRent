@@ -12,6 +12,7 @@ import 'auth/customer/home_screen.dart';
 import 'auth/admin/dashboard_screen.dart';
 import 'auth/customer/vehicle_list_screen.dart';
 import 'auth/customer/vehicle_details_screen.dart';
+import '../widgets/loading_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -33,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
   DateTime? _returnDate;
   List<VehicleModel> _vehicles = [];
   bool _loading = true;
+  String? _error;
 
   final _contactNameController = TextEditingController();
   final _contactEmailController = TextEditingController();
@@ -46,18 +48,44 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadData() async {
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final currentUser = _authService.currentUser;
       if (currentUser != null) {
-        _user = await _databaseService.getUser(currentUser.uid);
+        try {
+          _user = await _databaseService.getUser(currentUser.uid).timeout(const Duration(seconds: 4));
+        } catch (userErr) {
+          debugPrint('Error getting current user: $userErr. Continuing as guest/offline profile.');
+        }
       }
-      _branches = await _branchService.getBranches();
-      _vehicles = await _vehicleService.getVehicles();
+      
+      try {
+        _branches = await _branchService.getBranches().timeout(const Duration(seconds: 5));
+      } catch (branchErr) {
+        debugPrint('Error getting branches: $branchErr. Using default branches.');
+        _branches = _branchService.getDefaultBranches();
+      }
+
+      try {
+        _vehicles = await _vehicleService.getVehicles().timeout(const Duration(seconds: 5));
+      } catch (vehicleErr) {
+        debugPrint('Error getting vehicles: $vehicleErr. Using default vehicles.');
+        _vehicles = _vehicleService.getDefaultVehicles();
+      }
+
       if (_branches.isNotEmpty) {
         _selectedPickupBranch = _branches.first;
       }
     } catch (e) {
-      debugPrint('Error loading home data: $e');
+      debugPrint('Unexpected error loading home data: $e');
+      // Even on unexpected errors, make sure we have defaults
+      if (_branches.isEmpty) _branches = _branchService.getDefaultBranches();
+      if (_vehicles.isEmpty) _vehicles = _vehicleService.getDefaultVehicles();
+      if (_branches.isNotEmpty) _selectedPickupBranch = _branches.first;
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -245,8 +273,44 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primaryOrange))
-          : SingleChildScrollView(
+          ? const Center(child: LoadingWidget(message: 'Loading Car Rental system...'))
+          : _error != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 64),
+                        const SizedBox(height: 16),
+                        Text(
+                          _error!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: AppColors.secondaryBlue,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton.icon(
+                          onPressed: _loadData,
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('Retry Loading'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryOrange,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [

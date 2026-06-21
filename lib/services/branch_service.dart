@@ -8,30 +8,34 @@ class BranchService {
   Future<List<BranchModel>> getBranches() async {
     List<BranchModel> branches = [];
     try {
-       final snapshot = await _db.get();
-       if (snapshot.exists) {
-         final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
-         data.forEach((key, value) {
-           branches.add(BranchModel.fromMap(key.toString(), value as Map<dynamic, dynamic>));
-         });
-       } else {
-         // Seed branches if none exist
-         await seedDefaultBranches();
-         return getBranches();
-       }
+      final snapshot = await _db.get().timeout(const Duration(seconds: 5));
+      if (snapshot.exists) {
+        final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
+        data.forEach((key, value) {
+          branches.add(BranchModel.fromMap(key.toString(), value as Map<dynamic, dynamic>));
+        });
+      } else {
+        // Seed branches if none exist, but don't let offline/unauthorized state hang
+        try {
+          await seedDefaultBranches().timeout(const Duration(seconds: 3));
+          final secondSnapshot = await _db.get().timeout(const Duration(seconds: 3));
+          if (secondSnapshot.exists) {
+            final Map<dynamic, dynamic> secondData = secondSnapshot.value as Map<dynamic, dynamic>;
+            secondData.forEach((key, value) {
+              branches.add(BranchModel.fromMap(key.toString(), value as Map<dynamic, dynamic>));
+            });
+            return branches;
+          }
+        } catch (seedError) {
+          debugPrint('Failed to seed default branches or read after seeding: $seedError. Using local defaults.');
+        }
+        return getDefaultBranches();
+      }
     } catch (e) {
-      debugPrint('Error getting branches: $e');
+      debugPrint('Error getting branches from Realtime Database: $e. Returning fallback branches.');
+      return getDefaultBranches();
     }
-
-    if (branches.isEmpty) {
-      branches = [
-        BranchModel(id: 'mock_b1', name: 'Kuala Lumpur', address: 'KL Sentral, 50470 Kuala Lumpur', phone: '+603-22741234'),
-        BranchModel(id: 'mock_b2', name: 'Shah Alam', address: 'Seksyen 7, 40000 Shah Alam, Selangor', phone: '+603-55101234'),
-        BranchModel(id: 'mock_b3', name: 'Putrajaya', address: 'Presint 1, 62000 Putrajaya', phone: '+603-88881234'),
-        BranchModel(id: 'mock_b4', name: 'Kajang', address: 'Jalan Kajang Impian, 43000 Kajang, Selangor', phone: '+603-87391234'),
-      ];
-    }
-    return branches;
+    return branches.isEmpty ? getDefaultBranches() : branches;
   }
 
   Stream<List<BranchModel>> getBranchesStream() {
@@ -77,14 +81,23 @@ class BranchService {
 
   Future<void> seedDefaultBranches() async {
     final defaults = [
-      BranchModel(id: '', name: 'Kajang', address: 'Jalan Kajang Impian, 43000 Kajang, Selangor', phone: '+603-87391234'),
       BranchModel(id: '', name: 'Kuala Lumpur', address: 'KL Sentral, 50470 Kuala Lumpur', phone: '+603-22741234'),
-      BranchModel(id: '', name: 'Putrajaya', address: 'Presint 1, 62000 Putrajaya', phone: '+603-88881234'),
       BranchModel(id: '', name: 'Shah Alam', address: 'Seksyen 7, 40000 Shah Alam, Selangor', phone: '+603-55101234'),
+      BranchModel(id: '', name: 'Putrajaya', address: 'Presint 1, 62000 Putrajaya', phone: '+603-88881234'),
+      BranchModel(id: '', name: 'Kajang', address: 'Jalan Kajang Impian, 43000 Kajang, Selangor', phone: '+603-87391234'),
     ];
 
     for (var branch in defaults) {
       await addBranch(branch);
     }
+  }
+
+  List<BranchModel> getDefaultBranches() {
+    return [
+      BranchModel(id: 'kl_sentral', name: 'Kuala Lumpur', address: 'KL Sentral, 50470 Kuala Lumpur', phone: '+603-22741234'),
+      BranchModel(id: 'shah_alam', name: 'Shah Alam', address: 'Seksyen 7, 40000 Shah Alam, Selangor', phone: '+603-55101234'),
+      BranchModel(id: 'putrajaya', name: 'Putrajaya', address: 'Presint 1, 62000 Putrajaya', phone: '+603-88881234'),
+      BranchModel(id: 'kajang', name: 'Kajang', address: 'Jalan Kajang Impian, 43000 Kajang, Selangor', phone: '+603-87391234'),
+    ];
   }
 }

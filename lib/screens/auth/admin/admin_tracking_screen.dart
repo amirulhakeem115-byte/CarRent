@@ -5,6 +5,7 @@ import '../../../models/vehicle_model.dart';
 import '../../../services/vehicle_service.dart';
 import '../../../services/tracking_service.dart';
 import '../customer/tracking_screen.dart';
+import '../../../widgets/loading_widget.dart';
 
 class AdminTrackingScreen extends StatefulWidget {
   const AdminTrackingScreen({super.key});
@@ -20,6 +21,7 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
   List<VehicleModel> _vehicles = [];
   String _searchQuery = '';
   bool _loading = true;
+  String? _error;
 
   // Active coordinates database listener map
   final Map<String, StreamSubscription?> _subscriptions = {};
@@ -35,26 +37,39 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
   }
 
   Future<void> _loadVehicles() async {
-    final list = await _vehicleService.getVehicles();
+    if (!mounted) return;
     setState(() {
-      _vehicles = list;
-      _loading = false;
+      _loading = true;
+      _error = null;
     });
+    try {
+      final list = await _vehicleService.getVehicles().timeout(const Duration(seconds: 10));
+      _vehicles = list;
 
-    // Setup streams & active route simulations for each vehicle
-    for (var vehicle in _vehicles) {
-      _simulators[vehicle.id] = _trackingService.startRouteSimulation(vehicle.id);
-      _subscriptions[vehicle.id] = _trackingService
-          .getVehicleLocationStream(vehicle.id)
-          .listen((loc) {
-        if (mounted && loc != null) {
-          setState(() {
-            _latitudes[vehicle.id] = loc.latitude;
-            _longitudes[vehicle.id] = loc.longitude;
-            _speeds[vehicle.id] = loc.speed;
-          });
-        }
+      // Setup streams & active route simulations for each vehicle
+      for (var vehicle in _vehicles) {
+        _simulators[vehicle.id] = _trackingService.startRouteSimulation(vehicle.id);
+        _subscriptions[vehicle.id] = _trackingService
+            .getVehicleLocationStream(vehicle.id)
+            .listen((loc) {
+          if (mounted && loc != null) {
+            setState(() {
+              _latitudes[vehicle.id] = loc.latitude;
+              _longitudes[vehicle.id] = loc.longitude;
+              _speeds[vehicle.id] = loc.speed;
+            });
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading active telematics: $e');
+      setState(() {
+        _error = 'Failed to initialize fleet satellite tracking.';
       });
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -86,7 +101,43 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
         title: const Text('Fleet GPS Telematics Center', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primaryOrange))
+          ? const Center(child: LoadingWidget(message: 'Initializing satellite telematics radar...'))
+          : _error != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 64),
+                        const SizedBox(height: 16),
+                        Text(
+                          _error!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: AppColors.secondaryBlue,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton.icon(
+                          onPressed: _loadVehicles,
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('Retry Loading'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryOrange,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
           : Flex(
               direction: isDesktop ? Axis.horizontal : Axis.vertical,
               crossAxisAlignment: CrossAxisAlignment.stretch,
