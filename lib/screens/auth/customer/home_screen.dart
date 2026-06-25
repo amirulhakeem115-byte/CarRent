@@ -8,12 +8,18 @@ import '../../../models/user_model.dart';
 import '../../../models/vehicle_model.dart';
 import '../../../models/branch_model.dart';
 import '../../../models/notification_model.dart';
-import 'vehicle_details_screen.dart';
 import 'vehicle_list_screen.dart';
 import 'profile_screen.dart';
-import '../login_screen.dart';
+import 'contact_support_screen.dart';
+import '../../home_screen.dart';
+import 'package:intl/intl.dart';
+import '../../../services/booking_service.dart';
+import '../../../services/payment_service.dart';
+import '../../../models/booking_model.dart';
+import '../../../models/payment_model.dart';
 import '../../../widgets/loading_widget.dart';
 import '../../../constants/colors.dart';
+import '../../../widgets/app_image.dart';
 
 class CustomerHomeScreen extends StatefulWidget {
   const CustomerHomeScreen({super.key});
@@ -29,11 +35,16 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   final VehicleService _vehicleService = VehicleService();
   final NotificationService _notificationService = NotificationService();
 
+  final BookingService _bookingService = BookingService();
+  final PaymentService _paymentService = PaymentService();
+
   UserModel? _user;
   List<BranchModel> _branches = [];
   BranchModel? _selectedBranch;
   List<VehicleModel> _vehicles = [];
   List<NotificationModel> _notifications = [];
+  List<BookingModel> _bookings = [];
+  List<PaymentModel> _payments = [];
   bool _loading = true;
   String? _error;
 
@@ -58,6 +69,14 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           _user = await _databaseService.getUser(currentUser.uid).timeout(const Duration(seconds: 4));
         } catch (e) {
           debugPrint('Error loading user details: $e');
+        }
+
+        // Load bookings & payments
+        try {
+          _bookings = await _bookingService.getUserBookings(currentUser.uid).timeout(const Duration(seconds: 4));
+          _payments = await _paymentService.getUserPayments(currentUser.uid).timeout(const Duration(seconds: 4));
+        } catch (e) {
+          debugPrint('Error loading bookings or payments: $e');
         }
 
         // Load notifications
@@ -218,7 +237,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     final unreadCount = _notifications.where((n) => !n.isRead).length;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: const Color(0xFFF4F6F8),
       body: _loading
           ? const Center(child: LoadingWidget(message: 'Loading customer dashboard...'))
           : _error != null
@@ -235,7 +254,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             fontSize: 16,
-                            color: Color(0xFF1E3C72),
+                            color: AppColors.secondaryBlue,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -258,379 +277,316 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   ),
                 )
               : RefreshIndicator(
-              onRefresh: _loadData,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header container with gradient
-                    Container(
-                      padding: const EdgeInsets.only(left: 24, right: 24, top: 60, bottom: 32),
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Color(0xFF1E3C72), Color(0xFF2A5298)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.only(
-                          bottomLeft: Radius.circular(32),
-                          bottomRight: Radius.circular(32),
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Welcome back,',
-                                     style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _user?.fullName ?? 'Valued Customer',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              Row(
-                                children: [
-                                  Stack(
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.notifications_outlined, color: Colors.white, size: 28),
-                                        onPressed: _showNotifications,
-                                      ),
-                                      if (unreadCount > 0)
-                                        Positioned(
-                                          right: 6,
-                                          top: 6,
-                                          child: Container(
-                                            padding: const EdgeInsets.all(4),
-                                            decoration: const BoxDecoration(
-                                              color: Colors.redAccent,
-                                              shape: BoxShape.circle,
-                                            ),
-                                            constraints: const BoxConstraints(
-                                              minWidth: 16,
-                                              minHeight: 16,
-                                            ),
-                                            child: Text(
-                                              '$unreadCount',
-                                              textAlign: TextAlign.center,
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 9,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  const SizedBox(width: 8),
-                                  GestureDetector(
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(builder: (context) => const ProfileScreen()),
-                                      ).then((_) => _loadData());
-                                    },
-                                    child: CircleAvatar(
-                                      radius: 20,
-                                      backgroundColor: Colors.white24,
-                                      backgroundImage: _user?.profileImage != null && _user!.profileImage.isNotEmpty
-                                          ? NetworkImage(_user!.profileImage)
-                                          : null,
-                                      child: _user?.profileImage == null || _user!.profileImage.isEmpty
-                                          ? const Icon(Icons.person, color: Colors.white)
-                                          : null,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 24),
-                          // Branch Filter Dropdown
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
+                  onRefresh: _loadData,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Premium full-bleed header with gradient
+                        Container(
+                          width: double.infinity,
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [AppColors.secondaryBlue, Color(0xFF07172C)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
                             ),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<BranchModel>(
-                                hint: const Text('Filter by Branch Location'),
-                                value: _selectedBranch,
-                                isExpanded: true,
-                                items: [
-                                  const DropdownMenuItem<BranchModel>(
-                                    value: null,
-                                    child: Text('All Branches'),
-                                  ),
-                                  ..._branches.map((BranchModel b) {
-                                    return DropdownMenuItem<BranchModel>(
-                                      value: b,
-                                      child: Text(b.name),
-                                    );
-                                  }),
-                                ],
-                                onChanged: (value) {
-                                  setState(() {
-                                    _selectedBranch = value;
-                                  });
-                                },
-                              ),
+                            borderRadius: BorderRadius.only(
+                              bottomLeft: Radius.circular(32),
+                              bottomRight: Radius.circular(32),
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 24),
-                      child: Text(
-                        'Quick Actions',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF2C3E50),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _buildQuickActionButton(
-                            icon: Icons.search,
-                            label: 'Search Cars',
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (context) => const VehicleListScreen()),
-                              );
-                            },
-                          ),
-                          _buildQuickActionButton(
-                            icon: Icons.history,
-                            label: 'History',
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (context) => const ProfileScreen()),
-                              );
-                            },
-                          ),
-                          _buildQuickActionButton(
-                            icon: Icons.person_outline,
-                            label: 'Profile',
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (context) => const ProfileScreen()),
-                              ).then((_) => _loadData());
-                            },
-                          ),
-                          _buildQuickActionButton(
-                            icon: Icons.logout,
-                            label: 'Logout',
-                            onTap: () async {
-                              final nav = Navigator.of(context);
-                              await _authService.logout();
-                              nav.pushAndRemoveUntil(
-                                MaterialPageRoute(builder: (context) => const LoginScreen()),
-                                (route) => false,
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    // Vehicles list header
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            _selectedBranch == null
-                                ? 'Available Fleet'
-                                : 'Available at ${_selectedBranch!.name}',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF2C3E50),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (context) => const VehicleListScreen()),
-                              );
-                            },
-                            child: const Text('View All'),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    // Vehicles list
-                    filteredVehicles.isEmpty
-                        ? Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: Center(
+                          child: Center(
+                            child: Container(
+                              constraints: const BoxConstraints(maxWidth: 1200),
+                              padding: const EdgeInsets.only(left: 24, right: 24, top: 60, bottom: 32),
                               child: Column(
                                 children: [
-                                  Icon(Icons.car_rental, size: 64, color: Colors.grey[400]),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    'No vehicles available at this location right now.',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(color: Colors.grey[600]),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          )
-                        : SizedBox(
-                            height: 280,
-                            child: ListView.builder(
-                              scrollDirection: Axis.horizontal,
-                              padding: const EdgeInsets.only(left: 24, right: 8),
-                              itemCount: filteredVehicles.length,
-                              itemBuilder: (context, index) {
-                                final vehicle = filteredVehicles[index];
-                                return GestureDetector(
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => VehicleDetailsScreen(vehicle: vehicle),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Welcome back,',
+                                            style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13, letterSpacing: 0.5),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            _user?.fullName ?? 'Valued Customer',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 26,
+                                              fontWeight: FontWeight.w900,
+                                              letterSpacing: -0.5,
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    );
-                                  },
-                                  child: Container(
-                                    width: 220,
-                                    margin: const EdgeInsets.only(right: 16, bottom: 16),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(24),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withValues(alpha: 0.04),
-                                          blurRadius: 10,
-                                          offset: const Offset(0, 4),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        ClipRRect(
-                                          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                                          child: vehicle.mainImage.isNotEmpty
-                                              ? Image.network(
-                                                  vehicle.mainImage,
-                                                  height: 130,
-                                                  width: double.infinity,
-                                                  fit: BoxFit.cover,
-                                                  errorBuilder: (_, _, _) => Container(
-                                                    height: 130,
-                                                    color: Colors.grey[200],
-                                                    child: const Icon(Icons.car_rental, size: 48, color: Colors.grey),
-                                                  ),
-                                                )
-                                              : Container(
-                                                  height: 130,
-                                                  color: Colors.grey[200],
-                                                  child: const Icon(Icons.car_rental, size: 48, color: Colors.grey),
+                                      Row(
+                                        children: [
+                                          Container(
+                                            decoration: BoxDecoration(
+                                              color: Colors.white.withValues(alpha: 0.08),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: Stack(
+                                              children: [
+                                                IconButton(
+                                                  icon: const Icon(Icons.notifications_outlined, color: Colors.white, size: 24),
+                                                  onPressed: _showNotifications,
                                                 ),
-                                        ),
-                                        Padding(
-                                          padding: const EdgeInsets.all(16),
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                '${vehicle.brand} ${vehicle.model}',
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 16,
-                                                  color: Color(0xFF2C3E50),
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Row(
-                                                children: [
-                                                  const Icon(Icons.location_on_outlined, size: 14, color: Colors.grey),
-                                                  const SizedBox(width: 4),
-                                                  Text(
-                                                    vehicle.branchName.isNotEmpty ? vehicle.branchName : 'General',
-                                                    style: const TextStyle(color: Colors.grey, fontSize: 12),
-                                                  ),
-                                                ],
-                                              ),
-                                              const SizedBox(height: 12),
-                                              Row(
-                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                children: [
-                                                  Text(
-                                                    'RM ${vehicle.pricePerDay.toStringAsFixed(0)}/day',
-                                                    style: const TextStyle(
-                                                      color: Color(0xFF1E3C72),
-                                                      fontWeight: FontWeight.bold,
-                                                      fontSize: 15,
-                                                    ),
-                                                  ),
-                                                  Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                    decoration: BoxDecoration(
-                                                      color: vehicle.isAvailable
-                                                          ? Colors.green.withValues(alpha: 0.1)
-                                                          : Colors.redAccent.withValues(alpha: 0.1),
-                                                      borderRadius: BorderRadius.circular(8),
-                                                    ),
-                                                    child: Text(
-                                                      vehicle.isAvailable ? 'Available' : 'Booked',
-                                                      style: TextStyle(
-                                                        color: vehicle.isAvailable ? Colors.green : Colors.redAccent,
-                                                        fontSize: 10,
-                                                        fontWeight: FontWeight.bold,
+                                                if (unreadCount > 0)
+                                                  Positioned(
+                                                    right: 8,
+                                                    top: 8,
+                                                    child: Container(
+                                                      padding: const EdgeInsets.all(4),
+                                                      decoration: const BoxDecoration(
+                                                        color: AppColors.primaryOrange,
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                      constraints: const BoxConstraints(
+                                                        minWidth: 16,
+                                                        minHeight: 16,
+                                                      ),
+                                                      child: Text(
+                                                        '$unreadCount',
+                                                        textAlign: TextAlign.center,
+                                                        style: const TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 9,
+                                                          fontWeight: FontWeight.bold,
+                                                        ),
                                                       ),
                                                     ),
                                                   ),
-                                                ],
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          GestureDetector(
+                                            onTap: () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                                              ).then((_) => _loadData());
+                                            },
+                                            child: Container(
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                border: Border.all(color: AppColors.primaryOrange, width: 2),
+                                              ),
+                                              child: CircleAvatar(
+                                                radius: 20,
+                                                backgroundColor: Colors.white24,
+                                                backgroundImage: getAppImageProvider(_user?.profileImage),
+                                                child: _user?.profileImage == null || _user!.profileImage.isEmpty || getAppImageProvider(_user?.profileImage) == null
+                                                    ? const Icon(Icons.person, color: Colors.white)
+                                                    : null,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 32),
+                                  // Floating glassmorphic branch selector card
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(alpha: 0.95),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(color: AppColors.primaryOrange.withValues(alpha: 0.25), width: 1.5),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.1),
+                                          blurRadius: 20,
+                                          offset: const Offset(0, 8),
+                                        ),
+                                      ],
+                                    ),
+                                    child: DropdownButtonHideUnderline(
+                                      child: DropdownButton<BranchModel>(
+                                        hint: const Text('Filter by Branch Location', style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.lightText)),
+                                        value: _selectedBranch,
+                                        isExpanded: true,
+                                        icon: const Icon(Icons.location_on_outlined, color: AppColors.primaryOrange, size: 22),
+                                        items: [
+                                          const DropdownMenuItem<BranchModel>(
+                                            value: null,
+                                            child: Text('All Branches', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+                                          ),
+                                          ..._branches.map((BranchModel b) {
+                                            return DropdownMenuItem<BranchModel>(
+                                              value: b,
+                                              child: Text(b.name, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+                                            );
+                                          }),
+                                        ],
+                                        onChanged: (value) {
+                                          setState(() {
+                                            _selectedBranch = value;
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        // Main responsive body content bounded to 1200px
+                        Center(
+                          child: Container(
+                            constraints: const BoxConstraints(maxWidth: 1200),
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Quick Actions',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
+                                    color: AppColors.secondaryBlue,
+                                    letterSpacing: -0.2,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    _buildQuickActionButton(
+                                      icon: Icons.search,
+                                      label: 'Search Cars',
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(builder: (context) => const VehicleListScreen()),
+                                        );
+                                      },
+                                    ),
+                                    _buildQuickActionButton(
+                                      icon: Icons.history,
+                                      label: 'History',
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                                        );
+                                      },
+                                    ),
+                                    _buildQuickActionButton(
+                                      icon: Icons.person_outline,
+                                      label: 'Profile',
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                                        ).then((_) => _loadData());
+                                      },
+                                    ),
+                                    _buildQuickActionButton(
+                                      icon: Icons.support_agent,
+                                      label: 'Support Desk',
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(builder: (context) => const ContactSupportScreen()),
+                                        ).then((_) => _loadData());
+                                      },
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 40),
+                                _buildBookingAndPaymentsSection(),
+                                const SizedBox(height: 40),
+                                // Available fleet list header
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      _selectedBranch == null
+                                          ? 'Available Fleet'
+                                          : 'Available at ${_selectedBranch!.name}',
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w900,
+                                        color: AppColors.secondaryBlue,
+                                        letterSpacing: -0.2,
+                                      ),
+                                    ),
+                                    TextButton(
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(builder: (context) => const VehicleListScreen()),
+                                        );
+                                      },
+                                      child: const Row(
+                                        children: [
+                                          Text('View All', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryOrange)),
+                                          SizedBox(width: 4),
+                                          Icon(Icons.arrow_forward_rounded, size: 16, color: AppColors.primaryOrange),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                                // Fleet horizontal carousel or empty state
+                                filteredVehicles.isEmpty
+                                    ? Container(
+                                        width: double.infinity,
+                                        padding: const EdgeInsets.symmetric(vertical: 60),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(20),
+                                          border: Border.all(color: Colors.grey[200]!),
+                                        ),
+                                        child: Center(
+                                          child: Column(
+                                            children: [
+                                              Icon(Icons.directions_car_filled_outlined, size: 48, color: Colors.grey[300]),
+                                              const SizedBox(height: 16),
+                                              Text(
+                                                'No vehicles available at this location right now.',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(color: Colors.grey[500], fontWeight: FontWeight.bold),
                                               ),
                                             ],
                                           ),
                                         ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
+                                      )
+                                    : SizedBox(
+                                        height: 410,
+                                        child: ListView.builder(
+                                          scrollDirection: Axis.horizontal,
+                                          itemCount: filteredVehicles.length,
+                                          itemBuilder: (context, index) {
+                                            final vehicle = filteredVehicles[index];
+                                            return Padding(
+                                              padding: const EdgeInsets.only(right: 20, bottom: 20),
+                                              child: VehicleHoverCard(vehicle: vehicle),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                const SizedBox(height: 40),
+                              ],
                             ),
                           ),
-                  ],
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ),
     );
   }
 
@@ -639,34 +595,397 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     required String label,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
+    return Expanded(
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 6),
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.grey[200]!),
               boxShadow: [
                 BoxShadow(
-                   color: Colors.black.withValues(alpha: 0.03),
+                  color: Colors.black.withValues(alpha: 0.03),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
               ],
             ),
-            child: Icon(icon, color: const Color(0xFF1E3C72), size: 28),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF2C3E50),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryOrange.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: AppColors.primaryOrange, size: 26),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.secondaryBlue,
+                  ),
+                ),
+              ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBookingAndPaymentsSection() {
+    final activeBookingsList = _bookings.where(
+      (b) => ['pending', 'approved', 'active', 'ongoing'].contains(b.status.toLowerCase()),
+    ).toList();
+    final currentBooking = activeBookingsList.isNotEmpty ? activeBookingsList.first : null;
+
+    final double width = MediaQuery.of(context).size.width;
+    final bool isDesktop = width > 900;
+
+    return Flex(
+      direction: isDesktop ? Axis.horizontal : Axis.vertical,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: isDesktop ? 5 : 0,
+          child: _buildCurrentBookingCard(currentBooking),
+        ),
+        if (isDesktop) const SizedBox(width: 24),
+        if (!isDesktop) const SizedBox(height: 24),
+        Expanded(
+          flex: isDesktop ? 5 : 0,
+          child: _buildRecentPaymentsCard(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCurrentBookingCard(BookingModel? booking) {
+    if (booking == null) {
+      return Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.grey[200]!),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Current Booking',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue),
+            ),
+            const SizedBox(height: 20),
+            Center(
+              child: Column(
+                children: [
+                  Icon(Icons.no_sim_outlined, size: 48, color: Colors.grey[300]),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No active bookings found.',
+                    style: TextStyle(color: Colors.grey[500], fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Need a car? Explore our fleet and make a booking.',
+                    style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const VehicleListScreen()),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryOrange,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    ),
+                    child: const Text('Book Now', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final dateFormat = DateFormat('dd MMM yyyy');
+    Color statusColor = Colors.orange;
+    if (booking.status == 'approved' || booking.status == 'active' || booking.status == 'ongoing') {
+      statusColor = Colors.blue;
+    } else if (booking.status == 'completed') {
+      statusColor = Colors.green;
+    } else if (booking.status == 'cancelled' || booking.status == 'rejected') {
+      statusColor = Colors.red;
+    }
+
+    final bool canCancel = ['pending', 'approved'].contains(booking.status.toLowerCase());
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Current Booking',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  booking.status.toUpperCase(),
+                  style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.lightGray,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.directions_car_filled, color: AppColors.secondaryBlue, size: 36),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      booking.vehicleName,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.secondaryBlue),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Booking ID: #${booking.id.substring(0, booking.id.length > 8 ? 8 : booking.id.length).toUpperCase()}',
+                      style: TextStyle(color: Colors.grey[500], fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          const Divider(),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('PICKUP DATE', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text(dateFormat.format(booking.pickUpDate), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  const Text('RETURN DATE', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text(dateFormat.format(booking.returnDate), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('TOTAL PRICE', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text('RM ${booking.totalPrice.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.primaryOrange)),
+                ],
+              ),
+              if (canCancel)
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Cancel Booking'),
+                        content: const Text('Are you sure you want to cancel this booking? This action cannot be undone.'),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('No')),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text('Cancel Booking'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm == true) {
+                      try {
+                        await _bookingService.cancelBooking(booking.id, booking.userId, booking.vehicleId, booking.vehicleName);
+                        _loadData();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Booking cancelled successfully'), backgroundColor: Colors.green),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Cancellation failed: $e'), backgroundColor: Colors.redAccent),
+                          );
+                        }
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.cancel_outlined, size: 14, color: Colors.redAccent),
+                  label: const Text('Cancel', style: TextStyle(color: Colors.redAccent, fontSize: 11, fontWeight: FontWeight.bold)),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.redAccent),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecentPaymentsCard() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Recent Payments',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                  );
+                },
+                child: const Text('View Ledger', style: TextStyle(color: AppColors.primaryOrange, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          _payments.isEmpty
+              ? Container(
+                  height: 160,
+                  alignment: Alignment.center,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.payment_outlined, size: 48, color: Colors.grey[300]),
+                      const SizedBox(height: 12),
+                      Text('No payment transactions found.', style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+                    ],
+                  ),
+                )
+              : ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _payments.length > 3 ? 3 : _payments.length,
+                  separatorBuilder: (context, index) => const Divider(height: 24),
+                  itemBuilder: (context, index) {
+                    final payment = _payments[index];
+                    Color statusColor = Colors.orange;
+                    if (payment.paymentStatus == 'Approved') {
+                      statusColor = Colors.green;
+                    } else if (payment.paymentStatus == 'Rejected') {
+                      statusColor = Colors.red;
+                    } else {
+                      statusColor = Colors.amber;
+                    }
+
+                    final String bRef = payment.bookingId.length > 8
+                        ? payment.bookingId.substring(0, 8).toUpperCase()
+                        : payment.bookingId.toUpperCase();
+
+                    return Row(
+                      children: [
+                        CircleAvatar(
+                          backgroundColor: statusColor.withValues(alpha: 0.1),
+                          child: Icon(Icons.payments_outlined, color: statusColor, size: 20),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'RM ${payment.amount.toStringAsFixed(2)}',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.secondaryBlue),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Ref Booking: #$bRef',
+                                style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            payment.paymentStatus ?? 'Pending Verification',
+                            style: TextStyle(color: statusColor, fontSize: 9, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
         ],
       ),
     );

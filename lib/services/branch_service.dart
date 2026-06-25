@@ -81,10 +81,12 @@ class BranchService {
 
   Future<void> seedDefaultBranches() async {
     final defaults = [
-      BranchModel(id: '', name: 'Kuala Lumpur', address: 'KL Sentral, 50470 Kuala Lumpur', phone: '+603-22741234'),
-      BranchModel(id: '', name: 'Shah Alam', address: 'Seksyen 7, 40000 Shah Alam, Selangor', phone: '+603-55101234'),
-      BranchModel(id: '', name: 'Putrajaya', address: 'Presint 1, 62000 Putrajaya', phone: '+603-88881234'),
-      BranchModel(id: '', name: 'Kajang', address: 'Jalan Kajang Impian, 43000 Kajang, Selangor', phone: '+603-87391234'),
+      BranchModel(id: '', branchName: 'Kuala Lumpur', address: 'KL Sentral Hub, Level 2, 50470 Kuala Lumpur', phone: '+603-22741234', latitude: 3.1390, longitude: 101.6869, operatingHours: '09:00 AM - 09:00 PM'),
+      BranchModel(id: '', branchName: 'Kajang', address: 'Jalan Kajang Impian Hub, 43000 Kajang, Selangor', phone: '+603-87391234', latitude: 3.0166, longitude: 101.7916, operatingHours: '09:00 AM - 09:00 PM'),
+      BranchModel(id: '', branchName: 'Putrajaya', address: 'Presint 1 Terminal Hub, 62000 Putrajaya', phone: '+603-88881234', latitude: 2.9264, longitude: 101.6964, operatingHours: '09:00 AM - 09:00 PM'),
+      BranchModel(id: '', branchName: 'Shah Alam', address: 'Seksyen 7 Commercial Hub, 40000 Shah Alam, Selangor', phone: '+603-55101234', latitude: 3.0738, longitude: 101.5183, operatingHours: '09:00 AM - 09:00 PM'),
+      BranchModel(id: '', branchName: 'Johor Bahru', address: 'Jalan Tun Abdul Razak Hub, 80000 Johor Bahru, Johor', phone: '+607-2211234', latitude: 1.4927, longitude: 103.7414, operatingHours: '09:00 AM - 09:00 PM'),
+      BranchModel(id: '', branchName: 'Penang', address: 'Jalan Sultan Azlan Shah Hub, 11900 Bayan Lepas, Pulau Pinang', phone: '+604-6411234', latitude: 5.3528, longitude: 100.3013, operatingHours: '09:00 AM - 09:00 PM'),
     ];
 
     for (var branch in defaults) {
@@ -94,10 +96,13 @@ class BranchService {
 
   List<BranchModel> getDefaultBranches() {
     return [
-      BranchModel(id: 'kl_sentral', name: 'Kuala Lumpur', address: 'KL Sentral, 50470 Kuala Lumpur', phone: '+603-22741234'),
-      BranchModel(id: 'shah_alam', name: 'Shah Alam', address: 'Seksyen 7, 40000 Shah Alam, Selangor', phone: '+603-55101234'),
-      BranchModel(id: 'putrajaya', name: 'Putrajaya', address: 'Presint 1, 62000 Putrajaya', phone: '+603-88881234'),
-      BranchModel(id: 'kajang', name: 'Kajang', address: 'Jalan Kajang Impian, 43000 Kajang, Selangor', phone: '+603-87391234'),
+      BranchModel(id: 'kl_hub', branchName: 'Kuala Lumpur', address: 'KL Sentral Hub, Level 2, 50470 Kuala Lumpur', phone: '+603-22741234', latitude: 3.1390, longitude: 101.6869, operatingHours: '09:00 AM - 09:00 PM'),
+      BranchModel(id: 'kajang_hub', branchName: 'Kajang', address: 'Jalan Kajang Impian Hub, 43000 Kajang, Selangor', phone: '+603-87391234', latitude: 3.0166, longitude: 101.7916, operatingHours: '09:00 AM - 09:00 PM'),
+      BranchModel(id: 'putrajaya_hub', branchName: 'Putrajaya', address: 'Presint 1 Terminal Hub, 62000 Putrajaya', phone: '+603-88881234', latitude: 2.9264, longitude: 101.6964, operatingHours: '09:00 AM - 09:00 PM'),
+      BranchModel(id: 'shah_alam_hub', branchName: 'Shah Alam', address: 'Seksyen 7 Commercial Hub, 40000 Shah Alam, Selangor', phone: '+603-55101234', latitude: 3.0738, longitude: 101.5183, operatingHours: '09:00 AM - 09:00 PM'),
+      BranchModel(id: 'jb_hub', branchName: 'Johor Bahru', address: 'Jalan Tun Abdul Razak Hub, 80000 Johor Bahru, Johor', phone: '+607-2211234', latitude: 1.4927, longitude: 103.7414, operatingHours: '09:00 AM - 09:00 PM'),
+      BranchModel(id: 'penang_hub', branchName: 'Penang', address: 'Jalan Sultan Azlan Shah Hub, 11900 Bayan Lepas, Pulau Pinang', phone: '+604-6411234', latitude: 5.3528, longitude: 100.3013, operatingHours: '09:00 AM - 09:00 PM'),
     ];
   }
+
 }

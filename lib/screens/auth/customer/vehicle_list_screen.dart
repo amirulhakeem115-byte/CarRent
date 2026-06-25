@@ -7,6 +7,7 @@ import '../../../constants/colors.dart';
 import '../../../widgets/custom_app_bar.dart';
 import 'vehicle_details_screen.dart';
 import '../../../widgets/loading_widget.dart';
+import '../../../widgets/vehicle_card.dart';
 
 class VehicleListScreen extends StatefulWidget {
   const VehicleListScreen({super.key});
@@ -29,7 +30,8 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
   String _searchQuery = '';
   String? _selectedTransmission;
   String? _selectedCategory;
-  final double _maxPrice = 1000.0;
+  double _priceBudget = 1000.0;
+  String? _selectedAvailability;
   BranchModel? _selectedBranch;
 
   @override
@@ -81,11 +83,13 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
           vehicle.model.toLowerCase().contains(_searchQuery);
       final matchesTransmission =
           _selectedTransmission == null || vehicle.transmission == _selectedTransmission;
-      final matchesPrice = vehicle.pricePerDay <= _maxPrice;
+      final matchesPrice = vehicle.pricePerDay <= _priceBudget;
       final matchesBranch = _selectedBranch == null || vehicle.branchName == _selectedBranch!.name;
       final matchesCategory = _selectedCategory == null || 
-          (vehicle.model.toLowerCase().contains(_selectedCategory!.toLowerCase()));
-      return matchesSearch && matchesTransmission && matchesPrice && matchesBranch && matchesCategory;
+          vehicle.category.toLowerCase() == _selectedCategory!.toLowerCase();
+      final matchesAvailability = _selectedAvailability == null ||
+          vehicle.status.toLowerCase() == _selectedAvailability!.toLowerCase();
+      return matchesSearch && matchesTransmission && matchesPrice && matchesBranch && matchesCategory && matchesAvailability;
     }).toList();
 
     return Scaffold(
@@ -192,123 +196,18 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                           runSpacing: 24,
                           alignment: WrapAlignment.center,
                           children: filteredVehicles.map((vehicle) {
-                            // Extract display details matching image reference 4
-                            final isCoupe = vehicle.model.toLowerCase().contains('coupe');
-                            final categoryTag = isCoupe ? 'COUPÉ' : 'SEDAN';
-
-                            return Container(
+                            return SizedBox(
                               width: 320,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF8F9FA),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Colors.grey[200]!),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Top Image & category tag block
-                                  Stack(
-                                    children: [
-                                      ClipRRect(
-                                        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                                        child: vehicle.mainImage.isNotEmpty
-                                            ? Image.network(
-                                                vehicle.mainImage,
-                                                height: 180,
-                                                width: double.infinity,
-                                                fit: BoxFit.cover,
-                                                errorBuilder: (_, _, _) => Container(
-                                                  height: 180,
-                                                  color: Colors.grey[200],
-                                                  child: const Icon(Icons.car_rental, size: 48, color: Colors.grey),
-                                                ),
-                                              )
-                                            : Container(
-                                                height: 180,
-                                                color: Colors.grey[200],
-                                                child: const Icon(Icons.car_rental, size: 48, color: Colors.grey),
-                                              ),
-                                      ),
-                                      // Absolute positioned category tag
-                                      Positioned(
-                                        right: 12,
-                                        top: 12,
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.primaryOrange,
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: Text(
-                                            categoryTag,
-                                            style: const TextStyle(
-                                              color: AppColors.secondaryBlue,
-                                              fontSize: 9,
-                                              fontWeight: FontWeight.w900,
-                                              letterSpacing: 0.5,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-
-                                  // Details Card Body
-                                  Padding(
-                                    padding: const EdgeInsets.all(20),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          '${vehicle.brand} ${vehicle.model}',
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppColors.secondaryBlue,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 12),
-                                        
-                                        // Specifications horizontal list matching reference image
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            _buildSpecBadge(Icons.settings, vehicle.transmission == 'Automatic' ? 'Automat' : 'Manual'),
-                                            _buildSpecBadge(Icons.speed, vehicle.engine),
-                                            _buildSpecBadge(Icons.ac_unit, 'AC'),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 20),
-
-                                        // Full width Navy button
-                                        SizedBox(
-                                          width: double.infinity,
-                                          height: 44,
-                                          child: ElevatedButton(
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: const Color(0xFF5A738E), // Greyish-Blue in mockup
-                                              foregroundColor: Colors.white,
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                              elevation: 0,
-                                            ),
-                                            onPressed: () {
-                                              Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (context) => VehicleDetailsScreen(vehicle: vehicle),
-                                                ),
-                                              ).then((_) => _loadData());
-                                            },
-                                            child: const Text(
-                                              'View Details',
-                                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
+                              child: VehicleCard(
+                                vehicle: vehicle,
+                                onTap: vehicle.status == 'available' ? () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => VehicleDetailsScreen(vehicle: vehicle),
                                     ),
-                                  ),
-                                ],
+                                  ).then((_) => _loadData());
+                                } : null,
                               ),
                             );
                           }).toList(),
@@ -325,6 +224,9 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
   }
 
   Widget _buildFilterBar() {
+    final double width = MediaQuery.of(context).size.width;
+    final bool isDesktop = width > 900;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -333,11 +235,14 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
         border: Border.all(color: Colors.grey[200]!),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
+          Flex(
+            direction: isDesktop ? Axis.horizontal : Axis.vertical,
+            crossAxisAlignment: isDesktop ? CrossAxisAlignment.center : CrossAxisAlignment.stretch,
             children: [
               Expanded(
+                flex: isDesktop ? 2 : 0,
                 child: TextField(
                   controller: _searchController,
                   decoration: const InputDecoration(
@@ -346,61 +251,114 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                   ),
                 ),
               ),
-              const SizedBox(width: 16),
-              DropdownButton<String>(
-                value: _selectedTransmission,
-                hint: const Text('Transmission'),
-                items: const [
-                  DropdownMenuItem(value: null, child: Text('All')),
-                  DropdownMenuItem(value: 'Automatic', child: Text('Automatic')),
-                  DropdownMenuItem(value: 'Manual', child: Text('Manual')),
+              if (isDesktop) const SizedBox(width: 16) else const SizedBox(height: 12),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  DropdownButton<String>(
+                    value: _selectedTransmission,
+                    hint: const Text('Transmission'),
+                    items: const [
+                      DropdownMenuItem(value: null, child: Text('All Transmissions')),
+                      DropdownMenuItem(value: 'Automatic', child: Text('Automatic')),
+                      DropdownMenuItem(value: 'Manual', child: Text('Manual')),
+                    ],
+                    onChanged: (val) {
+                      setState(() => _selectedTransmission = val);
+                    },
+                  ),
+                  DropdownButton<String>(
+                    value: _selectedCategory,
+                    hint: const Text('Category'),
+                    items: const [
+                      DropdownMenuItem(value: null, child: Text('All Categories')),
+                      DropdownMenuItem(value: 'Economy', child: Text('Economy')),
+                      DropdownMenuItem(value: 'Sedan', child: Text('Sedan')),
+                      DropdownMenuItem(value: 'SUV', child: Text('SUV')),
+                      DropdownMenuItem(value: 'MPV', child: Text('MPV')),
+                    ],
+                    onChanged: (val) {
+                      setState(() => _selectedCategory = val);
+                    },
+                  ),
+                  DropdownButton<BranchModel>(
+                    value: _selectedBranch,
+                    hint: const Text('Branch Hub'),
+                    items: [
+                      const DropdownMenuItem(value: null, child: Text('All Branches')),
+                      ..._branches.map((b) => DropdownMenuItem(value: b, child: Text(b.name))),
+                    ],
+                    onChanged: (val) {
+                      setState(() => _selectedBranch = val);
+                    },
+                  ),
+                  DropdownButton<String>(
+                    value: _selectedAvailability,
+                    hint: const Text('Availability'),
+                    items: const [
+                      DropdownMenuItem(value: null, child: Text('All Availability')),
+                      DropdownMenuItem(value: 'available', child: Text('Available')),
+                      DropdownMenuItem(value: 'booked', child: Text('Booked')),
+                      DropdownMenuItem(value: 'maintenance', child: Text('Under Maintenance')),
+                    ],
+                    onChanged: (val) {
+                      setState(() => _selectedAvailability = val);
+                    },
+                  ),
                 ],
-                onChanged: (val) {
-                  setState(() => _selectedTransmission = val);
-                },
               ),
-              const SizedBox(width: 16),
-              DropdownButton<String>(
-                value: _selectedCategory,
-                hint: const Text('Category'),
-                items: const [
-                  DropdownMenuItem(value: null, child: Text('All Categories')),
-                  DropdownMenuItem(value: 'Sedan', child: Text('Sedan')),
-                  DropdownMenuItem(value: 'Coupe', child: Text('Coupe')),
+            ],
+          ),
+          const SizedBox(height: 20),
+          const Divider(height: 1),
+          const SizedBox(height: 16),
+          // Price filter
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Price Budget per Day',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.secondaryBlue,
+                    ),
+                  ),
+                  Text(
+                    'RM ${_priceBudget.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.primaryOrange,
+                    ),
+                  ),
                 ],
-                onChanged: (val) {
-                  setState(() => _selectedCategory = val);
-                },
               ),
-              const SizedBox(width: 16),
-              DropdownButton<BranchModel>(
-                value: _selectedBranch,
-                hint: const Text('Branch Hub'),
-                items: [
-                  const DropdownMenuItem(value: null, child: Text('All Branches')),
-                  ..._branches.map((b) => DropdownMenuItem(value: b, child: Text(b.name))),
-                ],
-                onChanged: (val) {
-                  setState(() => _selectedBranch = val);
-                },
+              SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  activeTrackColor: AppColors.primaryOrange,
+                  inactiveTrackColor: Colors.grey[200],
+                  thumbColor: AppColors.primaryOrange,
+                  overlayColor: AppColors.primaryOrange.withValues(alpha: 0.15),
+                ),
+                child: Slider(
+                  value: _priceBudget,
+                  min: 0,
+                  max: 1000,
+                  divisions: 50,
+                  onChanged: (val) {
+                    setState(() => _priceBudget = val);
+                  },
+                ),
               ),
             ],
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildSpecBadge(IconData icon, String label) {
-    return Row(
-      children: [
-        Icon(icon, size: 14, color: AppColors.primaryOrange),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey),
-        ),
-      ],
     );
   }
 

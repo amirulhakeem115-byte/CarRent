@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/booking_model.dart';
 import 'notification_service.dart';
 import 'vehicle_service.dart';
@@ -28,6 +29,19 @@ class BookingService {
 
   Future<List<BookingModel>> getBookings() async {
     List<BookingModel> bookings = [];
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    String currentRole = 'unknown';
+    if (currentUid != null) {
+      try {
+        final roleSnap = await FirebaseDatabase.instance.ref().child('users').child(currentUid).child('role').get().timeout(const Duration(seconds: 3));
+        if (roleSnap.exists) {
+          currentRole = roleSnap.value.toString();
+        }
+      } catch (_) {}
+    }
+    debugPrint('[BookingService] [getBookings] Accessing path: bookings');
+    debugPrint('[BookingService] [getBookings] Current UID: $currentUid, Current Role: $currentRole');
+
     try {
       final snapshot = await _db.get().timeout(const Duration(seconds: 10));
       if (snapshot.exists) {
@@ -36,8 +50,34 @@ class BookingService {
           bookings.add(BookingModel.fromMap(key.toString(), value as Map<dynamic, dynamic>));
         });
       }
+
+      // Auto-complete ongoing/active bookings that have passed their return date
+      final now = DateTime.now();
+      for (int i = 0; i < bookings.length; i++) {
+        final b = bookings[i];
+        if ((b.status == 'ongoing' || b.status == 'active') && b.returnDate.isBefore(now)) {
+          await updateBookingStatus(b.id, 'completed', b.userId, b.vehicleId, b.vehicleName);
+          bookings[i] = BookingModel(
+            id: b.id,
+            vehicleId: b.vehicleId,
+            vehicleName: b.vehicleName,
+            userId: b.userId,
+            userName: b.userName,
+            userPhone: b.userPhone,
+            pickUpDate: b.pickUpDate,
+            returnDate: b.returnDate,
+            totalPrice: b.totalPrice,
+            depositAmount: b.depositAmount,
+            status: 'completed',
+            notes: b.notes,
+            createdAt: b.createdAt,
+          );
+        }
+      }
+
+      debugPrint('[BookingService] [getBookings] Bookings count loaded: ${bookings.length}');
     } catch (e) {
-      debugPrint('Error getting bookings: $e');
+      debugPrint('[BookingService] [getBookings] Error getting bookings: $e');
       rethrow;
     }
     return bookings;
@@ -83,11 +123,11 @@ class BookingService {
         'updatedAt': DateTime.now().toIso8601String(),
       }).timeout(const Duration(seconds: 10));
 
-      // Update vehicle availability if booking is ongoing (false) or completed/cancelled (true)
-      if (status == 'ongoing') {
-        await _vehicleService.toggleAvailability(vehicleId, false);
+      // Update vehicle status in database based on booking transition
+      if (status == 'ongoing' || status == 'active' || status == 'approved') {
+        await _vehicleService.updateVehicleStatus(vehicleId, 'booked');
       } else if (status == 'completed' || status == 'cancelled' || status == 'rejected') {
-        await _vehicleService.toggleAvailability(vehicleId, true);
+        await _vehicleService.updateVehicleStatus(vehicleId, 'available');
       }
 
       // Create notification
@@ -99,9 +139,9 @@ class BookingService {
       } else if (status == 'rejected') {
         title = 'Booking Rejected';
         message = 'Your booking request for $vehicleName was not accepted.';
-      } else if (status == 'ongoing') {
+      } else if (status == 'ongoing' || status == 'active') {
         title = 'Rental Started';
-        message = 'Your rental for $vehicleName is now ongoing. Drive safely!';
+        message = 'Your rental for $vehicleName is now active. Drive safely!';
       } else if (status == 'completed') {
         title = 'Rental Completed';
         message = 'Your rental for $vehicleName is complete. Thank you for renting with us!';

@@ -10,11 +10,15 @@ class VehicleModel {
   final int seats;
   final double pricePerDay;
   final bool isAvailable;
+  final String status; // 'available', 'booked', 'maintenance'
   final String mainImage;
   final String description;
   final String createdAt;
   final String branchId;
   final String branchName;
+  
+  final String category;
+  final int mileage;
   
   // Custom specs for high-fidelity UI references
   final String engine;
@@ -37,9 +41,12 @@ class VehicleModel {
     required this.seats,
     required this.pricePerDay,
     required this.isAvailable,
+    this.status = 'available',
     required this.mainImage,
     required this.description,
     required this.createdAt,
+    this.category = 'Economy',
+    this.mileage = 25000,
     this.branchId = '',
     this.branchName = '',
     this.engine = 'M280',
@@ -108,21 +115,11 @@ class VehicleModel {
       }
     }
     if (parsedMaintenance.isEmpty) {
-      parsedMaintenance = [
-        {
-          'section': 'Broken Window',
-          'description': 'Replaced passenger side window after impact damage.',
-          'startDate': '2026-05-12',
-          'endDate': '2026-05-14',
-        },
-        {
-          'section': 'Engine Failure',
-          'description': 'Routine belt replacement and fuel pump calibration.',
-          'startDate': '2026-03-20',
-          'endDate': '2026-03-25',
-        }
-      ];
+      parsedMaintenance = [];
     }
+
+
+    final parsedStatus = data['status'] ?? (data['isAvailable'] == false ? 'booked' : 'available');
 
     return VehicleModel(
       id: id,
@@ -135,10 +132,13 @@ class VehicleModel {
       fuelType: data['fuelType'] ?? '',
       seats: data['seats'] ?? 4,
       pricePerDay: (data['pricePerDay'] ?? 0).toDouble(),
-      isAvailable: data['isAvailable'] ?? true,
+      isAvailable: parsedStatus == 'available',
+      status: parsedStatus,
       mainImage: data['mainImage'] ?? '',
       description: data['description'] ?? '',
       createdAt: data['createdAt'] ?? '',
+      category: data['category'] ?? 'Economy',
+      mileage: data['mileage'] ?? 25000,
       branchId: data['branchId'] ?? '',
       branchName: data['branchName'] ?? '',
       engine: data['engine'] ?? defaultEngine,
@@ -162,10 +162,13 @@ class VehicleModel {
       'fuelType': fuelType,
       'seats': seats,
       'pricePerDay': pricePerDay,
-      'isAvailable': isAvailable,
+      'isAvailable': status == 'available',
+      'status': status,
       'mainImage': mainImage,
       'description': description,
       'createdAt': createdAt,
+      'category': category,
+      'mileage': mileage,
       'branchId': branchId,
       'branchName': branchName,
       'engine': engine,

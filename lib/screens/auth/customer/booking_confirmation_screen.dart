@@ -6,6 +6,8 @@ import '../../../models/vehicle_model.dart';
 import '../../../widgets/custom_app_bar.dart';
 import 'home_screen.dart';
 
+import '../../../widgets/app_image.dart';
+
 class BookingConfirmationScreen extends StatelessWidget {
   final BookingModel booking;
   final VehicleModel vehicle;
@@ -108,12 +110,12 @@ class BookingConfirmationScreen extends StatelessWidget {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(16),
                   child: vehicle.mainImage.isNotEmpty
-                      ? Image.network(
-                          vehicle.mainImage,
+                      ? AppImage(
+                          imageSrc: vehicle.mainImage,
                           height: isDesktop ? 400 : 250,
                           width: double.infinity,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => Container(
+                          placeholder: Container(
                             height: 250,
                             color: Colors.grey[100],
                             child: const Icon(Icons.car_rental, size: 80, color: Colors.grey),

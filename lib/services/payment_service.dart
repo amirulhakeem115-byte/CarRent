@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/payment_model.dart';
 import 'notification_service.dart';
+import 'booking_service.dart';
 
 class PaymentService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref().child('payments');
@@ -29,6 +31,19 @@ class PaymentService {
 
   Future<List<PaymentModel>> getPayments() async {
     List<PaymentModel> payments = [];
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    String currentRole = 'unknown';
+    if (currentUid != null) {
+      try {
+        final roleSnap = await FirebaseDatabase.instance.ref().child('users').child(currentUid).child('role').get().timeout(const Duration(seconds: 3));
+        if (roleSnap.exists) {
+          currentRole = roleSnap.value.toString();
+        }
+      } catch (_) {}
+    }
+    debugPrint('[PaymentService] [getPayments] Accessing path: payments');
+    debugPrint('[PaymentService] [getPayments] Current UID: $currentUid, Current Role: $currentRole');
+
     try {
       final snapshot = await _db.get().timeout(const Duration(seconds: 10));
       if (snapshot.exists) {
@@ -37,8 +52,9 @@ class PaymentService {
           payments.add(PaymentModel.fromMap(key.toString(), value as Map<dynamic, dynamic>));
         });
       }
+      debugPrint('[PaymentService] [getPayments] Payments count loaded: ${payments.length}');
     } catch (e) {
-      debugPrint('Error getting payments: $e');
+      debugPrint('[PaymentService] [getPayments] Error getting payments: $e');
       rethrow;
     }
 
@@ -78,16 +94,49 @@ class PaymentService {
     return payments;
   }
 
-  Future<void> updatePaymentStatus(String paymentId, String status, String userId) async {
+  Future<void> updatePaymentStatus(String paymentId, String status, String userId, {String reason = '', String? verifiedBy}) async {
     try {
+      final isApproved = status == 'paid' || status == 'Approved';
+      final dbStatus = isApproved ? 'paid' : 'failed';
+      final dbPaymentStatus = isApproved ? 'Approved' : 'Rejected';
+
       await _db.child(paymentId).update({
-        'status': status,
+        'status': dbStatus,
+        'paymentStatus': dbPaymentStatus,
+        'verifiedAt': DateTime.now().toIso8601String(),
+        'verifiedBy': verifiedBy ?? 'admin',
+        'rejectionReason': isApproved ? '' : reason,
       }).timeout(const Duration(seconds: 10));
+
+      // Get payment record to extract booking ID and update booking automatically
+      final paySnap = await _db.child(paymentId).get().timeout(const Duration(seconds: 5));
+      if (paySnap.exists) {
+        final payData = paySnap.value as Map<dynamic, dynamic>;
+        final bookingId = payData['bookingId'] as String?;
+        if (bookingId != null && bookingId.isNotEmpty) {
+          final bookingSnap = await FirebaseDatabase.instance.ref().child('bookings').child(bookingId).get().timeout(const Duration(seconds: 5));
+          if (bookingSnap.exists) {
+            final bookingData = bookingSnap.value as Map<dynamic, dynamic>;
+            final vehicleId = bookingData['vehicleId'] as String?;
+            final vehicleName = bookingData['vehicleName'] as String?;
+            if (vehicleId != null && vehicleName != null) {
+              final bookingService = BookingService();
+              if (isApproved) {
+                await bookingService.updateBookingStatus(bookingId, 'approved', userId, vehicleId, vehicleName);
+              } else {
+                await bookingService.updateBookingStatus(bookingId, 'rejected', userId, vehicleId, vehicleName);
+              }
+            }
+          }
+        }
+      }
 
       await _notificationService.createNotification(
         userId: userId,
-        title: 'Payment Update',
-        message: 'Your transaction status has been updated to $status.',
+        title: isApproved ? 'Payment Verified Successfully' : 'Payment Rejected',
+        message: isApproved 
+            ? 'Your payment has been verified successfully.' 
+            : 'Your payment was rejected. Please upload a valid receipt.',
         type: 'payment',
       );
     } catch (e) {

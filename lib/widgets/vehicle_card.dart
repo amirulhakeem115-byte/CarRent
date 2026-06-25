@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/vehicle_model.dart';
 import '../constants/colors.dart';
 import '../screens/auth/customer/vehicle_details_screen.dart';
+import 'app_image.dart';
 
 /// A card widget to display vehicle details such as brand, model, price, transmission,
 /// fuel type, seats, and availability status.
@@ -25,15 +26,17 @@ class VehicleCard extends StatelessWidget {
         side: const BorderSide(color: AppColors.borderGray),
       ),
       child: InkWell(
-        onTap: onTap ??
-            () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => VehicleDetailsScreen(vehicle: vehicle),
-                ),
-              );
-            },
+        onTap: vehicle.status == 'available'
+            ? (onTap ??
+                () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => VehicleDetailsScreen(vehicle: vehicle),
+                    ),
+                  );
+                })
+            : null,
         borderRadius: BorderRadius.circular(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -43,54 +46,137 @@ class VehicleCard extends StatelessWidget {
               children: [
                 ClipRRect(
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                  child: vehicle.mainImage.isNotEmpty
-                      ? Image.network(
-                          vehicle.mainImage,
-                          height: 160,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => Container(
-                            height: 160,
-                            color: AppColors.lightGray,
-                            child: const Icon(
-                              Icons.directions_car_filled_rounded,
-                              size: 48,
-                              color: AppColors.lightText,
-                            ),
-                          ),
-                        )
-                      : Container(
-                          height: 160,
-                          color: AppColors.lightGray,
-                          child: const Icon(
-                            Icons.directions_car_filled_rounded,
-                            size: 48,
-                            color: AppColors.lightText,
-                          ),
-                        ),
-                ),
-                Positioned(
-                  top: 12,
-                  right: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: vehicle.isAvailable
-                          ? const Color(0xFF2ECC71).withValues(alpha: 0.9)
-                          : const Color(0xFFE74C3C).withValues(alpha: 0.9),
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: Text(
-                      vehicle.isAvailable ? 'AVAILABLE' : 'RENTED',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.5,
+                  child: AppImage(
+                    imageSrc: vehicle.mainImage,
+                    height: 160,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    placeholder: Container(
+                      height: 160,
+                      color: AppColors.lightGray,
+                      child: const Icon(
+                        Icons.directions_car_filled_rounded,
+                        size: 48,
+                        color: AppColors.lightText,
                       ),
                     ),
                   ),
                 ),
+                
+                // Status Overlay Over Vehicle Image
+                if (vehicle.status == 'available')
+                  Positioned(
+                    top: 12,
+                    left: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2ECC71), // Green Badge
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          const Text(
+                            'AVAILABLE',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else if (vehicle.status == 'booked') ...[
+                  // Dark overlay
+                  Positioned.fill(
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                      child: Container(
+                        color: Colors.black.withValues(alpha: 0.4),
+                      ),
+                    ),
+                  ),
+                  // Diagonal stamp
+                  Positioned.fill(
+                    child: Center(
+                      child: Transform.rotate(
+                        angle: -0.2, // diagonal angle
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: const Color(0xFFE74C3C), width: 3),
+                            borderRadius: BorderRadius.circular(8),
+                            color: Colors.black.withValues(alpha: 0.5),
+                          ),
+                          child: const Text(
+                            'BOOKED',
+                            style: TextStyle(
+                              color: Color(0xFFE74C3C),
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 2,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ] else if (vehicle.status == 'maintenance') ...[
+                  // Dark overlay
+                  Positioned.fill(
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                      child: Container(
+                        color: Colors.black.withValues(alpha: 0.4),
+                      ),
+                    ),
+                  ),
+                  // Diagonal stamp
+                  Positioned.fill(
+                    child: Center(
+                      child: Transform.rotate(
+                        angle: -0.2,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: const Color(0xFFE67E22), width: 3),
+                            borderRadius: BorderRadius.circular(8),
+                            color: Colors.black.withValues(alpha: 0.5),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.build, color: Color(0xFFE67E22), size: 16),
+                              SizedBox(width: 6),
+                              Text(
+                                'MAINTENANCE',
+                                style: TextStyle(
+                                  color: Color(0xFFE67E22),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
             // Details Section
@@ -166,14 +252,14 @@ class VehicleCard extends StatelessWidget {
                         ],
                       ),
                       ElevatedButton(
-                        onPressed: () {
+                        onPressed: vehicle.status == 'available' ? () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (context) => VehicleDetailsScreen(vehicle: vehicle),
                             ),
                           );
-                        },
+                        } : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primaryOrange,
                           foregroundColor: Colors.white,

@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'database_service.dart';
 
 class AuthService {
@@ -77,6 +78,79 @@ class AuthService {
     } catch (e) {
       debugPrint('[AUTH] AUTH FAILED — unknown error: $e');
       throw Exception('Login failed. Please check your internet connection and try again.');
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  GOOGLE SIGN-IN
+  // ─────────────────────────────────────────────────────────────
+  Future<UserCredential> signInWithGoogle() async {
+    debugPrint('[AUTH] GOOGLE SIGN-IN STARTED');
+    try {
+      UserCredential userCredential;
+      if (kIsWeb) {
+        // For Web, use Firebase Authentication popup directly
+        final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+        userCredential = await _auth.signInWithPopup(googleProvider).timeout(const Duration(seconds: 60));
+      } else {
+        // For Android, use google_sign_in package
+        final GoogleSignIn googleSignIn = GoogleSignIn();
+        final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+        if (googleUser == null) {
+          throw Exception('Google Sign-In was cancelled by the user.');
+        }
+        final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+        final AuthCredential credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
+        userCredential = await _auth.signInWithCredential(credential).timeout(const Duration(seconds: 30));
+      }
+      
+      final uid = userCredential.user!.uid;
+      final email = userCredential.user!.email ?? '';
+      final name = userCredential.user!.displayName ?? 'Google User';
+      final profilePhoto = userCredential.user!.photoURL ?? '';
+
+      debugPrint('[AUTH] GOOGLE SIGN-IN SUCCESS — uid: $uid, email: $email');
+
+      // Check if user already exists in database
+      final existingUser = await _databaseService.getUser(uid);
+      if (existingUser == null) {
+        debugPrint('[AUTH] FIRST TIME GOOGLE USER, SAVING PROFILE — uid: $uid');
+        // Save to Firebase Realtime Database
+        // Save: uid, name, email, profilePhoto, role = customer, createdAt
+        await _databaseService.saveGoogleUser(
+          uid: uid,
+          name: name,
+          email: email,
+          profilePhoto: profilePhoto,
+        );
+      } else {
+        debugPrint('[AUTH] EXISTING GOOGLE USER — uid: $uid, role: ${existingUser.role}');
+        // Loaded existing data, do not overwrite role.
+      }
+      
+      // Fetch user profile again to get correct/latest role
+      final finalUser = await _databaseService.getUser(uid);
+      final role = finalUser?.role ?? 'customer';
+      
+      // ADD DEBUG LOGS: uid, email, role
+      debugPrint('[AUTH] GOOGLE SIGN-IN DEBUG LOGS:');
+      debugPrint('[AUTH]   - uid: $uid');
+      debugPrint('[AUTH]   - email: $email');
+      debugPrint('[AUTH]   - role: $role');
+      
+      return userCredential;
+    } on FirebaseAuthException catch (e) {
+      debugPrint('[AUTH] GOOGLE SIGN-IN FAILED — code: ${e.code}, message: ${e.message}');
+      throw _handleAuthException(e);
+    } catch (e) {
+      debugPrint('[AUTH] GOOGLE SIGN-IN FAILED — unknown error: $e');
+      if (e.toString().contains('cancelled') || e.toString().contains('canceled')) {
+        throw Exception('Google Sign-In was cancelled.');
+      }
+      throw Exception('Google Sign-In failed. Please try again.');
     }
   }
 

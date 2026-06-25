@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/foundation.dart';
 import '../../../constants/colors.dart';
 import '../../../models/vehicle_model.dart';
 import '../../../models/booking_model.dart';
@@ -11,6 +13,10 @@ import '../../../services/auth_service.dart';
 import '../../../services/database_service.dart';
 import 'booking_confirmation_screen.dart';
 import '../../../widgets/loading_widget.dart';
+import '../../../widgets/app_image.dart';
+import '../../../services/receipt_upload_helper.dart'
+    if (dart.library.html) '../../../services/receipt_upload_web.dart'
+    as receipt_upload;
 
 class BookingScreen extends StatefulWidget {
   final VehicleModel vehicle;
@@ -39,6 +45,13 @@ class _BookingScreenState extends State<BookingScreen> {
   String? _userName;
   String? _userPhone;
 
+  bool _qrEnabled = true;
+  String? _qrCodeUrl;
+  String? _bankName;
+  String? _accountName;
+  String? _accountNumber;
+  String? _bankLogoUrl;
+
   final List<String> _fpxBanks = [
     'Maybank2u',
     'CIMB Clicks',
@@ -51,6 +64,30 @@ class _BookingScreenState extends State<BookingScreen> {
   void initState() {
     super.initState();
     _loadUserProfile();
+    _loadQrSettings();
+    receipt_upload.registerPlatformDropzone();
+  }
+
+  Future<void> _loadQrSettings() async {
+    try {
+      final settings = await _databaseService.getQrPaymentSettings().timeout(const Duration(seconds: 5));
+      if (settings != null) {
+        setState(() {
+          _qrEnabled = settings['isEnabled'] ?? true;
+          _qrCodeUrl = settings['qrCodeBase64'] ?? settings['qrCodeUrl'];
+          _bankName = settings['bankName'];
+          _accountName = settings['accountName'];
+          _accountNumber = settings['accountNumber'];
+          _bankLogoUrl = settings['bankLogoUrl'];
+          
+          if (!_qrEnabled && _paymentMethod == 'DuitNow QR') {
+            _paymentMethod = 'FPX Online Banking';
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading QR settings: $e');
+    }
   }
 
   Future<void> _loadUserProfile() async {
@@ -166,89 +203,335 @@ class _BookingScreenState extends State<BookingScreen> {
     } else {
       _showCashConfirmationDialog();
     }
-  }
-
-  // DUITNOW QR payment flow
-  void _showDuitNowDialog() {
+  }  void _showDuitNowDialog() {
     final payAmount = _paymentOption == 'Deposit' ? _depositAmount : _totalPrice;
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Pay via DuitNow QR', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('Scan the QR code below to complete the deposit payment transfer.', textAlign: TextAlign.center),
-                const SizedBox(height: 20),
-                // Stylized high-fidelity representation of DuitNow QR
-                Container(
-                  width: 200,
-                  height: 200,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: Colors.grey[200]!, width: 2),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    children: [
-                      Container(
-                        color: Colors.pink,
-                        width: double.infinity,
-                        height: 30,
-                        alignment: Alignment.center,
-                        child: const Text('DuitNow QR', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10)),
-                      ),
-                      const Expanded(
-                        child: Icon(Icons.qr_code_2, size: 120, color: Colors.black),
-                      ),
-                      Text('RM ${payAmount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Upload/Paste your DuitNow Transaction Reference ID below:',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _txnIdController,
-                  decoration: const InputDecoration(
-                    hintText: 'e.g., Ref: 123456789012',
-                    labelText: 'Transaction Reference ID',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('CANCEL'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryOrange),
-              onPressed: () {
-                if (_txnIdController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please enter the DuitNow reference ID.')),
-                  );
-                  return;
+        bool hasPaid = false;
+        String? receiptBase64;
+        String? receiptName;
+        int? receiptSize;
+        String? errorMsg;
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            // Register callback to update dialog state
+            receipt_upload.onReceiptUploadedCallback = (String base64, String name, int size) {
+              setDialogState(() {
+                if (base64 == 'error:size' || size > 10 * 1024 * 1024) {
+                  errorMsg = 'File size exceeds 10MB limit.';
+                  receiptBase64 = null;
+                  receiptName = null;
+                  receiptSize = null;
+                } else if (base64 == 'error:format') {
+                  errorMsg = 'Invalid file format. Only JPG, JPEG, PNG, and PDF are accepted.';
+                  receiptBase64 = null;
+                  receiptName = null;
+                  receiptSize = null;
+                } else {
+                  errorMsg = null;
+                  receiptBase64 = base64;
+                  receiptName = name;
+                  receiptSize = size;
                 }
-                Navigator.pop(context);
-                _processBooking(status: 'pending', txId: _txnIdController.text.trim());
-              },
-              child: const Text('VERIFY PAYMENT', style: TextStyle(color: Colors.white)),
-            ),
-          ],
+              });
+            };
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Text(
+                hasPaid ? 'Upload Transaction Receipt' : 'Pay via DuitNow QR',
+                style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!hasPaid) ...[
+                      const Text('Scan the QR code or transfer to the bank account below to complete the deposit payment transfer.', textAlign: TextAlign.center),
+                      const SizedBox(height: 20),
+                      if (_qrCodeUrl != null && _qrCodeUrl!.isNotEmpty)
+                        Container(
+                          width: 200,
+                          height: 200,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            border: Border.all(color: Colors.grey[200]!, width: 2),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            children: [
+                              Container(
+                                color: Colors.pink,
+                                width: double.infinity,
+                                height: 30,
+                                alignment: Alignment.center,
+                                child: const Text('DuitNow QR', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10)),
+                              ),
+                              Expanded(
+                                child: AppImage(
+                                  imageSrc: _qrCodeUrl,
+                                  fit: BoxFit.contain,
+                                  placeholder: const Icon(Icons.qr_code_2, size: 120, color: Colors.black),
+                                ),
+                              ),
+                              Text('RM ${payAmount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                            ],
+                          ),
+                        )
+                      else
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.qr_code_2, size: 100, color: Colors.grey),
+                        ),
+                      const SizedBox(height: 16),
+                      if (_bankName != null && _bankName!.isNotEmpty) ...[
+                        const Divider(),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Bank Name:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_bankLogoUrl != null && _bankLogoUrl!.isNotEmpty) ...[
+                                  AppImage(
+                                    imageSrc: _bankLogoUrl!,
+                                    height: 18,
+                                    placeholder: const SizedBox(),
+                                  ),
+                                  const SizedBox(width: 6),
+                                ],
+                                Text(_bankName!, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Account Name:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                            Text(_accountName ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Account Number:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                            Text(_accountNumber ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        const Divider(),
+                      ],
+                    ] else ...[
+                      // Drag & Drop / Upload Panel
+                      const Text(
+                        'Please upload a copy of your transaction receipt to proceed with payment verification.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 13, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // Platform Specific File Dropzone / Selector
+                      if (kIsWeb) ...[
+                        Container(
+                          height: 150,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey[300]!),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const HtmlElementView(viewType: 'receipt-dropzone'),
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final file = await receipt_upload.pickReceiptFile();
+                            if (file != null) {
+                              setDialogState(() {
+                                if (file.base64Data == 'error:size' || file.size > 10 * 1024 * 1024) {
+                                  errorMsg = 'File size exceeds 10MB limit.';
+                                  receiptBase64 = null;
+                                } else {
+                                  errorMsg = null;
+                                  receiptBase64 = file.base64Data;
+                                  receiptName = file.name;
+                                  receiptSize = file.size;
+                                }
+                              });
+                            }
+                          },
+                          icon: const Icon(Icons.file_open),
+                          label: const Text('Browse Files'),
+                        ),
+                      ] else ...[
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.secondaryBlue,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: () async {
+                            final file = await receipt_upload.pickReceiptFile();
+                            if (file != null) {
+                              setDialogState(() {
+                                if (file.base64Data == 'error:size' || file.size > 10 * 1024 * 1024) {
+                                  errorMsg = 'File size exceeds 10MB limit.';
+                                  receiptBase64 = null;
+                                } else {
+                                  errorMsg = null;
+                                  receiptBase64 = file.base64Data;
+                                  receiptName = file.name;
+                                  receiptSize = file.size;
+                                }
+                              });
+                            }
+                          },
+                          icon: const Icon(Icons.file_upload),
+                          label: const Text('SELECT RECEIPT FILE'),
+                        ),
+                      ],
+                      
+                      const SizedBox(height: 16),
+                      if (errorMsg != null)
+                        Text(
+                          errorMsg!,
+                          style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center,
+                        ),
+                      
+                      // Preview Box
+                      if (receiptBase64 != null) ...[
+                        const SizedBox(height: 12),
+                        const Text('Receipt Preview:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.secondaryBlue)),
+                        const SizedBox(height: 8),
+                        Container(
+                          height: 140,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey[200]!),
+                            borderRadius: BorderRadius.circular(12),
+                            color: Colors.grey[50],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: receiptName!.toLowerCase().endsWith('.pdf') || receiptBase64!.startsWith('data:application/pdf')
+                                ? Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(Icons.picture_as_pdf, color: Colors.redAccent, size: 54),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        receiptName ?? 'Receipt.pdf',
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      if (receiptSize != null)
+                                        Text(
+                                          '${(receiptSize! / 1024 / 1024).toStringAsFixed(2)} MB',
+                                          style: const TextStyle(fontSize: 10, color: Colors.grey),
+                                        ),
+                                    ],
+                                  )
+                                : Image.memory(
+                                    base64Decode(receiptBase64!.split(',').last),
+                                    fit: BoxFit.contain,
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextButton.icon(
+                          onPressed: () {
+                            setDialogState(() {
+                              receiptBase64 = null;
+                              receiptName = null;
+                              receiptSize = null;
+                              errorMsg = null;
+                            });
+                          },
+                          icon: const Icon(Icons.delete, color: Colors.redAccent, size: 16),
+                          label: const Text('Remove File', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Paste your DuitNow Reference ID (if available):',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _txnIdController,
+                        decoration: const InputDecoration(
+                          hintText: 'e.g., Ref: 123456789012',
+                          labelText: 'Transaction Reference ID',
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                if (!hasPaid) ...[
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('CANCEL'),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryOrange),
+                    onPressed: () {
+                      setDialogState(() {
+                        hasPaid = true;
+                      });
+                    },
+                    child: const Text('I HAVE PAID', style: TextStyle(color: Colors.white)),
+                  ),
+                ] else ...[
+                  TextButton(
+                    onPressed: () {
+                      setDialogState(() {
+                        hasPaid = false;
+                      });
+                    },
+                    child: const Text('BACK'),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryOrange),
+                    onPressed: receiptBase64 == null
+                        ? null
+                        : () {
+                            final txId = _txnIdController.text.trim().isNotEmpty
+                                ? _txnIdController.text.trim()
+                                : 'QR-REF-${DateTime.now().millisecondsSinceEpoch}';
+                            Navigator.pop(context);
+                            _processBooking(
+                              status: 'pending',
+                              txId: txId,
+                              receiptImage: receiptBase64,
+                            );
+                          },
+                    child: const Text('SUBMIT TRANSACTION', style: TextStyle(color: Colors.white)),
+                  ),
+                ],
+              ],
+            );
+          },
         );
       },
     );
   }
-
   // FPX Online Banking payment flow
   void _showFPXDialog() {
     showDialog(
@@ -369,7 +652,11 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   // Core Booking processor
-  Future<void> _processBooking({required String status, required String txId}) async {
+  Future<void> _processBooking({
+    required String status,
+    required String txId,
+    String? receiptImage,
+  }) async {
     final currentUser = _authService.currentUser;
     if (currentUser == null || _userName == null) return;
 
@@ -389,7 +676,7 @@ class _BookingScreenState extends State<BookingScreen> {
         returnDate: _returnDate!,
         totalPrice: _totalPrice,
         depositAmount: _depositAmount,
-        status: status == 'paid' ? 'approved' : 'pending',
+        status: 'pending', // Pending initially, approved only on payment verification
         notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
         createdAt: DateTime.now(),
       );
@@ -407,9 +694,14 @@ class _BookingScreenState extends State<BookingScreen> {
         depositAmount: _depositAmount,
         balanceAmount: _paymentOption == 'Deposit' ? _balanceAmount : 0.0,
         paymentMethod: _paymentMethod,
-        status: status,
+        status: receiptImage != null ? 'Pending Verification' : status,
+        paymentStatus: receiptImage != null ? 'Pending Verification' : (status == 'paid' ? 'Approved' : 'Pending Verification'),
         transactionId: txId,
         paymentDate: DateTime.now(),
+        receiptImage: receiptImage,
+        receiptFile: receiptImage,
+        uploadedAt: receiptImage != null ? DateTime.now().toIso8601String() : null,
+        customerUid: currentUser.uid,
       );
 
       await _paymentService.createPayment(payment);
@@ -480,25 +772,18 @@ class _BookingScreenState extends State<BookingScreen> {
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(12),
-                            child: widget.vehicle.mainImage.isNotEmpty
-                                ? Image.network(
-                                    widget.vehicle.mainImage,
-                                    height: 80,
-                                    width: 100,
-                                    fit: BoxFit.cover,
-                                     errorBuilder: (_, _, _) => Container(
-                                      height: 80,
-                                      width: 100,
-                                      color: Colors.grey[200],
-                                      child: const Icon(Icons.car_rental, color: Colors.grey),
-                                    ),
-                                  )
-                                : Container(
-                                    height: 80,
-                                    width: 100,
-                                    color: Colors.grey[200],
-                                    child: const Icon(Icons.car_rental, color: Colors.grey),
-                                  ),
+                            child: AppImage(
+                              imageSrc: widget.vehicle.mainImage,
+                              height: 80,
+                              width: 100,
+                              fit: BoxFit.cover,
+                              placeholder: Container(
+                                height: 80,
+                                width: 100,
+                                color: Colors.grey[200],
+                                child: const Icon(Icons.car_rental, color: Colors.grey),
+                              ),
+                            ),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
@@ -652,7 +937,7 @@ class _BookingScreenState extends State<BookingScreen> {
                         child: DropdownButton<String>(
                           value: _paymentMethod,
                           underline: const SizedBox(),
-                          items: ['DuitNow QR', 'FPX Online Banking', 'Cash'].map((val) {
+                          items: (_qrEnabled ? ['DuitNow QR', 'FPX Online Banking', 'Cash'] : ['FPX Online Banking', 'Cash']).map((val) {
                             return DropdownMenuItem(
                               value: val,
                               child: Text(val, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),

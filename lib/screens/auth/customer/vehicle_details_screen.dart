@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import '../../../models/vehicle_model.dart';
 import '../../../models/review_model.dart';
+import '../../../models/user_model.dart';
+import '../../../models/maintenance_job_model.dart';
 import '../../../services/review_service.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/database_service.dart';
+import '../../../services/maintenance_service.dart';
 import '../../../constants/colors.dart';
 import '../../../widgets/custom_app_bar.dart';
 import 'booking_screen.dart';
 import 'profile_screen.dart';
+import '../../../widgets/app_image.dart';
 
 class VehicleDetailsScreen extends StatefulWidget {
   final VehicleModel vehicle;
@@ -26,7 +30,8 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
   List<ReviewModel> _reviews = [];
   double _avgRating = 0.0;
   bool _loadingReviews = true;
-  bool _isUserVerified = false;
+  UserModel? _userModel;
+  List<MaintenanceJobModel> _maintenanceJobs = [];
   
   // Selected gallery image index
   int _selectedImageIndex = 0;
@@ -44,15 +49,18 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
       _reviews = await _reviewService.getVehicleReviews(widget.vehicle.id).timeout(const Duration(seconds: 10));
       _avgRating = await _reviewService.getAverageRating(widget.vehicle.id).timeout(const Duration(seconds: 10));
       
+      final jobs = await MaintenanceService().getMaintenanceJobs().timeout(const Duration(seconds: 10));
+      _maintenanceJobs = jobs.where((job) => job.vehicleId == widget.vehicle.id && job.showToCustomer).toList();
+
       final currentUser = _authService.currentUser;
       if (currentUser != null) {
         final profile = await _databaseService.getUser(currentUser.uid).timeout(const Duration(seconds: 10));
         if (profile != null) {
-          _isUserVerified = profile.isVerified;
+          _userModel = profile;
         }
       }
     } catch (e) {
-      debugPrint('Error loading vehicle details/reviews: $e');
+      debugPrint('Error loading vehicle details/reviews/maintenance: $e');
     } finally {
       if (mounted) {
         setState(() => _loadingReviews = false);
@@ -60,8 +68,25 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
     }
   }
 
+
   void _handleBookNow() {
-    if (!_isUserVerified) {
+    final currentUser = _authService.currentUser;
+    final uid = currentUser?.uid;
+    final isVerified = _userModel?.isVerified ?? false;
+    final licenseNumber = _userModel?.licenseNumber;
+    final hasLicenseImage = _userModel?.licenseImage != null && _userModel!.licenseImage.isNotEmpty;
+    final approvalStatus = _userModel?.licenseStatus ?? 'unprovided';
+
+    debugPrint('[BookingValidation] User Verification Check:');
+    debugPrint('[BookingValidation]   - uid: $uid');
+    debugPrint('[BookingValidation]   - isVerified: $isVerified');
+    debugPrint('[BookingValidation]   - licenseNumber: $licenseNumber');
+    debugPrint('[BookingValidation]   - licenseImage exists: $hasLicenseImage');
+    debugPrint('[BookingValidation]   - approvalStatus: $approvalStatus');
+
+    final bool canBook = isVerified || (hasLicenseImage && approvalStatus != 'rejected' && approvalStatus != 'unprovided');
+
+    if (!canBook) {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
@@ -152,12 +177,12 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                           children: [
                             ClipRRect(
                               borderRadius: BorderRadius.circular(16),
-                              child: Image.network(
-                                imagesList[_selectedImageIndex],
+                             child: AppImage(
+                                imageSrc: imagesList[_selectedImageIndex],
                                 height: 380,
                                 width: double.infinity,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, _, _) => Container(
+                                placeholder: Container(
                                   height: 380,
                                   color: Colors.grey[200],
                                   child: const Icon(Icons.car_rental, size: 80, color: Colors.grey),
@@ -210,10 +235,10 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                                   ),
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(6),
-                                    child: Image.network(
-                                      imagesList[index],
+                                    child: AppImage(
+                                      imageSrc: imagesList[index],
                                       fit: BoxFit.cover,
-                                      errorBuilder: (_, _, _) => Container(
+                                      placeholder: Container(
                                         color: Colors.grey[100],
                                         child: const Icon(Icons.directions_car, size: 24, color: Colors.grey),
                                       ),
@@ -294,50 +319,67 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue),
                         ),
                         const SizedBox(height: 12),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey[200]!),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Table(
-                              columnWidths: const {
-                                0: FlexColumnWidth(1.2),
-                                1: FlexColumnWidth(2.5),
-                                2: FlexColumnWidth(1),
-                                3: FlexColumnWidth(1),
-                              },
-                              children: [
-                                // Table Header matching orange/gold mockup header
-                                TableRow(
-                                  decoration: const BoxDecoration(color: AppColors.primaryOrange),
-                                  children: [
-                                    _buildTableHeaderCell('MAINTENANCE SECTION'),
-                                    _buildTableHeaderCell('DESCRIPTION'),
-                                    _buildTableHeaderCell('START DATE'),
-                                    _buildTableHeaderCell('END DATE'),
-                                  ],
+                        _maintenanceJobs.isEmpty
+                            ? Container(
+                                padding: const EdgeInsets.all(24),
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.grey[200]!),
+                                  borderRadius: BorderRadius.circular(16),
+                                  color: Colors.grey[50],
                                 ),
-                                // Table Rows from parsed model maintenance records
-                                ...widget.vehicle.maintenance.map((record) {
-                                  return TableRow(
-                                    decoration: const BoxDecoration(
-                                      border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
-                                    ),
+                                child: const Center(
+                                  child: Text(
+                                    'No maintenance history available for this vehicle.',
+                                    style: TextStyle(color: Colors.grey, fontSize: 13),
+                                  ),
+                                ),
+                              )
+                            : ClipRRect(
+                                borderRadius: BorderRadius.circular(16),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.grey[200]!),
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Table(
+                                    columnWidths: const {
+                                      0: FlexColumnWidth(1.5),
+                                      1: FlexColumnWidth(2.5),
+                                      2: FlexColumnWidth(1),
+                                      3: FlexColumnWidth(1),
+                                    },
                                     children: [
-                                      _buildTableCell(record['section'] ?? '', isSection: true),
-                                      _buildTableCell(record['description'] ?? ''),
-                                      _buildTableCell(record['startDate'] ?? ''),
-                                      _buildTableCell(record['endDate'] ?? ''),
+                                      // Table Header matching orange/gold mockup header
+                                      TableRow(
+                                        decoration: const BoxDecoration(color: AppColors.primaryOrange),
+                                        children: [
+                                          _buildTableHeaderCell('SERVICE TYPE'),
+                                          _buildTableHeaderCell('NOTES / REMARKS'),
+                                          _buildTableHeaderCell('DATE'),
+                                          _buildTableHeaderCell('STATUS'),
+                                        ],
+                                      ),
+                                      // Table Rows from parsed model maintenance records
+                                      ..._maintenanceJobs.map((record) {
+                                        return TableRow(
+                                          decoration: const BoxDecoration(
+                                            border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+                                          ),
+                                          children: [
+                                            _buildTableCell(record.serviceType, isSection: true),
+                                            _buildTableCell(record.notes.isNotEmpty ? record.notes : 'N/A'),
+                                            _buildTableCell(record.date),
+                                            _buildTableCell(record.status),
+                                          ],
+                                        );
+                                      }),
                                     ],
-                                  );
-                                }),
-                              ],
-                            ),
-                          ),
-                        ),
+                                  ),
+                                ),
+                              ),
                         const SizedBox(height: 48),
+
                       ],
                     ),
                   ),
@@ -420,10 +462,12 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                             children: [
                               _buildSpecCard('GEAR BOX', widget.vehicle.transmission, Icons.settings),
                               _buildSpecCard('ENGINE', widget.vehicle.engine, Icons.offline_bolt_outlined),
-                              _buildSpecCard('COLOR', widget.vehicle.color, Icons.palette_outlined),
+                              _buildSpecCard('FUEL TYPE', widget.vehicle.fuelType, Icons.local_gas_station_outlined),
+                              _buildSpecCard('SEATS', '${widget.vehicle.seats} Seats', Icons.airline_seat_recline_normal),
+                              _buildSpecCard('MILEAGE', '${widget.vehicle.mileage} km', Icons.speed),
+                              _buildSpecCard('YEAR', '${widget.vehicle.year}', Icons.calendar_today_outlined),
                               _buildSpecCard('AC', widget.vehicle.ac ? 'Yes' : 'No', Icons.ac_unit_outlined),
-                              _buildSpecCard('SEATS', '${widget.vehicle.seats}', Icons.airline_seat_recline_normal),
-                              _buildSpecCard('CONDITION', widget.vehicle.condition, Icons.verified_outlined),
+                              _buildSpecCard('COLOR', widget.vehicle.color, Icons.palette_outlined),
                             ],
                           ),
                           const SizedBox(height: 24),
@@ -472,9 +516,13 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                 elevation: 0,
                               ),
-                              onPressed: widget.vehicle.isAvailable ? _handleBookNow : null,
+                              onPressed: widget.vehicle.status == 'available' ? _handleBookNow : null,
                               child: Text(
-                                widget.vehicle.isAvailable ? 'Rent Now' : 'NOT AVAILABLE',
+                                widget.vehicle.status == 'booked'
+                                    ? 'Currently Booked'
+                                    : widget.vehicle.status == 'maintenance'
+                                        ? 'Under Maintenance'
+                                        : 'Rent Now',
                                 style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
                               ),
                             ),

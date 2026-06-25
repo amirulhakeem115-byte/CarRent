@@ -9,11 +9,16 @@ class UserModel {
   final String? licenseNumber;
   final String licenseImage;
   final bool isVerified;
+  final bool isActive;
+  final String licenseStatus; // 'unprovided', 'pending', 'approved', 'rejected'
+  final String licenseRejectionReason;
   
   // High fidelity visual fields
   final String address;
   final String licenseClass;
   final String licenseExpiry;
+
+  bool get isAdmin => role == 'admin';
 
   UserModel({
     required this.id,
@@ -26,6 +31,9 @@ class UserModel {
     this.licenseNumber,
     this.licenseImage = '',
     this.isVerified = false,
+    this.isActive = true,
+    this.licenseStatus = 'unprovided',
+    this.licenseRejectionReason = '',
     this.address = '4521 Oakwood Avenue, Suite 300, Los Angeles, CA 90024',
     this.licenseClass = 'Class DA',
     this.licenseExpiry = '12 / 2028',
@@ -37,7 +45,7 @@ class UserModel {
   ) {
     return UserModel(
       id: id,
-      fullName: data['fullName'] ?? '',
+      fullName: data['fullName'] ?? data['name'] ?? 'User',
       email: data['email'] ?? '',
       phone: data['phone'] ?? '',
       role: data['role'] ?? 'customer',
@@ -46,6 +54,12 @@ class UserModel {
       licenseNumber: data['licenseNumber'],
       licenseImage: data['licenseImage'] ?? '',
       isVerified: data['isVerified'] ?? false,
+      isActive: data['isActive'] ?? true,
+      licenseStatus: data['licenseStatus'] ?? 
+          ((data['licenseImage'] != null && (data['licenseImage'] as String).trim().isNotEmpty)
+              ? (data['isVerified'] == true ? 'approved' : 'pending')
+              : 'unprovided'),
+      licenseRejectionReason: data['licenseRejectionReason'] ?? '',
       address: data['address'] ?? '4521 Oakwood Avenue, Suite 300, Los Angeles, CA 90024',
       licenseClass: data['licenseClass'] ?? 'Class DA',
       licenseExpiry: data['licenseExpiry'] ?? '12 / 2028',
@@ -63,6 +77,9 @@ class UserModel {
       'licenseNumber': licenseNumber,
       'licenseImage': licenseImage,
       'isVerified': isVerified,
+      'isActive': isActive,
+      'licenseStatus': licenseStatus,
+      'licenseRejectionReason': licenseRejectionReason,
       'address': address,
       'licenseClass': licenseClass,
       'licenseExpiry': licenseExpiry,

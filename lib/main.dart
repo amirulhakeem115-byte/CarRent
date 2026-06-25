@@ -29,7 +29,7 @@ Future<void> main() async {
             ? WebDebugProvider(debugToken: webDebugToken)
             : ReCaptchaV3Provider('6LeBqystAAAAAJS3i4iO7I6aKG8uh-Dt4NgpET8J'),
         providerAndroid: kDebugMode
-            ? AndroidDebugProvider()
+            ? AndroidDebugProvider(debugToken: webDebugToken)
             : AndroidPlayIntegrityProvider(),
         providerApple: kDebugMode
             ? AppleDebugProvider()

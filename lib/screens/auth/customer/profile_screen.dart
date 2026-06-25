@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -10,8 +11,16 @@ import '../../../services/review_service.dart';
 import '../../../models/user_model.dart';
 import '../../../models/booking_model.dart';
 import '../../../models/review_model.dart';
+import '../../../models/payment_model.dart';
+import 'package:flutter/foundation.dart';
+import 'package:firebase_database/firebase_database.dart';
+import '../../../services/receipt_upload_helper.dart'
+    if (dart.library.html) '../../../services/receipt_upload_web.dart'
+    as receipt_upload;
 import '../../../widgets/custom_app_bar.dart';
 import '../../../widgets/loading_widget.dart';
+import '../../../widgets/app_image.dart';
+import '../login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -29,6 +38,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   UserModel? _user;
   List<BookingModel> _bookings = [];
+  List<PaymentModel> _payments = [];
   bool _loading = true;
   String? _error;
 
@@ -39,6 +49,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _loadProfileData();
+    receipt_upload.registerPlatformDropzone();
   }
 
   Future<void> _loadProfileData() async {
@@ -58,12 +69,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ]).timeout(const Duration(seconds: 10));
         _user = results[0] as UserModel?;
         _bookings = results[1] as List<BookingModel>;
+        _payments = results[2] as List<PaymentModel>;
       }
     } catch (e) {
       debugPrint('Error loading profile: $e');
-      setState(() {
-        _error = 'Failed to load profile details. Please try again.';
-      });
+      if (mounted) {
+        setState(() {
+          _error = 'Failed to load profile details. Please try again.';
+        });
+      }
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -71,18 +85,117 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _showImagePreviewDialog({
+    required Uint8List imageBytes,
+    required String title,
+    required Future<void> Function() onSave,
+  }) async {
+    bool isSaving = false;
+    String? errorMessage;
+    
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    height: 200,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey[300]!),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.memory(imageBytes, fit: BoxFit.cover),
+                    ),
+                  ),
+                  if (errorMessage != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      errorMessage!,
+                      style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                  if (isSaving) ...[
+                    const SizedBox(height: 16),
+                    const CircularProgressIndicator(color: AppColors.primaryOrange),
+                    const SizedBox(height: 8),
+                    const Text('Saving...', style: TextStyle(color: Colors.grey)),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSaving ? null : () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.secondaryBlue,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: isSaving
+                      ? null
+                      : () async {
+                          setDialogState(() {
+                            isSaving = true;
+                            errorMessage = null;
+                          });
+                          try {
+                            await onSave();
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                            }
+                          } catch (e) {
+                            setDialogState(() {
+                              isSaving = false;
+                              errorMessage = 'Save failed: $e';
+                            });
+                          }
+                        },
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _pickProfileImage() async {
     if (_user == null) return;
     try {
-      final pickedFile = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+      final pickedFile = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 35,
+        maxWidth: 600,
+        maxHeight: 600,
+      );
       if (pickedFile != null) {
-        final dummyUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200';
-        await _databaseService.updateUser(_user!.id, {'profileImage': dummyUrl});
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile photo updated successfully'), backgroundColor: Colors.green),
+        final bytes = await pickedFile.readAsBytes();
+        await _showImagePreviewDialog(
+          imageBytes: bytes,
+          title: 'Preview Profile Photo',
+          onSave: () async {
+            final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+            await _databaseService.updateUser(_user!.id, {'profileImage': base64Image});
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Profile photo updated successfully'), backgroundColor: Colors.green),
+            );
+            _loadProfileData();
+          },
         );
-        _loadProfileData();
       }
     } catch (e) {
       debugPrint('Profile photo pick error: $e');
@@ -92,18 +205,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _pickLicenseImage() async {
     if (_user == null) return;
     try {
-      final pickedFile = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+      final pickedFile = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 35,
+        maxWidth: 600,
+        maxHeight: 600,
+      );
       if (pickedFile != null) {
-        final dummyUrl = 'https://images.unsplash.com/photo-1554774853-aae0a22c8aa4?auto=format&fit=crop&q=80&w=400';
-        await _databaseService.updateUser(_user!.id, {
-          'licenseImage': dummyUrl,
-          'isVerified': false,
-        });
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Driving License uploaded and is awaiting approval'), backgroundColor: AppColors.primaryOrange),
+        final bytes = await pickedFile.readAsBytes();
+        await _showImagePreviewDialog(
+          imageBytes: bytes,
+          title: 'Preview Driver License',
+          onSave: () async {
+            final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+            await _databaseService.updateUser(_user!.id, {
+              'licenseImage': base64Image,
+              'isVerified': false,
+              'licenseStatus': 'pending',
+              'licenseRejectionReason': '',
+            });
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Driving License uploaded and is awaiting approval'), backgroundColor: AppColors.primaryOrange),
+            );
+            _loadProfileData();
+          },
         );
-        _loadProfileData();
       }
     } catch (e) {
       debugPrint('License pick error: $e');
@@ -354,10 +481,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               CircleAvatar(
                                 radius: 36,
                                 backgroundColor: AppColors.secondaryBlue.withValues(alpha: 0.1),
-                                backgroundImage: _user?.profileImage.isNotEmpty == true
-                                    ? NetworkImage(_user!.profileImage)
-                                    : null,
-                                child: _user?.profileImage.isNotEmpty != true
+                                backgroundImage: getAppImageProvider(_user?.profileImage),
+                                child: _user?.profileImage.isNotEmpty != true || getAppImageProvider(_user?.profileImage) == null
                                     ? const Icon(Icons.person, size: 36, color: AppColors.secondaryBlue)
                                     : null,
                               ),
@@ -395,17 +520,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ],
                           ),
                         ),
-                        // Edit profile button with pencil icon
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.secondaryBlue,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          ),
-                          icon: const Icon(Icons.edit, size: 16),
-                          label: const Text('Edit Profile', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                          onPressed: _showEditProfileDialog,
+                        // Edit profile and logout buttons row
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.secondaryBlue,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              ),
+                              icon: const Icon(Icons.edit, size: 16),
+                              label: const Text('Edit Profile', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              onPressed: _showEditProfileDialog,
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.redAccent,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              ),
+                              icon: const Icon(Icons.logout, size: 16),
+                              label: const Text('Logout', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              onPressed: () async {
+                                final nav = Navigator.of(context);
+                                await _authService.logout();
+                                nav.pushAndRemoveUntil(
+                                  MaterialPageRoute(builder: (context) => const LoginScreen()),
+                                  (route) => false,
+                                );
+                              },
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -439,7 +588,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               icon: Icons.badge_outlined,
                               children: [
                                 _buildDetailRow('LICENSE CLASS', _user?.licenseClass ?? 'Class DA'),
-                                Row(
+                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
                                     const Text(
@@ -449,15 +598,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: _user != null && _user!.isVerified
-                                            ? Colors.green.withValues(alpha: 0.1)
-                                            : Colors.orange.withValues(alpha: 0.1),
+                                        color: _user == null
+                                            ? Colors.grey.withValues(alpha: 0.1)
+                                            : _user!.licenseStatus == 'approved'
+                                                ? Colors.green.withValues(alpha: 0.1)
+                                                : _user!.licenseStatus == 'rejected'
+                                                    ? Colors.red.withValues(alpha: 0.1)
+                                                    : Colors.orange.withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(6),
                                       ),
                                       child: Text(
-                                        _user != null && _user!.isVerified ? 'VERIFIED' : 'UNVERIFIED',
+                                        _user == null
+                                            ? 'License Status: Not Provided'
+                                            : _user!.licenseStatus == 'approved'
+                                                ? 'License Status: Approved'
+                                                : _user!.licenseStatus == 'rejected'
+                                                    ? 'License Status: Rejected'
+                                                    : 'License Status: Pending',
                                         style: TextStyle(
-                                          color: _user != null && _user!.isVerified ? Colors.green : Colors.orange,
+                                          color: _user == null
+                                              ? Colors.grey
+                                              : _user!.licenseStatus == 'approved'
+                                                  ? Colors.green
+                                                  : _user!.licenseStatus == 'rejected'
+                                                      ? Colors.red
+                                                      : Colors.orange,
                                           fontSize: 10,
                                           fontWeight: FontWeight.bold,
                                         ),
@@ -465,6 +630,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     ),
                                   ],
                                 ),
+                                if (_user != null && _user!.licenseStatus == 'rejected' && _user!.licenseRejectionReason.isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      'Rejection Reason: ${_user!.licenseRejectionReason}',
+                                      style: const TextStyle(color: Colors.red, fontSize: 11, fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                ],
                                 const SizedBox(height: 16),
                                 _buildDetailRow('LICENSE NUMBER', _user?.licenseNumber ?? 'Not Provided'),
                                 _buildDetailRow('EXPIRY DATE', _user?.licenseExpiry ?? '12 / 2028'),
@@ -519,6 +694,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ],
                               ),
                               const SizedBox(height: 16),
+                              // Statistics Row
+                              Container(
+                                margin: const EdgeInsets.only(bottom: 20),
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF8F9FA),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.grey[200]!),
+                                ),
+                                child: GridView.count(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  crossAxisCount: width > 600 ? 4 : 2,
+                                  childAspectRatio: width > 600 ? 2.5 : 2.0,
+                                  crossAxisSpacing: 12,
+                                  mainAxisSpacing: 12,
+                                  children: [
+                                    _buildStatMiniTile('Total Bookings', '${_bookings.length}', Icons.book_online, Colors.blue),
+                                    _buildStatMiniTile('Active Bookings', '${_bookings.where((b) => b.status == 'approved' || b.status == 'active' || b.status == 'ongoing').length}', Icons.directions_car, Colors.orange),
+                                    _buildStatMiniTile('Completed', '${_bookings.where((b) => b.status == 'completed').length}', Icons.check_circle_outline, Colors.green),
+                                    _buildStatMiniTile('Total Spent', 'RM ${_bookings.where((b) => b.status == 'completed' || b.status == 'active' || b.status == 'approved' || b.status == 'ongoing').fold(0.0, (sum, b) => sum + b.totalPrice).toStringAsFixed(0)}', Icons.monetization_on, Colors.indigo),
+                                  ],
+                                ),
+                              ),
                               _bookings.isEmpty
                                   ? Center(
                                       child: Padding(
@@ -543,11 +742,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         Color statusColor = Colors.orange;
                                         if (booking.status == 'approved' || booking.status == 'ongoing') {
                                           statusColor = Colors.blue;
-                                        } else if (booking.status == 'completed') {
+                        } else if (booking.status == 'completed') {
                                           statusColor = Colors.green;
                                         } else if (booking.status == 'cancelled' || booking.status == 'rejected') {
                                           statusColor = Colors.red;
                                         }
+                                        final paymentList = _payments.where((p) => p.bookingId == booking.id).toList();
+                                        final payment = paymentList.isNotEmpty ? paymentList.first : null;
 
                                         return Card(
                                           color: const Color(0xFFF8F9FA),
@@ -557,6 +758,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           child: Padding(
                                             padding: const EdgeInsets.all(12.0),
                                             child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
                                                 Row(
                                                   children: [
@@ -624,6 +826,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                     ),
                                                   ],
                                                 ),
+                                                if (payment != null) ...[
+                                                  const Divider(height: 16),
+                                                  Row(
+                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                    children: [
+                                                      Row(
+                                                        children: [
+                                                          const Text(
+                                                            'Payment Status: ',
+                                                            style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w600),
+                                                          ),
+                                                          _buildPaymentBadge(payment),
+                                                        ],
+                                                      ),
+                                                      if (payment.paymentStatus == 'Rejected')
+                                                        TextButton.icon(
+                                                          onPressed: () => _showReUploadReceiptDialog(payment),
+                                                          icon: const Icon(Icons.replay_outlined, size: 14, color: AppColors.primaryOrange),
+                                                          label: const Text(
+                                                            'Re-upload Receipt',
+                                                            style: TextStyle(color: AppColors.primaryOrange, fontSize: 11, fontWeight: FontWeight.bold),
+                                                          ),
+                                                          style: TextButton.styleFrom(
+                                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                          ),
+                                                        ),
+                                                    ],
+                                                  ),
+                                                  if (payment.paymentStatus == 'Rejected' && payment.rejectionReason != null && payment.rejectionReason!.isNotEmpty) ...[
+                                                    const SizedBox(height: 6),
+                                                    Align(
+                                                      alignment: Alignment.centerLeft,
+                                                      child: Text(
+                                                        'Rejection Reason: ${payment.rejectionReason}',
+                                                        style: const TextStyle(color: Colors.redAccent, fontSize: 11, fontWeight: FontWeight.w600),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ],
                                                 if (booking.status == 'completed') ...[
                                                   const Divider(height: 16),
                                                   SizedBox(
@@ -659,6 +901,262 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Widget _buildPaymentBadge(PaymentModel payment) {
+    Color badgeColor = Colors.orange;
+    String badgeText = 'Pending Verification';
+    
+    if (payment.paymentStatus == 'Approved') {
+      badgeColor = Colors.green;
+      badgeText = 'Approved';
+    } else if (payment.paymentStatus == 'Rejected') {
+      badgeColor = Colors.red;
+      badgeText = 'Rejected';
+    } else if (payment.paymentStatus == 'Pending Verification') {
+      badgeColor = Colors.amber;
+      badgeText = 'Pending Verification';
+    } else {
+      badgeText = payment.paymentStatus ?? 'Pending Verification';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: badgeColor.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        badgeText,
+        style: TextStyle(
+          color: badgeColor,
+          fontSize: 9,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  void _showReUploadReceiptDialog(PaymentModel payment) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        String? receiptBase64;
+        String? receiptName;
+        int? receiptSize;
+        String? errorMsg;
+        bool isSubmitting = false;
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            // Register callback to update dialog state
+            receipt_upload.onReceiptUploadedCallback = (String base64, String name, int size) {
+              setDialogState(() {
+                if (base64 == 'error:size' || size > 10 * 1024 * 1024) {
+                  errorMsg = 'File size exceeds 10MB limit.';
+                  receiptBase64 = null;
+                  receiptName = null;
+                  receiptSize = null;
+                } else if (base64 == 'error:format') {
+                  errorMsg = 'Invalid file format. Only JPG, JPEG, PNG, and PDF are accepted.';
+                  receiptBase64 = null;
+                  receiptName = null;
+                  receiptSize = null;
+                } else {
+                  errorMsg = null;
+                  receiptBase64 = base64;
+                  receiptName = name;
+                  receiptSize = size;
+                }
+              });
+            };
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: const Text('Re-upload Payment Receipt', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Upload a new, valid transaction receipt proof to clear verification.', textAlign: TextAlign.center),
+                    const SizedBox(height: 16),
+                    if (kIsWeb) ...[
+                      Container(
+                        height: 150,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey[300]!),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const HtmlElementView(viewType: 'receipt-dropzone'),
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final file = await receipt_upload.pickReceiptFile();
+                          if (file != null) {
+                            setDialogState(() {
+                              if (file.base64Data == 'error:size' || file.size > 10 * 1024 * 1024) {
+                                errorMsg = 'File size exceeds 10MB limit.';
+                                receiptBase64 = null;
+                              } else {
+                                errorMsg = null;
+                                receiptBase64 = file.base64Data;
+                                receiptName = file.name;
+                                receiptSize = file.size;
+                              }
+                            });
+                          }
+                        },
+                        icon: const Icon(Icons.file_open),
+                        label: const Text('Browse Files'),
+                      ),
+                    ] else ...[
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.secondaryBlue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: () async {
+                          final file = await receipt_upload.pickReceiptFile();
+                          if (file != null) {
+                            setDialogState(() {
+                              if (file.base64Data == 'error:size' || file.size > 10 * 1024 * 1024) {
+                                errorMsg = 'File size exceeds 10MB limit.';
+                                receiptBase64 = null;
+                              } else {
+                                errorMsg = null;
+                                receiptBase64 = file.base64Data;
+                                receiptName = file.name;
+                                receiptSize = file.size;
+                              }
+                            });
+                          }
+                        },
+                        icon: const Icon(Icons.file_upload),
+                        label: const Text('SELECT RECEIPT FILE'),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    if (errorMsg != null)
+                      Text(
+                        errorMsg!,
+                        style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                    if (receiptBase64 != null) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        height: 140,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey[200]!),
+                          borderRadius: BorderRadius.circular(12),
+                          color: Colors.grey[50],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: receiptName!.toLowerCase().endsWith('.pdf') || receiptBase64!.startsWith('data:application/pdf')
+                              ? Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.picture_as_pdf, color: Colors.redAccent, size: 54),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      receiptName ?? 'Receipt.pdf',
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    if (receiptSize != null)
+                                      Text(
+                                        '${(receiptSize! / 1024 / 1024).toStringAsFixed(2)} MB',
+                                        style: const TextStyle(fontSize: 10, color: Colors.grey),
+                                      ),
+                                  ],
+                                )
+                              : Image.memory(
+                                  base64Decode(receiptBase64!.split(',').last),
+                                  fit: BoxFit.contain,
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton.icon(
+                        onPressed: () {
+                          setDialogState(() {
+                            receiptBase64 = null;
+                            receiptName = null;
+                            receiptSize = null;
+                            errorMsg = null;
+                          });
+                        },
+                        icon: const Icon(Icons.delete, color: Colors.redAccent, size: 16),
+                        label: const Text('Remove File', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
+                      ),
+                    ],
+                    if (isSubmitting) ...[
+                      const SizedBox(height: 16),
+                      const CircularProgressIndicator(color: AppColors.primaryOrange),
+                      const SizedBox(height: 8),
+                      const Text('Uploading proof...', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting ? null : () => Navigator.pop(context),
+                  child: const Text('CANCEL'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryOrange),
+                  onPressed: receiptBase64 == null || isSubmitting
+                      ? null
+                      : () async {
+                          setDialogState(() {
+                            isSubmitting = true;
+                          });
+                          try {
+                            // Update payments record
+                            await FirebaseDatabase.instance.ref().child('payments').child(payment.id).update({
+                              'receiptImage': receiptBase64,
+                              'receiptFile': receiptBase64,
+                              'paymentStatus': 'Pending Verification',
+                              'status': 'pending',
+                              'uploadedAt': DateTime.now().toIso8601String(),
+                              'rejectionReason': '',
+                            });
+                            // Set booking back to pending
+                            await FirebaseDatabase.instance.ref().child('bookings').child(payment.bookingId).update({
+                              'status': 'pending',
+                              'updatedAt': DateTime.now().toIso8601String(),
+                            });
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('New receipt uploaded successfully! Waiting for verification.'), backgroundColor: Colors.green),
+                              );
+                            }
+                            _loadProfileData();
+                          } catch (e) {
+                            setDialogState(() {
+                              isSubmitting = false;
+                              errorMsg = 'Upload failed: $e';
+                            });
+                          }
+                        },
+                  child: const Text('SUBMIT PROOF', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildInfoCard({
     required String title,
     required IconData icon,
@@ -689,6 +1187,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const Divider(),
           const SizedBox(height: 16),
           ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatMiniTile(String label, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.01), blurRadius: 4, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 16,
+            backgroundColor: color.withValues(alpha: 0.1),
+            child: Icon(icon, color: color, size: 16),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(label, style: const TextStyle(fontSize: 9, color: Colors.grey, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 2),
+                Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue), maxLines: 1, overflow: TextOverflow.ellipsis),
+              ],
+            ),
+          ),
         ],
       ),
     );

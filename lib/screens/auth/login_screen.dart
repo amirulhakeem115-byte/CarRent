@@ -24,6 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final DatabaseService _databaseService = DatabaseService();
 
   bool _loading = false;
+  bool _googleLoading = false;
   bool _obscurePassword = true;
   bool _rememberMe = false;
   String? _error;
@@ -52,6 +53,15 @@ class _LoginScreenState extends State<LoginScreen> {
           _error = 'User profile not found. Please contact support.';
           _loading = false;
         });
+        return;
+      }
+
+      if (!userModel.isActive && userModel.role != 'admin') {
+        setState(() {
+          _error = 'Your account has been disabled. Please contact support.';
+          _loading = false;
+        });
+        await _authService.logout();
         return;
       }
 
@@ -84,6 +94,70 @@ class _LoginScreenState extends State<LoginScreen> {
       if (mounted) {
         setState(() {
           _loading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loginWithGoogle() async {
+    setState(() {
+      _googleLoading = true;
+      _error = null;
+    });
+
+    try {
+      final userCreds = await _authService.signInWithGoogle();
+
+      final uid = userCreds.user!.uid;
+      final userModel = await _databaseService.getUser(uid);
+
+      if (!mounted) return;
+
+      if (userModel == null) {
+        setState(() {
+          _error = 'Failed to load user profile. Please contact support.';
+          _googleLoading = false;
+        });
+        return;
+      }
+
+      if (!userModel.isActive && userModel.role != 'admin') {
+        setState(() {
+          _error = 'Your account has been disabled. Please contact support.';
+          _googleLoading = false;
+        });
+        await _authService.logout();
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Welcome back, ${userModel.fullName}!'),
+          backgroundColor: AppColors.primaryOrange,
+        ),
+      );
+
+      // Route based on role
+      if (userModel.role == 'admin') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const AdminDashboardScreen()),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const CustomerHomeScreen()),
+        );
+      }
+    } catch (e) {
+      final msg = e.toString();
+      setState(() {
+        _error = msg.startsWith('Exception: ') ? msg.substring(11) : msg;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _googleLoading = false;
         });
       }
     }
@@ -245,7 +319,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           elevation: 2,
                         ),
-                        onPressed: _loading ? null : _login,
+                        onPressed: (_loading || _googleLoading) ? null : _login,
                         child: _loading
                             ? const CircularProgressIndicator(color: Colors.white)
                             : const Text(
@@ -256,6 +330,57 @@ class _LoginScreenState extends State<LoginScreen> {
                                   letterSpacing: 1.2,
                                   color: Colors.white,
                                 ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      height: 54,
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: AppColors.secondaryBlue,
+                          side: const BorderSide(color: AppColors.borderGray, width: 1.5),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 1,
+                          shadowColor: Colors.black.withValues(alpha: 0.1),
+                        ),
+                        onPressed: (_loading || _googleLoading) ? null : _loginWithGoogle,
+                        child: _googleLoading
+                            ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.secondaryBlue),
+                                ),
+                              )
+                            : Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Image.network(
+                                    'https://www.gstatic.com/mobilesdk/160503_mobilesdk/logo/2x/google_g_normal_id_48dp.png',
+                                    height: 24,
+                                    width: 24,
+                                    errorBuilder: (context, error, stackTrace) => const Icon(
+                                      Icons.g_mobiledata_rounded,
+                                      color: AppColors.primaryOrange,
+                                      size: 28,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  const Text(
+                                    'Continue with Google',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                      color: AppColors.secondaryBlue,
+                                    ),
+                                  ),
+                                ],
                               ),
                       ),
                     ),
