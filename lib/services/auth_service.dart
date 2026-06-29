@@ -1,7 +1,11 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:intl/intl.dart';
+import 'package:web/web.dart' as web;
 import 'database_service.dart';
+import 'notification_service.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -44,6 +48,22 @@ class AuthService {
       );
 
       debugPrint('[AUTH] USER PROFILE SAVED TO DATABASE — uid: $uid');
+
+      try {
+        final notificationService = NotificationService();
+        await notificationService.notifyAllAdmins(
+          title: 'New Customer Registered',
+          message: '$fullName has registered.\nEmail: $email',
+          type: 'customer',
+          icon: '👤',
+          color: '0xFF14B8A6',
+          relatedId: uid,
+          actionRoute: 'Customers',
+        );
+      } catch (err) {
+        debugPrint('Failed to notify admins of registration: $err');
+      }
+
       return userCredential;
     } on FirebaseAuthException catch (e) {
       debugPrint('[AUTH] REGISTER FAILED — code: ${e.code}, message: ${e.message}');
@@ -71,9 +91,37 @@ class AuthService {
       ).timeout(const Duration(seconds: 15));
 
       debugPrint('[AUTH] AUTH SUCCESS — uid: ${userCredential.user?.uid}');
+
+      try {
+        final uid = userCredential.user!.uid;
+        final userModel = await _databaseService.getUser(uid);
+        if (userModel != null && userModel.role == 'admin') {
+          final sanitizedEmail = email.replaceAll('.', '_').replaceAll('@', '_');
+          await FirebaseDatabase.instance.ref().child('failed_logins').child(sanitizedEmail).remove();
+          
+          final device = getDeviceInfo();
+          final nowStr = DateFormat('dd MMM, hh:mm a').format(DateTime.now());
+          final notificationService = NotificationService();
+          await notificationService.notifyAllAdmins(
+            title: 'System Login',
+            message: 'Administrator ${userModel.fullName} logged in.\nDevice: $device\nTime: $nowStr',
+            type: 'security',
+            icon: '🔒',
+            color: '0xFF8B5CF6',
+            relatedId: uid,
+            actionRoute: 'Dashboard',
+          );
+        }
+      } catch (err) {
+        debugPrint('Failed to process admin login notification: $err');
+      }
+
       return userCredential;
     } on FirebaseAuthException catch (e) {
       debugPrint('[AUTH] AUTH FAILED — code: ${e.code}, message: ${e.message}');
+      recordFailedLogin(email).catchError((err) {
+        debugPrint('Error recording failed login: $err');
+      });
       throw _handleAuthException(e);
     } catch (e) {
       debugPrint('[AUTH] AUTH FAILED — unknown error: $e');
@@ -126,6 +174,21 @@ class AuthService {
           email: email,
           profilePhoto: profilePhoto,
         );
+
+        try {
+          final notificationService = NotificationService();
+          await notificationService.notifyAllAdmins(
+            title: 'New Customer Registered',
+            message: '$name registered via Google.\nEmail: $email',
+            type: 'customer',
+            icon: '👤',
+            color: '0xFF14B8A6',
+            relatedId: uid,
+            actionRoute: 'Customers',
+          );
+        } catch (err) {
+          debugPrint('Failed to notify admins of registration: $err');
+        }
       } else {
         debugPrint('[AUTH] EXISTING GOOGLE USER — uid: $uid, role: ${existingUser.role}');
         // Loaded existing data, do not overwrite role.
@@ -140,17 +203,101 @@ class AuthService {
       debugPrint('[AUTH]   - uid: $uid');
       debugPrint('[AUTH]   - email: $email');
       debugPrint('[AUTH]   - role: $role');
+
+      if (role == 'admin') {
+        try {
+          final device = getDeviceInfo();
+          final nowStr = DateFormat('dd MMM, hh:mm a').format(DateTime.now());
+          final notificationService = NotificationService();
+          await notificationService.notifyAllAdmins(
+            title: 'System Login',
+            message: 'Administrator ${finalUser?.fullName ?? name} logged in via Google.\nDevice: $device\nTime: $nowStr',
+            type: 'security',
+            icon: '🔒',
+            color: '0xFF8B5CF6',
+            relatedId: uid,
+            actionRoute: 'Dashboard',
+          );
+        } catch (err) {
+          debugPrint('Failed to notify admin google login: $err');
+        }
+      }
       
       return userCredential;
     } on FirebaseAuthException catch (e) {
       debugPrint('[AUTH] GOOGLE SIGN-IN FAILED — code: ${e.code}, message: ${e.message}');
       throw _handleAuthException(e);
-    } catch (e) {
-      debugPrint('[AUTH] GOOGLE SIGN-IN FAILED — unknown error: $e');
-      if (e.toString().contains('cancelled') || e.toString().contains('canceled')) {
-        throw Exception('Google Sign-In was cancelled.');
+    }
+  }
+
+  String getDeviceInfo() {
+    if (kIsWeb) {
+      try {
+        final userAgent = web.window.navigator.userAgent.toLowerCase();
+        String browser = 'Unknown Browser';
+        if (userAgent.contains('chrome')) {
+          browser = 'Chrome';
+        } else if (userAgent.contains('firefox')) {
+          browser = 'Firefox';
+        } else if (userAgent.contains('safari') && !userAgent.contains('chrome')) {
+          browser = 'Safari';
+        } else if (userAgent.contains('edge')) {
+          browser = 'Edge';
+        }
+        
+        String os = 'Unknown OS';
+        if (userAgent.contains('windows')) {
+          os = 'Windows';
+        } else if (userAgent.contains('macintosh') || userAgent.contains('mac os x')) {
+          os = 'macOS';
+        } else if (userAgent.contains('linux')) {
+          os = 'Linux';
+        } else if (userAgent.contains('iphone') || userAgent.contains('ipad')) {
+          os = 'iOS';
+        } else if (userAgent.contains('android')) {
+          os = 'Android';
+        }
+        return '$browser on $os';
+      } catch (_) {
+        return 'Web Browser';
       }
-      throw Exception('Google Sign-In failed. Please try again.');
+    } else {
+      return defaultTargetPlatform.name;
+    }
+  }
+
+  Future<void> recordFailedLogin(String email) async {
+    try {
+      final sanitizedEmail = email.replaceAll('.', '_').replaceAll('@', '_');
+      final ref = FirebaseDatabase.instance.ref().child('failed_logins').child(sanitizedEmail);
+      final snap = await ref.get();
+      int count = 1;
+      if (snap.exists) {
+        final data = snap.value as Map;
+        count = (data['count'] ?? 0) as int;
+        count += 1;
+      }
+      await ref.set({
+        'count': count,
+        'lastAttempt': DateTime.now().toIso8601String(),
+        'email': email,
+      });
+
+      if (count >= 3) {
+        final notificationService = NotificationService();
+        await notificationService.notifyAllAdmins(
+          title: 'Failed Login Security Alert',
+          message: 'Multiple failed login attempts detected for account $email.',
+          type: 'security',
+          icon: '🔒',
+          color: '0xFFEF4444',
+          relatedId: email,
+          actionRoute: 'Dashboard',
+        );
+        await ref.update({'count': 0});
+      }
+    } catch (e) {
+      debugPrint('Error recording failed login: $e');
     }
   }
 

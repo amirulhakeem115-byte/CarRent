@@ -10,7 +10,7 @@ class VehicleModel {
   final int seats;
   final double pricePerDay;
   final bool isAvailable;
-  final String status; // 'available', 'booked', 'maintenance'
+  final String status; // 'Available', 'Booked', 'Maintenance', 'Inactive'
   final String mainImage;
   final String description;
   final String createdAt;
@@ -41,7 +41,7 @@ class VehicleModel {
     required this.seats,
     required this.pricePerDay,
     required this.isAvailable,
-    this.status = 'available',
+    this.status = 'Available',
     required this.mainImage,
     required this.description,
     required this.createdAt,
@@ -119,7 +119,21 @@ class VehicleModel {
     }
 
 
-    final parsedStatus = data['status'] ?? (data['isAvailable'] == false ? 'booked' : 'available');
+    // Normalize status to capitalized version
+    String rawStatus = (data['status'] ?? (data['isAvailable'] == false ? 'Booked' : 'Available')).toString();
+    final statusLower = rawStatus.toLowerCase().replaceAll(RegExp(r'\s+'), '');
+    String parsedStatus = 'Available';
+    if (statusLower == 'available') {
+      parsedStatus = 'Available';
+    } else if (statusLower == 'booked' || statusLower == 'reserved' || statusLower == 'rented' || statusLower == 'activebooked' || statusLower == 'bookedvehicle') {
+      parsedStatus = 'Booked';
+    } else if (statusLower == 'maintenance') {
+      parsedStatus = 'Maintenance';
+    } else if (statusLower == 'inactive') {
+      parsedStatus = 'Inactive';
+    } else {
+      parsedStatus = 'Available';
+    }
 
     return VehicleModel(
       id: id,
@@ -132,7 +146,7 @@ class VehicleModel {
       fuelType: data['fuelType'] ?? '',
       seats: data['seats'] ?? 4,
       pricePerDay: (data['pricePerDay'] ?? 0).toDouble(),
-      isAvailable: parsedStatus == 'available',
+      isAvailable: parsedStatus == 'Available',
       status: parsedStatus,
       mainImage: data['mainImage'] ?? '',
       description: data['description'] ?? '',
@@ -162,7 +176,7 @@ class VehicleModel {
       'fuelType': fuelType,
       'seats': seats,
       'pricePerDay': pricePerDay,
-      'isAvailable': status == 'available',
+      'isAvailable': status.toLowerCase() == 'available',
       'status': status,
       'mainImage': mainImage,
       'description': description,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/vehicle_model.dart';
 import '../constants/colors.dart';
 import '../screens/auth/customer/vehicle_details_screen.dart';
+import '../screens/auth/customer/customer_responsive_shell.dart';
 import 'app_image.dart';
 
 /// A card widget to display vehicle details such as brand, model, price, transmission,
@@ -18,6 +19,11 @@ class VehicleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final String status = vehicle.status.toLowerCase();
+    final bool isAvailable = status == 'available';
+    final bool isBooked = status == 'booked';
+    final bool isMaintenance = status == 'maintenance';
+
     return Card(
       color: Colors.white,
       elevation: 0,
@@ -26,13 +32,16 @@ class VehicleCard extends StatelessWidget {
         side: const BorderSide(color: AppColors.borderGray),
       ),
       child: InkWell(
-        onTap: vehicle.status == 'available'
+        onTap: isAvailable
             ? (onTap ??
                 () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => VehicleDetailsScreen(vehicle: vehicle),
+                      builder: (context) => CustomerResponsiveShell(
+                        initialIndex: 1,
+                        customBody: VehicleDetailsScreen(vehicle: vehicle, hideAppBar: true),
+                      ),
                     ),
                   );
                 })
@@ -64,7 +73,7 @@ class VehicleCard extends StatelessWidget {
                 ),
                 
                 // Status Overlay Over Vehicle Image
-                if (vehicle.status == 'available')
+                if (isAvailable)
                   Positioned(
                     top: 12,
                     left: 12,
@@ -99,7 +108,7 @@ class VehicleCard extends StatelessWidget {
                       ),
                     ),
                   )
-                else if (vehicle.status == 'booked') ...[
+                else ...[
                   // Dark overlay
                   Positioned.fill(
                     child: ClipRRect(
@@ -119,58 +128,21 @@ class VehicleCard extends StatelessWidget {
                           decoration: BoxDecoration(
                             border: Border.all(color: const Color(0xFFE74C3C), width: 3),
                             borderRadius: BorderRadius.circular(8),
-                            color: Colors.black.withValues(alpha: 0.5),
+                            color: Colors.black.withValues(alpha: 0.6),
                           ),
-                          child: const Text(
-                            'BOOKED',
-                            style: TextStyle(
+                          child: Text(
+                            isBooked
+                                ? 'BOOKED'
+                                : isMaintenance
+                                    ? 'UNDER MAINTENANCE'
+                                    : 'NOT AVAILABLE',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
                               color: Color(0xFFE74C3C),
-                              fontSize: 18,
+                              fontSize: 14,
                               fontWeight: FontWeight.w900,
-                              letterSpacing: 2,
+                              letterSpacing: 1.5,
                             ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ] else if (vehicle.status == 'maintenance') ...[
-                  // Dark overlay
-                  Positioned.fill(
-                    child: ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                      child: Container(
-                        color: Colors.black.withValues(alpha: 0.4),
-                      ),
-                    ),
-                  ),
-                  // Diagonal stamp
-                  Positioned.fill(
-                    child: Center(
-                      child: Transform.rotate(
-                        angle: -0.2,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: const Color(0xFFE67E22), width: 3),
-                            borderRadius: BorderRadius.circular(8),
-                            color: Colors.black.withValues(alpha: 0.5),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.build, color: Color(0xFFE67E22), size: 16),
-                              SizedBox(width: 6),
-                              Text(
-                                'MAINTENANCE',
-                                style: TextStyle(
-                                  color: Color(0xFFE67E22),
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 1,
-                                ),
-                              ),
-                            ],
                           ),
                         ),
                       ),
@@ -252,11 +224,14 @@ class VehicleCard extends StatelessWidget {
                         ],
                       ),
                       ElevatedButton(
-                        onPressed: vehicle.status == 'available' ? () {
-                          Navigator.push(
+                        onPressed: isAvailable ? () {
+                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => VehicleDetailsScreen(vehicle: vehicle),
+                              builder: (context) => CustomerResponsiveShell(
+                                initialIndex: 1,
+                                customBody: VehicleDetailsScreen(vehicle: vehicle, hideAppBar: true),
+                              ),
                             ),
                           );
                         } : null,

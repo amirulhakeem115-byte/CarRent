@@ -18,32 +18,22 @@ Future<void> main() async {
 
     // App Check settings for development testing
     // Set to true if App Check enforcement is active in your Firebase Console
-    bool enableAppCheckInDebug = true;
+    // bool enableAppCheckInDebug = false;
 
     // Persistent debug token registered in Firebase Console under App Check > Manage debug tokens
-    const String webDebugToken = 'b1761c25-c825-49a0-9932-fed7f28437ad';
+    // const String webDebugToken = 'b1761c25-c825-49a0-9932-fed7f28437ad';
 
-    if (!kDebugMode || enableAppCheckInDebug) {
-      await FirebaseAppCheck.instance.activate(
-        providerWeb: kDebugMode
-            ? WebDebugProvider(debugToken: webDebugToken)
-            : ReCaptchaV3Provider('6LeBqystAAAAAJS3i4iO7I6aKG8uh-Dt4NgpET8J'),
-        providerAndroid: kDebugMode
-            ? AndroidDebugProvider(debugToken: webDebugToken)
-            : AndroidPlayIntegrityProvider(),
-        providerApple: kDebugMode
-            ? AppleDebugProvider()
-            : AppleAppAttestProvider(),
-      );
-      debugPrint(
-        'Firebase App Check activated successfully (enableAppCheckInDebug: $enableAppCheckInDebug).',
-      );
-    // ignore: dead_code
-    } else {
-      debugPrint(
-        'Firebase App Check is temporarily disabled in development/debug mode.',
-      );
-    }
+    await FirebaseAppCheck.instance.activate(
+      providerWeb: kDebugMode
+          ? WebDebugProvider(debugToken: 'b1761c25-c825-49a0-9932-fed7f28437ad')
+          : ReCaptchaV3Provider('6LeBqystAAAAAJS3i4iO7I6aKG8uh-Dt4NgpET8J'),
+      providerAndroid: kDebugMode
+          ? AndroidDebugProvider()
+          : AndroidPlayIntegrityProvider(),
+      providerApple: kDebugMode
+          ? AppleDebugProvider()
+          : AppleAppAttestProvider(),
+    );
   } catch (e) {
     if (e.toString().contains('duplicate-app')) {
       debugPrint('Firebase already initialized: $e');

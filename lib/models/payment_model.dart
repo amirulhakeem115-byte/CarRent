@@ -20,6 +20,8 @@ class PaymentModel {
   final String? verifiedAt;
   final String? verifiedBy;
   final String? rejectionReason;
+  final String? paymentTime;
+  final bool? rewardPointsAwarded;
 
   PaymentModel({
     required this.id,
@@ -41,6 +43,8 @@ class PaymentModel {
     this.verifiedAt,
     this.verifiedBy,
     this.rejectionReason,
+    this.paymentTime,
+    this.rewardPointsAwarded,
   });
 
   factory PaymentModel.fromMap(
@@ -73,6 +77,8 @@ class PaymentModel {
       verifiedAt: data['verifiedAt'],
       verifiedBy: data['verifiedBy'],
       rejectionReason: data['rejectionReason'],
+      paymentTime: data['paymentTime'],
+      rewardPointsAwarded: data['rewardPointsAwarded'] as bool?,
     );
   }
 
@@ -96,6 +102,8 @@ class PaymentModel {
       'verifiedAt': verifiedAt,
       'verifiedBy': verifiedBy,
       'rejectionReason': rejectionReason,
+      'paymentTime': paymentTime,
+      'rewardPointsAwarded': rewardPointsAwarded,
     };
   }
 }

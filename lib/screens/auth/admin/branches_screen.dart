@@ -24,6 +24,19 @@ class _BranchesViewState extends State<BranchesView> {
   final MapController _mapController = MapController();
   StreamSubscription<List<BranchModel>>? _branchesSubscription;
 
+  // Add/Edit Form State
+  bool _isFormActive = false;
+  BranchModel? _editingBranch;
+  bool _isSelectingLocationFromMap = false;
+
+  final _nameController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _hoursController = TextEditingController();
+  final _latController = TextEditingController();
+  final _lngController = TextEditingController();
+  String _status = 'Active';
+
   @override
   void initState() {
     super.initState();
@@ -57,87 +70,97 @@ class _BranchesViewState extends State<BranchesView> {
   @override
   void dispose() {
     _branchesSubscription?.cancel();
+    _nameController.dispose();
+    _addressController.dispose();
+    _phoneController.dispose();
+    _hoursController.dispose();
+    _latController.dispose();
+    _lngController.dispose();
     super.dispose();
   }
 
-  void _showAddEditBranchDialog({BranchModel? branch}) {
-    final isEdit = branch != null;
-    final nameController = TextEditingController(text: branch?.branchName);
-    final addressController = TextEditingController(text: branch?.address);
-    final phoneController = TextEditingController(text: branch?.phone);
-    final hoursController = TextEditingController(text: branch != null ? branch.operatingHours : '09:00 AM - 09:00 PM');
-    final latController = TextEditingController(text: branch != null ? branch.latitude.toString() : '3.0166');
-    final lngController = TextEditingController(text: branch != null ? branch.longitude.toString() : '101.7916');
+  bool _isValidLatLng(double? lat, double? lng) {
+    if (lat == null || lng == null) return false;
+    if (lat == 0.0 && lng == 0.0) return false;
+    return lat >= -90.0 && lat <= 90.0 && lng >= -180.0 && lng <= 180.0;
+  }
 
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: Text(isEdit ? 'Edit Branch Location' : 'Add Branch Location', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Branch Name')),
-                TextField(controller: addressController, decoration: const InputDecoration(labelText: 'Address')),
-                TextField(controller: phoneController, decoration: const InputDecoration(labelText: 'Phone Number')),
-                TextField(controller: hoursController, decoration: const InputDecoration(labelText: 'Operating Hours')),
-                TextField(controller: latController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Latitude')),
-                TextField(controller: lngController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Longitude')),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.secondaryBlue,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              onPressed: () async {
-                if (nameController.text.trim().isEmpty || addressController.text.trim().isEmpty) return;
+  void _activateForm({BranchModel? branch}) {
+    setState(() {
+      _editingBranch = branch;
+      _isFormActive = true;
+      _isSelectingLocationFromMap = false;
+      
+      _nameController.text = branch?.branchName ?? '';
+      _addressController.text = branch?.address ?? '';
+      _phoneController.text = branch?.phone ?? '';
+      _hoursController.text = branch?.operatingHours ?? '09:00 AM - 09:00 PM';
+      _latController.text = branch != null ? branch.latitude.toString() : '3.0166';
+      _lngController.text = branch != null ? branch.longitude.toString() : '101.7916';
+      _status = branch?.status ?? 'Active';
+    });
+  }
 
-                final name = nameController.text.trim();
-                final address = addressController.text.trim();
-                final phone = phoneController.text.trim();
-                final hours = hoursController.text.trim();
-                final lat = double.tryParse(latController.text.trim()) ?? 3.0166;
-                final lng = double.tryParse(lngController.text.trim()) ?? 101.7916;
+  void _cancelForm() {
+    setState(() {
+      _isFormActive = false;
+      _editingBranch = null;
+      _isSelectingLocationFromMap = false;
+    });
+  }
 
-                if (isEdit) {
-                  await _branchService.updateBranch(branch.id, {
-                    'branchName': name,
-                    'name': name,
-                    'address': address,
-                    'phone': phone,
-                    'operatingHours': hours,
-                    'latitude': lat,
-                    'longitude': lng,
-                  });
-                } else {
-                  final newBranch = BranchModel(
-                    id: '',
-                    branchName: name,
-                    address: address,
-                    phone: phone,
-                    operatingHours: hours,
-                    latitude: lat,
-                    longitude: lng,
-                  );
-                  await _branchService.addBranch(newBranch);
-                }
+  Future<void> _saveForm() async {
+    final name = _nameController.text.trim();
+    final address = _addressController.text.trim();
+    final phone = _phoneController.text.trim();
+    final hours = _hoursController.text.trim();
+    final lat = double.tryParse(_latController.text.trim()) ?? 0.0;
+    final lng = double.tryParse(_lngController.text.trim()) ?? 0.0;
 
-                if (!context.mounted) return;
-                Navigator.pop(context);
-              },
-              child: Text(isEdit ? 'Save Changes' : 'Add Branch'),
-            ),
-          ],
+    if (name.isEmpty || address.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Branch Name and Address are required!'), backgroundColor: Colors.redAccent),
+      );
+      return;
+    }
+
+    try {
+      if (_editingBranch != null) {
+        await _branchService.updateBranch(_editingBranch!.id, {
+          'branchName': name,
+          'name': name,
+          'address': address,
+          'phone': phone,
+          'operatingHours': hours,
+          'latitude': lat,
+          'longitude': lng,
+          'status': _status,
+        });
+      } else {
+        final newBranch = BranchModel(
+          id: '',
+          branchName: name,
+          address: address,
+          phone: phone,
+          operatingHours: hours,
+          latitude: lat,
+          longitude: lng,
+          status: _status,
         );
-      },
-    );
+        await _branchService.addBranch(newBranch);
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_editingBranch != null ? 'Branch updated successfully' : 'Branch added successfully'), backgroundColor: Colors.green),
+      );
+      _cancelForm();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to save branch: $e'), backgroundColor: Colors.redAccent),
+      );
+    }
   }
 
   Future<void> _deleteBranch(String id) async {
@@ -163,6 +186,7 @@ class _BranchesViewState extends State<BranchesView> {
   }
 
   void _showBranchInfo(BranchModel branch) {
+    final isValid = _isValidLatLng(branch.latitude, branch.longitude);
     showDialog(
       context: context,
       builder: (context) {
@@ -193,21 +217,35 @@ class _BranchesViewState extends State<BranchesView> {
               const SizedBox(height: 6),
               Row(
                 children: [
+                  const Icon(Icons.info_outline, size: 14, color: Colors.blue),
+                  const SizedBox(width: 6),
+                  Text('Status: ${branch.status}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
                   const Icon(Icons.location_on, size: 14, color: Colors.blue),
                   const SizedBox(width: 6),
-                  Text('GPS: ${branch.latitude.toStringAsFixed(4)}, ${branch.longitude.toStringAsFixed(4)}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  Text(
+                    isValid
+                        ? 'GPS: ${branch.latitude.toStringAsFixed(4)}, ${branch.longitude.toStringAsFixed(4)}'
+                        : 'GPS: Missing/Invalid coordinates',
+                    style: TextStyle(fontSize: 12, color: isValid ? Colors.grey : Colors.red, fontWeight: isValid ? FontWeight.normal : FontWeight.bold),
+                  ),
                 ],
               ),
             ],
           ),
           actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                download_helper.openUrl('https://www.google.com/maps/search/?api=1&query=${branch.latitude},${branch.longitude}');
-              },
-              child: const Text('Open in Google Maps'),
-            ),
+            if (isValid)
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  download_helper.openUrl('https://www.google.com/maps/search/?api=1&query=${branch.latitude},${branch.longitude}');
+                },
+                child: const Text('Open in Google Maps'),
+              ),
             TextButton(
               onPressed: () => Navigator.pop(context),
               child: const Text('Close'),
@@ -217,7 +255,6 @@ class _BranchesViewState extends State<BranchesView> {
       },
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -243,35 +280,47 @@ class _BranchesViewState extends State<BranchesView> {
     final double width = MediaQuery.of(context).size.width;
     final bool isDesktop = width > 1000;
 
+    final validMapBranches = _branches.where((b) => _isValidLatLng(b.latitude, b.longitude)).toList();
+
     return Padding(
       padding: const EdgeInsets.all(24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header Row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Locations & Branches', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue)),
-                  Text('Configure corporate branch details, latitude coordinates, and live pins.', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                ],
-              ),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryOrange,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          // Header
+          isDesktop
+              ? Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Locations & Branches', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue)),
+                          Text('Configure corporate branch details, latitude coordinates, and live pins.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    if (!_isFormActive) _buildAddBranchButton(),
+                  ],
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Locations & Branches', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue)),
+                        Text('Configure corporate branch details, latitude coordinates, and live pins.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      ],
+                    ),
+                    if (!_isFormActive) ...[
+                      const SizedBox(height: 16),
+                      _buildAddBranchButton(),
+                    ],
+                  ],
                 ),
-                onPressed: () => _showAddEditBranchDialog(),
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Add Branch', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
           const SizedBox(height: 24),
 
           // Statistics Grid
@@ -280,123 +329,361 @@ class _BranchesViewState extends State<BranchesView> {
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
             shrinkWrap: true,
-            childAspectRatio: isDesktop ? 4.5 : 3.0,
+            childAspectRatio: isDesktop ? 5.5 : 3.5,
             physics: const NeverScrollableScrollPhysics(),
             children: [
               _buildStatCard('Total Seeded Branches', _branches.length.toString(), Icons.storefront, Colors.indigo),
-              _buildStatCard('Active Hubs (Map Pins)', _branches.length.toString(), Icons.pin_drop, Colors.green),
+              _buildStatCard('Active Hubs (Map Pins)', validMapBranches.where((b) => b.status == 'Active').length.toString(), Icons.pin_drop, Colors.green),
             ],
           ),
           const SizedBox(height: 24),
 
-          // Split panel: Map and List
+          // Split panel: Left (List or Form) and Right (Map)
           Expanded(
             child: Flex(
               direction: isDesktop ? Axis.horizontal : Axis.vertical,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // List of Branches
+                // Left Panel: Form or List
                 Expanded(
-                  flex: isDesktop ? 5 : 0,
-                  child: Card(
-                    color: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    elevation: 0,
-                    child: _branches.isEmpty
-                        ? const Center(child: Text('No branches registered.'))
-                        : ListView.builder(
-                            itemCount: _branches.length,
-                            itemBuilder: (context, index) {
-                              final branch = _branches[index];
-                              return ListTile(
-                                leading: const CircleAvatar(
-                                  backgroundColor: AppColors.lightGray,
-                                  child: Icon(Icons.location_on_outlined, color: AppColors.primaryOrange, size: 20),
-                                ),
-                                title: Text(branch.name, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(branch.address, style: const TextStyle(fontSize: 12)),
-                                    Text('Phone: ${branch.phone} | Lat: ${branch.latitude.toStringAsFixed(3)}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                                  ],
-                                ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.map_outlined, color: Colors.blue, size: 18),
-                                      onPressed: () {
-                                        _mapController.move(LatLng(branch.latitude, branch.longitude), 12.0);
-                                      },
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.edit_outlined, color: Colors.indigo, size: 18),
-                                      onPressed: () => _showAddEditBranchDialog(branch: branch),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18),
-                                      onPressed: () => _deleteBranch(branch.id),
-                                    ),
-                                  ],
-                                ),
-                                onTap: () => _showBranchInfo(branch),
-                              );
-                            },
-                          ),
-                  ),
+                  flex: isDesktop ? 5 : 1,
+                  child: _isFormActive ? _buildBranchForm() : _buildBranchList(),
                 ),
                 if (isDesktop) const SizedBox(width: 24) else const SizedBox(height: 24),
 
-                // Interactive map
+                // Right Panel: Interactive map
                 Expanded(
-                  flex: isDesktop ? 5 : 0,
-                  child: Card(
-                    color: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    elevation: 0,
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: FlutterMap(
-                          mapController: _mapController,
-                          options: MapOptions(
-                            initialCenter: _branches.isNotEmpty ? LatLng(_branches.first.latitude, _branches.first.longitude) : const LatLng(3.0166, 101.7916),
-                            initialZoom: 7.0,
+                  flex: isDesktop ? 6 : 1,
+                  child: Stack(
+                    children: [
+                      Card(
+                        color: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        elevation: 0,
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: FlutterMap(
+                              mapController: _mapController,
+                              options: MapOptions(
+                                initialCenter: validMapBranches.isNotEmpty 
+                                    ? LatLng(validMapBranches.first.latitude, validMapBranches.first.longitude) 
+                                    : const LatLng(3.0166, 101.7916),
+                                initialZoom: 7.0,
+                                onTap: (tapPosition, point) {
+                                  if (_isSelectingLocationFromMap) {
+                                    setState(() {
+                                      _latController.text = point.latitude.toStringAsFixed(6);
+                                      _lngController.text = point.longitude.toStringAsFixed(6);
+                                      _isSelectingLocationFromMap = false;
+                                    });
+                                  }
+                                },
+                              ),
+                              children: [
+                                TileLayer(
+                                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                  userAgentPackageName: 'com.carrent.app',
+                                ),
+                                MarkerLayer(
+                                  markers: [
+                                    ...validMapBranches.map((branch) {
+                                      final isActive = branch.status == 'Active';
+                                      return Marker(
+                                        point: LatLng(branch.latitude, branch.longitude),
+                                        width: 40,
+                                        height: 40,
+                                        child: GestureDetector(
+                                          onTap: () => _showBranchInfo(branch),
+                                          child: Icon(
+                                            Icons.location_on,
+                                            color: isActive ? AppColors.primaryOrange : Colors.grey,
+                                            size: 32,
+                                          ),
+                                        ),
+                                      );
+                                    }),
+                                    if (_isFormActive) ...[
+                                      // Render a temporary target marker if admin entered/selected valid lat/lng
+                                      (() {
+                                        final double? lat = double.tryParse(_latController.text);
+                                        final double? lng = double.tryParse(_lngController.text);
+                                        if (_isValidLatLng(lat, lng)) {
+                                          return Marker(
+                                            point: LatLng(lat!, lng!),
+                                            width: 40,
+                                            height: 40,
+                                            child: const Icon(
+                                              Icons.add_location_alt,
+                                              color: Colors.redAccent,
+                                              size: 36,
+                                            ),
+                                          );
+                                        }
+                                        return null;
+                                      })()
+                                    ].whereType<Marker>(),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
-                          children: [
-                            TileLayer(
-                              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                              userAgentPackageName: 'com.carrent.app',
-                            ),
-                            MarkerLayer(
-                              markers: _branches.map((branch) {
-                                return Marker(
-                                  point: LatLng(branch.latitude, branch.longitude),
-                                  width: 40,
-                                  height: 40,
-                                  child: GestureDetector(
-                                    onTap: () => _showBranchInfo(branch),
-                                    child: const Icon(
-                                      Icons.location_on,
-                                      color: AppColors.primaryOrange,
-                                      size: 32,
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          ],
                         ),
                       ),
-                    ),
+                      if (_isSelectingLocationFromMap)
+                        Positioned(
+                          top: 16,
+                          left: 16,
+                          right: 16,
+                          child: Card(
+                            color: Colors.redAccent,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.touch_app, color: Colors.white),
+                                  SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      'Click anywhere on the map to set the branch coordinates!',
+                                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAddBranchButton() {
+    return ElevatedButton.icon(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.primaryOrange,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      onPressed: () => _activateForm(),
+      icon: const Icon(Icons.add, size: 18),
+      label: const Text('Add Branch', style: TextStyle(fontWeight: FontWeight.bold)),
+    );
+  }
+
+  Widget _buildBranchList() {
+    return Card(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 0,
+      child: _branches.isEmpty
+          ? const Center(child: Text('No branches registered.'))
+          : ListView.builder(
+              itemCount: _branches.length,
+              itemBuilder: (context, index) {
+                final branch = _branches[index];
+                final isValid = _isValidLatLng(branch.latitude, branch.longitude);
+                final isActive = branch.status == 'Active';
+
+                return ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: isActive ? AppColors.lightGray : Colors.grey[200],
+                    child: Icon(Icons.location_on_outlined, color: isActive ? AppColors.primaryOrange : Colors.grey, size: 20),
+                  ),
+                  title: Row(
+                    children: [
+                      Text(branch.name, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isActive ? Colors.green.withValues(alpha: 0.1) : Colors.grey.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          branch.status.toUpperCase(),
+                          style: TextStyle(color: isActive ? Colors.green : Colors.grey, fontSize: 8, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(branch.address, style: const TextStyle(fontSize: 12)),
+                      if (!isValid)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 4.0),
+                          child: Row(
+                            children: [
+                              Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 14),
+                              SizedBox(width: 4),
+                              Text('Missing/Invalid GPS Coordinates!', style: TextStyle(color: Colors.orange, fontSize: 11, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      Text('Phone: ${branch.phone} | GPS: ${branch.latitude.toStringAsFixed(3)}, ${branch.longitude.toStringAsFixed(3)}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                    ],
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (isValid)
+                        IconButton(
+                          icon: const Icon(Icons.map_outlined, color: Colors.blue, size: 18),
+                          onPressed: () {
+                            _mapController.move(LatLng(branch.latitude, branch.longitude), 12.0);
+                          },
+                        ),
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined, color: Colors.indigo, size: 18),
+                        onPressed: () => _activateForm(branch: branch),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18),
+                        onPressed: () => _deleteBranch(branch.id),
+                      ),
+                    ],
+                  ),
+                  onTap: () => _showBranchInfo(branch),
+                );
+              },
+            ),
+    );
+  }
+
+  Widget _buildBranchForm() {
+    final isEdit = _editingBranch != null;
+    return Card(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 0,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  isEdit ? 'Edit Branch' : 'Add Branch Location',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.grey),
+                  onPressed: _cancelForm,
+                ),
+              ],
+            ),
+            const Divider(height: 24),
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(labelText: 'Branch Name', hintText: 'e.g. Kajang Hub'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _addressController,
+              decoration: const InputDecoration(labelText: 'Address', hintText: 'Full physical address'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _phoneController,
+              decoration: const InputDecoration(labelText: 'Phone Number', hintText: 'e.g. +603-87391234'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _hoursController,
+              decoration: const InputDecoration(labelText: 'Operating Hours', hintText: 'e.g. 09:00 AM - 09:00 PM'),
+            ),
+            const SizedBox(height: 12),
+            
+            // Coordinates Row with "Select from map" trigger
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _latController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: 'Latitude'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _lngController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: 'Longitude'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _isSelectingLocationFromMap ? Colors.redAccent : AppColors.lightGray,
+                foregroundColor: _isSelectingLocationFromMap ? Colors.white : AppColors.secondaryBlue,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () {
+                setState(() {
+                  _isSelectingLocationFromMap = !_isSelectingLocationFromMap;
+                });
+              },
+              icon: Icon(_isSelectingLocationFromMap ? Icons.touch_app : Icons.map),
+              label: Text(_isSelectingLocationFromMap ? 'TAPPING ACTIVE...' : 'Select Location Directly From Map'),
+            ),
+            const SizedBox(height: 16),
+
+            // Status Dropdown
+            DropdownButtonFormField<String>(
+              initialValue: _status,
+              decoration: const InputDecoration(labelText: 'Branch Status'),
+              items: ['Active', 'Inactive'].map((s) {
+                return DropdownMenuItem(value: s, child: Text(s));
+              }).toList(),
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() => _status = val);
+                }
+              },
+            ),
+            const SizedBox(height: 24),
+
+            // Form actions
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _cancelForm,
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryOrange,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: _saveForm,
+                    child: const Text('Save Branch'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../models/booking_model.dart';
@@ -22,10 +23,13 @@ class _BookingsViewState extends State<BookingsView> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
+  StreamSubscription<List<BookingModel>>? _bookingsSubscription;
+
   @override
   void initState() {
     super.initState();
     _loadBookings();
+    _subscribeToBookings();
     _searchController.addListener(() {
       setState(() {
         _searchQuery = _searchController.text.trim().toLowerCase();
@@ -33,9 +37,22 @@ class _BookingsViewState extends State<BookingsView> {
     });
   }
 
+  void _subscribeToBookings() {
+    _bookingsSubscription?.cancel();
+    _bookingsSubscription = _bookingService.getBookingsStream().listen((bookingsList) {
+      if (mounted) {
+        setState(() {
+          _bookings = bookingsList;
+          _bookings.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        });
+      }
+    });
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
+    _bookingsSubscription?.cancel();
     super.dispose();
   }
 
@@ -294,42 +311,38 @@ class _BookingsViewState extends State<BookingsView> {
             elevation: 0,
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      decoration: const InputDecoration(
-                        hintText: 'Search by booking ID, vehicle model, or customer name...',
-                        prefixIcon: Icon(Icons.search, size: 20),
-                        contentPadding: EdgeInsets.symmetric(vertical: 8),
-                      ),
+              child: isDesktop
+                  ? Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            decoration: const InputDecoration(
+                              hintText: 'Search by booking ID, vehicle model, or customer name...',
+                              prefixIcon: Icon(Icons.search, size: 20),
+                              contentPadding: EdgeInsets.symmetric(vertical: 8),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        _buildStatusFilterDropdown(),
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        TextField(
+                          controller: _searchController,
+                          decoration: const InputDecoration(
+                            hintText: 'Search by booking ID, vehicle model, or customer name...',
+                            prefixIcon: Icon(Icons.search, size: 20),
+                            contentPadding: EdgeInsets.symmetric(vertical: 8),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        _buildStatusFilterDropdown(),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: DropdownButton<String>(
-                      value: _selectedFilter,
-                      underline: const SizedBox(),
-                      items: ['All', 'Pending', 'Approved', 'Ongoing', 'Completed', 'Cancelled'].map((s) {
-                        return DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)));
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          setState(() {
-                            _selectedFilter = val;
-                          });
-                        }
-                      },
-                    ),
-                  ),
-                ],
-              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -506,6 +519,30 @@ class _BookingsViewState extends State<BookingsView> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildStatusFilterDropdown() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: DropdownButton<String>(
+        value: _selectedFilter,
+        underline: const SizedBox(),
+        items: ['All', 'Pending', 'Approved', 'Ongoing', 'Completed', 'Cancelled'].map((s) {
+          return DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)));
+        }).toList(),
+        onChanged: (val) {
+          if (val != null) {
+            setState(() {
+              _selectedFilter = val;
+            });
+          }
+        },
+      ),
     );
   }
 }

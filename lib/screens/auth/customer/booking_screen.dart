@@ -11,6 +11,7 @@ import '../../../services/booking_service.dart';
 import '../../../services/payment_service.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/database_service.dart';
+import '../../../services/reward_service.dart';
 import 'booking_confirmation_screen.dart';
 import '../../../widgets/loading_widget.dart';
 import '../../../widgets/app_image.dart';
@@ -38,8 +39,13 @@ class _BookingScreenState extends State<BookingScreen> {
   DateTime? _pickupDate;
   DateTime? _returnDate;
 
-  String _paymentMethod = 'DuitNow QR'; // 'DuitNow QR', 'FPX Online Banking', 'Cash'
-  String? _selectedBank; // Maybank, CIMB, RHB, Public Bank, Hong Leong
+  int _availablePoints = 0;
+  int _pointsToRedeem = 0;
+  final _pointsController = TextEditingController();
+  String? _pointsError;
+
+  String _paymentMethod = 'DuitNow QR'; // 'DuitNow QR', 'Online Bank Transfer', 'FPX Online Banking', 'Cash'
+  String? _selectedBank;
   String _paymentOption = 'Deposit'; // 'Deposit' or 'Full'
   bool _loading = false;
   String? _userName;
@@ -99,6 +105,7 @@ class _BookingScreenState extends State<BookingScreen> {
           setState(() {
             _userName = profile.fullName;
             _userPhone = profile.phone;
+            _availablePoints = profile.rewardPoints;
           });
         }
       }
@@ -117,14 +124,24 @@ class _BookingScreenState extends State<BookingScreen> {
     return _rentalDays * widget.vehicle.pricePerDay;
   }
 
+  double get _discountAmount {
+    return _pointsToRedeem * 0.10;
+  }
+
+  double get _discountedTotal {
+    final val = _totalPrice - _discountAmount;
+    return val < 0.0 ? 0.0 : val;
+  }
+
   double get _depositAmount {
-    // 30% of total price as deposit, minimum RM 150
-    final calc = _totalPrice * 0.3;
-    return calc < 150 ? 150.0 : calc;
+    final calc = _discountedTotal * 0.3;
+    final minDep = _discountedTotal < 150.0 ? _discountedTotal : 150.0;
+    return calc < minDep ? minDep : calc;
   }
 
   double get _balanceAmount {
-    return _totalPrice - _depositAmount;
+    final val = _discountedTotal - _depositAmount;
+    return val < 0.0 ? 0.0 : val;
   }
 
   Future<void> _selectPickupDate() async {
@@ -197,14 +214,166 @@ class _BookingScreenState extends State<BookingScreen> {
     }
 
     if (_paymentMethod == 'DuitNow QR') {
-      _showDuitNowDialog();
+      _showPaymentDialog(isQr: true);
+    } else if (_paymentMethod == 'Online Bank Transfer') {
+      _showPaymentDialog(isQr: false);
     } else if (_paymentMethod == 'FPX Online Banking') {
       _showFPXDialog();
     } else {
       _showCashConfirmationDialog();
     }
-  }  void _showDuitNowDialog() {
-    final payAmount = _paymentOption == 'Deposit' ? _depositAmount : _totalPrice;
+  }
+
+  void _showFPXDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: const Text('Select Your Bank', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Choose your preferred FPX online banking bank portal to authorize payment:'),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.lightGray,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey[200]!),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _selectedBank,
+                        hint: const Text('Choose a bank'),
+                        isExpanded: true,
+                        items: _fpxBanks.map((bank) {
+                          return DropdownMenuItem(value: bank, child: Text(bank));
+                        }).toList(),
+                        onChanged: (val) {
+                          setDialogState(() {
+                            _selectedBank = val;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('CANCEL'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryOrange),
+                  onPressed: _selectedBank != null
+                      ? () {
+                          Navigator.pop(context);
+                          _simulateFPXGateway();
+                        }
+                      : null,
+                  child: const Text('PROCEED', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _simulateFPXGateway() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(color: AppColors.primaryOrange),
+              const SizedBox(height: 20),
+              Text('Redirecting to $_selectedBank portal...', style: const TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              const Text('Please authorize the FPX secure payment window.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Colors.grey)),
+            ],
+          ),
+        );
+      },
+    );
+
+    Future.delayed(const Duration(seconds: 2), () {
+      if (!mounted) return;
+      Navigator.pop(context); // close simulation loading dialog
+      
+      final payAmount = _paymentOption == 'Deposit' ? _depositAmount : _discountedTotal;
+      final DateFormat timeFormat = DateFormat('HH:mm:ss');
+      final now = DateTime.now();
+      final autoTime = timeFormat.format(now);
+
+      _processBooking(
+        status: 'Approved',
+        txId: 'FPX-${_selectedBank?.substring(0, 3).toUpperCase()}-${DateTime.now().millisecondsSinceEpoch}',
+        amount: payAmount,
+        paymentDate: now,
+        paymentTime: autoTime,
+      );
+    });
+  }
+
+  void _showCashConfirmationDialog() {
+    final payAmount = _paymentOption == 'Deposit' ? _depositAmount : _discountedTotal;
+    final DateFormat timeFormat = DateFormat('HH:mm:ss');
+    final now = DateTime.now();
+    final autoTime = timeFormat.format(now);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Cash Payment Confirmation', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+          content: Text(
+            'Confirming this booking will place it in an active booked status. You can pay RM ${payAmount.toStringAsFixed(2)} at the branch counter on pickup.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('CANCEL'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryOrange),
+              onPressed: () {
+                Navigator.pop(context);
+                _processBooking(
+                  status: 'Approved',
+                  txId: 'CASH-BRANCH-${DateTime.now().millisecondsSinceEpoch}',
+                  amount: payAmount,
+                  paymentDate: now,
+                  paymentTime: autoTime,
+                );
+              },
+              child: const Text('CONFIRM', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showPaymentDialog({required bool isQr}) {
+    final payAmount = _paymentOption == 'Deposit' ? _depositAmount : _discountedTotal;
+    final DateFormat dialogDateFormat = DateFormat('yyyy-MM-dd');
+    final DateFormat timeFormat = DateFormat('HH:mm:ss');
+    final now = DateTime.now();
+    final autoDate = dialogDateFormat.format(now);
+    final autoTime = timeFormat.format(now);
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -215,9 +384,10 @@ class _BookingScreenState extends State<BookingScreen> {
         int? receiptSize;
         String? errorMsg;
 
+        final referenceController = TextEditingController();
+
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            // Register callback to update dialog state
             receipt_upload.onReceiptUploadedCallback = (String base64, String name, int size) {
               setDialogState(() {
                 if (base64 == 'error:size' || size > 10 * 1024 * 1024) {
@@ -239,10 +409,13 @@ class _BookingScreenState extends State<BookingScreen> {
               });
             };
 
+            final bool canSubmit =
+                receiptBase64 != null && referenceController.text.trim().isNotEmpty;
+
             return AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               title: Text(
-                hasPaid ? 'Upload Transaction Receipt' : 'Pay via DuitNow QR',
+                hasPaid ? 'Upload Transaction Receipt' : (isQr ? 'Pay via DuitNow QR' : 'Online Bank Transfer'),
                 style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue),
               ),
               content: SingleChildScrollView(
@@ -250,48 +423,95 @@ class _BookingScreenState extends State<BookingScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (!hasPaid) ...[
-                      const Text('Scan the QR code or transfer to the bank account below to complete the deposit payment transfer.', textAlign: TextAlign.center),
-                      const SizedBox(height: 20),
-                      if (_qrCodeUrl != null && _qrCodeUrl!.isNotEmpty)
-                        Container(
-                          width: 200,
-                          height: 200,
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            border: Border.all(color: Colors.grey[200]!, width: 2),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Column(
-                            children: [
-                              Container(
-                                color: Colors.pink,
-                                width: double.infinity,
-                                height: 30,
-                                alignment: Alignment.center,
-                                child: const Text('DuitNow QR', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10)),
-                              ),
-                              Expanded(
-                                child: AppImage(
-                                  imageSrc: _qrCodeUrl,
-                                  fit: BoxFit.contain,
-                                  placeholder: const Icon(Icons.qr_code_2, size: 120, color: Colors.black),
-                                ),
-                              ),
-                              Text('RM ${payAmount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                            ],
-                          ),
-                        )
-                      else
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(Icons.qr_code_2, size: 100, color: Colors.grey),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: AppColors.lightGray,
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                      const SizedBox(height: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'BOOKING SUMMARY',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Vehicle: ${widget.vehicle.brand} ${widget.vehicle.model}',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.secondaryBlue),
+                            ),
+                            Text(
+                              'Dates: ${dialogDateFormat.format(_pickupDate!)} to ${dialogDateFormat.format(_returnDate!)} ($_rentalDays days)',
+                              style: const TextStyle(fontSize: 12, color: AppColors.secondaryBlue),
+                            ),
+                            const Divider(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Total Price:', style: TextStyle(fontSize: 12)),
+                                Text('RM ${_totalPrice.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('Amount Due ($_paymentOption):', style: const TextStyle(fontSize: 12, color: AppColors.primaryOrange, fontWeight: FontWeight.bold)),
+                                Text('RM ${payAmount.toStringAsFixed(2)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.primaryOrange)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (isQr) ...[
+                        const Text('Scan the QR code or transfer to the bank account below to complete the deposit payment transfer.', textAlign: TextAlign.center),
+                        const SizedBox(height: 20),
+                        if (_qrCodeUrl != null && _qrCodeUrl!.isNotEmpty)
+                          Container(
+                            width: 200,
+                            height: 200,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              border: Border.all(color: Colors.grey[200]!, width: 2),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Column(
+                              children: [
+                                Container(
+                                  color: Colors.pink,
+                                  width: double.infinity,
+                                  height: 30,
+                                  alignment: Alignment.center,
+                                  child: const Text('DuitNow QR', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10)),
+                                ),
+                                Expanded(
+                                  child: AppImage(
+                                    imageSrc: _qrCodeUrl,
+                                    fit: BoxFit.contain,
+                                    placeholder: const Icon(Icons.qr_code_2, size: 120, color: Colors.black),
+                                  ),
+                                ),
+                                Text('RM ${payAmount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                              ],
+                            ),
+                          )
+                        else
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.qr_code_2, size: 100, color: Colors.grey),
+                          ),
+                        const SizedBox(height: 16),
+                      ] else ...[
+                        const Text('Please transfer the payment amount to the corporate bank account details listed below.', textAlign: TextAlign.center),
+                        const SizedBox(height: 16),
+                      ],
                       if (_bankName != null && _bankName!.isNotEmpty) ...[
                         const Divider(),
                         const SizedBox(height: 8),
@@ -335,15 +555,12 @@ class _BookingScreenState extends State<BookingScreen> {
                         const Divider(),
                       ],
                     ] else ...[
-                      // Drag & Drop / Upload Panel
                       const Text(
                         'Please upload a copy of your transaction receipt to proceed with payment verification.',
                         textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 13, color: Colors.grey),
                       ),
                       const SizedBox(height: 16),
-                      
-                      // Platform Specific File Dropzone / Selector
                       if (kIsWeb) ...[
                         Container(
                           height: 150,
@@ -403,7 +620,6 @@ class _BookingScreenState extends State<BookingScreen> {
                           label: const Text('SELECT RECEIPT FILE'),
                         ),
                       ],
-                      
                       const SizedBox(height: 16),
                       if (errorMsg != null)
                         Text(
@@ -411,8 +627,6 @@ class _BookingScreenState extends State<BookingScreen> {
                           style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold),
                           textAlign: TextAlign.center,
                         ),
-                      
-                      // Preview Box
                       if (receiptBase64 != null) ...[
                         const SizedBox(height: 12),
                         const Text('Receipt Preview:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.secondaryBlue)),
@@ -467,17 +681,63 @@ class _BookingScreenState extends State<BookingScreen> {
                         ),
                       ],
                       const SizedBox(height: 16),
-                      const Text(
-                        'Paste your DuitNow Reference ID (if available):',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                      TextField(
+                        controller: referenceController,
+                        onChanged: (_) => setDialogState(() {}),
+                        decoration: const InputDecoration(
+                          labelText: 'Transaction Reference ID *',
+                          hintText: 'e.g., Ref: 123456789012',
+                          border: OutlineInputBorder(),
+                          helperText: 'Found on your bank transfer confirmation',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: 'Payment Amount (RM)',
+                          border: const OutlineInputBorder(),
+                          filled: true,
+                          fillColor: Colors.grey[100],
+                          suffixIcon: const Icon(Icons.lock_outline, size: 16, color: Colors.grey),
+                        ),
+                        child: Text(
+                          'RM ${payAmount.toStringAsFixed(2)}',
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: 'Payment Date',
+                          border: const OutlineInputBorder(),
+                          filled: true,
+                          fillColor: Colors.grey[100],
+                          suffixIcon: const Icon(Icons.lock_outline, size: 16, color: Colors.grey),
+                        ),
+                        child: Text(
+                          autoDate,
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: 'Payment Time',
+                          border: const OutlineInputBorder(),
+                          filled: true,
+                          fillColor: Colors.grey[100],
+                          suffixIcon: const Icon(Icons.lock_outline, size: 16, color: Colors.grey),
+                        ),
+                        child: Text(
+                          autoTime,
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue),
+                        ),
                       ),
                       const SizedBox(height: 8),
-                      TextField(
-                        controller: _txnIdController,
-                        decoration: const InputDecoration(
-                          hintText: 'e.g., Ref: 123456789012',
-                          labelText: 'Transaction Reference ID',
-                        ),
+                      const Text(
+                        '🔒 Amount, date and time are auto-filled and cannot be edited.',
+                        style: TextStyle(fontSize: 11, color: Colors.grey),
+                        textAlign: TextAlign.center,
                       ),
                     ],
                   ],
@@ -509,143 +769,29 @@ class _BookingScreenState extends State<BookingScreen> {
                   ),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryOrange),
-                    onPressed: receiptBase64 == null
-                        ? null
-                        : () {
-                            final txId = _txnIdController.text.trim().isNotEmpty
-                                ? _txnIdController.text.trim()
-                                : 'QR-REF-${DateTime.now().millisecondsSinceEpoch}';
+                    onPressed: canSubmit
+                        ? () {
+                            final txId = referenceController.text.trim();
                             Navigator.pop(context);
                             _processBooking(
-                              status: 'pending',
+                              status: 'Approved',
                               txId: txId,
+                              amount: payAmount,
+                              paymentDate: now,
+                              paymentTime: autoTime,
                               receiptImage: receiptBase64,
                             );
-                          },
-                    child: const Text('SUBMIT TRANSACTION', style: TextStyle(color: Colors.white)),
+                          }
+                        : null,
+                    child: Text(
+                      canSubmit ? 'SUBMIT TRANSACTION' : 'UPLOAD RECEIPT & ENTER REF ID',
+                      style: const TextStyle(color: Colors.white),
+                    ),
                   ),
                 ],
               ],
             );
           },
-        );
-      },
-    );
-  }
-  // FPX Online Banking payment flow
-  void _showFPXDialog() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Select Your Bank', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('Choose your preferred FPX online banking bank portal to authorize payment:'),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: AppColors.lightGray,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey[200]!),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _selectedBank,
-                        hint: const Text('Choose a bank'),
-                        isExpanded: true,
-                        items: _fpxBanks.map((bank) {
-                          return DropdownMenuItem(value: bank, child: Text(bank));
-                        }).toList(),
-                        onChanged: (val) {
-                          setDialogState(() {
-                            _selectedBank = val;
-                          });
-                        },
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('CANCEL'),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryOrange),
-                  onPressed: _selectedBank == null
-                      ? null
-                      : () {
-                          Navigator.pop(context);
-                          _simulateFPXGateway();
-                        },
-                  child: const Text('PROCEED', style: TextStyle(color: Colors.white)),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _simulateFPXGateway() {
-    // Shows custom dialog simulating redirection to Maybank/CIMB secure authorize page
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return AlertDialog(
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircularProgressIndicator(color: AppColors.primaryOrange),
-              const SizedBox(height: 20),
-              Text('Redirecting to $_selectedBank portal...', style: const TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              const Text('Please authorize the FPX secure payment window.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Colors.grey)),
-            ],
-          ),
-        );
-      },
-    );
-
-    Future.delayed(const Duration(seconds: 2), () {
-      if (!mounted) return;
-      Navigator.pop(context); // close simulation loading dialog
-      _processBooking(status: 'paid', txId: 'FPX-${_selectedBank?.substring(0, 3).toUpperCase()}-${DateTime.now().millisecondsSinceEpoch}');
-    });
-  }
-
-  // Cash payment confirmation
-  void _showCashConfirmationDialog() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Cash Payment Verification', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
-          content: const Text(
-            'Your booking will be placed in a pending verification status. You must complete the cash payment at the pickup branch counter before vehicle keys can be released.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('CANCEL'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryOrange),
-              onPressed: () {
-                Navigator.pop(context);
-                _processBooking(status: 'pending', txId: 'CASH-BRANCH-${DateTime.now().millisecondsSinceEpoch}');
-              },
-              child: const Text('RESERVE', style: TextStyle(color: Colors.white)),
-            ),
-          ],
         );
       },
     );
@@ -655,7 +801,10 @@ class _BookingScreenState extends State<BookingScreen> {
   Future<void> _processBooking({
     required String status,
     required String txId,
+    required double amount,
+    required DateTime paymentDate,
     String? receiptImage,
+    String? paymentTime,
   }) async {
     final currentUser = _authService.currentUser;
     if (currentUser == null || _userName == null) return;
@@ -663,6 +812,35 @@ class _BookingScreenState extends State<BookingScreen> {
     setState(() => _loading = true);
 
     try {
+      // 1. Validate dates
+      final nowToday = DateTime.now();
+      final todayStart = DateTime(nowToday.year, nowToday.month, nowToday.day);
+      if (_pickupDate == null) {
+        throw 'Please select a pickup date.';
+      }
+      if (_pickupDate!.isBefore(todayStart)) {
+        throw 'Pickup date cannot be in the past.';
+      }
+      if (_returnDate == null) {
+        throw 'Please select a return date.';
+      }
+      if (!_returnDate!.isAfter(_pickupDate!)) {
+        throw 'Return date must be after the pickup date.';
+      }
+
+      // 2. Validate vehicle exists and is available
+      final vehicleSnap = await FirebaseDatabase.instance.ref().child('vehicles').child(widget.vehicle.id).get();
+      if (!vehicleSnap.exists) {
+        throw 'The selected vehicle does not exist.';
+      }
+      final vehicleData = vehicleSnap.value as Map<dynamic, dynamic>;
+      final freshStatus = (vehicleData['status'] ?? '').toString().toLowerCase();
+      if (freshStatus != 'available') {
+        throw 'This vehicle is no longer available (Current status: $freshStatus).';
+      }
+
+
+
       final String bookingId = FirebaseDatabase.instance.ref().child('bookings').push().key!;
       
       final booking = BookingModel(
@@ -674,49 +852,63 @@ class _BookingScreenState extends State<BookingScreen> {
         userPhone: _userPhone ?? '',
         pickUpDate: _pickupDate!,
         returnDate: _returnDate!,
-        totalPrice: _totalPrice,
+        totalPrice: _discountedTotal,
         depositAmount: _depositAmount,
-        status: 'pending', // Pending initially, approved only on payment verification
+        status: 'Confirmed', // Confirmed automatically
         notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
         createdAt: DateTime.now(),
+        pointsRedeemed: _pointsToRedeem,
+        discountAmount: _discountAmount,
+        pointsRedeemedProcessed: _pointsToRedeem > 0,
+        rewardPointsAwarded: false,
       );
 
       // Save Booking
       await _bookingService.createBooking(booking);
 
       // Save Payment record
-      final payAmount = _paymentOption == 'Deposit' ? _depositAmount : _totalPrice;
       final payment = PaymentModel(
         id: '',
         bookingId: bookingId,
         userId: currentUser.uid,
-        amount: payAmount,
+        amount: amount,
         depositAmount: _depositAmount,
-        balanceAmount: _paymentOption == 'Deposit' ? _balanceAmount : 0.0,
+        balanceAmount: _paymentOption == 'Deposit' ? _discountedTotal - amount : 0.0,
         paymentMethod: _paymentMethod,
-        status: receiptImage != null ? 'Pending Verification' : status,
-        paymentStatus: receiptImage != null ? 'Pending Verification' : (status == 'paid' ? 'Approved' : 'Pending Verification'),
+        status: 'Approved', // Auto-approved
+        paymentStatus: 'Approved',
         transactionId: txId,
-        paymentDate: DateTime.now(),
+        paymentDate: paymentDate,
         receiptImage: receiptImage,
         receiptFile: receiptImage,
-        uploadedAt: receiptImage != null ? DateTime.now().toIso8601String() : null,
+        uploadedAt: DateTime.now().toIso8601String(),
         customerUid: currentUser.uid,
+        paymentTime: paymentTime,
       );
 
       await _paymentService.createPayment(payment);
 
+      // Deduct reward points immediately if any were redeemed
+      if (_pointsToRedeem > 0) {
+        try {
+          await RewardPointsService().deductPointsForBooking(bookingId);
+        } catch (rewardErr) {
+          debugPrint('Error auto-deducting reward points: $rewardErr');
+        }
+      }
+
       if (!mounted) return;
 
-      Navigator.pushAndRemoveUntil(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (context) => BookingConfirmationScreen(
             booking: booking,
             vehicle: widget.vehicle,
+            paymentMethod: _paymentMethod,
+            paymentStatus: 'Paid',
           ),
         ),
-        (route) => false,
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -733,6 +925,7 @@ class _BookingScreenState extends State<BookingScreen> {
   void dispose() {
     _notesController.dispose();
     _txnIdController.dispose();
+    _pointsController.dispose();
     super.dispose();
   }
 
@@ -879,6 +1072,8 @@ class _BookingScreenState extends State<BookingScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
+                  _buildRewardsRedemptionCard(),
+                  const SizedBox(height: 24),
                   // Deposit choices
                   const Text('Payment Option', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.secondaryBlue)),
                   const SizedBox(height: 12),
@@ -937,7 +1132,7 @@ class _BookingScreenState extends State<BookingScreen> {
                         child: DropdownButton<String>(
                           value: _paymentMethod,
                           underline: const SizedBox(),
-                          items: (_qrEnabled ? ['DuitNow QR', 'FPX Online Banking', 'Cash'] : ['FPX Online Banking', 'Cash']).map((val) {
+                          items: ['DuitNow QR', 'Online Bank Transfer', 'FPX Online Banking', 'Cash'].map((val) {
                             return DropdownMenuItem(
                               value: val,
                               child: Text(val, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
@@ -963,7 +1158,11 @@ class _BookingScreenState extends State<BookingScreen> {
                     const SizedBox(height: 12),
                     _buildPriceRow('Rental Duration', '$_rentalDays days'),
                     _buildPriceRow('Price / Day', 'RM ${widget.vehicle.pricePerDay.toStringAsFixed(2)}'),
-                    _buildPriceRow('Total Cost', 'RM ${_totalPrice.toStringAsFixed(2)}', isBold: true),
+                    _buildPriceRow('Total Cost', 'RM ${_totalPrice.toStringAsFixed(2)}', isBold: _pointsToRedeem == 0),
+                    if (_pointsToRedeem > 0) ...[
+                      _buildPriceRow('Reward Discount ($_pointsToRedeem pts)', '-RM ${_discountAmount.toStringAsFixed(2)}', color: Colors.green),
+                      _buildPriceRow('Discounted Total', 'RM ${_discountedTotal.toStringAsFixed(2)}', isBold: true),
+                    ],
                     const Divider(height: 24),
                     _buildPriceRow('Deposit Amount (RM 150 min)', 'RM ${_depositAmount.toStringAsFixed(2)}',
                         isBold: _paymentOption == 'Deposit', color: AppColors.primaryOrange),
@@ -985,7 +1184,7 @@ class _BookingScreenState extends State<BookingScreen> {
                           Text(
                             _paymentOption == 'Deposit'
                                 ? 'RM ${_depositAmount.toStringAsFixed(2)}'
-                                : 'RM ${_totalPrice.toStringAsFixed(2)}',
+                                : 'RM ${_discountedTotal.toStringAsFixed(2)}',
                             style: const TextStyle(
                               color: AppColors.primaryOrange,
                               fontWeight: FontWeight.bold,
@@ -1008,7 +1207,7 @@ class _BookingScreenState extends State<BookingScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      onPressed: _pickupDate != null && _returnDate != null ? _triggerPaymentFlow : null,
+                      onPressed: (_pickupDate != null && _returnDate != null && widget.vehicle.status.toLowerCase() == 'available') ? _triggerPaymentFlow : null,
                       child: const Text('CONFIRM RESERVATION', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
                     ),
                   ),
@@ -1032,6 +1231,106 @@ class _BookingScreenState extends State<BookingScreen> {
           Text(label, style: style),
           Text(value, style: style),
         ],
+      ),
+    );
+  }
+
+  Widget _buildRewardsRedemptionCard() {
+    if (_availablePoints <= 0) {
+      return const SizedBox.shrink();
+    }
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 0,
+      color: Colors.white,
+      margin: const EdgeInsets.only(bottom: 24),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.borderGray),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.stars_rounded, color: AppColors.primaryOrange, size: 20),
+                const SizedBox(width: 8),
+                const Text(
+                  'Redeem Reward Points',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.secondaryBlue),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Available balance: $_availablePoints points. (10 points = RM 1.00 discount)',
+              style: const TextStyle(fontSize: 12, color: AppColors.lightText),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _pointsController,
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(fontSize: 13),
+                    decoration: InputDecoration(
+                      hintText: 'e.g. 100',
+                      errorText: _pointsError,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                    onChanged: (val) {
+                      if (val.isEmpty) {
+                        setState(() {
+                          _pointsError = null;
+                          _pointsToRedeem = 0;
+                        });
+                        return;
+                      }
+                      final parsed = int.tryParse(val) ?? -1;
+                      setState(() {
+                        if (parsed < 0) {
+                          _pointsError = 'Points must be a positive integer';
+                          _pointsToRedeem = 0;
+                        } else if (parsed > _availablePoints) {
+                          _pointsError = 'Exceeds available points';
+                          _pointsToRedeem = 0;
+                        } else if (parsed * 0.10 > _totalPrice) {
+                          _pointsError = 'Discount exceeds total price';
+                          _pointsToRedeem = 0;
+                        } else {
+                          _pointsError = null;
+                          _pointsToRedeem = parsed;
+                        }
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryOrange.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text('DISCOUNT', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.primaryOrange)),
+                      const SizedBox(height: 2),
+                      Text(
+                        '-RM ${(_pointsToRedeem * 0.10).toStringAsFixed(2)}',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primaryOrange),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

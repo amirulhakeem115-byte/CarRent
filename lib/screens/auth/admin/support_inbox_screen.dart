@@ -18,7 +18,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
   List<UserModel> _users = [];
   bool _loading = true;
   String? _error;
-  String _selectedFilter = 'All'; // 'All', 'Open', 'Pending', 'Closed'
+  String _selectedFilter = 'All'; // 'All', 'Open', 'In Progress', 'Closed'
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
@@ -111,7 +111,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                   } catch (_) {}
                 }
                 Color statusColor = Colors.orange;
-                if (status.toLowerCase() == 'pending') statusColor = Colors.blue;
+                if (status.toLowerCase() == 'pending' || status.toLowerCase() == 'in progress') statusColor = Colors.blue;
                 if (status.toLowerCase() == 'closed') statusColor = Colors.green;
 
                 return AlertDialog(
@@ -245,9 +245,9 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                           children: [
                             const Text('Modify Ticket Status:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
                             DropdownButton<String>(
-                              value: ['Open', 'Pending', 'Closed'].contains(status) ? status : 'Open',
+                              value: ['Open', 'In Progress', 'Closed'].contains(status) ? status : 'Open',
                               underline: const SizedBox(),
-                              items: ['Open', 'Pending', 'Closed'].map((s) {
+                              items: ['Open', 'In Progress', 'Closed'].map((s) {
                                 return DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)));
                               }).toList(),
                               onChanged: (val) {
@@ -305,7 +305,10 @@ class _SupportInboxViewState extends State<SupportInboxView> {
         // Calculations
         final totalTickets = tickets.length;
         final openTickets = tickets.where((m) => (m['status'] ?? 'Open').toString().toLowerCase() == 'open').length;
-        final pendingTickets = tickets.where((m) => (m['status'] ?? '').toString().toLowerCase() == 'pending').length;
+        final inProgressTickets = tickets.where((m) {
+          final s = (m['status'] ?? '').toString().toLowerCase();
+          return s == 'pending' || s == 'in progress';
+        }).length;
         final closedTickets = tickets.where((m) => (m['status'] ?? '').toString().toLowerCase() == 'closed').length;
 
         // Filters application
@@ -366,7 +369,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                 children: [
                   _buildStatCard('Total Tickets Received', totalTickets.toString(), Icons.mark_as_unread, Colors.indigo),
                   _buildStatCard('Open Tickets', openTickets.toString(), Icons.hourglass_top, Colors.orange),
-                  _buildStatCard('Pending Tickets', pendingTickets.toString(), Icons.chat_bubble_outline, Colors.blue),
+                  _buildStatCard('In Progress Tickets', inProgressTickets.toString(), Icons.chat_bubble_outline, Colors.blue),
                   _buildStatCard('Closed Tickets', closedTickets.toString(), Icons.check_circle_outline, Colors.green),
                 ],
               ),
@@ -379,42 +382,71 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                 elevation: 0,
                 child: Padding(
                   padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _searchController,
-                          decoration: const InputDecoration(
-                            hintText: 'Search tickets by customer name, email, subject, or ticket ID...',
-                            prefixIcon: Icon(Icons.search, size: 20),
-                            contentPadding: EdgeInsets.symmetric(vertical: 8),
-                          ),
+                  child: isDesktop
+                      ? Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _searchController,
+                                decoration: const InputDecoration(
+                                  hintText: 'Search tickets by customer name, email, subject, or ticket ID...',
+                                  prefixIcon: Icon(Icons.search, size: 20),
+                                  contentPadding: EdgeInsets.symmetric(vertical: 8),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[100],
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: DropdownButton<String>(
+                                value: _selectedFilter,
+                                underline: const SizedBox(),
+                                items: ['All', 'Open', 'In Progress', 'Closed'].map((s) {
+                                  return DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)));
+                                }).toList(),
+                                onChanged: (val) {
+                                  if (val != null) setState(() => _selectedFilter = val);
+                                },
+                              ),
+                            ),
+                          ],
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            TextField(
+                              controller: _searchController,
+                              decoration: const InputDecoration(
+                                hintText: 'Search tickets by name, email, subject or ID...',
+                                prefixIcon: Icon(Icons.search, size: 20),
+                                contentPadding: EdgeInsets.symmetric(vertical: 8),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[100],
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: DropdownButton<String>(
+                                value: _selectedFilter,
+                                underline: const SizedBox(),
+                                isExpanded: true,
+                                items: ['All', 'Open', 'In Progress', 'Closed'].map((s) {
+                                  return DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)));
+                                }).toList(),
+                                onChanged: (val) {
+                                  if (val != null) setState(() => _selectedFilter = val);
+                                },
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: DropdownButton<String>(
-                          value: _selectedFilter,
-                          underline: const SizedBox(),
-                          items: ['All', 'Open', 'Pending', 'Closed'].map((s) {
-                            return DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)));
-                          }).toList(),
-                          onChanged: (val) {
-                            if (val != null) {
-                              setState(() {
-                                _selectedFilter = val;
-                              });
-                            }
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -524,7 +556,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
             }
 
             Color statusColor = Colors.orange;
-            if (status.toLowerCase() == 'pending') statusColor = Colors.blue;
+            if (status.toLowerCase() == 'pending' || status.toLowerCase() == 'in progress') statusColor = Colors.blue;
             if (status.toLowerCase() == 'closed') statusColor = Colors.green;
 
             return DataRow(
@@ -584,7 +616,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
         }
 
         Color statusColor = Colors.orange;
-        if (status.toLowerCase() == 'pending') statusColor = Colors.blue;
+        if (status.toLowerCase() == 'pending' || status.toLowerCase() == 'in progress') statusColor = Colors.blue;
         if (status.toLowerCase() == 'closed') statusColor = Colors.green;
 
         return Card(

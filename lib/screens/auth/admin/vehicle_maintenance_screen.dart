@@ -22,7 +22,8 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
   List<VehicleModel> _vehicles = [];
   bool _loading = true;
   String? _error;
-  String _selectedFilter = 'All'; // 'All', 'Pending', 'In Progress', 'Completed'
+  String _selectedFilter = 'All'; // 'All', 'Scheduled', 'In Progress', 'Completed', 'Cancelled'
+  String _selectedVehicleFilter = 'All'; // 'All' or vehicleId
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
@@ -89,18 +90,6 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
 
   Future<void> _updateStatus(String jobId, String status) async {
     await _maintenanceService.updateMaintenanceJob(jobId, {'status': status});
-    try {
-      final job = _jobs.firstWhere((j) => j.id == jobId);
-      if (status == 'Completed') {
-        await _vehicleService.updateVehicleStatus(job.vehicleId, 'available');
-      } else if (status == 'In Progress') {
-        await _vehicleService.updateVehicleStatus(job.vehicleId, 'maintenance');
-      } else if (status == 'Pending') {
-        await _vehicleService.updateVehicleStatus(job.vehicleId, 'available');
-      }
-    } catch (e) {
-      debugPrint('Error updating vehicle status on maintenance status change: $e');
-    }
     _loadData();
   }
 
@@ -116,12 +105,18 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
     VehicleModel selectedVehicle = isEdit
         ? _vehicles.firstWhere((v) => v.id == job.vehicleId, orElse: () => _vehicles.first)
         : _vehicles.first;
-    final typeController = TextEditingController(text: job?.serviceType);
+    final titleController = TextEditingController(text: job?.title);
+    final descriptionController = TextEditingController(text: job?.description);
     final costController = TextEditingController(text: job != null ? job.cost.toString() : '');
-    final notesController = TextEditingController(text: job?.notes);
-    DateTime selectedDate = job != null
-        ? (DateTime.tryParse(job.date) ?? DateTime.now())
+    
+    DateTime startDate = job != null
+        ? (DateTime.tryParse(job.startDate) ?? DateTime.now())
         : DateTime.now();
+    DateTime endDate = job != null
+        ? (DateTime.tryParse(job.endDate) ?? DateTime.now())
+        : DateTime.now();
+        
+    String status = job?.status ?? 'Scheduled';
     bool showToCustomer = job?.showToCustomer ?? false;
 
     showDialog(
@@ -156,8 +151,14 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                     ),
                     const SizedBox(height: 12),
                     TextField(
-                      controller: typeController,
-                      decoration: const InputDecoration(labelText: 'Service / Repair Type', hintText: 'e.g., Oil Change, Tyre Alignment'),
+                      controller: titleController,
+                      decoration: const InputDecoration(labelText: 'Service / Repair Title', hintText: 'e.g., Oil Change, Tyre Alignment'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: descriptionController,
+                      maxLines: 2,
+                      decoration: const InputDecoration(labelText: 'Description / Notes', hintText: 'Explain issue or service details...'),
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -165,45 +166,110 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       decoration: const InputDecoration(labelText: 'Est. Cost (RM)', hintText: 'e.g., 250.00'),
                     ),
+                    const SizedBox(height: 16),
+                    // Start Date & End Date Row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: startDate,
+                                firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                                lastDate: DateTime.now().add(const Duration(days: 365)),
+                              );
+                              if (picked != null) {
+                                setDialogState(() {
+                                  startDate = picked;
+                                  if (endDate.isBefore(startDate)) {
+                                    endDate = startDate;
+                                  }
+                                });
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey[300]!),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Start Date', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(DateFormat('yyyy-MM-dd').format(startDate), style: const TextStyle(fontSize: 11)),
+                                      const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: InkWell(
+                            onTap: () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: endDate,
+                                firstDate: startDate,
+                                lastDate: DateTime.now().add(const Duration(days: 365)),
+                              );
+                              if (picked != null) {
+                                setDialogState(() {
+                                  endDate = picked;
+                                });
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey[300]!),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('End Date', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(DateFormat('yyyy-MM-dd').format(endDate), style: const TextStyle(fontSize: 11)),
+                                      const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 12),
-                    InkWell(
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: selectedDate,
-                          firstDate: DateTime.now().subtract(const Duration(days: 365)),
-                          lastDate: DateTime.now().add(const Duration(days: 365)),
-                        );
-                        if (picked != null) {
+                    DropdownButtonFormField<String>(
+                      initialValue: status,
+                      decoration: const InputDecoration(labelText: 'Status'),
+                      items: ['Scheduled', 'In Progress', 'Completed', 'Cancelled'].map((s) {
+                        return DropdownMenuItem(value: s, child: Text(s));
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) {
                           setDialogState(() {
-                            selectedDate = picked;
+                            status = val;
                           });
                         }
                       },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey[400]!),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Service Date: ${DateFormat('yyyy-MM-dd').format(selectedDate)}'),
-                            const Icon(Icons.calendar_today, size: 18),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: notesController,
-                      maxLines: 2,
-                      decoration: const InputDecoration(labelText: 'Notes / Remarks', hintText: 'Optional special remarks...'),
                     ),
                     const SizedBox(height: 12),
                     SwitchListTile(
-                      title: const Text('Show to Customer', style: TextStyle(fontSize: 14)),
+                      title: const Text('Show to Customers', style: TextStyle(fontSize: 14)),
                       subtitle: const Text('Allow customers to view this maintenance record in vehicle details', style: TextStyle(fontSize: 11, color: Colors.grey)),
                       value: showToCustomer,
                       activeThumbColor: AppColors.primaryOrange,
@@ -225,17 +291,19 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   onPressed: () async {
-                    if (typeController.text.trim().isEmpty) return;
+                    if (titleController.text.trim().isEmpty) return;
                     final cost = double.tryParse(costController.text.trim()) ?? 0.0;
                     
                     if (isEdit) {
                       final updatedData = {
                         'vehicleId': selectedVehicle.id,
                         'vehicleName': '${selectedVehicle.brand} ${selectedVehicle.model}',
-                        'serviceType': typeController.text.trim(),
+                        'title': titleController.text.trim(),
+                        'description': descriptionController.text.trim(),
                         'cost': cost,
-                        'date': DateFormat('yyyy-MM-dd').format(selectedDate),
-                        'notes': notesController.text.trim(),
+                        'startDate': DateFormat('yyyy-MM-dd').format(startDate),
+                        'endDate': DateFormat('yyyy-MM-dd').format(endDate),
+                        'status': status,
                         'showToCustomer': showToCustomer,
                       };
                       await _maintenanceService.updateMaintenanceJob(job.id, updatedData);
@@ -244,12 +312,15 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                         id: '',
                         vehicleId: selectedVehicle.id,
                         vehicleName: '${selectedVehicle.brand} ${selectedVehicle.model}',
-                        serviceType: typeController.text.trim(),
+                        title: titleController.text.trim(),
+                        description: descriptionController.text.trim(),
                         cost: cost,
-                        date: DateFormat('yyyy-MM-dd').format(selectedDate),
-                        notes: notesController.text.trim(),
-                        status: 'Pending',
+                        startDate: DateFormat('yyyy-MM-dd').format(startDate),
+                        endDate: DateFormat('yyyy-MM-dd').format(endDate),
+                        status: status,
                         showToCustomer: showToCustomer,
+                        createdAt: DateTime.now().toIso8601String(),
+                        updatedAt: DateTime.now().toIso8601String(),
                       );
                       await _maintenanceService.addMaintenanceJob(newJob);
                     }
@@ -291,7 +362,7 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
 
     // Calculations
     final totalJobs = _jobs.length;
-    final activeJobs = _jobs.where((j) => j.status == 'In Progress').length;
+    final activeJobs = _jobs.where((j) => j.status == 'In Progress' || j.status == 'Scheduled').length;
     final completedJobs = _jobs.where((j) => j.status == 'Completed').length;
     double totalCost = 0.0;
     for (var j in _jobs) {
@@ -301,10 +372,11 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
     // Filters
     final filteredJobs = _jobs.where((job) {
       final matchesStatus = _selectedFilter == 'All' || job.status.toLowerCase() == _selectedFilter.toLowerCase();
+      final matchesVehicle = _selectedVehicleFilter == 'All' || job.vehicleId == _selectedVehicleFilter;
       final matchesSearch = job.vehicleName.toLowerCase().contains(_searchQuery) ||
-          job.serviceType.toLowerCase().contains(_searchQuery) ||
-          job.notes.toLowerCase().contains(_searchQuery);
-      return matchesStatus && matchesSearch;
+          job.title.toLowerCase().contains(_searchQuery) ||
+          job.description.toLowerCase().contains(_searchQuery);
+      return matchesStatus && matchesVehicle && matchesSearch;
     }).toList();
 
     final double width = MediaQuery.of(context).size.width;
@@ -316,35 +388,64 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header title + Action
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Vehicle Maintenance Log',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue),
-                  ),
-                  Text(
-                    'Track fleet repairs, scheduled tune-ups, and cost reports.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                ],
-              ),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryOrange,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          isDesktop
+              ? Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Vehicle Maintenance Log',
+                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue),
+                        ),
+                        Text(
+                          'Track fleet repairs, scheduled tune-ups, and cost reports.',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryOrange,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () => _showAddEditJobDialog(),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Schedule Service', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Vehicle Maintenance Log',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue),
+                    ),
+                    const Text(
+                      'Track fleet repairs, scheduled tune-ups, and cost reports.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryOrange,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () => _showAddEditJobDialog(),
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text('Schedule Service', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
                 ),
-                onPressed: () => _showAddEditJobDialog(),
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Schedule Service', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
           const SizedBox(height: 24),
 
           // Stats Grid
@@ -371,42 +472,46 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
             elevation: 0,
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      decoration: const InputDecoration(
-                        hintText: 'Search by vehicle, service type, or remarks...',
-                        prefixIcon: Icon(Icons.search, size: 20),
-                        contentPadding: EdgeInsets.symmetric(vertical: 8),
-                      ),
+              child: isDesktop
+                  ? Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            decoration: const InputDecoration(
+                              hintText: 'Search by vehicle, service title, or notes...',
+                              prefixIcon: Icon(Icons.search, size: 20),
+                              contentPadding: EdgeInsets.symmetric(vertical: 8),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        _buildStatusDropdown(),
+                        const SizedBox(width: 16),
+                        _buildVehicleDropdown(),
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        TextField(
+                          controller: _searchController,
+                          decoration: const InputDecoration(
+                            hintText: 'Search by vehicle, service title, or notes...',
+                            prefixIcon: Icon(Icons.search, size: 20),
+                            contentPadding: EdgeInsets.symmetric(vertical: 8),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(child: _buildStatusDropdown()),
+                            const SizedBox(width: 12),
+                            Expanded(child: _buildVehicleDropdown()),
+                          ],
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: DropdownButton<String>(
-                      value: _selectedFilter,
-                      underline: const SizedBox(),
-                      items: ['All', 'Pending', 'In Progress', 'Completed'].map((s) {
-                        return DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)));
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          setState(() {
-                            _selectedFilter = val;
-                          });
-                        }
-                      },
-                    ),
-                  ),
-                ],
-              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -480,24 +585,27 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
           headingRowColor: WidgetStateProperty.all(Colors.grey[50]),
           columns: const [
             DataColumn(label: Text('Vehicle', style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('Service Type', style: TextStyle(fontWeight: FontWeight.bold))),
+            DataColumn(label: Text('Title', style: TextStyle(fontWeight: FontWeight.bold))),
             DataColumn(label: Text('Cost (RM)', style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('Date', style: TextStyle(fontWeight: FontWeight.bold))),
+            DataColumn(label: Text('Start Date', style: TextStyle(fontWeight: FontWeight.bold))),
+            DataColumn(label: Text('End Date', style: TextStyle(fontWeight: FontWeight.bold))),
             DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('Notes', style: TextStyle(fontWeight: FontWeight.bold))),
+            DataColumn(label: Text('Description', style: TextStyle(fontWeight: FontWeight.bold))),
             DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold))),
           ],
           rows: jobs.map((job) {
             Color statusColor = Colors.orange;
             if (job.status == 'In Progress') statusColor = Colors.blue;
             if (job.status == 'Completed') statusColor = Colors.green;
+            if (job.status == 'Cancelled') statusColor = Colors.redAccent;
 
             return DataRow(
               cells: [
                 DataCell(Text(job.vehicleName, style: const TextStyle(fontWeight: FontWeight.w600))),
-                DataCell(Text(job.serviceType)),
+                DataCell(Text(job.title)),
                 DataCell(Text('RM ${job.cost.toStringAsFixed(2)}')),
-                DataCell(Text(job.date)),
+                DataCell(Text(job.startDate)),
+                DataCell(Text(job.endDate)),
                 DataCell(
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -511,16 +619,16 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                     ),
                   ),
                 ),
-                DataCell(Text(job.notes.isNotEmpty ? job.notes : 'N/A')),
+                DataCell(Text(job.description.isNotEmpty ? job.description : 'N/A')),
                 DataCell(
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       DropdownButton<String>(
-                        value: job.status,
+                        value: ['Scheduled', 'In Progress', 'Completed', 'Cancelled'].contains(job.status) ? job.status : 'Scheduled',
                         underline: const SizedBox(),
                         icon: const Icon(Icons.edit_note, size: 18),
-                        items: ['Pending', 'In Progress', 'Completed'].map((s) {
+                        items: ['Scheduled', 'In Progress', 'Completed', 'Cancelled'].map((s) {
                           return DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontSize: 12)));
                         }).toList(),
                         onChanged: (val) {
@@ -558,6 +666,7 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
         Color statusColor = Colors.orange;
         if (job.status == 'In Progress') statusColor = Colors.blue;
         if (job.status == 'Completed') statusColor = Colors.green;
+        if (job.status == 'Cancelled') statusColor = Colors.redAccent;
 
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -587,12 +696,12 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text('Service: ${job.serviceType}', style: const TextStyle(fontSize: 13)),
+                Text('Title: ${job.title}', style: const TextStyle(fontSize: 13)),
                 Text('Cost: RM ${job.cost.toStringAsFixed(2)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.primaryOrange)),
-                Text('Scheduled: ${job.date}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                if (job.notes.isNotEmpty) ...[
+                Text('Start: ${job.startDate} | End: ${job.endDate}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                if (job.description.isNotEmpty) ...[
                   const SizedBox(height: 8),
-                  Text('Notes: ${job.notes}', style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey)),
+                  Text('Description: ${job.description}', style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey)),
                 ],
                 const Divider(),
                 Row(
@@ -600,9 +709,9 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                   children: [
                     const Text('Status: ', style: TextStyle(fontSize: 12)),
                     DropdownButton<String>(
-                      value: job.status,
+                      value: ['Scheduled', 'In Progress', 'Completed', 'Cancelled'].contains(job.status) ? job.status : 'Scheduled',
                       underline: const SizedBox(),
-                      items: ['Pending', 'In Progress', 'Completed'].map((s) {
+                      items: ['Scheduled', 'In Progress', 'Completed', 'Cancelled'].map((s) {
                         return DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontSize: 12)));
                       }).toList(),
                       onChanged: (val) {
@@ -628,6 +737,57 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildStatusDropdown() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: DropdownButton<String>(
+        value: _selectedFilter,
+        underline: const SizedBox(),
+        isExpanded: true,
+        items: ['All', 'Scheduled', 'In Progress', 'Completed', 'Cancelled'].map((s) {
+          return DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)));
+        }).toList(),
+        onChanged: (val) {
+          if (val != null) setState(() => _selectedFilter = val);
+        },
+      ),
+    );
+  }
+
+  Widget _buildVehicleDropdown() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: DropdownButton<String>(
+        value: _selectedVehicleFilter,
+        underline: const SizedBox(),
+        isExpanded: true,
+        items: [
+          const DropdownMenuItem(
+            value: 'All',
+            child: Text('All Vehicles', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          ),
+          ..._vehicles.map((v) {
+            return DropdownMenuItem(
+              value: v.id,
+              child: Text('${v.brand} ${v.model}', overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)),
+            );
+          }),
+        ],
+        onChanged: (val) {
+          if (val != null) setState(() => _selectedVehicleFilter = val);
+        },
+      ),
     );
   }
 }

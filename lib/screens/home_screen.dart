@@ -9,7 +9,7 @@ import '../models/user_model.dart';
 import '../models/vehicle_model.dart';
 import '../models/branch_model.dart';
 import 'auth/login_screen.dart';
-import 'auth/customer/home_screen.dart';
+import 'auth/customer/customer_responsive_shell.dart';
 import 'auth/admin/dashboard_screen.dart';
 import 'auth/customer/vehicle_list_screen.dart';
 import 'auth/customer/vehicle_details_screen.dart';
@@ -87,7 +87,7 @@ class _HomeScreenState extends State<HomeScreen> {
             } else {
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (context) => const CustomerHomeScreen()),
+                MaterialPageRoute(builder: (context) => const CustomerResponsiveShell()),
               );
               return;
             }
@@ -98,17 +98,17 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       
       try {
-        _branches = await _branchService.getBranches().timeout(const Duration(seconds: 5));
+        _branches = await _branchService.getBranches().timeout(const Duration(seconds: 8));
       } catch (branchErr) {
-        debugPrint('Error getting branches: $branchErr. Using default branches.');
-        _branches = _branchService.getDefaultBranches();
+        debugPrint('Error getting branches: $branchErr.');
+        _branches = [];
       }
 
       try {
-        _vehicles = await _vehicleService.getVehicles().timeout(const Duration(seconds: 5));
+        _vehicles = await _vehicleService.getVehicles().timeout(const Duration(seconds: 8));
       } catch (vehicleErr) {
-        debugPrint('Error getting vehicles: $vehicleErr. Using default vehicles.');
-        _vehicles = _vehicleService.getDefaultVehicles();
+        debugPrint('Error getting vehicles: $vehicleErr.');
+        _vehicles = [];
       }
 
       if (_branches.isNotEmpty) {
@@ -116,10 +116,6 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (e) {
       debugPrint('Unexpected error loading home data: $e');
-      // Even on unexpected errors, make sure we have defaults
-      if (_branches.isEmpty) _branches = _branchService.getDefaultBranches();
-      if (_vehicles.isEmpty) _vehicles = _vehicleService.getDefaultVehicles();
-      if (_branches.isNotEmpty) _selectedPickupBranch = _branches.first;
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -317,7 +313,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             } else {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (context) => const CustomerHomeScreen()),
+                                MaterialPageRoute(builder: (context) => const CustomerResponsiveShell()),
                               );
                             }
                           } else {
@@ -1742,25 +1738,25 @@ class _VehicleHoverCardState extends State<VehicleHoverCard> {
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
-      cursor: v.status == 'available' ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      cursor: v.status.toLowerCase() == 'available' ? SystemMouseCursors.click : SystemMouseCursors.basic,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
         curve: Curves.easeOut,
         width: 320,
-        transform: Matrix4.translationValues(0.0, (_isHovered && v.status == 'available') ? -8.0 : 0.0, 0.0),
+        transform: Matrix4.translationValues(0.0, (_isHovered && v.status.toLowerCase() == 'available') ? -8.0 : 0.0, 0.0),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: (_isHovered && v.status == 'available') ? 0.08 : 0.03),
-              blurRadius: (_isHovered && v.status == 'available') ? 20 : 10,
-              offset: Offset(0, (_isHovered && v.status == 'available') ? 10 : 4),
+              color: Colors.black.withValues(alpha: (_isHovered && v.status.toLowerCase() == 'available') ? 0.08 : 0.03),
+              blurRadius: (_isHovered && v.status.toLowerCase() == 'available') ? 20 : 10,
+              offset: Offset(0, (_isHovered && v.status.toLowerCase() == 'available') ? 10 : 4),
             ),
           ],
           border: Border.all(
-            color: (_isHovered && v.status == 'available') ? AppColors.primaryOrange.withValues(alpha: 0.5) : Colors.grey[200]!,
-            width: (_isHovered && v.status == 'available') ? 1.5 : 1.0,
+            color: (_isHovered && v.status.toLowerCase() == 'available') ? AppColors.primaryOrange.withValues(alpha: 0.5) : Colors.grey[200]!,
+            width: (_isHovered && v.status.toLowerCase() == 'available') ? 1.5 : 1.0,
           ),
         ),
         child: Column(
@@ -1799,7 +1795,7 @@ class _VehicleHoverCardState extends State<VehicleHoverCard> {
                 ),
                 
                 // Status Overlay Over Vehicle Image
-                if (v.status == 'available')
+                if (v.status.toLowerCase() == 'available')
                   Positioned(
                     top: 16,
                     right: 16,
@@ -1969,7 +1965,7 @@ class _VehicleHoverCardState extends State<VehicleHoverCard> {
                         ],
                       ),
                       ElevatedButton(
-                        onPressed: v.status == 'available' ? () {
+                        onPressed: v.status.toLowerCase() == 'available' ? () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -1980,7 +1976,7 @@ class _VehicleHoverCardState extends State<VehicleHoverCard> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primaryOrange,
                           foregroundColor: Colors.white,
-                          elevation: (_isHovered && v.status == 'available') ? 2 : 0,
+                          elevation: (_isHovered && v.status.toLowerCase() == 'available') ? 2 : 0,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         ),

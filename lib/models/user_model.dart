@@ -17,6 +17,7 @@ class UserModel {
   final String address;
   final String licenseClass;
   final String licenseExpiry;
+  final int rewardPoints;
 
   bool get isAdmin => role == 'admin';
 
@@ -37,6 +38,7 @@ class UserModel {
     this.address = '4521 Oakwood Avenue, Suite 300, Los Angeles, CA 90024',
     this.licenseClass = 'Class DA',
     this.licenseExpiry = '12 / 2028',
+    this.rewardPoints = 0,
   });
 
   factory UserModel.fromMap(
@@ -63,6 +65,9 @@ class UserModel {
       address: data['address'] ?? '4521 Oakwood Avenue, Suite 300, Los Angeles, CA 90024',
       licenseClass: data['licenseClass'] ?? 'Class DA',
       licenseExpiry: data['licenseExpiry'] ?? '12 / 2028',
+      rewardPoints: data['rewardPoints'] is int
+          ? data['rewardPoints'] as int
+          : int.tryParse(data['rewardPoints']?.toString() ?? '') ?? 0,
     );
   }
 
@@ -83,6 +88,7 @@ class UserModel {
       'address': address,
       'licenseClass': licenseClass,
       'licenseExpiry': licenseExpiry,
+      'rewardPoints': rewardPoints,
     };
   }
 }

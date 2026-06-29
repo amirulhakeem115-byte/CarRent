@@ -9,6 +9,7 @@ import 'package:firebase_database/firebase_database.dart';
 import '../../../constants/colors.dart';
 import '../../../models/payment_model.dart';
 import '../../../models/booking_model.dart';
+import '../../../models/user_model.dart';
 import '../../../services/payment_service.dart';
 import '../../../services/booking_service.dart';
 import '../../../widgets/loading_widget.dart';
@@ -28,6 +29,7 @@ class _PaymentsViewState extends State<PaymentsView> {
   List<PaymentModel> _payments = [];
   List<BookingModel> _bookings = [];
   final Map<String, String> _userNames = {}; // uid -> fullName
+  final Map<String, UserModel> _usersMap = {}; // uid -> UserModel
   bool _loading = true;
   String? _error;
   String _searchQuery = '';
@@ -66,11 +68,13 @@ class _PaymentsViewState extends State<PaymentsView> {
       _bookings = results[1] as List<BookingModel>;
       
       _userNames.clear();
+      _usersMap.clear();
       if (usersSnap.exists) {
         final Map<dynamic, dynamic> usersData = usersSnap.value as Map<dynamic, dynamic>;
         usersData.forEach((key, value) {
           if (value is Map) {
             _userNames[key.toString()] = value['fullName'] ?? value['name'] ?? 'User';
+            _usersMap[key.toString()] = UserModel.fromMap(key.toString(), value);
           }
         });
       }
@@ -88,79 +92,7 @@ class _PaymentsViewState extends State<PaymentsView> {
     }
   }
 
-  Future<void> _verifyPayment(PaymentModel payment, bool approve) async {
-    final status = approve ? 'paid' : 'failed';
-    final action = approve ? 'Approve' : 'Reject';
 
-    String reason = '';
-    if (!approve) {
-      final reasonController = TextEditingController();
-      final reasonSubmitted = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Rejection Reason Required'),
-          content: TextField(
-            controller: reasonController,
-            decoration: const InputDecoration(
-              hintText: 'Enter the reason for rejection...',
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              onPressed: () {
-                if (reasonController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please enter a reason.')),
-                  );
-                  return;
-                }
-                Navigator.pop(context, true);
-              },
-              child: const Text('Reject'),
-            ),
-          ],
-        ),
-      );
-      
-      if (reasonSubmitted != true) return;
-      reason = reasonController.text.trim();
-    } else {
-      final confirm = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text('Confirm Payment $action'),
-          content: Text('Are you sure you want to $action this payment of RM ${payment.amount.toStringAsFixed(2)}?'),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: approve ? Colors.green : Colors.red,
-                foregroundColor: Colors.white,
-              ),
-              onPressed: () => Navigator.pop(context, true),
-              child: Text(action),
-            ),
-          ],
-        ),
-      );
-      if (confirm != true) return;
-    }
-
-    setState(() => _loading = true);
-    try {
-      await _paymentService.updatePaymentStatus(payment.id, status, payment.userId, reason: reason);
-      _loadPayments();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Verification failed: $e')),
-        );
-      }
-      setState(() => _loading = false);
-    }
-  }
 
   Future<void> _refundTransaction(PaymentModel payment) async {
     final confirm = await showDialog<bool>(
@@ -379,78 +311,76 @@ class _PaymentsViewState extends State<PaymentsView> {
 
         final bookingMap = {for (var b in _bookings) b.id: b};
         final booking = bookingMap[payment.bookingId];
-        final customerName = _userNames[payment.userId] ?? booking?.userName ?? 'Unknown';
+        final user = _usersMap[payment.userId];
         final vehicleName = booking?.vehicleName ?? 'Unknown';
 
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
           title: const Text('Transaction Receipt Spec', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildDetailRow('Customer Name', customerName),
-              _buildDetailRow('Vehicle Name', vehicleName),
-              _buildDetailRow('Transaction ID', payment.id),
-              _buildDetailRow('Booking Reference', payment.bookingId),
-              _buildDetailRow('Amount Settled', 'RM ${payment.amount.toStringAsFixed(2)}'),
-              _buildDetailRow('Payment Mode', payment.paymentMethod),
-              _buildDetailRow('Timestamp', DateFormat('dd MMM yyyy, hh:mm a').format(payment.paymentDate)),
-              if (payment.transactionId != null && payment.transactionId!.isNotEmpty)
-                _buildDetailRow('Ref Reference Key', payment.transactionId!),
-              if (payment.rejectionReason != null && payment.rejectionReason!.isNotEmpty)
-                _buildDetailRow('Rejection Reason', payment.rejectionReason!),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text('Receipt Status: ', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      (payment.paymentStatus ?? payment.status).toUpperCase(),
-                      style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
-                    ),
-                  ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('CUSTOMER INFORMATION', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                const SizedBox(height: 6),
+                _buildDetailRow('Full Name', user?.fullName ?? booking?.userName ?? 'Unknown'),
+                _buildDetailRow('Email', user?.email ?? 'N/A'),
+                _buildDetailRow('Phone', user?.phone ?? booking?.userPhone ?? 'N/A'),
+                const Divider(height: 20),
+                const Text('BOOKING INFORMATION', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                const SizedBox(height: 6),
+                _buildDetailRow('Vehicle Name', vehicleName),
+                _buildDetailRow('Booking Reference', payment.bookingId),
+                if (booking != null) ...[
+                  _buildDetailRow('Pick-up Date', DateFormat('dd MMM yyyy').format(booking.pickUpDate)),
+                  _buildDetailRow('Return Date', DateFormat('dd MMM yyyy').format(booking.returnDate)),
+                  _buildDetailRow('Booking Total', 'RM ${booking.totalPrice.toStringAsFixed(2)}'),
                 ],
-              ),
-              const Divider(height: 24),
-              if (payment.paymentStatus == 'Pending Verification' || payment.status == 'pending') ...[
+                const Divider(height: 20),
+                const Text('PAYMENT DETAILS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                const SizedBox(height: 6),
+                _buildDetailRow('Transaction ID', payment.id),
+                _buildDetailRow('Amount Settled', 'RM ${payment.amount.toStringAsFixed(2)}'),
+                _buildDetailRow('Payment Mode', payment.paymentMethod),
+                _buildDetailRow('Payment Date', DateFormat('dd MMM yyyy').format(payment.paymentDate)),
+                if (payment.paymentTime != null && payment.paymentTime!.isNotEmpty)
+                  _buildDetailRow('Payment Time', payment.paymentTime!),
+                if (payment.transactionId != null && payment.transactionId!.isNotEmpty)
+                  _buildDetailRow('Reference ID', payment.transactionId!),
+                if (payment.rejectionReason != null && payment.rejectionReason!.isNotEmpty)
+                  _buildDetailRow('Rejection Reason', payment.rejectionReason!),
+                const SizedBox(height: 12),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    OutlinedButton(
-                      style: OutlinedButton.styleFrom(foregroundColor: Colors.redAccent, side: const BorderSide(color: Colors.redAccent)),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _verifyPayment(payment, false);
-                      },
-                      child: const Text('Reject Paid'),
-                    ),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _verifyPayment(payment, true);
-                      },
-                      child: const Text('Approve Paid'),
+                    const Text('Receipt Status: ', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        (payment.paymentStatus ?? payment.status).toUpperCase(),
+                        style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ],
                 ),
-              ] else if (payment.status == 'paid' || payment.paymentStatus == 'Approved') ...[
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.purple, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 44)),
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _refundTransaction(payment);
-                  },
-                  child: const Text('Issue Full Refund'),
-                ),
+                if (payment.status == 'paid' || payment.paymentStatus == 'Approved') ...[
+                  const Divider(height: 24),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.purple, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 44)),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _refundTransaction(payment);
+                    },
+                    child: const Text('Issue Full Refund'),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
@@ -459,6 +389,7 @@ class _PaymentsViewState extends State<PaymentsView> {
       },
     );
   }
+
 
   Widget _buildDetailRow(String label, String value) {
     return Padding(
@@ -533,45 +464,85 @@ class _PaymentsViewState extends State<PaymentsView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Payments Ledger', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue)),
-                  Text('Verify customer deposits, issue refunds, and audit revenue streams.', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                ],
-              ),
-              Row(
-                children: [
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppColors.secondaryBlue),
-                      foregroundColor: AppColors.secondaryBlue,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          isDesktop
+              ? Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Payments Ledger', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue)),
+                        Text('Verify customer deposits, issue refunds, and audit revenue streams.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      ],
                     ),
-                    onPressed: _exportExcel,
-                    icon: const Icon(Icons.table_view_outlined, size: 18),
-                    label: const Text('Export Excel', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryOrange,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    Row(
+                      children: [
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: AppColors.secondaryBlue),
+                            foregroundColor: AppColors.secondaryBlue,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: _exportExcel,
+                          icon: const Icon(Icons.table_view_outlined, size: 18),
+                          label: const Text('Export Excel', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryOrange,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: _exportPdf,
+                          icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                          label: const Text('Export PDF', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ],
                     ),
-                    onPressed: _exportPdf,
-                    icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
-                    label: const Text('Export PDF', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              ),
-            ],
-          ),
+                  ],
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Payments Ledger', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue)),
+                    const Text('Verify customer deposits, issue refunds, and audit revenue streams.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: AppColors.secondaryBlue),
+                              foregroundColor: AppColors.secondaryBlue,
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            onPressed: _exportExcel,
+                            icon: const Icon(Icons.table_view_outlined, size: 16),
+                            label: const Text('Excel', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primaryOrange,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            onPressed: _exportPdf,
+                            icon: const Icon(Icons.picture_as_pdf_outlined, size: 16),
+                            label: const Text('PDF', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
           const SizedBox(height: 24),
 
           GridView.count(
@@ -764,18 +735,6 @@ class _PaymentsViewState extends State<PaymentsView> {
                         tooltip: 'Details',
                         onPressed: () => _showPaymentDetails(p),
                       ),
-                      if (p.paymentStatus == 'Pending Verification' || p.status == 'pending') ...[
-                        IconButton(
-                          icon: const Icon(Icons.check_circle_outline, color: Colors.green, size: 18),
-                          tooltip: 'Approve',
-                          onPressed: () => _verifyPayment(p, true),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.cancel_outlined, color: Colors.redAccent, size: 18),
-                          tooltip: 'Reject',
-                          onPressed: () => _verifyPayment(p, false),
-                        ),
-                      ]
                     ],
                   ),
                 ),
@@ -847,26 +806,7 @@ class _PaymentsViewState extends State<PaymentsView> {
                 Text('Vehicle: $vehicleName', style: const TextStyle(fontSize: 12)),
                 Text('Amount: RM ${p.amount.toStringAsFixed(2)} | Mode: ${p.paymentMethod}', style: const TextStyle(fontSize: 12)),
                 Text('Date: ${dateFormat.format(p.paymentDate)}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                if (p.paymentStatus == 'Pending Verification' || p.status == 'pending') ...[
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, minimumSize: const Size(60, 26), padding: const EdgeInsets.symmetric(horizontal: 8)),
-                        onPressed: () => _verifyPayment(p, true),
-                        icon: const Icon(Icons.check, size: 12),
-                        label: const Text('Approve', style: TextStyle(fontSize: 10)),
-                      ),
-                      const SizedBox(width: 8),
-                      OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(foregroundColor: Colors.redAccent, side: const BorderSide(color: Colors.redAccent), minimumSize: const Size(60, 26), padding: const EdgeInsets.symmetric(horizontal: 8)),
-                        onPressed: () => _verifyPayment(p, false),
-                        icon: const Icon(Icons.close, size: 12),
-                        label: const Text('Reject', style: TextStyle(fontSize: 10)),
-                      ),
-                    ],
-                  ),
-                ],
+
               ],
             ),
             trailing: Container(

@@ -6,6 +6,7 @@ class BranchModel {
   final double latitude;
   final double longitude;
   final String operatingHours;
+  final String status; // 'Active' or 'Inactive'
 
   String get name => branchName;
 
@@ -17,6 +18,7 @@ class BranchModel {
     this.latitude = 3.0166,
     this.longitude = 101.7916,
     this.operatingHours = '09:00 AM - 09:00 PM',
+    this.status = 'Active',
   });
 
   factory BranchModel.fromMap(String id, Map<dynamic, dynamic> data) {
@@ -28,6 +30,7 @@ class BranchModel {
       latitude: (data['latitude'] ?? 3.0166).toDouble(),
       longitude: (data['longitude'] ?? 101.7916).toDouble(),
       operatingHours: data['operatingHours'] ?? '09:00 AM - 09:00 PM',
+      status: data['status'] ?? 'Active',
     );
   }
 
@@ -40,6 +43,7 @@ class BranchModel {
       'latitude': latitude,
       'longitude': longitude,
       'operatingHours': operatingHours,
+      'status': status,
     };
   }
 }

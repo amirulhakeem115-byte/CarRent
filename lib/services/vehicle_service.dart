@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/vehicle_model.dart';
+import 'notification_service.dart';
 
 class VehicleService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref().child('vehicles');
@@ -23,36 +24,20 @@ class VehicleService {
     debugPrint('[VehicleService] [getVehicles] Current UID: $currentUid, Current Role: $currentRole');
 
     try {
-      final snapshot = await _db.get().timeout(const Duration(seconds: 5));
-      if (snapshot.exists) {
+      final snapshot = await _db.get().timeout(const Duration(seconds: 8));
+      if (snapshot.exists && snapshot.value != null) {
         final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
         data.forEach((key, value) {
-          vehicles.add(VehicleModel.fromMap(key.toString(), value as Map<dynamic, dynamic>));
-        });
-      } else {
-        // Seed default vehicles if none exist, but don't let offline/unauthorized state hang
-        try {
-          await seedDefaultVehicles().timeout(const Duration(seconds: 3));
-          final secondSnapshot = await _db.get().timeout(const Duration(seconds: 3));
-          if (secondSnapshot.exists) {
-            final Map<dynamic, dynamic> secondData = secondSnapshot.value as Map<dynamic, dynamic>;
-            secondData.forEach((key, value) {
-              vehicles.add(VehicleModel.fromMap(key.toString(), value as Map<dynamic, dynamic>));
-            });
-            debugPrint('[VehicleService] [getVehicles] Vehicles count loaded (after seeding): ${vehicles.length}');
-            return vehicles;
+          if (value is Map) {
+            vehicles.add(VehicleModel.fromMap(key.toString(), value));
           }
-        } catch (seedError) {
-          debugPrint('Failed to seed default vehicles or read after seeding: $seedError. Using local defaults.');
-        }
-        return getDefaultVehicles();
+        });
       }
       debugPrint('[VehicleService] [getVehicles] Vehicles count loaded: ${vehicles.length}');
     } catch (e) {
-      debugPrint('[VehicleService] [getVehicles] Error getting vehicles: $e. Returning fallback vehicles.');
-      return getDefaultVehicles();
+      debugPrint('[VehicleService] [getVehicles] Error getting vehicles: $e');
     }
-    return vehicles.isEmpty ? getDefaultVehicles() : vehicles;
+    return vehicles;
   }
 
   Stream<List<VehicleModel>> getVehiclesStream() {
@@ -71,7 +56,20 @@ class VehicleService {
   Future<void> addVehicle(VehicleModel vehicle) async {
     try {
       final newRef = _db.push();
-      await newRef.set(vehicle.toMap());
+      final data = vehicle.toMap();
+      data['id'] = newRef.key!;
+      await newRef.set(data);
+
+      final notificationService = NotificationService();
+      await notificationService.notifyAllAdmins(
+        title: 'Vehicle Added',
+        message: 'New vehicle registered: ${vehicle.brand} ${vehicle.model} (${vehicle.plateNumber}).',
+        type: 'vehicle',
+        icon: '🚗',
+        color: '0xFF3B82F6',
+        relatedId: newRef.key!,
+        actionRoute: 'Cars',
+      );
     } catch (e) {
       debugPrint('Error adding vehicle: $e');
       rethrow;
@@ -81,6 +79,24 @@ class VehicleService {
   Future<void> updateVehicle(String id, Map<String, dynamic> data) async {
     try {
       await _db.child(id).update(data);
+      
+      final brand = data['brand'] ?? '';
+      final model = data['model'] ?? '';
+      final plate = data['plateNumber'] ?? '';
+      final String desc = (brand.isNotEmpty || model.isNotEmpty)
+          ? '$brand $model ($plate)'
+          : 'ID: $id';
+
+      final notificationService = NotificationService();
+      await notificationService.notifyAllAdmins(
+        title: 'Vehicle Updated',
+        message: 'Vehicle information modified: $desc.',
+        type: 'vehicle',
+        icon: '🚗',
+        color: '0xFF3B82F6',
+        relatedId: id,
+        actionRoute: 'Cars',
+      );
     } catch (e) {
       debugPrint('Error updating vehicle: $e');
       rethrow;
@@ -90,6 +106,17 @@ class VehicleService {
   Future<void> deleteVehicle(String id) async {
     try {
       await _db.child(id).remove();
+      
+      final notificationService = NotificationService();
+      await notificationService.notifyAllAdmins(
+        title: 'Vehicle Deleted',
+        message: 'Vehicle was permanently removed from the fleet register (ID: $id).',
+        type: 'vehicle',
+        icon: '🚗',
+        color: '0xFFEF4444',
+        relatedId: id,
+        actionRoute: 'Cars',
+      );
     } catch (e) {
       debugPrint('Error deleting vehicle: $e');
       rethrow;
@@ -100,7 +127,7 @@ class VehicleService {
     try {
       await _db.child(id).update({
         'isAvailable': isAvailable,
-        'status': isAvailable ? 'available' : 'booked',
+        'status': isAvailable ? 'Available' : 'Booked',
       });
     } catch (e) {
       debugPrint('Error toggling availability: $e');
@@ -110,9 +137,20 @@ class VehicleService {
 
   Future<void> updateVehicleStatus(String id, String status) async {
     try {
+      String normStatus = status;
+      final statusLower = status.toLowerCase().replaceAll(RegExp(r'\s+'), '');
+      if (statusLower == 'available') {
+        normStatus = 'Available';
+      } else if (statusLower == 'booked' || statusLower == 'reserved' || statusLower == 'rented' || statusLower == 'activebooked' || statusLower == 'bookedvehicle') {
+        normStatus = 'Booked';
+      } else if (statusLower == 'maintenance') {
+        normStatus = 'Maintenance';
+      } else if (statusLower == 'inactive') {
+        normStatus = 'Inactive';
+      }
       await _db.child(id).update({
-        'status': status,
-        'isAvailable': status == 'available',
+        'status': normStatus,
+        'isAvailable': normStatus == 'Available',
       });
     } catch (e) {
       debugPrint('Error updating vehicle status: $e');
@@ -158,9 +196,7 @@ class VehicleService {
           'https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&q=80&w=600',
         ],
         equipment: ['ABS', 'Airbags', 'USB Port', 'Bluetooth', 'Reverse Sensors'],
-        maintenance: [
-          {'section': 'Engine Oil', 'description': 'Routine oil change and fluid top-up.', 'startDate': '2026-05-10', 'endDate': '2026-05-10'},
-        ],
+        maintenance: const [],
       ),
       VehicleModel(
         id: '',
@@ -189,9 +225,7 @@ class VehicleService {
           'https://images.unsplash.com/photo-1553440569-bcc63803a83d?auto=format&fit=crop&q=80&w=600',
         ],
         equipment: ['ABS', 'Airbags', 'Bluetooth', 'Reverse Sensors', 'Spare Tyre'],
-        maintenance: [
-          {'section': 'Brakes', 'description': 'Replaced front brake pads.', 'startDate': '2026-04-18', 'endDate': '2026-04-18'},
-        ],
+        maintenance: const [],
       ),
       VehicleModel(
         id: '',
@@ -219,9 +253,7 @@ class VehicleService {
           'https://images.unsplash.com/photo-1616422285623-13ff0162193c?auto=format&fit=crop&q=80&w=600',
         ],
         equipment: ['ABS', 'Airbags', 'Keyless Entry', 'Bluetooth', 'Sensors'],
-        maintenance: [
-          {'section': 'Tyres', 'description': 'Replaced front tyre set.', 'startDate': '2026-03-22', 'endDate': '2026-03-22'},
-        ],
+        maintenance: const [],
       ),
       VehicleModel(
         id: '',
@@ -249,9 +281,7 @@ class VehicleService {
           'https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&q=80&w=600',
         ],
         equipment: ['ABS', 'Airbags', 'Apple CarPlay', 'Android Auto', 'Reverse Camera', 'LED Headlights'],
-        maintenance: [
-          {'section': 'Engine Oil', 'description': 'First service completed.', 'startDate': '2026-05-02', 'endDate': '2026-05-02'},
-        ],
+        maintenance: const [],
       ),
       VehicleModel(
         id: '',
@@ -279,9 +309,7 @@ class VehicleService {
           'https://images.unsplash.com/photo-1553440569-bcc63803a83d?auto=format&fit=crop&q=80&w=600',
         ],
         equipment: ['ABS', 'Airbags', 'Keyless Start', '360 Camera', 'Blind Spot Monitor'],
-        maintenance: [
-          {'section': 'Air Filter', 'description': 'Replaced cabin air filters.', 'startDate': '2026-04-12', 'endDate': '2026-04-12'},
-        ],
+        maintenance: const [],
       ),
       VehicleModel(
         id: '',
@@ -310,9 +338,7 @@ class VehicleService {
           'https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&q=80&w=600',
         ],
         equipment: ['ABS', 'Airbags', 'Honda SENSING', 'Leather Seats', 'Turbo Engine', 'Digital Dashboard'],
-        maintenance: [
-          {'section': 'Engine Tune', 'description': 'Spark plugs and ECU check.', 'startDate': '2026-05-15', 'endDate': '2026-05-15'},
-        ],
+        maintenance: const [],
       ),
       VehicleModel(
         id: '',
@@ -340,9 +366,7 @@ class VehicleService {
           'https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&q=80&w=600',
         ],
         equipment: ['ABS', 'Airbags', 'Voice Command', 'Panoramic Sunroof', 'Auto Park Assist'],
-        maintenance: [
-          {'section': 'Oil Service', 'description': 'Engine oil filter change.', 'startDate': '2026-03-10', 'endDate': '2026-03-10'},
-        ],
+        maintenance: const [],
       ),
       VehicleModel(
         id: '',
@@ -370,9 +394,7 @@ class VehicleService {
           'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&fit=crop&q=80&w=600',
         ],
         equipment: ['ABS', 'Airbags', 'Ventilated Seats', 'GPS Tracker', 'Nappa Leather'],
-        maintenance: [
-          {'section': 'Air Cond', 'description': 'AC system cleaning and recharge.', 'startDate': '2026-02-28', 'endDate': '2026-02-28'},
-        ],
+        maintenance: const [],
       ),
       VehicleModel(
         id: '',
@@ -400,9 +422,7 @@ class VehicleService {
           'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=600',
         ],
         equipment: ['ABS', 'Airbags', 'ULTRA Seats', 'Honda SENSING', 'Keyless Go'],
-        maintenance: [
-          {'section': 'Battery', 'description': 'Replaced car battery (AGM).', 'startDate': '2026-04-05', 'endDate': '2026-04-05'},
-        ],
+        maintenance: const [],
       ),
       VehicleModel(
         id: '',
@@ -430,9 +450,7 @@ class VehicleService {
           'https://images.unsplash.com/photo-1625217527288-93919c996509?auto=format&fit=crop&q=80&w=600',
         ],
         equipment: ['ABS', 'Airbags', 'Hybrid Engine', 'Toyota Safety Sense', 'TSS 2.0'],
-        maintenance: [
-          {'section': 'Hybrid Check', 'description': 'Inverter and battery diagnostic check.', 'startDate': '2026-05-11', 'endDate': '2026-05-11'},
-        ],
+        maintenance: const [],
       ),
       VehicleModel(
         id: '',
@@ -460,9 +478,7 @@ class VehicleService {
           'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=600',
         ],
         equipment: ['ABS', 'Airbags', '7 Seats', 'Rear AC Vents', 'HDMI Input'],
-        maintenance: [
-          {'section': 'Alignment', 'description': 'Wheel alignment and tyre rotation.', 'startDate': '2026-05-01', 'endDate': '2026-05-01'},
-        ],
+        maintenance: const [],
       ),
       VehicleModel(
         id: '',
@@ -490,9 +506,7 @@ class VehicleService {
           'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&q=80&w=600',
         ],
         equipment: ['ABS', 'Airbags', '8 Seats', 'Dual Blower AC', 'Touch Screen Nav'],
-        maintenance: [
-          {'section': 'Transmission', 'description': 'Gearbox fluid check.', 'startDate': '2026-03-15', 'endDate': '2026-03-15'},
-        ],
+        maintenance: const [],
       ),
     ];
 
@@ -530,9 +544,7 @@ class VehicleService {
           'https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&q=80&w=600',
         ],
         equipment: ['ABS', 'Airbags', 'USB Port', 'Bluetooth', 'Reverse Sensors'],
-        maintenance: [
-          {'section': 'Engine Oil', 'description': 'Routine oil change and fluid top-up.', 'startDate': '2026-05-10', 'endDate': '2026-05-10'},
-        ],
+        maintenance: const [],
       ),
       VehicleModel(
         id: 'proton_saga',
@@ -561,9 +573,7 @@ class VehicleService {
           'https://images.unsplash.com/photo-1553440569-bcc63803a83d?auto=format&fit=crop&q=80&w=600',
         ],
         equipment: ['ABS', 'Airbags', 'Bluetooth', 'Reverse Sensors', 'Spare Tyre'],
-        maintenance: [
-          {'section': 'Brakes', 'description': 'Replaced front brake pads.', 'startDate': '2026-04-18', 'endDate': '2026-04-18'},
-        ],
+        maintenance: const [],
       ),
       VehicleModel(
         id: 'perodua_bezza',
@@ -591,9 +601,7 @@ class VehicleService {
           'https://images.unsplash.com/photo-1616422285623-13ff0162193c?auto=format&fit=crop&q=80&w=600',
         ],
         equipment: ['ABS', 'Airbags', 'Keyless Entry', 'Bluetooth', 'Sensors'],
-        maintenance: [
-          {'section': 'Tyres', 'description': 'Replaced front tyre set.', 'startDate': '2026-03-22', 'endDate': '2026-03-22'},
-        ],
+        maintenance: const [],
       ),
       VehicleModel(
         id: 'honda_city',
@@ -621,9 +629,7 @@ class VehicleService {
           'https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&q=80&w=600',
         ],
         equipment: ['ABS', 'Airbags', 'Apple CarPlay', 'Android Auto', 'Reverse Camera', 'LED Headlights'],
-        maintenance: [
-          {'section': 'Engine Oil', 'description': 'First service completed.', 'startDate': '2026-05-02', 'endDate': '2026-05-02'},
-        ],
+        maintenance: const [],
       ),
       VehicleModel(
         id: 'toyota_vios',
@@ -651,9 +657,7 @@ class VehicleService {
           'https://images.unsplash.com/photo-1553440569-bcc63803a83d?auto=format&fit=crop&q=80&w=600',
         ],
         equipment: ['ABS', 'Airbags', 'Keyless Start', '360 Camera', 'Blind Spot Monitor'],
-        maintenance: [
-          {'section': 'Air Filter', 'description': 'Replaced cabin air filters.', 'startDate': '2026-04-12', 'endDate': '2026-04-12'},
-        ],
+        maintenance: const [],
       ),
       VehicleModel(
         id: 'honda_civic',
@@ -682,9 +686,7 @@ class VehicleService {
           'https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&q=80&w=600',
         ],
         equipment: ['ABS', 'Airbags', 'Honda SENSING', 'Leather Seats', 'Turbo Engine', 'Digital Dashboard'],
-        maintenance: [
-          {'section': 'Engine Tune', 'description': 'Spark plugs and ECU check.', 'startDate': '2026-05-15', 'endDate': '2026-05-15'},
-        ],
+        maintenance: const [],
       ),
       VehicleModel(
         id: 'proton_x50',
@@ -712,9 +714,7 @@ class VehicleService {
           'https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&q=80&w=600',
         ],
         equipment: ['ABS', 'Airbags', 'Voice Command', 'Panoramic Sunroof', 'Auto Park Assist'],
-        maintenance: [
-          {'section': 'Oil Service', 'description': 'Engine oil filter change.', 'startDate': '2026-03-10', 'endDate': '2026-03-10'},
-        ],
+        maintenance: const [],
       ),
       VehicleModel(
         id: 'proton_x70',
@@ -742,9 +742,7 @@ class VehicleService {
           'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&fit=crop&q=80&w=600',
         ],
         equipment: ['ABS', 'Airbags', 'Ventilated Seats', 'GPS Tracker', 'Nappa Leather'],
-        maintenance: [
-          {'section': 'Air Cond', 'description': 'AC system cleaning and recharge.', 'startDate': '2026-02-28', 'endDate': '2026-02-28'},
-        ],
+        maintenance: const [],
       ),
       VehicleModel(
         id: 'honda_hrv',
@@ -772,9 +770,7 @@ class VehicleService {
           'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=600',
         ],
         equipment: ['ABS', 'Airbags', 'ULTRA Seats', 'Honda SENSING', 'Keyless Go'],
-        maintenance: [
-          {'section': 'Battery', 'description': 'Replaced car battery (AGM).', 'startDate': '2026-04-05', 'endDate': '2026-04-05'},
-        ],
+        maintenance: const [],
       ),
       VehicleModel(
         id: 'toyota_corolla_cross',
@@ -802,9 +798,7 @@ class VehicleService {
           'https://images.unsplash.com/photo-1625217527288-93919c996509?auto=format&fit=crop&q=80&w=600',
         ],
         equipment: ['ABS', 'Airbags', 'Hybrid Engine', 'Toyota Safety Sense', 'TSS 2.0'],
-        maintenance: [
-          {'section': 'Hybrid Check', 'description': 'Inverter and battery diagnostic check.', 'startDate': '2026-05-11', 'endDate': '2026-05-11'},
-        ],
+        maintenance: const [],
       ),
       VehicleModel(
         id: 'perodua_alza',
@@ -832,9 +826,7 @@ class VehicleService {
           'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=600',
         ],
         equipment: ['ABS', 'Airbags', '7 Seats', 'Rear AC Vents', 'HDMI Input'],
-        maintenance: [
-          {'section': 'Alignment', 'description': 'Wheel alignment and tyre rotation.', 'startDate': '2026-05-01', 'endDate': '2026-05-01'},
-        ],
+        maintenance: const [],
       ),
       VehicleModel(
         id: 'toyota_innova',
@@ -862,9 +854,7 @@ class VehicleService {
           'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&q=80&w=600',
         ],
         equipment: ['ABS', 'Airbags', '8 Seats', 'Dual Blower AC', 'Touch Screen Nav'],
-        maintenance: [
-          {'section': 'Transmission', 'description': 'Gearbox fluid check.', 'startDate': '2026-03-15', 'endDate': '2026-03-15'},
-        ],
+        maintenance: const [],
       ),
     ];
   }

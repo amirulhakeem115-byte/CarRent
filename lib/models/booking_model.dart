@@ -13,6 +13,10 @@ class BookingModel {
   final String? notes;
   final DateTime createdAt;
   final DateTime? updatedAt;
+  final int pointsRedeemed;
+  final double discountAmount;
+  final bool pointsRedeemedProcessed;
+  final bool rewardPointsAwarded;
 
   BookingModel({
     required this.id,
@@ -29,6 +33,10 @@ class BookingModel {
     this.notes,
     required this.createdAt,
     this.updatedAt,
+    this.pointsRedeemed = 0,
+    this.discountAmount = 0.0,
+    this.pointsRedeemedProcessed = false,
+    this.rewardPointsAwarded = false,
   });
 
   factory BookingModel.fromMap(
@@ -58,6 +66,12 @@ class BookingModel {
       updatedAt: data['updatedAt'] != null
           ? DateTime.parse(data['updatedAt'])
           : null,
+      pointsRedeemed: data['pointsRedeemed'] is int
+          ? data['pointsRedeemed'] as int
+          : int.tryParse(data['pointsRedeemed']?.toString() ?? '') ?? 0,
+      discountAmount: (data['discountAmount'] ?? 0.0).toDouble(),
+      pointsRedeemedProcessed: data['pointsRedeemedProcessed'] ?? false,
+      rewardPointsAwarded: data['rewardPointsAwarded'] ?? false,
     );
   }
 
@@ -76,6 +90,10 @@ class BookingModel {
       'notes': notes,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
+      'pointsRedeemed': pointsRedeemed,
+      'discountAmount': discountAmount,
+      'pointsRedeemedProcessed': pointsRedeemedProcessed,
+      'rewardPointsAwarded': rewardPointsAwarded,
     };
   }
 

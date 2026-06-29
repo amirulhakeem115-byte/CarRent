@@ -12,15 +12,19 @@ import '../../../models/user_model.dart';
 import '../../../models/booking_model.dart';
 import '../../../models/review_model.dart';
 import '../../../models/payment_model.dart';
+import '../../../services/vehicle_service.dart';
+import '../../../models/vehicle_model.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'reward_history_screen.dart';
 import '../../../services/receipt_upload_helper.dart'
     if (dart.library.html) '../../../services/receipt_upload_web.dart'
     as receipt_upload;
-import '../../../widgets/custom_app_bar.dart';
-import '../../../widgets/loading_widget.dart';
 import '../../../widgets/app_image.dart';
 import '../login_screen.dart';
+import '../../../services/file_download_helper.dart'
+    if (dart.library.html) '../../../services/file_download_web.dart'
+    as download_helper;
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -35,12 +39,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final BookingService _bookingService = BookingService();
   final PaymentService _paymentService = PaymentService();
   final ReviewService _reviewService = ReviewService();
+  final VehicleService _vehicleService = VehicleService();
 
   UserModel? _user;
   List<BookingModel> _bookings = [];
   List<PaymentModel> _payments = [];
+  List<VehicleModel> _vehicles = [];
   bool _loading = true;
   String? _error;
+
+  String? _qrCodeUrl;
+  String? _bankName;
+  String? _accountName;
+  String? _accountNumber;
+  String? _bankLogoUrl;
 
   // Image Picker
   final _picker = ImagePicker();
@@ -62,14 +74,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final currentUser = _authService.currentUser;
       if (currentUser != null) {
-        final results = await Future.wait([
-          _databaseService.getUser(currentUser.uid),
+        _user = await _databaseService.getUser(currentUser.uid).timeout(const Duration(seconds: 5));
+        if (_user == null) {
+          throw Exception("User profile not found in database");
+        }
+        
+        if (mounted) {
+          setState(() {
+            _loading = false;
+          });
+        }
+
+        // Fetch bookings, payments, QR settings, and vehicles asynchronously in the background
+        Future.wait([
           _bookingService.getUserBookings(currentUser.uid),
           _paymentService.getUserPayments(currentUser.uid),
-        ]).timeout(const Duration(seconds: 10));
-        _user = results[0] as UserModel?;
-        _bookings = results[1] as List<BookingModel>;
-        _payments = results[2] as List<PaymentModel>;
+          _databaseService.getQrPaymentSettings(),
+          _vehicleService.getVehicles(),
+        ]).timeout(const Duration(seconds: 10)).then((results) {
+          if (mounted) {
+            setState(() {
+              _bookings = results[0] as List<BookingModel>;
+              _payments = results[1] as List<PaymentModel>;
+              final qrSettings = results[2] as Map<String, dynamic>?;
+              _vehicles = results[3] as List<VehicleModel>;
+              if (qrSettings != null) {
+                _qrCodeUrl = qrSettings['qrCodeBase64'] ?? qrSettings['qrCodeUrl'];
+                _bankName = qrSettings['bankName'];
+                _accountName = qrSettings['accountName'];
+                _accountNumber = qrSettings['accountNumber'];
+                _bankLogoUrl = qrSettings['bankLogoUrl'];
+              }
+            });
+          }
+        }).catchError((err) {
+          debugPrint('Error loading background data for ProfileScreen: $err');
+          if (mounted) {
+            setState(() {
+              if (_vehicles.isEmpty) {
+                _vehicles = [];
+              }
+            });
+          }
+        });
       }
     } catch (e) {
       debugPrint('Error loading profile: $e');
@@ -202,40 +249,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _pickLicenseImage() async {
-    if (_user == null) return;
-    try {
-      final pickedFile = await _picker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 35,
-        maxWidth: 600,
-        maxHeight: 600,
-      );
-      if (pickedFile != null) {
-        final bytes = await pickedFile.readAsBytes();
-        await _showImagePreviewDialog(
-          imageBytes: bytes,
-          title: 'Preview Driver License',
-          onSave: () async {
-            final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
-            await _databaseService.updateUser(_user!.id, {
-              'licenseImage': base64Image,
-              'isVerified': false,
-              'licenseStatus': 'pending',
-              'licenseRejectionReason': '',
-            });
-            if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Driving License uploaded and is awaiting approval'), backgroundColor: AppColors.primaryOrange),
-            );
-            _loadProfileData();
-          },
-        );
-      }
-    } catch (e) {
-      debugPrint('License pick error: $e');
-    }
-  }
+
 
   void _showEditProfileDialog() {
     if (_user == null) return;
@@ -243,9 +257,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final nameController = TextEditingController(text: _user!.fullName);
     final phoneController = TextEditingController(text: _user!.phone);
     final addressController = TextEditingController(text: _user!.address);
-    final licenseController = TextEditingController(text: _user!.licenseNumber ?? '');
-    final classController = TextEditingController(text: _user!.licenseClass);
-    final expiryController = TextEditingController(text: _user!.licenseExpiry);
 
     showDialog(
       context: context,
@@ -271,21 +282,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   controller: addressController,
                   decoration: const InputDecoration(labelText: 'Residential Address', prefixIcon: Icon(Icons.home_outlined)),
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: licenseController,
-                  decoration: const InputDecoration(labelText: 'License Number', prefixIcon: Icon(Icons.badge_outlined)),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: classController,
-                  decoration: const InputDecoration(labelText: 'License Class', prefixIcon: Icon(Icons.class_outlined)),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: expiryController,
-                  decoration: const InputDecoration(labelText: 'Expiry Date', prefixIcon: Icon(Icons.calendar_today_outlined)),
-                ),
               ],
             ),
           ),
@@ -304,9 +300,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   'fullName': nameController.text.trim(),
                   'phone': phoneController.text.trim(),
                   'address': addressController.text.trim(),
-                  'licenseNumber': licenseController.text.trim().toUpperCase(),
-                  'licenseClass': classController.text.trim(),
-                  'licenseExpiry': expiryController.text.trim(),
                 });
                 if (!context.mounted) return;
                 Navigator.pop(context);
@@ -414,48 +407,56 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final double width = MediaQuery.of(context).size.width;
     final bool isDesktop = width > 900;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      appBar: const CustomAppBar(),
-      body: _loading
-          ? const Center(child: LoadingWidget(message: 'Loading profile details...'))
-          : _error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 64),
-                        const SizedBox(height: 16),
-                        Text(
-                          _error!,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            color: AppColors.secondaryBlue,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        ElevatedButton.icon(
-                          onPressed: _loadProfileData,
-                          icon: const Icon(Icons.refresh_rounded),
-                          label: const Text('Retry Loading'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primaryOrange,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+    if (_loading) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: AppColors.primaryOrange,
+          strokeWidth: 2.5,
+        ),
+      );
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline_rounded,
+                  color: Colors.redAccent, size: 64),
+              const SizedBox(height: 16),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: AppColors.secondaryBlue,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: _loadProfileData,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Retry Loading'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryOrange,
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                )
-              : SingleChildScrollView(
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
               padding: EdgeInsets.symmetric(
                 horizontal: isDesktop ? 60.0 : 20.0,
                 vertical: 24.0,
@@ -516,6 +517,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               Text(
                                 _user?.email ?? '',
                                 style: TextStyle(color: Colors.grey[500], fontSize: 13),
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  const Icon(Icons.stars_rounded, color: AppColors.primaryOrange, size: 16),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${_user?.rewardPoints ?? 0} Points',
+                                    style: const TextStyle(
+                                      color: AppColors.primaryOrange,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -581,86 +597,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 _buildDetailRow('RESIDENTIAL ADDRESS', _user?.address ?? 'N/A'),
                               ],
                             ),
-                            const SizedBox(height: 24),
-                            // 2. Driving Credentials Card
-                            _buildInfoCard(
-                              title: 'Driving Credentials',
-                              icon: Icons.badge_outlined,
-                              children: [
-                                _buildDetailRow('LICENSE CLASS', _user?.licenseClass ?? 'Class DA'),
+                             const SizedBox(height: 16),
+                             _buildInfoCard(
+                               title: 'Loyalty Rewards',
+                               icon: Icons.stars_rounded,
+                               children: [
                                  Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Text(
-                                      'STATUS',
-                                      style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: _user == null
-                                            ? Colors.grey.withValues(alpha: 0.1)
-                                            : _user!.licenseStatus == 'approved'
-                                                ? Colors.green.withValues(alpha: 0.1)
-                                                : _user!.licenseStatus == 'rejected'
-                                                    ? Colors.red.withValues(alpha: 0.1)
-                                                    : Colors.orange.withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Text(
-                                        _user == null
-                                            ? 'License Status: Not Provided'
-                                            : _user!.licenseStatus == 'approved'
-                                                ? 'License Status: Approved'
-                                                : _user!.licenseStatus == 'rejected'
-                                                    ? 'License Status: Rejected'
-                                                    : 'License Status: Pending',
-                                        style: TextStyle(
-                                          color: _user == null
-                                              ? Colors.grey
-                                              : _user!.licenseStatus == 'approved'
-                                                  ? Colors.green
-                                                  : _user!.licenseStatus == 'rejected'
-                                                      ? Colors.red
-                                                      : Colors.orange,
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                if (_user != null && _user!.licenseStatus == 'rejected' && _user!.licenseRejectionReason.isNotEmpty) ...[
-                                  const SizedBox(height: 8),
-                                  Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: Text(
-                                      'Rejection Reason: ${_user!.licenseRejectionReason}',
-                                      style: const TextStyle(color: Colors.red, fontSize: 11, fontWeight: FontWeight.w600),
-                                    ),
-                                  ),
-                                ],
-                                const SizedBox(height: 16),
-                                _buildDetailRow('LICENSE NUMBER', _user?.licenseNumber ?? 'Not Provided'),
-                                _buildDetailRow('EXPIRY DATE', _user?.licenseExpiry ?? '12 / 2028'),
-                                const SizedBox(height: 16),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.grey[200],
-                                      foregroundColor: AppColors.secondaryBlue,
-                                      elevation: 0,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
-                                    ),
-                                    icon: const Icon(Icons.file_upload_outlined, size: 18),
-                                    label: const Text('Update Documents', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                                    onPressed: _pickLicenseImage,
-                                  ),
-                                ),
-                              ],
-                            ),
+                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                   children: [
+                                     Column(
+                                       crossAxisAlignment: CrossAxisAlignment.start,
+                                       children: [
+                                         const Text('CURRENT BALANCE', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
+                                         const SizedBox(height: 4),
+                                         Text('${_user?.rewardPoints ?? 0} Points', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryOrange, fontSize: 16)),
+                                       ],
+                                     ),
+                                     ElevatedButton.icon(
+                                       style: ElevatedButton.styleFrom(
+                                         backgroundColor: AppColors.secondaryBlue,
+                                         foregroundColor: Colors.white,
+                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                       ),
+                                       icon: const Icon(Icons.history, size: 14),
+                                       label: const Text('View Ledger', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                       onPressed: () {
+                                         Navigator.push(
+                                           context,
+                                           MaterialPageRoute(builder: (context) => const RewardHistoryScreen()),
+                                         );
+                                       },
+                                     ),
+                                   ],
+                                 ),
+                               ],
+                             ),
                           ],
                         ),
                       ),
@@ -826,35 +798,71 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                     ),
                                                   ],
                                                 ),
-                                                if (payment != null) ...[
-                                                  const Divider(height: 16),
-                                                  Row(
-                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                    children: [
-                                                      Row(
-                                                        children: [
-                                                          const Text(
-                                                            'Payment Status: ',
-                                                            style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w600),
-                                                          ),
-                                                          _buildPaymentBadge(payment),
-                                                        ],
-                                                      ),
-                                                      if (payment.paymentStatus == 'Rejected')
-                                                        TextButton.icon(
-                                                          onPressed: () => _showReUploadReceiptDialog(payment),
-                                                          icon: const Icon(Icons.replay_outlined, size: 14, color: AppColors.primaryOrange),
-                                                          label: const Text(
-                                                            'Re-upload Receipt',
-                                                            style: TextStyle(color: AppColors.primaryOrange, fontSize: 11, fontWeight: FontWeight.bold),
-                                                          ),
-                                                          style: TextButton.styleFrom(
-                                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                                          ),
-                                                        ),
-                                                    ],
-                                                  ),
+                                                 if (payment != null) ...[
+                                                   const Divider(height: 16),
+                                                   Row(
+                                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                     children: [
+                                                       Row(
+                                                         children: [
+                                                           const Text(
+                                                             'Payment Status: ',
+                                                             style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w600),
+                                                           ),
+                                                           _buildPaymentBadge(payment),
+                                                         ],
+                                                       ),
+                                                       Row(
+                                                         mainAxisSize: MainAxisSize.min,
+                                                         children: [
+                                                           if (payment.receiptImage != null && payment.receiptImage!.isNotEmpty) ...[
+                                                             TextButton.icon(
+                                                               onPressed: () => _openReceiptLightbox(payment),
+                                                               icon: const Icon(Icons.visibility_outlined, size: 14, color: AppColors.secondaryBlue),
+                                                               label: const Text(
+                                                                 'View Receipt',
+                                                                 style: TextStyle(color: AppColors.secondaryBlue, fontSize: 11, fontWeight: FontWeight.bold),
+                                                               ),
+                                                               style: TextButton.styleFrom(
+                                                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                               ),
+                                                             ),
+                                                             const SizedBox(width: 8),
+                                                           ],
+                                                           if (payment.paymentStatus == 'Rejected')
+                                                             TextButton.icon(
+                                                               onPressed: _vehicles.any((v) => v.id == booking.vehicleId && v.status.toLowerCase() == 'maintenance')
+                                                                   ? null
+                                                                   : () => _showReUploadReceiptDialog(payment),
+                                                               icon: Icon(
+                                                                 Icons.replay_outlined,
+                                                                 size: 14,
+                                                                 color: _vehicles.any((v) => v.id == booking.vehicleId && v.status.toLowerCase() == 'maintenance')
+                                                                     ? Colors.grey
+                                                                     : AppColors.primaryOrange,
+                                                               ),
+                                                               label: Text(
+                                                                 _vehicles.any((v) => v.id == booking.vehicleId && v.status.toLowerCase() == 'maintenance')
+                                                                     ? 'Under Maintenance'
+                                                                     : 'Re-upload Receipt',
+                                                                 style: TextStyle(
+                                                                   color: _vehicles.any((v) => v.id == booking.vehicleId && v.status.toLowerCase() == 'maintenance')
+                                                                       ? Colors.grey
+                                                                       : AppColors.primaryOrange,
+                                                                   fontSize: 11,
+                                                                   fontWeight: FontWeight.bold,
+                                                                 ),
+                                                               ),
+                                                               style: TextButton.styleFrom(
+                                                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                               ),
+                                                             ),
+                                                         ],
+                                                       ),
+                                                     ],
+                                                   ),
                                                   if (payment.paymentStatus == 'Rejected' && payment.rejectionReason != null && payment.rejectionReason!.isNotEmpty) ...[
                                                     const SizedBox(height: 6),
                                                     Align(
@@ -897,7 +905,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ],
               ),
-            ),
     );
   }
 
@@ -936,6 +943,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showReUploadReceiptDialog(PaymentModel payment) {
+    final DateFormat dialogDateFormat = DateFormat('yyyy-MM-dd');
+    BookingModel? booking;
+    try {
+      booking = _bookings.firstWhere((b) => b.id == payment.bookingId);
+    } catch (_) {}
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -945,6 +958,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         int? receiptSize;
         String? errorMsg;
         bool isSubmitting = false;
+
+        final amountController = TextEditingController(text: payment.amount.toStringAsFixed(2));
+        final referenceController = TextEditingController(text: payment.transactionId ?? '');
+        DateTime selectedPaymentDate = payment.paymentDate;
 
         return StatefulBuilder(
           builder: (context, setDialogState) {
@@ -977,6 +994,110 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (booking != null) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: AppColors.lightGray,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'BOOKING SUMMARY',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Vehicle: ${booking.vehicleName}',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.secondaryBlue),
+                            ),
+                            Text(
+                              'Dates: ${dialogDateFormat.format(booking.pickUpDate)} to ${dialogDateFormat.format(booking.returnDate)}',
+                              style: const TextStyle(fontSize: 12, color: AppColors.secondaryBlue),
+                            ),
+                            const Divider(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Total Price:', style: TextStyle(fontSize: 12)),
+                                Text('RM ${booking.totalPrice.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Deposit Amount:', style: TextStyle(fontSize: 12)),
+                                Text('RM ${booking.depositAmount.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    if (_bankName != null && _bankName!.isNotEmpty) ...[
+                      const Divider(),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Bank Name:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (_bankLogoUrl != null && _bankLogoUrl!.isNotEmpty) ...[
+                                AppImage(
+                                  imageSrc: _bankLogoUrl!,
+                                  height: 18,
+                                  placeholder: const SizedBox(),
+                                ),
+                                const SizedBox(width: 6),
+                              ],
+                              Text(_bankName!, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Account Number:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                          Text(_accountNumber ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Account Name:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                          Text(_accountName ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      if (_qrCodeUrl != null && _qrCodeUrl!.isNotEmpty) ...[
+                        Center(
+                          child: Container(
+                            width: 140,
+                            height: 140,
+                            margin: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey[200]!),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: AppImage(
+                              imageSrc: _qrCodeUrl,
+                              fit: BoxFit.contain,
+                              placeholder: const Icon(Icons.qr_code_2, size: 80),
+                            ),
+                          ),
+                        ),
+                      ],
+                      const Divider(),
+                    ],
                     const Text('Upload a new, valid transaction receipt proof to clear verification.', textAlign: TextAlign.center),
                     const SizedBox(height: 16),
                     if (kIsWeb) ...[
@@ -1096,6 +1217,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         label: const Text('Remove File', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
                       ),
                     ],
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: referenceController,
+                      decoration: const InputDecoration(
+                        labelText: 'Transaction Reference ID',
+                        hintText: 'e.g., Ref: 123456789012',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: amountController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: 'Payment Amount (RM)',
+                        hintText: 'e.g., 150.00',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    InkWell(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: selectedPaymentDate,
+                          firstDate: DateTime.now().subtract(const Duration(days: 30)),
+                          lastDate: DateTime.now().add(const Duration(days: 7)),
+                        );
+                        if (picked != null) {
+                          setDialogState(() {
+                            selectedPaymentDate = picked;
+                          });
+                        }
+                      },
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Payment Date',
+                          border: OutlineInputBorder(),
+                          suffixIcon: Icon(Icons.calendar_today),
+                        ),
+                        child: Text(dialogDateFormat.format(selectedPaymentDate)),
+                      ),
+                    ),
                     if (isSubmitting) ...[
                       const SizedBox(height: 16),
                       const CircularProgressIndicator(color: AppColors.primaryOrange),
@@ -1115,6 +1279,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   onPressed: receiptBase64 == null || isSubmitting
                       ? null
                       : () async {
+                          final txId = referenceController.text.trim();
+                          if (txId.isEmpty) {
+                            setDialogState(() {
+                              errorMsg = 'Please enter Transaction Reference ID.';
+                            });
+                            return;
+                          }
+                          final parsedAmount = double.tryParse(amountController.text.trim());
+                          if (parsedAmount == null || parsedAmount <= 0) {
+                            setDialogState(() {
+                              errorMsg = 'Please enter a valid payment amount.';
+                            });
+                            return;
+                          }
+
                           setDialogState(() {
                             isSubmitting = true;
                           });
@@ -1127,6 +1306,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               'status': 'pending',
                               'uploadedAt': DateTime.now().toIso8601String(),
                               'rejectionReason': '',
+                              'transactionId': txId,
+                              'amount': parsedAmount,
+                              'paymentDate': selectedPaymentDate.toIso8601String(),
                             });
                             // Set booking back to pending
                             await FirebaseDatabase.instance.ref().child('bookings').child(payment.bookingId).update({
@@ -1152,6 +1334,102 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             );
           },
+        );
+      },
+    );
+  }
+
+  void _openReceiptLightbox(PaymentModel payment) {
+    if (payment.receiptImage == null || payment.receiptImage!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No receipt file uploaded for this transaction.')),
+      );
+      return;
+    }
+
+    final isPdf = payment.receiptImage!.toLowerCase().contains('.pdf') ||
+        payment.receiptImage!.startsWith('data:application/pdf');
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppBar(
+                backgroundColor: Colors.black54,
+                elevation: 0,
+                title: Text(isPdf ? 'PDF Receipt document' : 'Receipt Image Lightbox', style: const TextStyle(color: Colors.white)),
+                leading: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.download, color: Colors.white),
+                    onPressed: () {
+                      try {
+                        final rawBase64 = payment.receiptImage!.split(',').last;
+                        final bytes = base64Decode(rawBase64);
+                        final ext = isPdf ? 'pdf' : 'png';
+                        download_helper.downloadFile(bytes, 'receipt_${payment.id}.$ext');
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('File download initiated successfully.'), backgroundColor: Colors.green),
+                        );
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Download failed: $e'), backgroundColor: Colors.redAccent),
+                        );
+                      }
+                    },
+                  ),
+                ],
+              ),
+              Expanded(
+                child: Container(
+                  color: Colors.black87,
+                  alignment: Alignment.center,
+                  child: isPdf
+                      ? Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.picture_as_pdf, color: Colors.redAccent, size: 100),
+                            const SizedBox(height: 16),
+                            const Text('PDF Receipt Document Uploaded', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 12),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                try {
+                                  final rawBase64 = payment.receiptImage!.split(',').last;
+                                  final bytes = base64Decode(rawBase64);
+                                  download_helper.downloadFile(bytes, 'receipt_${payment.id}.pdf');
+                                } catch (e) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Download failed: $e')),
+                                  );
+                                }
+                              },
+                              icon: const Icon(Icons.download),
+                              label: const Text('Download PDF file to view'),
+                            ),
+                          ],
+                        )
+                      : InteractiveViewer(
+                          panEnabled: true,
+                          boundaryMargin: const EdgeInsets.all(20),
+                          minScale: 0.5,
+                          maxScale: 4.0,
+                          child: Image.memory(
+                            base64Decode(payment.receiptImage!.split(',').last),
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
         );
       },
     );

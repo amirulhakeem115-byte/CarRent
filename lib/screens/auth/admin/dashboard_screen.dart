@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' hide Path;
 import 'package:intl/intl.dart';
-import 'package:excel/excel.dart' hide Border, TextSpan;
-import 'package:pdf/pdf.dart' as pdf_lib;
-import 'package:pdf/widgets.dart' as pw;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'dart:async';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/foundation.dart';
+import 'package:web/web.dart' as web;
 
 import '../../../constants/colors.dart';
 import '../../../services/auth_service.dart';
@@ -15,12 +14,13 @@ import '../../../services/database_service.dart';
 import '../../../services/vehicle_service.dart';
 import '../../../services/booking_service.dart';
 import '../../../services/payment_service.dart';
-import '../../../services/branch_service.dart';
 import '../../../models/user_model.dart';
 import '../../../models/vehicle_model.dart';
 import '../../../models/booking_model.dart';
 import '../../../models/payment_model.dart';
-import '../../../models/branch_model.dart';
+import '../../../services/notification_service.dart';
+import '../../../models/notification_model.dart';
+import '../../../services/tracking_service.dart';
 
 import 'vehicles_screen.dart';
 import 'bookings_screen.dart';
@@ -30,11 +30,17 @@ import 'branches_screen.dart';
 import 'support_inbox_screen.dart';
 import 'vehicle_maintenance_screen.dart';
 import 'qr_settings_view.dart';
+import 'contact_settings_view.dart';
+import 'admin_profile_view.dart';
+import 'reports_view.dart';
+import 'admin_tracking_view.dart';
+import 'admin_notifications_view.dart';
+import 'reward_points_view.dart';
 import '../../../services/maintenance_service.dart';
 import '../../../models/maintenance_job_model.dart';
 import '../login_screen.dart';
 import '../../../widgets/loading_widget.dart';
-import '../../../services/file_download_helper.dart' if (dart.library.html) '../../../services/file_download_web.dart' as download_helper;
+import '../../../widgets/app_image.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -53,40 +59,196 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   final MaintenanceService _maintenanceService = MaintenanceService();
 
   int _totalCars = 0;
-  int _totalBookings = 0;
   int _totalCustomers = 0;
-  double _totalRevenue = 0.0;
+  double _monthlyRevenue = 0.0;
   int _pendingPaymentsCount = 0;
-  int _pendingLicensesCount = 0;
   int _availableCars = 0;
-  int _bookedCars = 0;
-  int _maintenanceCars = 0;
 
   List<BookingModel> _bookings = [];
   List<PaymentModel> _payments = [];
   List<VehicleModel> _vehicles = [];
   List<UserModel> _users = [];
   List<MaintenanceJobModel> _maintenanceJobs = [];
-  List<BranchModel> _branches = [];
   bool _loading = true;
   String? _error;
 
-  BookingModel? _selectedQrBooking;
   String _activeTab = 'Dashboard';
-  StreamSubscription<List<BranchModel>>? _branchesSubscription;
+
+  final NotificationService _notificationService = NotificationService();
+  StreamSubscription<List<NotificationModel>>? _adminNotificationsSubscription;
+  List<NotificationModel> _adminNotifications = [];
+  final int _adminNotificationsLimit = 15;
+
+  final Set<String> _playedNotificationIds = {};
+  late final DateTime _dashboardLoadTime;
+
+  // Real-time admin state and tracking properties
+  UserModel? _adminUser;
+  int _activeBookingsCount = 0;
+  Map<String, Map<String, dynamic>> _liveLocations = {};
+  StreamSubscription? _trackingSubscription;
+  final MapController _dashboardMapController = MapController();
+  Map<String, dynamic>? _selectedTrackedVehicle;
+  final Map<String, Timer?> _simulators = {};
+  final TrackingService _trackingService = TrackingService();
+
+  void _playNotificationSound() {
+    if (!kIsWeb) return;
+    try {
+      final audioCtx = web.AudioContext();
+      _playTone(audioCtx, 880, 0.1, 0.0);
+      _playTone(audioCtx, 1200, 0.25, 0.08);
+    } catch (e) {
+      debugPrint('Web Audio API error: $e');
+    }
+  }
+
+  void _playTone(web.AudioContext ctx, double frequency, double duration, double delay) {
+    try {
+      final osc = ctx.createOscillator();
+      final gainNode = ctx.createGain();
+      
+      osc.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      
+      osc.frequency.value = frequency;
+      osc.type = 'sine';
+      
+      final startTime = ctx.currentTime + delay;
+      final endTime = startTime + duration;
+      
+      gainNode.gain.setValueAtTime(0.1, startTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, endTime);
+      
+      osc.start(startTime);
+      osc.stop(endTime);
+    } catch (e) {
+      debugPrint('Tone play error: $e');
+    }
+  }
+
+  void _subscribeNotifications() {
+    final currentUser = _authService.currentUser;
+    if (currentUser != null) {
+      _adminNotificationsSubscription?.cancel();
+      _adminNotificationsSubscription = _notificationService.getNotificationsStream(currentUser.uid, limit: _adminNotificationsLimit).listen((notifs) {
+        if (mounted) {
+          // Play sound logic for newly arrived notifications
+          for (var notif in notifs) {
+            if (!notif.isRead && 
+                notif.createdAt.isAfter(_dashboardLoadTime) && 
+                !_playedNotificationIds.contains(notif.id)) {
+              _playedNotificationIds.add(notif.id);
+              _playNotificationSound();
+            }
+          }
+          setState(() {
+            _adminNotifications = notifs;
+          });
+        }
+      });
+    }
+  }
+
+  void _subscribeTracking() {
+    _trackingSubscription?.cancel();
+    _trackingSubscription = FirebaseDatabase.instance.ref().child('tracking').onValue.listen((event) {
+      if (mounted && event.snapshot.exists && event.snapshot.value != null) {
+        try {
+          final Map<dynamic, dynamic> data = event.snapshot.value as Map<dynamic, dynamic>;
+          final Map<String, Map<String, dynamic>> parsed = {};
+          data.forEach((key, value) {
+            if (value is Map) {
+              parsed[key.toString()] = Map<String, dynamic>.from(value);
+            }
+          });
+          setState(() {
+            _liveLocations = parsed;
+          });
+        } catch (e) {
+          debugPrint('Error parsing real-time tracking node: $e');
+        }
+      }
+    });
+  }
+
+  StreamSubscription<List<BookingModel>>? _bookingsSubscription;
+  StreamSubscription<List<VehicleModel>>? _vehiclesSubscription;
+  StreamSubscription<List<PaymentModel>>? _paymentsSubscription;
+  StreamSubscription<List<UserModel>>? _usersSubscription;
 
   @override
   void initState() {
     super.initState();
+    _dashboardLoadTime = DateTime.now();
     _loadDashboardData();
-    _subscribeBranches();
+    _subscribeNotifications();
+    _subscribeTracking();
+    _subscribeToLiveData();
   }
 
-  void _subscribeBranches() {
-    _branchesSubscription = BranchService().getBranchesStream().listen((branchesList) {
+  void _subscribeToLiveData() {
+    _bookingsSubscription?.cancel();
+    _bookingsSubscription = _bookingService.getBookingsStream().listen((bookingsList) {
       if (mounted) {
         setState(() {
-          _branches = branchesList;
+          _bookings = bookingsList;
+          _bookings.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          _activeBookingsCount = _bookings.where((b) => b.status == 'pending' || b.status == 'approved' || b.status == 'ongoing' || b.status == 'Confirmed' || b.status == 'active').length;
+          
+          for (var booking in _bookings) {
+            final bStat = booking.status.toLowerCase();
+            if (bStat == 'ongoing' || bStat == 'approved' || bStat == 'confirmed' || bStat == 'active') {
+              if (!_simulators.containsKey(booking.vehicleId)) {
+                _simulators[booking.vehicleId] = _trackingService.startRouteSimulation(booking.vehicleId);
+              }
+            }
+          }
+        });
+      }
+    });
+
+    _vehiclesSubscription?.cancel();
+    _vehiclesSubscription = _vehicleService.getVehiclesStream().listen((vehiclesList) {
+      if (mounted) {
+        setState(() {
+          _vehicles = vehiclesList;
+          _totalCars = _vehicles.length;
+          _availableCars = _vehicles.where((v) => v.status.toLowerCase() == 'available').length;
+        });
+      }
+    });
+
+    _paymentsSubscription?.cancel();
+    _paymentsSubscription = _paymentService.getPaymentsStream().listen((paymentsList) {
+      if (mounted) {
+        setState(() {
+          _payments = paymentsList;
+          _pendingPaymentsCount = _payments.where((p) => p.status == 'pending' || p.status == 'Pending Verification').length;
+
+          double monthlyRev = 0.0;
+          final now = DateTime.now();
+          for (var payment in _payments) {
+            final status = payment.status.toLowerCase();
+            final pStatus = (payment.paymentStatus ?? '').toLowerCase();
+            if (status == 'approved' || status == 'paid' || pStatus == 'approved') {
+              final pDate = payment.paymentDate;
+              if (pDate.year == now.year && pDate.month == now.month) {
+                monthlyRev += payment.amount;
+              }
+            }
+          }
+          _monthlyRevenue = monthlyRev;
+        });
+      }
+    });
+
+    _usersSubscription?.cancel();
+    _usersSubscription = _databaseService.getUsersStream().listen((usersList) {
+      if (mounted) {
+        setState(() {
+          _users = usersList;
+          _totalCustomers = _users.where((u) => u.role == 'customer').length;
         });
       }
     });
@@ -94,7 +256,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   @override
   void dispose() {
-    _branchesSubscription?.cancel();
+    _adminNotificationsSubscription?.cancel();
+    _trackingSubscription?.cancel();
+    _bookingsSubscription?.cancel();
+    _vehiclesSubscription?.cancel();
+    _paymentsSubscription?.cancel();
+    _usersSubscription?.cancel();
+    _simulators.forEach((_, sim) => sim?.cancel());
     super.dispose();
   }
 
@@ -120,33 +288,43 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       _payments = results[3] as List<PaymentModel>;
       _maintenanceJobs = results[4] as List<MaintenanceJobModel>;
 
+      // Load admin profile user data
+      final currentUser = _authService.currentUser;
+      if (currentUser != null) {
+        _adminUser = await _databaseService.getUser(currentUser.uid);
+      }
+
       _totalCustomers = _users.where((u) => u.role == 'customer').length;
       _totalCars = _vehicles.length;
-      _totalBookings = _bookings.length;
-      _availableCars = _vehicles.where((v) => v.status == 'available').length;
-      _bookedCars = _vehicles.where((v) => v.status == 'booked').length;
-      _maintenanceCars = _vehicles.where((v) => v.status == 'maintenance').length;
-      _pendingLicensesCount = _users.where((u) => u.role == 'customer' && u.licenseStatus == 'pending').length;
+      _availableCars = _vehicles.where((v) => v.status.toLowerCase() == 'available').length;
 
-      double revenue = 0.0;
+      _activeBookingsCount = _bookings.where((b) => b.status == 'pending' || b.status == 'approved' || b.status == 'ongoing').length;
+
+      // Automatically trigger mock hardware simulator for active bookings
+      for (var booking in _bookings) {
+        if (booking.status == 'ongoing' || booking.status == 'approved') {
+          if (!_simulators.containsKey(booking.vehicleId)) {
+            _simulators[booking.vehicleId] = _trackingService.startRouteSimulation(booking.vehicleId);
+          }
+        }
+      }
+
+      double monthlyRev = 0.0;
+      final now = DateTime.now();
+
       for (var payment in _payments) {
         final status = payment.status.toLowerCase();
-        if (status == 'paid' || status == 'approved') {
-          revenue += payment.amount;
+        final pStatus = (payment.paymentStatus ?? '').toLowerCase();
+        if (status == 'approved' || status == 'paid' || pStatus == 'approved') {
+          final pDate = payment.paymentDate;
+          if (pDate.year == now.year && pDate.month == now.month) {
+            monthlyRev += payment.amount;
+          }
         }
       }
-      _totalRevenue = revenue;
+      _monthlyRevenue = monthlyRev;
 
       _pendingPaymentsCount = _payments.where((p) => p.status == 'pending' || p.status == 'Pending Verification').length;
-
-      if (_bookings.isNotEmpty) {
-        final pendingBookings = _bookings.where((b) => b.status == 'pending').toList();
-        if (pendingBookings.isNotEmpty) {
-          _selectedQrBooking = pendingBookings.first;
-        } else {
-          _selectedQrBooking = _bookings.first;
-        }
-      }
     } catch (e) {
       debugPrint('Dashboard loading error: $e');
       setState(() {
@@ -156,394 +334,49 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       if (mounted) {
         setState(() => _loading = false);
       }
+      _checkMaintenanceDue();
     }
   }
 
-  void _exportExcel(String type) {
-    var excelObj = Excel.createExcel();
-    var sheet = excelObj[excelObj.getDefaultSheet() ?? 'Sheet1'];
-    
-    if (type == 'Bookings') {
-      sheet.appendRow([
-        TextCellValue('Booking ID'),
-        TextCellValue('Vehicle'),
-        TextCellValue('Customer'),
-        TextCellValue('Phone'),
-        TextCellValue('Pick Up Date'),
-        TextCellValue('Return Date'),
-        TextCellValue('Total Price (RM)'),
-        TextCellValue('Status'),
-        TextCellValue('Created At')
-      ]);
-      for (var booking in _bookings) {
-        sheet.appendRow([
-          TextCellValue(booking.id),
-          TextCellValue(booking.vehicleName),
-          TextCellValue(booking.userName),
-          TextCellValue(booking.userPhone),
-          TextCellValue(booking.pickUpDate.toIso8601String()),
-          TextCellValue(booking.returnDate.toIso8601String()),
-          DoubleCellValue(booking.totalPrice),
-          TextCellValue(booking.status),
-          TextCellValue(booking.createdAt.toIso8601String()),
-        ]);
-      }
-    } else if (type == 'Payments' || type == 'Revenue') {
-      sheet.appendRow([
-        TextCellValue('Payment ID'),
-        TextCellValue('Customer Name'),
-        TextCellValue('Booking ID'),
-        TextCellValue('Amount (RM)'),
-        TextCellValue('Method'),
-        TextCellValue('Status'),
-        TextCellValue('Transaction ID'),
-        TextCellValue('Date')
-      ]);
-      double sum = 0.0;
-      for (var payment in _payments) {
-        String customerName = 'Unknown';
+  Future<void> _checkMaintenanceDue() async {
+    final today = DateTime.now();
+    final parsedToday = DateTime(today.year, today.month, today.day);
+
+    for (var job in _maintenanceJobs) {
+      if (job.status == 'Scheduled') {
         try {
-          final matchedUser = _users.firstWhere((u) => u.id == payment.userId);
-          customerName = matchedUser.fullName;
-        } catch (_) {}
-        sheet.appendRow([
-          TextCellValue(payment.id),
-          TextCellValue(customerName),
-          TextCellValue(payment.bookingId),
-          DoubleCellValue(payment.amount),
-          TextCellValue(payment.paymentMethod),
-          TextCellValue(payment.status),
-          TextCellValue(payment.transactionId ?? 'N/A'),
-          TextCellValue(payment.paymentDate.toIso8601String()),
-        ]);
-        final status = payment.status.toLowerCase();
-        if (status == 'paid' || status == 'approved') {
-          sum += payment.amount;
-        }
+          final startDate = DateTime.parse(job.startDate);
+          final parsedStart = DateTime(startDate.year, startDate.month, startDate.day);
 
-      }
-      sheet.appendRow([]);
-      sheet.appendRow([
-        TextCellValue('Total Successful Revenue (RM):'),
-        DoubleCellValue(sum)
-      ]);
-    } else if (type == 'Customers') {
-      sheet.appendRow([
-        TextCellValue('Customer ID'),
-        TextCellValue('Full Name'),
-        TextCellValue('Email'),
-        TextCellValue('Phone'),
-        TextCellValue('Address'),
-        TextCellValue('Verified'),
-        TextCellValue('Active')
-      ]);
-      for (var user in _users) {
-        if (user.role == 'customer') {
-          sheet.appendRow([
-            TextCellValue(user.id),
-            TextCellValue(user.fullName),
-            TextCellValue(user.email),
-            TextCellValue(user.phone),
-            TextCellValue(user.address),
-            TextCellValue(user.isVerified ? 'Yes' : 'No'),
-            TextCellValue(user.isActive ? 'Yes' : 'No'),
-          ]);
+          if (parsedStart.isBefore(parsedToday) || parsedStart.isAtSameMomentAs(parsedToday)) {
+            // Check if alert already exists in database (to prevent duplication)
+            final ref = FirebaseDatabase.instance.ref().child('notifications');
+            final snapshot = await ref.orderByChild('relatedId').equalTo(job.id).get().timeout(const Duration(seconds: 5));
+            bool alreadyAlerted = false;
+            if (snapshot.exists && snapshot.value != null) {
+              final data = snapshot.value as Map;
+              alreadyAlerted = data.values.any((n) => (n as Map)['type'] == 'maintenance');
+            }
+
+            if (!alreadyAlerted) {
+              await _notificationService.notifyAllAdmins(
+                title: 'Vehicle Maintenance Due',
+                message: 'Maintenance is due today for ${job.vehicleName}.\nJob: ${job.title}',
+                type: 'maintenance',
+                icon: '🔧',
+                color: '0xFFEF4444',
+                relatedId: job.id,
+                actionRoute: 'Vehicle Maintenance',
+              );
+            }
+          }
+        } catch (e) {
+          debugPrint('Error checking maintenance due: $e');
         }
       }
-    } else if (type == 'Vehicles') {
-      sheet.appendRow([
-        TextCellValue('Vehicle ID'),
-        TextCellValue('Brand'),
-        TextCellValue('Model'),
-        TextCellValue('Category'),
-        TextCellValue('Plate Number'),
-        TextCellValue('Color'),
-        TextCellValue('Transmission'),
-        TextCellValue('Fuel Type'),
-        TextCellValue('Price/Day (RM)'),
-        TextCellValue('Availability'),
-      ]);
-      for (var vehicle in _vehicles) {
-        sheet.appendRow([
-          TextCellValue(vehicle.id),
-          TextCellValue(vehicle.brand),
-          TextCellValue(vehicle.model),
-          TextCellValue(vehicle.category),
-          TextCellValue(vehicle.plateNumber),
-          TextCellValue(vehicle.color),
-          TextCellValue(vehicle.transmission),
-          TextCellValue(vehicle.fuelType),
-          DoubleCellValue(vehicle.pricePerDay),
-          TextCellValue(vehicle.isAvailable ? 'Available' : 'Booked'),
-        ]);
-      }
-    } else if (type == 'Maintenance') {
-      sheet.appendRow([
-        TextCellValue('Job ID'),
-        TextCellValue('Vehicle Unit'),
-        TextCellValue('Service / Repair Type'),
-        TextCellValue('Cost (RM)'),
-        TextCellValue('Scheduled Date'),
-        TextCellValue('Notes'),
-        TextCellValue('Status')
-      ]);
-      double sumCost = 0.0;
-      for (var job in _maintenanceJobs) {
-        sheet.appendRow([
-          TextCellValue(job.id),
-          TextCellValue(job.vehicleName),
-          TextCellValue(job.serviceType),
-          DoubleCellValue(job.cost),
-          TextCellValue(job.date),
-          TextCellValue(job.notes),
-          TextCellValue(job.status),
-        ]);
-        sumCost += job.cost;
-      }
-      sheet.appendRow([]);
-      sheet.appendRow([
-        TextCellValue('Total Maintenance Cost (RM):'),
-        DoubleCellValue(sumCost)
-      ]);
-    }
-
-    final fileBytes = excelObj.save();
-    if (fileBytes != null) {
-      download_helper.downloadFile(Uint8List.fromList(fileBytes), 'CARRENT_${type}_Report_${DateTime.now().millisecondsSinceEpoch}.xlsx');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$type report downloaded in Excel format!'), backgroundColor: Colors.green),
-      );
     }
   }
 
-  Future<void> _exportPdf(String type) async {
-    final pdf = pw.Document();
-    
-    List<List<String>> tableData = [];
-    List<String> headers = [];
-
-    if (type == 'Bookings') {
-      headers = ['Vehicle', 'Customer', 'Period', 'Price', 'Status'];
-      tableData = _bookings.map((b) => [
-        b.vehicleName,
-        b.userName,
-        '${DateFormat('dd/MM').format(b.pickUpDate)} - ${DateFormat('dd/MM').format(b.returnDate)}',
-        'RM ${b.totalPrice.toStringAsFixed(0)}',
-        b.status.toUpperCase()
-      ]).toList();
-    } else if (type == 'Payments' || type == 'Revenue') {
-      headers = ['Date', 'Customer', 'Booking Ref', 'Amount', 'Status'];
-      double sum = 0.0;
-      tableData = _payments.map((p) {
-        String customerName = 'Unknown';
-        try {
-          final matchedUser = _users.firstWhere((u) => u.id == p.userId);
-          customerName = matchedUser.fullName;
-        } catch (_) {}
-        if (p.status == 'paid') {
-          sum += p.amount;
-        }
-        return [
-          DateFormat('dd/MM/yyyy').format(p.paymentDate),
-          customerName,
-          p.bookingId.substring(0, p.bookingId.length > 8 ? 8 : p.bookingId.length),
-          'RM ${p.amount.toStringAsFixed(2)}',
-          p.status.toUpperCase()
-        ];
-      }).toList();
-      tableData.add(['', 'TOTAL REVENUE:', '', 'RM ${sum.toStringAsFixed(2)}', '']);
-    } else if (type == 'Customers') {
-      headers = ['Name', 'Email', 'Phone', 'Verified', 'Active'];
-      tableData = _users.where((u) => u.role == 'customer').map((u) => [
-        u.fullName,
-        u.email,
-        u.phone,
-        u.isVerified ? 'YES' : 'NO',
-        u.isActive ? 'YES' : 'NO'
-      ]).toList();
-    } else if (type == 'Vehicles') {
-      headers = ['Vehicle Unit', 'Category', 'Plate', 'Daily Rate', 'Status'];
-      tableData = _vehicles.map((v) => [
-        '${v.brand} ${v.model}',
-        v.category,
-        v.plateNumber,
-        'RM ${v.pricePerDay.toStringAsFixed(0)}',
-        v.isAvailable ? 'AVAILABLE' : 'BOOKED'
-      ]).toList();
-    } else if (type == 'Maintenance') {
-      headers = ['Vehicle Unit', 'Service Type', 'Date', 'Cost', 'Status'];
-      double sumCost = 0.0;
-      tableData = _maintenanceJobs.map((j) {
-        sumCost += j.cost;
-        return [
-          j.vehicleName,
-          j.serviceType,
-          j.date,
-          'RM ${j.cost.toStringAsFixed(2)}',
-          j.status.toUpperCase()
-        ];
-      }).toList();
-      tableData.add(['', 'TOTAL COST:', '', 'RM ${sumCost.toStringAsFixed(2)}', '']);
-    }
-
-    pdf.addPage(
-      pw.MultiPage(
-        pageFormat: pdf_lib.PdfPageFormat.a4,
-        build: (pw.Context context) {
-          return [
-            pw.Header(
-              level: 0,
-              child: pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text('CARRENT PLATFORM REPORT', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 22, color: pdf_lib.PdfColor.fromInt(0xFF1A237E))),
-                  pw.Text('Generated: ${DateFormat('dd MMM yyyy').format(DateTime.now())}', style: pw.TextStyle(fontSize: 10, color: pdf_lib.PdfColor.fromInt(0xFF757575))),
-                ],
-              ),
-            ),
-            pw.SizedBox(height: 20),
-            pw.Text('$type Analytics Summary', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: pdf_lib.PdfColor.fromInt(0xFFFF9800))),
-            pw.SizedBox(height: 16),
-            pw.TableHelper.fromTextArray(
-              headers: headers,
-              data: tableData,
-              border: pw.TableBorder.all(width: 0.5, color: pdf_lib.PdfColor.fromInt(0xFFE0E0E0)),
-              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: pdf_lib.PdfColors.white),
-              headerDecoration: pw.BoxDecoration(color: pdf_lib.PdfColor.fromInt(0xFF1A237E)),
-              cellAlignment: pw.Alignment.centerLeft,
-              cellStyle: const pw.TextStyle(fontSize: 9),
-            ),
-            pw.SizedBox(height: 30),
-            pw.Divider(),
-            pw.SizedBox(height: 10),
-            pw.Align(
-              alignment: pw.Alignment.centerRight,
-              child: pw.Text('Page 1 of 1 | Confidential Business Record', style: pw.TextStyle(fontSize: 8, color: pdf_lib.PdfColor.fromInt(0xFF9E9E9E))),
-            ),
-          ];
-        },
-      ),
-    );
-
-    final messenger = ScaffoldMessenger.of(context);
-    final fileBytes = await pdf.save();
-    download_helper.downloadFile(fileBytes, 'CARRENT_${type}_Report_${DateTime.now().millisecondsSinceEpoch}.pdf');
-    messenger.showSnackBar(
-      SnackBar(content: Text('$type report downloaded in PDF format!'), backgroundColor: Colors.green),
-    );
-  }
-
-  void _showBranchInfo(String name, String address, String phone, String operatingHours, double lat, double lng) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Address: $address', style: const TextStyle(fontSize: 14)),
-              const SizedBox(height: 12),
-              Text('Phone: $phone', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              Text('Operating Hours: $operatingHours', style: const TextStyle(fontSize: 13, color: Colors.grey, fontStyle: FontStyle.italic)),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Close'),
-            ),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryOrange,
-                foregroundColor: Colors.white,
-              ),
-              onPressed: () {
-                Navigator.pop(context);
-                download_helper.openUrl('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
-              },
-              icon: const Icon(Icons.open_in_browser, size: 18),
-              label: const Text('Open in Google Maps'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showQRSelectionDialog() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('Select Booking to Receive Payment', style: TextStyle(fontWeight: FontWeight.bold)),
-          content: SizedBox(
-            width: 400,
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: _bookings.length,
-              itemBuilder: (context, index) {
-                final booking = _bookings[index];
-                return ListTile(
-                  title: Text(booking.vehicleName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('Customer: ${booking.userName} | RM ${booking.totalPrice.toStringAsFixed(0)}'),
-                  trailing: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: booking.status == 'pending' ? Colors.orange.withValues(alpha: 0.1) : Colors.green.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      booking.status.toUpperCase(),
-                      style: TextStyle(color: booking.status == 'pending' ? Colors.orange : Colors.green, fontSize: 9, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  onTap: () {
-                    setState(() {
-                      _selectedQrBooking = booking;
-                    });
-                    Navigator.pop(context);
-                  },
-                );
-              },
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _approveQrPayment() async {
-    if (_selectedQrBooking == null) return;
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      // Find matching payment record if exists
-      final matching = _payments.where((p) => p.bookingId == _selectedQrBooking!.id);
-      if (matching.isNotEmpty) {
-        final payment = matching.first;
-        await _paymentService.updatePaymentStatus(payment.id, 'paid', payment.userId);
-      }
-      await _bookingService.updateBookingStatus(
-        _selectedQrBooking!.id,
-        'approved',
-        _selectedQrBooking!.userId,
-        _selectedQrBooking!.vehicleId,
-        _selectedQrBooking!.vehicleName,
-      );
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Payment approved and booking marked as Paid!'), backgroundColor: Colors.green),
-      );
-      _loadDashboardData();
-    } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(content: Text('Failed to process payment: $e'), backgroundColor: Colors.redAccent),
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -631,18 +464,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             const Expanded(child: PaymentsView()),
           ],
         );
-      case 'Locations':
+      case 'Reward Points':
         return Column(
           children: [
             _buildHeader(isDesktop),
-            const Expanded(child: BranchesView()),
+            const Expanded(child: RewardPointsView()),
           ],
         );
-      case 'Support Inbox':
+      case 'Vehicle Tracking':
         return Column(
           children: [
             _buildHeader(isDesktop),
-            const Expanded(child: SupportInboxView()),
+            Expanded(
+              child: AdminTrackingView(
+                vehicles: _vehicles,
+                liveLocations: _liveLocations,
+              ),
+            ),
           ],
         );
       case 'Vehicle Maintenance':
@@ -652,11 +490,82 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             const Expanded(child: VehicleMaintenanceView()),
           ],
         );
-      case 'QR Settings':
+      case 'Locations':
+        return Column(
+          children: [
+            _buildHeader(isDesktop),
+            const Expanded(child: BranchesView()),
+          ],
+        );
+      case 'Reports':
+        return Column(
+          children: [
+            _buildHeader(isDesktop),
+            Expanded(
+              child: ReportsView(
+                bookings: _bookings,
+                payments: _payments,
+                vehicles: _vehicles,
+                users: _users,
+                maintenanceJobs: _maintenanceJobs,
+              ),
+            ),
+          ],
+        );
+      case 'Support Inbox':
+        return Column(
+          children: [
+            _buildHeader(isDesktop),
+            const Expanded(child: SupportInboxView()),
+          ],
+        );
+      case 'QR Payment Settings':
         return Column(
           children: [
             _buildHeader(isDesktop),
             const Expanded(child: QrSettingsView()),
+          ],
+        );
+      case 'Contact Settings':
+        return Column(
+          children: [
+            _buildHeader(isDesktop),
+            const Expanded(child: ContactSettingsView()),
+          ],
+        );
+      case 'Admin Profile':
+        return Column(
+          children: [
+            _buildHeader(isDesktop),
+            const Expanded(child: AdminProfileView()),
+          ],
+        );
+      case 'Notifications':
+        return Column(
+          children: [
+            _buildHeader(isDesktop),
+            Expanded(
+              child: AdminNotificationsView(
+                onNavigateTab: (route, relatedId) {
+                  setState(() {
+                    _activeTab = route;
+                  });
+                  if (relatedId != null && relatedId.isNotEmpty) {
+                    if (route == 'Bookings') {
+                      try {
+                        final booking = _bookings.firstWhere((b) => b.id == relatedId);
+                        _showBookingDetailsDialog(booking);
+                      } catch (_) {}
+                    } else if (route == 'Payments') {
+                      try {
+                        final payment = _payments.firstWhere((p) => p.id == relatedId);
+                        _showPaymentDetailsDialog(payment);
+                      } catch (_) {}
+                    }
+                  }
+                },
+              ),
+            ),
           ],
         );
       default:
@@ -667,7 +576,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Widget _buildSidebar(BuildContext context) {
     return Container(
       width: 250,
-      color: AppColors.secondaryBlue,
+      color: const Color(0xFF0F172A), // Dark charcoal premium color
       child: Column(
         children: [
           Container(
@@ -684,19 +593,30 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ],
             ),
           ),
-          const Divider(color: Colors.white24, height: 1),
-          const SizedBox(height: 16),
-          _buildSidebarTile(Icons.dashboard_outlined, 'Dashboard', () => setState(() => _activeTab = 'Dashboard')),
-          _buildSidebarTile(Icons.directions_car_filled_outlined, 'Cars', () => setState(() => _activeTab = 'Cars')),
-          _buildSidebarTile(Icons.calendar_today_outlined, 'Bookings', () => setState(() => _activeTab = 'Bookings')),
-          _buildSidebarTile(Icons.people_outline_rounded, 'Customers', () => setState(() => _activeTab = 'Customers')),
-          _buildSidebarTile(Icons.payment_outlined, 'Payments', () => setState(() => _activeTab = 'Payments')),
-          _buildSidebarTile(Icons.build_outlined, 'Vehicle Maintenance', () => setState(() => _activeTab = 'Vehicle Maintenance')),
-          _buildSidebarTile(Icons.storefront_outlined, 'Locations', () => setState(() => _activeTab = 'Locations')),
-          _buildSidebarTile(Icons.mail_outline_rounded, 'Support Inbox', () => setState(() => _activeTab = 'Support Inbox')),
-          _buildSidebarTile(Icons.qr_code_2, 'QR Settings', () => setState(() => _activeTab = 'QR Settings')),
-          const Spacer(),
-          const Divider(color: Colors.white24, height: 1),
+          const Divider(color: Colors.white12, height: 1),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              children: [
+                _buildSidebarTile(Icons.dashboard_outlined, 'Dashboard', () => setState(() => _activeTab = 'Dashboard')),
+                _buildSidebarTile(Icons.directions_car_filled_outlined, 'Cars', () => setState(() => _activeTab = 'Cars')),
+                _buildSidebarTile(Icons.calendar_today_outlined, 'Bookings', () => setState(() => _activeTab = 'Bookings')),
+                _buildSidebarTile(Icons.people_outline_rounded, 'Customers', () => setState(() => _activeTab = 'Customers')),
+                _buildSidebarTile(Icons.payment_outlined, 'Payments', () => setState(() => _activeTab = 'Payments')),
+                _buildSidebarTile(Icons.stars_rounded, 'Reward Points', () => setState(() => _activeTab = 'Reward Points')),
+                _buildSidebarTile(Icons.map_outlined, 'Vehicle Tracking', () => setState(() => _activeTab = 'Vehicle Tracking')),
+                _buildSidebarTile(Icons.build_outlined, 'Vehicle Maintenance', () => setState(() => _activeTab = 'Vehicle Maintenance')),
+                _buildSidebarTile(Icons.storefront_outlined, 'Locations', () => setState(() => _activeTab = 'Locations')),
+                _buildSidebarTile(Icons.assessment_outlined, 'Reports', () => setState(() => _activeTab = 'Reports')),
+                _buildSidebarTile(Icons.notifications_none_outlined, 'Notifications', () => setState(() => _activeTab = 'Notifications')),
+                _buildSidebarTile(Icons.mail_outline_rounded, 'Support Inbox', () => setState(() => _activeTab = 'Support Inbox')),
+                _buildSidebarTile(Icons.qr_code_2, 'QR Payment Settings', () => setState(() => _activeTab = 'QR Payment Settings')),
+                _buildSidebarTile(Icons.contact_support_outlined, 'Contact Settings', () => setState(() => _activeTab = 'Contact Settings')),
+                _buildSidebarTile(Icons.person_outline, 'Admin Profile', () => setState(() => _activeTab = 'Admin Profile')),
+              ],
+            ),
+          ),
+          const Divider(color: Colors.white12, height: 1),
           _buildSidebarTile(Icons.logout, 'Logout', () async {
             final nav = Navigator.of(context);
             await _authService.logout();
@@ -736,7 +656,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               style: TextStyle(
                 color: isActive ? Colors.white : Colors.white70,
                 fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                fontSize: 14,
+                fontSize: 13,
               ),
             ),
           ],
@@ -745,48 +665,444 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
+
+
+  String _getRelativeTimeString(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inSeconds < 60) {
+      return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      final mins = difference.inMinutes;
+      return '$mins ${mins == 1 ? "minute" : "minutes"} ago';
+    } else if (difference.inHours < 24) {
+      final hours = difference.inHours;
+      return '$hours ${hours == 1 ? "hour" : "hours"} ago';
+    } else if (difference.inDays < 7) {
+      final days = difference.inDays;
+      return '$days ${days == 1 ? "day" : "days"} ago';
+    } else {
+      return DateFormat('dd MMM, hh:mm a').format(dateTime);
+    }
+  }
+
   Widget _buildHeader(bool isDesktop) {
+    final unreadCount = _adminNotifications.where((n) => !n.isRead).length;
+    final String formattedDate = DateFormat('dd MMM yyyy').format(DateTime.now());
+
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              if (!isDesktop) ...[
-                IconButton(
-                  icon: const Icon(Icons.menu, color: AppColors.secondaryBlue),
-                  onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-                ),
-                const SizedBox(width: 8),
-              ],
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _activeTab == 'Dashboard' ? 'Dashboard Overview' : _activeTab,
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue),
+          Expanded(
+            child: Row(
+              children: [
+                if (!isDesktop) ...[
+                  IconButton(
+                    icon: const Icon(Icons.menu, color: AppColors.secondaryBlue),
+                    onPressed: () => _scaffoldKey.currentState?.openDrawer(),
                   ),
-                  Text(
-                    _activeTab == 'Dashboard' ? 'Welcome back, Administrator' : 'CARRENT Platform Management',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
+                  const SizedBox(width: 8),
                 ],
-              ),
-            ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _activeTab == 'Dashboard' ? 'Dashboard Overview' : _activeTab,
+                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        _activeTab == 'Dashboard'
+                            ? 'Welcome back, ${_adminUser?.fullName ?? "Administrator"} 👋'
+                            : 'CARRENT Platform Management',
+                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
+          const SizedBox(width: 16),
           Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
+              // Date Indicator
+              if (isDesktop) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey[200]!),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_today, size: 14, color: AppColors.secondaryBlue),
+                      const SizedBox(width: 8),
+                      Text(
+                        formattedDate,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.secondaryBlue,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+              ],
+
+              // Refresh Button
               IconButton(
                 icon: const Icon(Icons.refresh, color: AppColors.secondaryBlue),
                 onPressed: _loadDashboardData,
+                tooltip: 'Refresh Data',
               ),
               const SizedBox(width: 16),
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: AppColors.secondaryBlue.withValues(alpha: 0.1),
-                child: const Icon(Icons.person, color: AppColors.secondaryBlue),
+
+              // Notifications Bell
+              PopupMenuButton<void>(
+                offset: const Offset(0, 48),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                tooltip: 'Notifications Dropdown',
+                padding: EdgeInsets.zero,
+                itemBuilder: (context) {
+                  final currentUser = _authService.currentUser;
+                  final recentNotifs = _adminNotifications.take(10).toList();
+                  final dropdownUnread = _adminNotifications.where((n) => !n.isRead).length;
+
+                  return [
+                    PopupMenuItem<void>(
+                      enabled: false,
+                      padding: EdgeInsets.zero,
+                      child: Container(
+                        width: 380,
+                        color: Colors.white,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Dropdown Header
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Notifications ($dropdownUnread)',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 15,
+                                      color: AppColors.secondaryBlue,
+                                    ),
+                                  ),
+                                  if (currentUser != null && _adminNotifications.any((n) => !n.isRead))
+                                    TextButton(
+                                      onPressed: () async {
+                                        Navigator.pop(context);
+                                        await _notificationService.markAllAsRead(currentUser.uid);
+                                      },
+                                      style: TextButton.styleFrom(
+                                        padding: EdgeInsets.zero,
+                                        minimumSize: Size.zero,
+                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                      child: const Text(
+                                        'Mark All Read',
+                                        style: TextStyle(
+                                          color: AppColors.primaryOrange,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            const Divider(height: 1),
+                            // List of 10 items
+                            if (recentNotifs.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 32),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.notifications_none_rounded, size: 40, color: Colors.grey[300]),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      'No notifications yet',
+                                      style: TextStyle(color: Colors.grey[500], fontSize: 12, fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            else
+                              ConstrainedBox(
+                                constraints: const BoxConstraints(maxHeight: 350),
+                                child: ListView.separated(
+                                  shrinkWrap: true,
+                                  physics: const ClampingScrollPhysics(),
+                                  itemCount: recentNotifs.length,
+                                  separatorBuilder: (context, index) => const Divider(height: 1),
+                                  itemBuilder: (context, index) {
+                                    final notif = recentNotifs[index];
+                                    final parsedColor = Color(int.parse(notif.color));
+
+                                    return InkWell(
+                                      onTap: () async {
+                                        Navigator.pop(context); // Close dropdown
+                                        if (!notif.isRead) {
+                                          await _notificationService.markAsRead(notif.userId, notif.id);
+                                        }
+                                        if (notif.actionRoute.isNotEmpty) {
+                                          setState(() {
+                                            _activeTab = notif.actionRoute;
+                                          });
+                                          // Open direct details if applicable
+                                          if (notif.relatedId.isNotEmpty) {
+                                            if (notif.actionRoute == 'Bookings') {
+                                              try {
+                                                final booking = _bookings.firstWhere((b) => b.id == notif.relatedId);
+                                                _showBookingDetailsDialog(booking);
+                                              } catch (_) {}
+                                            } else if (notif.actionRoute == 'Payments') {
+                                              try {
+                                                final payment = _payments.firstWhere((p) => p.id == notif.relatedId);
+                                                _showPaymentDetailsDialog(payment);
+                                              } catch (_) {}
+                                            }
+                                          }
+                                        }
+                                      },
+                                      child: Container(
+                                        color: notif.isRead ? Colors.transparent : const Color(0xFFFFF7ED),
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                        child: Row(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            CircleAvatar(
+                                              radius: 16,
+                                              backgroundColor: parsedColor.withValues(alpha: 0.1),
+                                              child: Text(notif.icon, style: const TextStyle(fontSize: 14)),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    notif.title,
+                                                    style: TextStyle(
+                                                      fontWeight: notif.isRead ? FontWeight.bold : FontWeight.w900,
+                                                      fontSize: 12,
+                                                      color: AppColors.secondaryBlue,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    notif.message,
+                                                    maxLines: 2,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      fontSize: 10,
+                                                      height: 1.3,
+                                                      color: notif.isRead ? Colors.grey[600] : Colors.grey[800],
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 6),
+                                                  Text(
+                                                    _getRelativeTimeString(notif.createdAt),
+                                                    style: const TextStyle(fontSize: 8, color: Colors.grey, fontWeight: FontWeight.w500),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            if (!notif.isRead)
+                                              Container(
+                                                width: 6,
+                                                height: 6,
+                                                margin: const EdgeInsets.only(top: 4, left: 4),
+                                                decoration: const BoxDecoration(
+                                                  color: AppColors.primaryOrange,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            const Divider(height: 1),
+                            // Footer Button
+                            InkWell(
+                              onTap: () {
+                                Navigator.pop(context);
+                                setState(() {
+                                  _activeTab = 'Notifications';
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                alignment: Alignment.center,
+                                color: Colors.grey[50],
+                                child: const Text(
+                                  'View All Notifications',
+                                  style: TextStyle(
+                                    color: AppColors.secondaryBlue,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ];
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    shape: BoxShape.circle,
+                  ),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      const Icon(Icons.notifications_outlined, color: AppColors.secondaryBlue, size: 24),
+                      if (unreadCount > 0)
+                        Positioned(
+                          right: -2,
+                          top: -2,
+                          child: Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: const BoxDecoration(
+                              color: AppColors.primaryOrange,
+                              shape: BoxShape.circle,
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 14,
+                              minHeight: 14,
+                            ),
+                            child: Text(
+                              '$unreadCount',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 8,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+
+              // Admin Dropdown menu profile trigger
+              PopupMenuButton<String>(
+                offset: const Offset(0, 48),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                tooltip: 'Admin Settings',
+                onSelected: (val) {
+                  if (val == 'profile') {
+                    setState(() => _activeTab = 'Admin Profile');
+                  } else if (val == 'logout') {
+                    _logout();
+                  }
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: 'profile',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.person_outline, size: 18),
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _adminUser?.fullName ?? 'Admin User',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                            Text(
+                              _adminUser?.email ?? 'admin@gmail.com',
+                              style: const TextStyle(fontSize: 10, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuDivider(),
+                  const PopupMenuItem(
+                    value: 'profile',
+                    child: Row(
+                      children: [
+                        Icon(Icons.settings_outlined, size: 18),
+                        SizedBox(width: 12),
+                        Text('Edit Profile', style: TextStyle(fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'logout',
+                    child: Row(
+                      children: [
+                        Icon(Icons.logout, size: 18, color: Colors.redAccent),
+                        SizedBox(width: 12),
+                        Text('Logout', style: TextStyle(color: Colors.redAccent, fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                ],
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 18,
+                      backgroundColor: AppColors.secondaryBlue.withValues(alpha: 0.1),
+                      backgroundImage: getAppImageProvider(_adminUser?.profileImage),
+                      child: _adminUser?.profileImage.isNotEmpty != true
+                          ? const Icon(Icons.person, size: 18, color: AppColors.secondaryBlue)
+                          : null,
+                    ),
+                    const SizedBox(width: 8),
+                    if (isDesktop) ...[
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _adminUser?.fullName ?? 'Admin',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.secondaryBlue),
+                          ),
+                          const Text(
+                            'Super Administrator',
+                            style: TextStyle(fontSize: 9, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                      const Icon(Icons.arrow_drop_down, size: 16, color: AppColors.secondaryBlue),
+                    ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -795,58 +1111,154 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
+  Future<void> _logout() async {
+    final nav = Navigator.of(context);
+    await _authService.logout();
+    nav.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const LoginScreen()),
+      (route) => false,
+    );
+  }
+
   Widget _buildTopStatsGrid(bool isDesktop) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final now = DateTime.now();
+
+    // 1. Total Vehicles added this month
+    int vehiclesAddedThisMonth = _vehicles.where((v) {
+      try {
+        final date = DateTime.parse(v.createdAt);
+        return date.year == now.year && date.month == now.month;
+      } catch (_) {
+        return false;
+      }
+    }).length;
+    String vehiclesTrend = vehiclesAddedThisMonth > 0 ? '+$vehiclesAddedThisMonth this month' : 'Stable fleet';
+
+    // 2. Available vehicles percentage
+    double availablePct = _totalCars > 0 ? (_availableCars / _totalCars) * 100 : 0.0;
+    String availableTrend = '${availablePct.toStringAsFixed(0)}% ready to rent';
+
+    // 3. Active Bookings
+    String bookingsTrend = 'Ongoing rentals';
+
+    // 4. Monthly Revenue dynamic comparison
+    double lastMonthRev = 0.0;
+    for (var payment in _payments) {
+      final status = payment.status.toLowerCase();
+      final pStatus = (payment.paymentStatus ?? '').toLowerCase();
+      if (status == 'approved' || status == 'paid' || pStatus == 'approved') {
+        final pDate = payment.paymentDate;
+        final lastMonth = now.month == 1 ? 12 : now.month - 1;
+        final lastYear = now.month == 1 ? now.year - 1 : now.year;
+        if (pDate.year == lastYear && pDate.month == lastMonth) {
+          lastMonthRev += payment.amount;
+        }
+      }
+    }
+    double revChange = 0.0;
+    if (lastMonthRev > 0) {
+      revChange = ((_monthlyRevenue - lastMonthRev) / lastMonthRev) * 100;
+    }
+    String revenueTrend = revChange >= 0
+        ? '+${revChange.toStringAsFixed(1)}% vs last month'
+        : '${revChange.toStringAsFixed(1)}% vs last month';
+
+    // 5. Total Customers registered this month
+    int customersThisMonth = _users.where((u) {
+      if (u.role != 'customer') return false;
+      try {
+        final date = DateTime.parse(u.createdAt);
+        return date.year == now.year && date.month == now.month;
+      } catch (_) {
+        return false;
+      }
+    }).length;
+    String customersTrend = customersThisMonth > 0 ? '+$customersThisMonth this month' : 'Stable userbase';
+
+    // 6. Pending Payments action required
+    String paymentsTrend = _pendingPaymentsCount > 0 ? 'Requires approval' : 'All cleared';
+
+    return GridView.count(
+      crossAxisCount: isDesktop ? 6 : (MediaQuery.of(context).size.width > 600 ? 3 : 2),
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisSpacing: 16,
+      mainAxisSpacing: 16,
+      childAspectRatio: isDesktop ? 1.05 : 1.25,
       children: [
-        GridView.count(
-          crossAxisCount: isDesktop ? 6 : 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: isDesktop ? 1.3 : 1.3,
-          children: [
-            _buildStatsCard('Total Users', '$_totalCustomers users', Icons.people, Colors.indigo),
-            _buildStatsCard('Total Vehicles', '$_totalCars units', Icons.directions_car_filled, Colors.blue),
-            _buildStatsCard('Total Revenue', 'RM ${_totalRevenue.toStringAsFixed(0)}', Icons.monetization_on, Colors.green),
-            _buildStatsCard('Total Bookings', '$_totalBookings runs', Icons.book_online, Colors.purple),
-            _buildStatsCard('Pending Payments', '$_pendingPaymentsCount checks', Icons.hourglass_top, Colors.orange),
-            _buildStatsCard('Pending Licenses', '$_pendingLicensesCount checks', Icons.badge_outlined, Colors.redAccent),
-          ],
+        _buildStatsCard(
+          'Total Vehicles',
+          '$_totalCars',
+          Icons.directions_car,
+          Colors.indigo,
+          vehiclesTrend,
+          false,
         ),
-        const SizedBox(height: 24),
-        const Text(
-          'Vehicle Fleet Status Summary',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue),
+        _buildStatsCard(
+          'Available Vehicles',
+          '$_availableCars',
+          Icons.check_circle_outline,
+          Colors.green,
+          availableTrend,
+          false,
         ),
-        const SizedBox(height: 12),
-        GridView.count(
-          crossAxisCount: isDesktop ? 3 : 1,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: isDesktop ? 2.2 : 3.5,
-          children: [
-            _buildStatsCard('Available Cars', '$_availableCars units', Icons.check_circle_outline, Colors.green),
-            _buildStatsCard('Booked Cars', '$_bookedCars units', Icons.block, Colors.redAccent),
-            _buildStatsCard('Maintenance Cars', '$_maintenanceCars units', Icons.build_circle_outlined, Colors.orange),
-          ],
+        _buildStatsCard(
+          'Active Bookings',
+          '$_activeBookingsCount',
+          Icons.calendar_month,
+          Colors.amber,
+          bookingsTrend,
+          false,
+        ),
+        _buildStatsCard(
+          'Monthly Revenue',
+          'RM ${NumberFormat('#,##0.00').format(_monthlyRevenue)}',
+          Icons.monetization_on,
+          Colors.purple,
+          revenueTrend,
+          revChange >= 0,
+        ),
+        _buildStatsCard(
+          'Total Customers',
+          '$_totalCustomers',
+          Icons.people_outline,
+          Colors.teal,
+          customersTrend,
+          false,
+        ),
+        _buildStatsCard(
+          'Pending Payments',
+          '$_pendingPaymentsCount',
+          Icons.hourglass_top,
+          Colors.orange,
+          paymentsTrend,
+          _pendingPaymentsCount > 0,
         ),
       ],
     );
   }
 
-  Widget _buildStatsCard(String label, String value, IconData icon, Color color) {
+  Widget _buildStatsCard(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+    String trendText,
+    bool isPositiveAction,
+  ) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
         ],
+        border: Border.all(color: Colors.grey[200]!),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -855,13 +1267,73 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.bold)),
-              Icon(icon, color: color, size: 24),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              if (label.contains('Pending') && _pendingPaymentsCount > 0)
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                ),
             ],
           ),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue),
+          const SizedBox(height: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    value,
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Icon(
+                label.contains('Revenue')
+                    ? (isPositiveAction ? Icons.arrow_upward : Icons.arrow_downward)
+                    : (label.contains('Pending') && _pendingPaymentsCount > 0 ? Icons.error_outline : Icons.trending_up),
+                color: label.contains('Revenue')
+                    ? (isPositiveAction ? Colors.green : Colors.red)
+                    : (label.contains('Pending') && _pendingPaymentsCount > 0 ? Colors.orange : Colors.grey),
+                size: 12,
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  trendText,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: label.contains('Revenue')
+                        ? (isPositiveAction ? Colors.green : Colors.red)
+                        : (label.contains('Pending') && _pendingPaymentsCount > 0 ? Colors.orange : Colors.grey),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -869,321 +1341,1168 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildMiddleSection(bool isDesktop) {
-    return Flex(
-      direction: isDesktop ? Axis.horizontal : Axis.vertical,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Chart 1: Revenue Line Chart
-        Expanded(
-          flex: isDesktop ? 2 : 0,
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Monthly Revenue Chart',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.secondaryBlue),
+    final currentYear = DateTime.now().year;
+    List<double> monthlyRevenue = List.filled(12, 0.0);
+    for (var payment in _payments) {
+      final status = payment.status.toLowerCase();
+      final pStatus = (payment.paymentStatus ?? '').toLowerCase();
+      if (status == 'paid' || status == 'approved' || pStatus == 'approved') {
+        final pDate = payment.paymentDate;
+        if (pDate.year == currentYear) {
+          monthlyRevenue[pDate.month - 1] += payment.amount;
+        }
+      }
+    }
+
+    int pendingCount = _bookings.where((b) => b.status.toLowerCase() == 'pending').length;
+    int approvedCount = _bookings.where((b) => b.status.toLowerCase() == 'approved').length;
+    int ongoingCount = _bookings.where((b) => b.status.toLowerCase() == 'ongoing').length;
+    int completedCount = _bookings.where((b) => b.status.toLowerCase() == 'completed').length;
+    int cancelledCount = _bookings.where((b) => b.status.toLowerCase() == 'cancelled' || b.status.toLowerCase() == 'rejected').length;
+    
+    Map<String, int> statusCounts = {
+      'Pending': pendingCount,
+      'Approved': approvedCount,
+      'Ongoing': ongoingCount,
+      'Completed': completedCount,
+      'Cancelled': cancelledCount,
+    };
+
+    final totalBookingsCount = statusCounts.values.fold(0, (sum, val) => sum + val);
+
+    final chartCard = Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Revenue Overview',
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppColors.secondaryBlue),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Colors.grey[200]!),
                 ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  height: 220,
-                  child: CustomPaint(
-                    painter: DashboardLineChartPainter(
-                      values: [3000, 4500, 7000, 6200, 9500, _totalRevenue],
-                      labels: const ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-                    ),
-                    child: Container(),
-                  ),
-                ),
-              ],
+                child: const Text('Monthly', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            height: 220,
+            child: CustomPaint(
+              painter: RevenueOverviewLineChartPainter(
+                values: monthlyRevenue,
+                labels: const ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+              ),
+              child: Container(),
             ),
           ),
-        ),
-        if (isDesktop) const SizedBox(width: 24),
-        if (!isDesktop) const SizedBox(height: 24),
-        // QR Code Payment Scanner Pane
-        Expanded(
-          flex: isDesktop ? 1 : 0,
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  'Scan to Receive Payment',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.secondaryBlue),
+        ],
+      ),
+    );
+
+    final statusCard = Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Bookings Status',
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppColors.secondaryBlue),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Colors.grey[200]!),
                 ),
-                const SizedBox(height: 12),
-                if (_selectedQrBooking != null) ...[
-                  Center(
-                    child: Image.network(
-                      'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=carrent://payment?bookingId=${_selectedQrBooking!.id}&amount=${_selectedQrBooking!.totalPrice}',
-                      height: 140,
-                      width: 140,
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) => const Icon(Icons.qr_code, size: 100, color: Colors.grey),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    _selectedQrBooking!.vehicleName,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.secondaryBlue),
-                  ),
-                  Text(
-                    'Due: RM ${_selectedQrBooking!.totalPrice.toStringAsFixed(2)}',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: AppColors.primaryOrange, fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
+                child: const Text('This Year', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                flex: 4,
+                child: SizedBox(
+                  height: 160,
+                  child: Stack(
+                    alignment: Alignment.center,
                     children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: _showQRSelectionDialog,
-                          child: const Text('Change Booking', style: TextStyle(fontSize: 11)),
-                        ),
+                      CustomPaint(
+                        size: const Size(140, 140),
+                        painter: BookingStatusDoughnutPainter(statusCounts: statusCounts),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('Total', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+                          Text(
+                            '$totalBookingsCount',
+                            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue),
                           ),
-                          onPressed: _approveQrPayment,
-                          child: const Text('Approve Paid', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                        ),
+                          const Text('Bookings', style: TextStyle(fontSize: 8, color: Colors.grey, fontWeight: FontWeight.bold)),
+                        ],
                       ),
                     ],
                   ),
-                ] else ...[
-                  const SizedBox(height: 40),
-                  const Text('No bookings available to charge.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
-                  const SizedBox(height: 40),
-                ]
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBottomSection(bool isDesktop) {
-    return Flex(
-      direction: isDesktop ? Axis.horizontal : Axis.vertical,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Headquarters Info & Map
-        Expanded(
-          flex: isDesktop ? 2 : 0,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)),
                 ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 3,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Malaysian Branch Map Hub', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.secondaryBlue)),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'HQ Location: Presint 1 Terminal Hub, 62000 Putrajaya | Working hours: Mon - Fri: 9:00 AM - 6:00 PM PST',
-                      style: TextStyle(color: Colors.grey, fontSize: 12),
-                    ),
-                    const SizedBox(height: 12),
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryOrange, foregroundColor: Colors.white),
-                      onPressed: () => download_helper.openUrl('https://www.google.com/maps/search/?api=1&query=3.0166,101.7916'),
-                      icon: const Icon(Icons.open_in_new, size: 16),
-                      label: const Text('Open HQ in Google Maps'),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                height: 250,
-                decoration: const BoxDecoration(
-                  borderRadius: BorderRadius.only(bottomLeft: Radius.circular(16), bottomRight: Radius.circular(16)),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: FlutterMap(
-                  options: const MapOptions(
-                    initialCenter: LatLng(3.0166, 101.7916), // Kajang HQ
-                    initialZoom: 7.5,
-                  ),
-                  children: [
-                    TileLayer(
-                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'com.carrent.app',
-                    ),
-                    MarkerLayer(
-                      markers: _branches.map((branch) {
-                        final isHq = branch.branchName.toLowerCase().contains('kajang') || branch.branchName.toLowerCase().contains('headquarters');
-                        return Marker(
-                          point: LatLng(branch.latitude, branch.longitude),
-                          width: 40,
-                          height: 40,
-                          child: GestureDetector(
-                            onTap: () => _showBranchInfo(branch.branchName, branch.address, branch.phone, branch.operatingHours, branch.latitude, branch.longitude),
-                            child: Icon(
-                              Icons.location_on,
-                              color: isHq ? Colors.red : AppColors.primaryOrange,
-                              size: isHq ? 36 : 32,
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
+                    _buildLegendRow('Pending', pendingCount, totalBookingsCount, Colors.orange),
+                    _buildLegendRow('Approved', approvedCount, totalBookingsCount, Colors.blue),
+                    _buildLegendRow('Ongoing', ongoingCount, totalBookingsCount, Colors.teal),
+                    _buildLegendRow('Completed', completedCount, totalBookingsCount, Colors.green),
+                    _buildLegendRow('Cancelled', cancelledCount, totalBookingsCount, Colors.redAccent),
                   ],
                 ),
               ),
             ],
           ),
-        ),
-        if (isDesktop) const SizedBox(width: 24),
-        if (!isDesktop) const SizedBox(height: 24),
-        // Export Panel & Recent Payments
-        Expanded(
-          flex: isDesktop ? 1 : 0,
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-            ),
+        ],
+      ),
+    );
+
+    return isDesktop
+        ? Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: 2, child: chartCard),
+              const SizedBox(width: 24),
+              Expanded(flex: 1, child: statusCard),
+            ],
+          )
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              chartCard,
+              const SizedBox(height: 24),
+              statusCard,
+            ],
+          );
+  }
+
+  Widget _buildLegendRow(String label, int count, int total, Color color) {
+    final double pct = total > 0 ? (count / total) * 100 : 0.0;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          const SizedBox(width: 8),
+          Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Generate Operations Reports', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.secondaryBlue)),
-                const SizedBox(height: 16),
-                const Text('PAYMENT LEDGER STATUS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildPaymentStatItem('Total', '${_payments.length}', Colors.blue),
-                    _buildPaymentStatItem('Pending', '$_pendingPaymentsCount', Colors.orange),
-                    _buildPaymentStatItem('Success', '${_payments.where((p) => p.status == 'paid').length}', Colors.green),
-                    _buildPaymentStatItem('Failed', '${_payments.where((p) => p.status == 'failed' || p.status == 'refunded').length}', Colors.red),
-                  ],
+                Text(
+                  label,
+                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue),
                 ),
-                const SizedBox(height: 20),
-                const Text('SELECT REPORT MODULE:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  alignment: WrapAlignment.center,
-                  children: [
-                    _buildReportTile('Revenue'),
-                    _buildReportTile('Bookings'),
-                    _buildReportTile('Vehicles'),
-                    _buildReportTile('Customers'),
-                    _buildReportTile('Maintenance'),
-                  ],
+                Text(
+                  '$count (${pct.toStringAsFixed(0)}%)',
+                  style: const TextStyle(fontSize: 9, color: Colors.grey),
                 ),
               ],
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
-  Widget _buildPaymentStatItem(String label, String value, Color color) {
+  Widget _buildBottomSection(bool isDesktop) {
     return Column(
       children: [
-        Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: color)),
-        const SizedBox(height: 2),
-        Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.w600)),
+        _buildTrackingAndBookingsSection(isDesktop),
+        const SizedBox(height: 24),
+        _buildActionsAlertsPaymentsSection(isDesktop),
       ],
     );
   }
 
-  Widget _buildReportTile(String title) {
-    return Container(
-      width: 100,
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      padding: const EdgeInsets.symmetric(vertical: 12),
+  List<Map<String, dynamic>> _getActiveTrackedVehicles() {
+    final Map<String, Map<String, dynamic>> tracked = {};
+    final activeBookings = _bookings.where((b) => b.status == 'ongoing' || b.status == 'approved').toList();
+
+    for (var booking in activeBookings) {
+      if (tracked.containsKey(booking.vehicleId)) continue;
+
+      final vehicleList = _vehicles.where((v) => v.id == booking.vehicleId);
+      if (vehicleList.isEmpty) continue;
+      final vehicle = vehicleList.first;
+
+      final loc = _liveLocations[vehicle.id];
+      final double lat = loc != null ? (loc['latitude'] as num).toDouble() : 3.1344;
+      final double lng = loc != null ? (loc['longitude'] as num).toDouble() : 101.6861;
+      final double speed = loc != null ? (loc['speed'] as num).toDouble() : 0.0;
+
+      tracked[booking.vehicleId] = {
+        'booking': booking,
+        'vehicle': vehicle,
+        'latitude': lat,
+        'longitude': lng,
+        'speed': speed,
+      };
+    }
+    return tracked.values.toList();
+  }
+
+  List<BookingModel> _getRecentBookings() {
+    final list = List<BookingModel>.from(_bookings);
+    list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return list.take(5).toList();
+  }
+
+  List<MaintenanceJobModel> _getActiveMaintenanceJobs() {
+    return _maintenanceJobs.where((j) => j.status == 'Scheduled' || j.status == 'In Progress').toList();
+  }
+
+  List<PaymentModel> _getRecentPayments() {
+    final list = List<PaymentModel>.from(_payments);
+    list.sort((a, b) => b.paymentDate.compareTo(a.paymentDate));
+    return list.take(5).toList();
+  }
+
+  String _getCustomerName(String userId) {
+    try {
+      return _users.firstWhere((u) => u.id == userId).fullName;
+    } catch (_) {
+      return 'Customer';
+    }
+  }
+
+  String _getVehicleNameForPayment(String bookingId) {
+    try {
+      return _bookings.firstWhere((b) => b.id == bookingId).vehicleName;
+    } catch (_) {
+      return 'Vehicle';
+    }
+  }
+
+  Widget _buildTrackingAndBookingsSection(bool isDesktop) {
+    final trackedVehicles = _getActiveTrackedVehicles();
+    final recentBookings = _getRecentBookings();
+    final mapCard = Container(
+      height: 380,
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F9FA),
-        borderRadius: BorderRadius.circular(10),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.grey[200]!),
       ),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => _showReportOptions(title),
-        child: Column(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            color: Colors.white,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.gps_fixed, color: AppColors.primaryOrange, size: 18),
+                    SizedBox(width: 8),
+                    Text('Live Vehicle Tracking', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: AppColors.secondaryBlue)),
+                  ],
+                ),
+                if (trackedVehicles.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(width: 6, height: 6, decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle)),
+                        const SizedBox(width: 4),
+                        Text('${trackedVehicles.length} Active', style: const TextStyle(color: Colors.green, fontSize: 9, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: trackedVehicles.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.map_outlined, size: 48, color: Colors.grey[300]),
+                        const SizedBox(height: 8),
+                        const Text('No active tracked vehicles', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                        const Text('Active bookings will drive automated simulated routes.', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                      ],
+                    ),
+                  )
+                : Stack(
+                    children: [
+                      FlutterMap(
+                        mapController: _dashboardMapController,
+                        options: MapOptions(
+                          initialCenter: LatLng(trackedVehicles.first['latitude'], trackedVehicles.first['longitude']),
+                          initialZoom: 11,
+                        ),
+                        children: [
+                          TileLayer(
+                            urlTemplate: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+                            userAgentPackageName: 'com.carrent.app',
+                          ),
+                          MarkerLayer(
+                            markers: trackedVehicles.map((tv) {
+                              return Marker(
+                                point: LatLng(tv['latitude'], tv['longitude']),
+                                width: 44,
+                                height: 44,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedTrackedVehicle = tv;
+                                    });
+                                  },
+                                  child: MouseRegion(
+                                    cursor: SystemMouseCursors.click,
+                                    child: Stack(
+                                      alignment: Alignment.center,
+                                      children: [
+                                        Container(
+                                          width: 38,
+                                          height: 38,
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primaryOrange.withValues(alpha: 0.2),
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                        Container(
+                                          width: 24,
+                                          height: 24,
+                                          decoration: const BoxDecoration(
+                                            color: Colors.white,
+                                            shape: BoxShape.circle,
+                                            boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 1))],
+                                          ),
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(2.0),
+                                            child: Container(
+                                              decoration: const BoxDecoration(
+                                                color: AppColors.primaryOrange,
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: const Icon(Icons.directions_car, color: Colors.white, size: 12),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                      ),
+                      if (_selectedTrackedVehicle != null)
+                        Positioned(
+                          top: 16,
+                          left: 16,
+                          child: Container(
+                            width: 260,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 2))],
+                              border: Border.all(color: Colors.grey[100]!),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text('Live Vehicle Telematics', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppColors.secondaryBlue)),
+                                    IconButton(
+                                      icon: const Icon(Icons.close, size: 14),
+                                      onPressed: () => setState(() => _selectedTrackedVehicle = null),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: Container(
+                                        width: 50,
+                                        height: 38,
+                                        color: Colors.grey[100],
+                                        child: AppImage(
+                                          imageSrc: (_selectedTrackedVehicle!['vehicle'] as VehicleModel).mainImage,
+                                          placeholder: const Icon(Icons.directions_car, size: 14),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '${(_selectedTrackedVehicle!['vehicle'] as VehicleModel).brand} ${(_selectedTrackedVehicle!['vehicle'] as VehicleModel).model}',
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.secondaryBlue),
+                                          ),
+                                          Text(
+                                            (_selectedTrackedVehicle!['vehicle'] as VehicleModel).plateNumber,
+                                            style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                const Divider(height: 1),
+                                const SizedBox(height: 8),
+                                _buildOverlayRow('Customer', (_selectedTrackedVehicle!['booking'] as BookingModel).userName),
+                                _buildOverlayRow('Booking Status', (_selectedTrackedVehicle!['booking'] as BookingModel).status.toUpperCase()),
+                                _buildOverlayRow('Speed', '${_selectedTrackedVehicle!['speed'].toStringAsFixed(0)} km/h'),
+                                const SizedBox(height: 8),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.secondaryBlue,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                    ),
+                                    onPressed: () => _showVehicleDetailsDialog(_selectedTrackedVehicle!['vehicle']),
+                                    child: const Text('View Specifications', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+
+    final bookingsCard = Container(
+      height: 380,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Recent Bookings', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppColors.secondaryBlue)),
+              TextButton(
+                onPressed: () => setState(() => _activeTab = 'Bookings'),
+                child: const Text('View All', style: TextStyle(color: AppColors.primaryOrange, fontWeight: FontWeight.bold, fontSize: 12)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: recentBookings.isEmpty
+                ? const Center(child: Text('No bookings available'))
+                : ListView.separated(
+                    itemCount: recentBookings.length,
+                    separatorBuilder: (_, index) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final booking = recentBookings[index];
+                      
+                      // Find vehicle image
+                      String vehicleImg = '';
+                      try {
+                        vehicleImg = _vehicles.firstWhere((v) => v.id == booking.vehicleId).mainImage;
+                      } catch (_) {}
+
+                      Color statusColor = Colors.orange;
+                      if (booking.status == 'approved' || booking.status == 'ongoing') {
+                        statusColor = Colors.blue;
+                      } else if (booking.status == 'completed') {
+                        statusColor = Colors.green;
+                      } else if (booking.status == 'cancelled' || booking.status == 'rejected') {
+                        statusColor = Colors.red;
+                      }
+
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            width: 48,
+                            height: 36,
+                            color: Colors.grey[100],
+                            child: AppImage(
+                              imageSrc: vehicleImg,
+                              placeholder: const Icon(Icons.directions_car, color: Colors.grey, size: 20),
+                            ),
+                          ),
+                        ),
+                        title: Text(
+                          booking.vehicleName,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.secondaryBlue),
+                        ),
+                        subtitle: Text(
+                          '${booking.userName} • ${DateFormat('dd MMM').format(booking.pickUpDate)}',
+                          style: const TextStyle(fontSize: 10, color: Colors.grey),
+                        ),
+                        trailing: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text('RM ${booking.totalPrice.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.secondaryBlue)),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
+                              child: Text(
+                                booking.status.toUpperCase(),
+                                style: TextStyle(color: statusColor, fontSize: 8, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ),
+                        onTap: () => _showBookingDetailsDialog(booking),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+
+    return isDesktop
+        ? Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: 2, child: mapCard),
+              const SizedBox(width: 24),
+              Expanded(flex: 1, child: bookingsCard),
+            ],
+          )
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              mapCard,
+              const SizedBox(height: 24),
+              bookingsCard,
+            ],
+          );
+  }
+
+  Widget _buildOverlayRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+          Text(value, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionsAlertsPaymentsSection(bool isDesktop) {
+    final activeMaintenance = _getActiveMaintenanceJobs();
+    final recentPayments = _getRecentPayments();
+
+    final actionsCard = Container(
+      height: 280,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Quick Actions', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppColors.secondaryBlue)),
+          const SizedBox(height: 16),
+          Expanded(
+            child: GridView.count(
+              crossAxisCount: 2,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 2.1,
+              children: [
+                _buildQuickActionButton(
+                  'Add Vehicle',
+                  Icons.add_road,
+                  Colors.blue,
+                  () {
+                    setState(() => _activeTab = 'Cars');
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Click "Add Vehicle" at the top right of the fleet screen.'), backgroundColor: Colors.indigo),
+                    );
+                  },
+                ),
+                _buildQuickActionButton(
+                  'New Booking',
+                  Icons.add_box,
+                  Colors.green,
+                  () {
+                    setState(() => _activeTab = 'Bookings');
+                  },
+                ),
+                _buildQuickActionButton(
+                  'Add Customer',
+                  Icons.person_add,
+                  Colors.teal,
+                  () {
+                    setState(() => _activeTab = 'Customers');
+                  },
+                ),
+                _buildQuickActionButton(
+                  'Generate Report',
+                  Icons.assessment,
+                  Colors.purple,
+                  () {
+                    setState(() => _activeTab = 'Reports');
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryOrange,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                elevation: 0,
+              ),
+              onPressed: _showSendNotificationDialog,
+              icon: const Icon(Icons.campaign, size: 18),
+              label: const Text('Send Broadcast Notification', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    final maintenanceCard = activeMaintenance.isNotEmpty
+        ? Container(
+            height: 280,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey[200]!),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Maintenance Alerts', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppColors.secondaryBlue)),
+                    TextButton(
+                      onPressed: () => setState(() => _activeTab = 'Vehicle Maintenance'),
+                      child: const Text('View All', style: TextStyle(color: AppColors.primaryOrange, fontWeight: FontWeight.bold, fontSize: 12)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: ListView.separated(
+                    itemCount: activeMaintenance.length > 4 ? 4 : activeMaintenance.length,
+                    separatorBuilder: (_, index) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final job = activeMaintenance[index];
+                      final Color statusColor = job.status == 'In Progress' ? Colors.orange : Colors.blue;
+
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: Text(
+                          job.vehicleName,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.secondaryBlue),
+                        ),
+                        subtitle: Text(
+                          '${job.title} • Due: ${job.endDate}',
+                          style: const TextStyle(fontSize: 10, color: Colors.grey),
+                        ),
+                        trailing: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
+                          child: Text(
+                            job.status.toUpperCase(),
+                            style: TextStyle(color: statusColor, fontSize: 8, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          )
+        : null;
+
+    final paymentsCard = Container(
+      height: 280,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Recent Payments', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppColors.secondaryBlue)),
+              TextButton(
+                onPressed: () => setState(() => _activeTab = 'Payments'),
+                child: const Text('View All', style: TextStyle(color: AppColors.primaryOrange, fontWeight: FontWeight.bold, fontSize: 12)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: recentPayments.isEmpty
+                ? const Center(child: Text('No payments found'))
+                : ListView.separated(
+                    itemCount: recentPayments.length,
+                    separatorBuilder: (_, index) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final payment = recentPayments[index];
+                      final custName = _getCustomerName(payment.userId);
+                      final vName = _getVehicleNameForPayment(payment.bookingId);
+                      final bool isPending = payment.status.toLowerCase() == 'pending' || payment.status == 'Pending Verification';
+                      final Color statusColor = isPending ? Colors.orange : Colors.green;
+
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          vName,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.secondaryBlue),
+                        ),
+                        subtitle: Text(
+                          '$custName • ${DateFormat('dd MMM').format(payment.paymentDate)}',
+                          style: const TextStyle(fontSize: 10, color: Colors.grey),
+                        ),
+                        trailing: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'RM ${payment.amount.toStringAsFixed(0)}',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.secondaryBlue),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
+                              child: Text(
+                                isPending ? 'PENDING' : 'PAID',
+                                style: TextStyle(color: statusColor, fontSize: 8, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ),
+                        onTap: () => _showPaymentDetailsDialog(payment),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+
+    return isDesktop
+        ? Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: actionsCard),
+              const SizedBox(width: 24),
+              if (maintenanceCard != null) ...[
+                Expanded(child: maintenanceCard),
+                const SizedBox(width: 24),
+              ],
+              Expanded(child: paymentsCard),
+            ],
+          )
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              actionsCard,
+              const SizedBox(height: 24),
+              if (maintenanceCard != null) ...[
+                maintenanceCard,
+                const SizedBox(height: 24),
+              ],
+              paymentsCard,
+            ],
+          );
+  }
+
+  Widget _buildQuickActionButton(String label, IconData icon, Color color, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.15)),
+        ),
+        child: Row(
           children: [
-            const Icon(Icons.file_copy_outlined, color: AppColors.secondaryBlue, size: 20),
-            const SizedBox(height: 4),
-            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 9, color: AppColors.secondaryBlue)),
+            CircleAvatar(
+              backgroundColor: color.withValues(alpha: 0.15),
+              radius: 14,
+              child: Icon(icon, color: color, size: 14),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: color),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  void _showReportOptions(String reportName) {
-    showModalBottomSheet(
+  void _showVehicleDetailsDialog(VehicleModel vehicle) {
+    showDialog(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('Export $reportName Report', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppColors.secondaryBlue)),
-              const SizedBox(height: 20),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14)),
-                onPressed: () {
-                  Navigator.pop(context);
-                  _exportExcel(reportName);
-                },
-                icon: const Icon(Icons.table_view),
-                label: const Text('Download Excel (.XLSX)', style: TextStyle(fontWeight: FontWeight.bold)),
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('${vehicle.brand} ${vehicle.model}', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+          content: Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            constraints: const BoxConstraints(maxWidth: 450),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (vehicle.mainImage.isNotEmpty)
+                    Center(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          height: 150,
+                          width: 250,
+                          color: Colors.grey[100],
+                          child: AppImage(imageSrc: vehicle.mainImage),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+                  _buildDetailDialogRow('Plate Number', vehicle.plateNumber),
+                  _buildDetailDialogRow('Category', vehicle.category),
+                  _buildDetailDialogRow('Daily Rental Rate', 'RM ${vehicle.pricePerDay.toStringAsFixed(0)}'),
+                  _buildDetailDialogRow('Seats', '${vehicle.seats} Seats'),
+                  _buildDetailDialogRow('Transmission', vehicle.transmission),
+                  _buildDetailDialogRow('Fuel Type', vehicle.fuelType),
+                  _buildDetailDialogRow('Engine Spec', vehicle.engine),
+                  _buildDetailDialogRow('Condition', vehicle.condition),
+                  _buildDetailDialogRow('Current Status', vehicle.status),
+                ],
               ),
-              const SizedBox(height: 12),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14)),
-                onPressed: () {
-                  Navigator.pop(context);
-                  _exportPdf(reportName);
-                },
-                icon: const Icon(Icons.picture_as_pdf),
-                label: const Text('Download PDF Document', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showBookingDetailsDialog(BookingModel booking) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Booking Details', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+          content: Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            constraints: const BoxConstraints(maxWidth: 450),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildDetailDialogRow('Booking Reference', booking.id),
+                  _buildDetailDialogRow('Vehicle Model', booking.vehicleName),
+                  _buildDetailDialogRow('Customer Name', booking.userName),
+                  _buildDetailDialogRow('Customer Phone', booking.userPhone),
+                  _buildDetailDialogRow('Pickup Date', DateFormat('dd MMM yyyy, hh:mm a').format(booking.pickUpDate)),
+                  _buildDetailDialogRow('Return Date', DateFormat('dd MMM yyyy, hh:mm a').format(booking.returnDate)),
+                  _buildDetailDialogRow('Total Paid Price', 'RM ${booking.totalPrice.toStringAsFixed(2)}'),
+                  _buildDetailDialogRow('Deposit Amount', 'RM ${booking.depositAmount.toStringAsFixed(2)}'),
+                  _buildDetailDialogRow('Booking Status', booking.status.toUpperCase()),
+                  if (booking.notes?.isNotEmpty == true)
+                    _buildDetailDialogRow('Reservation Notes', booking.notes!),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showPaymentDetailsDialog(PaymentModel payment) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Transaction Details', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+          content: Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            constraints: const BoxConstraints(maxWidth: 450),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildDetailDialogRow('Payment Receipt ID', payment.id),
+                  _buildDetailDialogRow('Booking Reference', payment.bookingId),
+                  _buildDetailDialogRow('Transaction Amount', 'RM ${payment.amount.toStringAsFixed(2)}'),
+                  _buildDetailDialogRow('Payment Method', payment.paymentMethod),
+                  _buildDetailDialogRow('Transaction Ref', payment.transactionId ?? 'N/A'),
+                  _buildDetailDialogRow('Payment Date', DateFormat('dd MMM yyyy, hh:mm a').format(payment.paymentDate)),
+                  _buildDetailDialogRow('Verification Status', payment.status.toUpperCase()),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildDetailDialogRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('$label: ', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)),
+          Expanded(
+            child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: AppColors.secondaryBlue)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSendNotificationDialog() {
+    final titleController = TextEditingController();
+    final messageController = TextEditingController();
+    String target = 'all_customers';
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text('Send Broadcast Notification', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+              content: Container(
+                width: MediaQuery.of(context).size.width * 0.9,
+                constraints: const BoxConstraints(maxWidth: 450),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: titleController,
+                        decoration: const InputDecoration(labelText: 'Notification Title', border: OutlineInputBorder()),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: messageController,
+                        maxLines: 3,
+                        decoration: const InputDecoration(labelText: 'Notification Message', border: OutlineInputBorder()),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: target,
+                        decoration: const InputDecoration(labelText: 'Recipient Target', border: OutlineInputBorder()),
+                        items: const [
+                          DropdownMenuItem(value: 'all_customers', child: Text('All Customers')),
+                          DropdownMenuItem(value: 'all_admins', child: Text('All Admin Staff')),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setDialogState(() {
+                              target = val;
+                            });
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryOrange,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () async {
+                    if (titleController.text.trim().isEmpty || messageController.text.trim().isEmpty) {
+                      return;
+                    }
+                    final title = titleController.text.trim();
+                    final msg = messageController.text.trim();
+                    Navigator.pop(context);
+                    
+                    try {
+                      if (target == 'all_customers') {
+                        await _notificationService.notifyAllCustomers(title: title, message: msg, type: 'system');
+                      } else if (target == 'all_admins') {
+                        await _notificationService.notifyAllAdmins(title: title, message: msg, type: 'system');
+                      }
+                      scaffoldMessenger.showSnackBar(
+                        const SnackBar(content: Text('Broadcast notification sent successfully!'), backgroundColor: Colors.green),
+                      );
+                    } catch (e) {
+                      scaffoldMessenger.showSnackBar(
+                        SnackBar(content: Text('Failed to broadcast: $e'), backgroundColor: Colors.redAccent),
+                      );
+                    }
+                  },
+                  child: const Text('Send Broadcast', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+
+}
+
+class BookingSelectionDialogContent extends StatelessWidget {
+  final List<BookingModel> bookings;
+  final ValueChanged<BookingModel> onSelected;
+
+  const BookingSelectionDialogContent({
+    super.key,
+    required this.bookings,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      shrinkWrap: true,
+      itemCount: bookings.length,
+      itemBuilder: (context, index) {
+        final booking = bookings[index];
+        return ListTile(
+          title: Text(booking.vehicleName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          subtitle: Text('Customer: ${booking.userName} | RM ${booking.totalPrice.toStringAsFixed(0)}', style: const TextStyle(fontSize: 11)),
+          trailing: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: booking.status == 'pending' ? Colors.orange.withValues(alpha: 0.1) : Colors.green.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              booking.status.toUpperCase(),
+              style: TextStyle(color: booking.status == 'pending' ? Colors.orange : Colors.green, fontSize: 8, fontWeight: FontWeight.bold),
+            ),
+          ),
+          onTap: () => onSelected(booking),
         );
       },
     );
   }
 }
 
-class DashboardLineChartPainter extends CustomPainter {
+class RevenueOverviewLineChartPainter extends CustomPainter {
   final List<double> values;
   final List<String> labels;
 
-  DashboardLineChartPainter({required this.values, required this.labels});
+  RevenueOverviewLineChartPainter({required this.values, required this.labels});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1192,20 +2511,41 @@ class DashboardLineChartPainter extends CustomPainter {
     final paintLine = Paint()
       ..color = AppColors.primaryOrange
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0;
+      ..strokeWidth = 3.0
+      ..strokeCap = StrokeCap.round;
 
-    final paintFill = Paint()
-      ..style = PaintingStyle.fill;
+    final paintFill = Paint()..style = PaintingStyle.fill;
 
-    final double maxVal = values.reduce((a, b) => a > b ? a : b);
+    double maxVal = values.reduce((a, b) => a > b ? a : b);
+    if (maxVal == 0) maxVal = 1000.0;
     final double stepX = size.width / (values.length - 1);
+
+    // Draw horizontal grid lines
+    final paintGrid = Paint()
+      ..color = Colors.grey[200]!
+      ..strokeWidth = 1.0;
     
+    for (int i = 0; i <= 4; i++) {
+      final double y = 20.0 + (size.height - 50.0) * i / 4;
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paintGrid);
+
+      final double gridVal = maxVal - (maxVal * i / 4);
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: 'RM ${(gridVal / 1000).toStringAsFixed(1)}K',
+          style: const TextStyle(color: Colors.grey, fontSize: 8, fontWeight: FontWeight.bold),
+        ),
+        textDirection: ui.TextDirection.ltr,
+      )..layout();
+      textPainter.paint(canvas, Offset(5, y - 10));
+    }
+
     final path = Path();
     final fillPath = Path();
-    
+
     for (int i = 0; i < values.length; i++) {
       final double x = i * stepX;
-      final double y = size.height - 30 - ((values[i] / maxVal) * (size.height - 60));
+      final double y = 20.0 + (size.height - 50.0) * (1.0 - (values[i] / maxVal));
 
       if (i == 0) {
         path.moveTo(x, y);
@@ -1221,15 +2561,17 @@ class DashboardLineChartPainter extends CustomPainter {
         fillPath.close();
       }
 
-      // Draw labels
-      final textPainter = TextPainter(
-        text: TextSpan(
-          text: labels[i],
-          style: const TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold),
-        ),
-        textDirection: ui.TextDirection.ltr,
-      )..layout();
-      textPainter.paint(canvas, Offset(x - (textPainter.width / 2), size.height - 15));
+      // Draw X-axis monthly label
+      if (i % 2 == 0 || i == values.length - 1) {
+        final textPainter = TextPainter(
+          text: TextSpan(
+            text: labels[i],
+            style: const TextStyle(color: Colors.grey, fontSize: 9, fontWeight: FontWeight.bold),
+          ),
+          textDirection: ui.TextDirection.ltr,
+        )..layout();
+        textPainter.paint(canvas, Offset(x - (textPainter.width / 2), size.height - 15));
+      }
     }
 
     final gradient = LinearGradient(
@@ -1237,11 +2579,73 @@ class DashboardLineChartPainter extends CustomPainter {
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
     );
-    
+
     paintFill.shader = gradient.createShader(Rect.fromLTWH(0, 0, size.width, size.height));
-    
     canvas.drawPath(fillPath, paintFill);
     canvas.drawPath(path, paintLine);
+
+    // Draw point dots
+    final paintDot = Paint()..color = AppColors.primaryOrange;
+    final paintDotOuter = Paint()..color = Colors.white;
+    for (int i = 0; i < values.length; i++) {
+      final double x = i * stepX;
+      final double y = 20.0 + (size.height - 50.0) * (1.0 - (values[i] / maxVal));
+      canvas.drawCircle(Offset(x, y), 5.0, paintDotOuter);
+      canvas.drawCircle(Offset(x, y), 3.0, paintDot);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class BookingStatusDoughnutPainter extends CustomPainter {
+  final Map<String, int> statusCounts;
+
+  BookingStatusDoughnutPainter({required this.statusCounts});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double total = statusCounts.values.fold(0, (sum, val) => sum + val).toDouble();
+    if (total == 0) return;
+
+    final double centerPadding = size.width / 2;
+    final double radius = size.width / 2.4;
+    final center = Offset(centerPadding, centerPadding);
+
+    final List<MapEntry<String, int>> entries = statusCounts.entries.toList();
+    final List<Color> colors = [
+      Colors.orange,
+      Colors.blue,
+      Colors.teal,
+      Colors.green,
+      Colors.redAccent,
+    ];
+
+    double startAngle = -3.14159 / 2;
+
+    final paintStroke = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 14.0
+      ..strokeCap = StrokeCap.round;
+
+    for (int i = 0; i < entries.length; i++) {
+      final count = entries[i].value;
+      if (count == 0) continue;
+
+      final double sweepAngle = (count / total) * 2 * 3.14159;
+      paintStroke.color = colors[i % colors.length];
+
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        startAngle,
+        sweepAngle - 0.08,
+        false,
+        paintStroke,
+      );
+
+      startAngle += sweepAngle;
+    }
   }
 
   @override

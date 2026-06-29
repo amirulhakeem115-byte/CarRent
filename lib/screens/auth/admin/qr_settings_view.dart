@@ -211,101 +211,106 @@ class _QrSettingsViewState extends State<QrSettingsView> {
           // Main Form and Assets Container
           Expanded(
             child: SingleChildScrollView(
-              child: Flex(
-                direction: isDesktop ? Axis.horizontal : Axis.vertical,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Form Fields Card
-                  Expanded(
-                    flex: isDesktop ? 6 : 0,
-                    child: Card(
-                      color: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      elevation: 0,
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text('QR Payments Enabled', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.secondaryBlue)),
-                                Switch(
-                                  value: _isEnabled,
-                                  activeThumbColor: AppColors.primaryOrange,
-                                  onChanged: (val) {
-                                    setState(() {
-                                      _isEnabled = val;
-                                    });
-                                  },
-                                ),
-                              ],
-                            ),
-                            const Divider(height: 24),
-                            TextField(
-                              controller: _bankNameController,
-                              decoration: const InputDecoration(
-                                labelText: 'Bank Name',
-                                hintText: 'e.g., Maybank, CIMB Bank',
-                                prefixIcon: Icon(Icons.account_balance_outlined),
+              child: Builder(
+                builder: (context) {
+                  final formCard = Card(
+                    color: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    elevation: 0,
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('QR Payments Enabled', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.secondaryBlue)),
+                              Switch(
+                                value: _isEnabled,
+                                activeThumbColor: AppColors.primaryOrange,
+                                onChanged: (val) {
+                                  setState(() {
+                                    _isEnabled = val;
+                                  });
+                                },
                               ),
+                            ],
+                          ),
+                          const Divider(height: 24),
+                          TextField(
+                            controller: _bankNameController,
+                            decoration: const InputDecoration(
+                              labelText: 'Bank Name',
+                              hintText: 'e.g., Maybank, CIMB Bank',
+                              prefixIcon: Icon(Icons.account_balance_outlined),
                             ),
-                            const SizedBox(height: 16),
-                            TextField(
-                              controller: _accountNameController,
-                              decoration: const InputDecoration(
-                                labelText: 'Account Holder Name',
-                                hintText: 'e.g., CARRENT SDN BHD',
-                                prefixIcon: Icon(Icons.person_outline),
+                          ),
+                          const SizedBox(height: 16),
+                          TextField(
+                            controller: _accountNameController,
+                            decoration: const InputDecoration(
+                              labelText: 'Account Holder Name',
+                              hintText: 'e.g., CARRENT SDN BHD',
+                              prefixIcon: Icon(Icons.person_outline),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          TextField(
+                            controller: _accountNumberController,
+                            decoration: const InputDecoration(
+                              labelText: 'Bank Account Number',
+                              hintText: 'e.g., 514012345678',
+                              prefixIcon: Icon(Icons.credit_card_outlined),
+                            ),
+                          ),
+                          const SizedBox(height: 32),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 50,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.secondaryBlue,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               ),
+                              onPressed: _saving ? null : _saveSettings,
+                              child: _saving
+                                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                  : const Text('Save QR Credentials', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
                             ),
-                            const SizedBox(height: 16),
-                            TextField(
-                              controller: _accountNumberController,
-                              decoration: const InputDecoration(
-                                labelText: 'Bank Account Number',
-                                hintText: 'e.g., 514012345678',
-                                prefixIcon: Icon(Icons.credit_card_outlined),
-                              ),
-                            ),
-                            const SizedBox(height: 32),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 50,
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.secondaryBlue,
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                                onPressed: _saving ? null : _saveSettings,
-                                child: _saving
-                                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                    : const Text('Save QR Credentials', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                  if (isDesktop) const SizedBox(width: 24) else const SizedBox(height: 24),
-                  
-                  // Image Asset Previews
-                  Expanded(
-                    flex: isDesktop ? 4 : 0,
-                    child: Column(
-                      children: [
-                        // Company QR code image card
-                        _buildAssetUploadCard('Company DuitNow QR', _qrCodeUrl, true),
-                        const SizedBox(height: 20),
-                        // Bank logo card
-                        _buildAssetUploadCard('Bank Logo/Icon', _bankLogoUrl, false),
-                      ],
-                    ),
-                  ),
-                ],
+                  );
+
+                  final assetColumn = Column(
+                    children: [
+                      _buildAssetUploadCard('Company DuitNow QR', _qrCodeUrl, true),
+                      const SizedBox(height: 20),
+                      _buildAssetUploadCard('Bank Logo/Icon', _bankLogoUrl, false),
+                    ],
+                  );
+
+                  return isDesktop
+                      ? Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(flex: 6, child: formCard),
+                            const SizedBox(width: 24),
+                            Expanded(flex: 4, child: assetColumn),
+                          ],
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            formCard,
+                            const SizedBox(height: 24),
+                            assetColumn,
+                          ],
+                        );
+                },
               ),
             ),
           ),

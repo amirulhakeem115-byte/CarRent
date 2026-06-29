@@ -1,0 +1,969 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
+import 'package:intl/intl.dart';
+import 'package:web/web.dart' as web;
+import '../../../constants/colors.dart';
+import '../../../services/auth_service.dart';
+import '../../../services/database_service.dart';
+import '../../../services/notification_service.dart';
+import '../../../models/user_model.dart';
+import '../../../models/notification_model.dart';
+import '../../../widgets/app_image.dart';
+import '../login_screen.dart';
+
+// Import all screens to load them inside the shell
+import 'home_screen.dart';
+import 'vehicle_list_screen.dart';
+import 'my_bookings_screen.dart';
+import 'history_screen.dart';
+import 'profile_screen.dart';
+import 'contact_support_screen.dart';
+import 'customer_notifications_screen.dart';
+import 'branches_map_screen.dart';
+import 'reward_history_screen.dart';
+
+class CustomerResponsiveShell extends StatefulWidget {
+  final int initialIndex;
+  final Widget? customBody;
+
+  const CustomerResponsiveShell({
+    super.key,
+    this.initialIndex = 0,
+    this.customBody,
+  });
+
+  static CustomerResponsiveShellState? of(BuildContext context) {
+    return context.findAncestorStateOfType<CustomerResponsiveShellState>();
+  }
+
+  @override
+  State<CustomerResponsiveShell> createState() => CustomerResponsiveShellState();
+}
+
+class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
+  final AuthService _authService = AuthService();
+  final DatabaseService _databaseService = DatabaseService();
+  final NotificationService _notificationService = NotificationService();
+
+  late int _currentIndex;
+  Widget? _customBody;
+  UserModel? _user;
+  List<NotificationModel> _notifications = [];
+  StreamSubscription<List<NotificationModel>>? _notificationsSubscription;
+  final Set<String> _playedNotificationIds = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _customBody = widget.customBody;
+    _loadUserData();
+  }
+
+  void showCustomBody(Widget body) {
+    setState(() {
+      _customBody = body;
+    });
+  }
+
+  void clearCustomBody() {
+    setState(() {
+      _customBody = null;
+    });
+  }
+
+  void setIndex(int index) {
+    setState(() {
+      _currentIndex = index;
+      _customBody = null;
+    });
+  }
+
+  @override
+  void dispose() {
+    _notificationsSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadUserData() async {
+    final currentUser = _authService.currentUser;
+    if (currentUser != null) {
+      try {
+        final userModel = await _databaseService.getUser(currentUser.uid);
+        if (mounted) {
+          setState(() {
+            _user = userModel;
+          });
+          _subscribeNotifications(currentUser.uid);
+        }
+      } catch (e) {
+        debugPrint('Error fetching user for shell: $e');
+      }
+    }
+  }
+
+  void _subscribeNotifications(String userId) {
+    // ignore: avoid_print
+    print("Customer UID: $userId");
+    // ignore: avoid_print
+    print("Listening to: notifications/$userId");
+    _notificationsSubscription?.cancel();
+    bool isInitial = true;
+    _notificationsSubscription = _notificationService
+        .getNotificationsStream(userId)
+        .listen((notifs) {
+      if (mounted) {
+        final count = notifs.where((n) => !n.isRead).length;
+        // ignore: avoid_print
+        print("Unread count: $count");
+        for (var notif in notifs) {
+          if (!notif.isRead && !_playedNotificationIds.contains(notif.id)) {
+            if (!isInitial) {
+              // ignore: avoid_print
+              print("Notification received: ${notif.title} - ${notif.message}");
+              // ignore: avoid_print
+              print("Playing notification sound");
+              _playNotificationSound();
+              _showNotificationSnackbar(notif);
+            }
+          }
+          _playedNotificationIds.add(notif.id);
+        }
+        
+        isInitial = false;
+
+        setState(() {
+          _notifications = notifs;
+        });
+      }
+    });
+  }
+
+  void _playNotificationSound() {
+    if (kIsWeb) {
+      try {
+        final audioCtx = web.AudioContext();
+        _playTone(audioCtx, 880, 0.1, 0.0);
+        _playTone(audioCtx, 1200, 0.25, 0.08);
+      } catch (e) {
+        debugPrint('Web Audio API error: $e');
+      }
+    } else {
+      try {
+        SystemSound.play(SystemSoundType.alert);
+      } catch (e) {
+        debugPrint('SystemSound play error: $e');
+      }
+    }
+  }
+
+  void _playTone(web.AudioContext ctx, double frequency, double duration, double delay) {
+    try {
+      final osc = ctx.createOscillator();
+      final gainNode = ctx.createGain();
+      
+      osc.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      
+      osc.frequency.value = frequency;
+      osc.type = 'sine';
+      
+      final startTime = ctx.currentTime + delay;
+      final endTime = startTime + duration;
+      
+      gainNode.gain.setValueAtTime(0.08, startTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, endTime);
+      
+      osc.start(startTime);
+      osc.stop(endTime);
+    } catch (e) {
+      debugPrint('Tone play error: $e');
+    }
+  }
+
+  void _showNotificationSnackbar(NotificationModel notif) {
+    if (!mounted) return;
+    final parsedColor = Color(int.parse(notif.color));
+
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        padding: EdgeInsets.zero,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        content: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey[200]!),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: parsedColor.withValues(alpha: 0.1),
+                child: Text(notif.icon, style: const TextStyle(fontSize: 16)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      notif.title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: AppColors.secondaryBlue,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      notif.message,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.lightText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              TextButton(
+                onPressed: () async {
+                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                  if (!notif.isRead) {
+                    await _notificationService.markAsRead(notif.userId, notif.id);
+                  }
+                  if (notif.actionRoute == 'Bookings' || notif.type == 'booking') {
+                    setIndex(2);
+                  } else if (notif.actionRoute == 'Payments' || notif.type == 'payment') {
+                    setIndex(5);
+                  } else if (notif.actionRoute == 'Support Inbox' || notif.actionRoute == 'Support' || notif.type == 'support') {
+                    setIndex(7);
+                  } else if (notif.actionRoute == 'Loyalty Rewards' || notif.type == 'reward') {
+                    setIndex(4);
+                  }
+                },
+                child: const Text(
+                  'View',
+                  style: TextStyle(
+                    color: AppColors.primaryOrange,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        duration: const Duration(seconds: 5),
+      ),
+    );
+  }
+
+  Future<void> _logout() async {
+    final nav = Navigator.of(context);
+    await _authService.logout();
+    nav.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const LoginScreen()),
+      (route) => false,
+    );
+  }
+
+  String _getRelativeTimeString(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inSeconds < 60) {
+      return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      final mins = difference.inMinutes;
+      return '$mins min${mins == 1 ? "" : "s"} ago';
+    } else if (difference.inHours < 24) {
+      final hours = difference.inHours;
+      return '$hours hr${hours == 1 ? "" : "s"} ago';
+    } else {
+      return DateFormat('dd MMM').format(dateTime);
+    }
+  }
+
+  Widget _getActiveScreen() {
+    if (_customBody != null) {
+      return _customBody!;
+    }
+    switch (_currentIndex) {
+      case 0:
+        return const CustomerHomeScreen();
+      case 1:
+        return const VehicleListScreen();
+      case 2:
+        return const MyBookingsScreen();
+      case 3:
+        return const BranchesMapScreen();
+      case 4:
+        return const RewardHistoryScreen();
+      case 5:
+        return const HistoryScreen();
+      case 6:
+        return const ProfileScreen();
+      case 7:
+        return const ContactSupportScreen();
+      default:
+        return const CustomerHomeScreen();
+    }
+  }
+
+  String _getScreenTitle() {
+    if (_customBody != null) {
+      return 'Details';
+    }
+    switch (_currentIndex) {
+      case 0:
+        return 'Dashboard';
+      case 1:
+        return 'Search Cars';
+      case 2:
+        return 'My Bookings';
+      case 3:
+        return 'Rental Hubs';
+      case 4:
+        return 'Loyalty Rewards';
+      case 5:
+        return 'Payments Ledger';
+      case 6:
+        return 'My Profile';
+      case 7:
+        return 'Support Desk';
+      default:
+        return 'CARRENT';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final double width = MediaQuery.of(context).size.width;
+    final bool isDesktop = width > 950;
+    final unreadCount = _notifications.where((n) => !n.isRead).length;
+
+    // Mapping for Bottom Navigation Items (matches indices: 0, 1, 2, 5)
+    int bottomNavIndex = 0;
+    if (_currentIndex == 1) bottomNavIndex = 1;
+    if (_currentIndex == 2) bottomNavIndex = 2;
+    if (_currentIndex == 6) bottomNavIndex = 3;
+
+    return PopScope(
+      canPop: _customBody == null && _currentIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_customBody != null) {
+          clearCustomBody();
+        } else if (_currentIndex != 0) {
+          setIndex(0);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        appBar: !isDesktop
+            ? AppBar(
+                backgroundColor: Colors.white,
+                elevation: 0,
+                centerTitle: false,
+                title: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryOrange.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.directions_car_filled_rounded,
+                        color: AppColors.primaryOrange,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _getScreenTitle(),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.secondaryBlue,
+                      ),
+                    ),
+                  ],
+                ),
+                actions: [
+                  _buildNotificationBell(unreadCount),
+                  const SizedBox(width: 12),
+                  _buildProfileAvatar(),
+                  const SizedBox(width: 16),
+                ],
+              )
+            : null,
+        drawer: !isDesktop ? _buildDrawer() : null,
+        body: Row(
+          children: [
+            if (isDesktop) _buildSidebar(),
+            Expanded(
+              child: Column(
+                children: [
+                  if (isDesktop) _buildHeader(unreadCount),
+                  Expanded(
+                    child: Container(
+                      color: AppColors.lightGray,
+                      child: _getActiveScreen(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        bottomNavigationBar: !isDesktop && _customBody == null
+            ? Container(
+                decoration: BoxDecoration(
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, -2),
+                    ),
+                  ],
+                ),
+                child: BottomNavigationBar(
+                  currentIndex: bottomNavIndex,
+                  selectedItemColor: AppColors.primaryOrange,
+                  unselectedItemColor: Colors.blueGrey[400],
+                  showUnselectedLabels: true,
+                  type: BottomNavigationBarType.fixed,
+                  backgroundColor: Colors.white,
+                  elevation: 0,
+                  selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                  unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 11),
+                  onTap: (index) {
+                    setState(() {
+                      if (index == 0) _currentIndex = 0;
+                      if (index == 1) _currentIndex = 1;
+                      if (index == 2) _currentIndex = 2;
+                      if (index == 3) _currentIndex = 6;
+                    });
+                  },
+                  items: const [
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.dashboard_outlined),
+                      activeIcon: Icon(Icons.dashboard_rounded),
+                      label: 'Dashboard',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.search_rounded),
+                      label: 'Search',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.calendar_today_outlined),
+                      activeIcon: Icon(Icons.calendar_today_rounded),
+                      label: 'Bookings',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.person_outline),
+                      activeIcon: Icon(Icons.person_rounded),
+                      label: 'Profile',
+                    ),
+                  ],
+                ),
+              )
+            : null,
+      ),
+    );
+  }
+
+  Widget _buildNotificationBell(int unreadCount) {
+    return PopupMenuButton<void>(
+      offset: const Offset(0, 48),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      tooltip: 'Notifications',
+      padding: EdgeInsets.zero,
+      itemBuilder: (context) {
+        final recentNotifs = _notifications.take(10).toList();
+        return [
+          PopupMenuItem<void>(
+            enabled: false,
+            padding: EdgeInsets.zero,
+            child: Container(
+              width: 340,
+              color: Colors.white,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Notifications ($unreadCount)',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 14,
+                            color: AppColors.secondaryBlue,
+                          ),
+                        ),
+                        if (_user != null && _notifications.any((n) => !n.isRead))
+                          TextButton(
+                            onPressed: () async {
+                              Navigator.pop(context);
+                              await _notificationService.markAllAsRead(_user!.id);
+                            },
+                            child: const Text(
+                              'Mark All Read',
+                              style: TextStyle(
+                                color: AppColors.primaryOrange,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  if (recentNotifs.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 32),
+                      child: Column(
+                        children: [
+                          Icon(Icons.notifications_none_rounded, size: 40, color: Colors.grey[300]),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'No notifications yet',
+                            style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    )
+                  else ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 280),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        physics: const ClampingScrollPhysics(),
+                        itemCount: recentNotifs.length,
+                        separatorBuilder: (context, index) => const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          final notif = recentNotifs[index];
+                          final parsedColor = Color(int.parse(notif.color));
+
+                          return InkWell(
+                            onTap: () async {
+                              Navigator.pop(context);
+                              if (!notif.isRead) {
+                                await _notificationService.markAsRead(notif.userId, notif.id);
+                              }
+                              if (notif.actionRoute == 'Bookings' || notif.type == 'booking') {
+                                setIndex(2);
+                              } else if (notif.actionRoute == 'Payments' || notif.type == 'payment') {
+                                setIndex(5);
+                              } else if (notif.actionRoute == 'Support Inbox' || notif.actionRoute == 'Support' || notif.type == 'support') {
+                                setIndex(7);
+                              } else if (notif.actionRoute == 'Loyalty Rewards' || notif.type == 'reward') {
+                                setIndex(4);
+                              }
+                            },
+                            child: Container(
+                              color: notif.isRead ? Colors.transparent : const Color(0xFFFFF7ED),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  CircleAvatar(
+                                    radius: 14,
+                                    backgroundColor: parsedColor.withValues(alpha: 0.1),
+                                    child: Text(notif.icon, style: const TextStyle(fontSize: 12)),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          notif.title,
+                                          style: TextStyle(
+                                            fontWeight: notif.isRead ? FontWeight.bold : FontWeight.w900,
+                                            fontSize: 12,
+                                            color: AppColors.secondaryBlue,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          notif.message,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: notif.isRead ? Colors.grey[600] : Colors.grey[800],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          _getRelativeTimeString(notif.createdAt),
+                                          style: const TextStyle(fontSize: 8, color: Colors.grey),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  const Divider(height: 1),
+                  InkWell(
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const CustomerNotificationsScreen(),
+                        ),
+                      ).then((route) {
+                        if (route != null && route is String) {
+                          if (route == 'Bookings') {
+                            setIndex(2);
+                          } else if (route == 'Payments') {
+                            setIndex(5);
+                          } else if (route == 'Support') {
+                            setIndex(7);
+                          }
+                        }
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      alignment: Alignment.center,
+                      child: const Text(
+                        'View All Notifications',
+                        style: TextStyle(
+                          color: AppColors.primaryOrange,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ];
+      },
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          shape: BoxShape.circle,
+          border: Border.all(color: AppColors.borderGray),
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            const Icon(Icons.notifications_outlined, color: AppColors.secondaryBlue, size: 20),
+            if (unreadCount > 0)
+              Positioned(
+                right: -2,
+                top: -2,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: const BoxDecoration(
+                    color: AppColors.primaryOrange,
+                    shape: BoxShape.circle,
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 14,
+                    minHeight: 14,
+                  ),
+                  child: Text(
+                    '$unreadCount',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 8,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileAvatar() {
+    return GestureDetector(
+      onTap: () {
+        setState(() => _currentIndex = 6);
+      },
+      child: CircleAvatar(
+        radius: 18,
+        backgroundColor: AppColors.lightGray,
+        backgroundImage: getAppImageProvider(_user?.profileImage),
+        child: _user?.profileImage.isNotEmpty != true
+            ? const Icon(Icons.person, size: 18, color: AppColors.secondaryBlue)
+            : null,
+      ),
+    );
+  }
+
+  Widget _buildHeader(int unreadCount) {
+    return Container(
+      height: 70,
+      padding: const EdgeInsets.symmetric(horizontal: 32),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(color: AppColors.borderGray),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            _getScreenTitle(),
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              color: AppColors.secondaryBlue,
+            ),
+          ),
+          Row(
+            children: [
+              _buildNotificationBell(unreadCount),
+              const SizedBox(width: 16),
+              const VerticalDivider(width: 20, indent: 20, endIndent: 20),
+              const SizedBox(width: 8),
+              _buildProfileAvatar(),
+              const SizedBox(width: 12),
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _user?.fullName ?? 'Customer',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: AppColors.secondaryBlue,
+                    ),
+                  ),
+                  Text(
+                    _user?.email ?? '',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.blueGrey[400],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSidebar() {
+    return Container(
+      width: 250,
+      color: AppColors.secondaryBlue,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 24),
+            alignment: Alignment.centerLeft,
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryOrange.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.directions_car_filled_rounded,
+                    color: AppColors.primaryOrange,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'CARRENT',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(color: Colors.white10, height: 1),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              children: [
+                _buildSidebarTile(Icons.dashboard_rounded, 'Dashboard', 0),
+                _buildSidebarTile(Icons.search_rounded, 'Search Cars', 1),
+                _buildSidebarTile(Icons.calendar_today_rounded, 'My Bookings', 2),
+                _buildSidebarTile(Icons.map_rounded, 'Branches', 3),
+                _buildSidebarTile(Icons.stars_rounded, 'Loyalty Rewards', 4),
+                _buildSidebarTile(Icons.history_rounded, 'History', 5),
+                _buildSidebarTile(Icons.person_rounded, 'Profile', 6),
+                _buildSidebarTile(Icons.support_agent_rounded, 'Support Desk', 7),
+              ],
+            ),
+          ),
+          const Divider(color: Colors.white10, height: 1),
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+            leading: const Icon(Icons.logout, color: Colors.white60),
+            title: const Text(
+              'Logout',
+              style: TextStyle(color: Colors.white60, fontSize: 13, fontWeight: FontWeight.bold),
+            ),
+            onTap: _logout,
+          ),
+          const SizedBox(height: 12),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSidebarTile(IconData icon, String title, int index) {
+    final bool isActive = _currentIndex == index && _customBody == null;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: isActive ? AppColors.primaryOrange : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ListTile(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        onTap: () {
+          setIndex(index);
+        },
+        leading: Icon(
+          icon,
+          color: isActive ? Colors.white : Colors.blueGrey[300],
+          size: 20,
+        ),
+        title: Text(
+          title,
+          style: TextStyle(
+            color: isActive ? Colors.white : Colors.blueGrey[300],
+            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+            fontSize: 13,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawer() {
+    return Drawer(
+      backgroundColor: AppColors.secondaryBlue,
+      child: Column(
+        children: [
+          DrawerHeader(
+            decoration: const BoxDecoration(color: AppColors.secondaryBlue),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryOrange.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.directions_car_filled_rounded,
+                    color: AppColors.primaryOrange,
+                    size: 32,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'CARRENT SYSTEM',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 18,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                _buildDrawerTile(Icons.dashboard_rounded, 'Dashboard', 0),
+                _buildDrawerTile(Icons.search_rounded, 'Search Cars', 1),
+                _buildDrawerTile(Icons.calendar_today_rounded, 'My Bookings', 2),
+                _buildDrawerTile(Icons.map_rounded, 'Branches', 3),
+                _buildDrawerTile(Icons.stars_rounded, 'Loyalty Rewards', 4),
+                _buildDrawerTile(Icons.history_rounded, 'History', 5),
+                _buildDrawerTile(Icons.person_rounded, 'Profile', 6),
+                _buildDrawerTile(Icons.support_agent_rounded, 'Support Desk', 7),
+              ],
+            ),
+          ),
+          const Divider(color: Colors.white10),
+          ListTile(
+            leading: const Icon(Icons.logout, color: Colors.white60),
+            title: const Text('Logout', style: TextStyle(color: Colors.white60)),
+            onTap: _logout,
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDrawerTile(IconData icon, String title, int index) {
+    final bool isActive = _currentIndex == index;
+    return ListTile(
+      leading: Icon(icon, color: isActive ? AppColors.primaryOrange : Colors.white70),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: isActive ? AppColors.primaryOrange : Colors.white70,
+          fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
+      onTap: () {
+        Navigator.pop(context); // Close Drawer
+        setIndex(index);
+      },
+    );
+  }
+}

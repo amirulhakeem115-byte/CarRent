@@ -150,6 +150,18 @@ class DatabaseService {
         'message': initialMessage,
         'timestamp': now,
       });
+
+      // Send notification to all admins
+      try {
+        final notificationService = NotificationService();
+        await notificationService.notifyAllAdmins(
+          title: 'New Support Ticket: $subject',
+          message: 'A new ticket has been submitted: "$initialMessage"',
+          type: 'support',
+        );
+      } catch (e) {
+        debugPrint('Failed to send new ticket notification: $e');
+      }
     } catch (e) {
       debugPrint('Error creating support ticket: $e');
       rethrow;
@@ -172,8 +184,36 @@ class DatabaseService {
       // Update lastReplyAt and status on the ticket
       await _db.child('support_tickets').child(ticketId).update({
         'lastReplyAt': now,
-        'status': senderRole == 'customer' ? 'Open' : 'Pending',
+        'status': senderRole == 'customer' ? 'Open' : 'In Progress',
       });
+
+      // Send reply notifications
+      try {
+        final ticketSnap = await _db.child('support_tickets').child(ticketId).get().timeout(const Duration(seconds: 5));
+        if (ticketSnap.exists) {
+          final ticketData = Map<String, dynamic>.from(ticketSnap.value as Map);
+          final customerId = ticketData['customerId'] ?? '';
+          final subject = ticketData['subject'] ?? 'Support Ticket';
+          
+          final notificationService = NotificationService();
+          if (senderRole == 'admin') {
+            await notificationService.createNotification(
+              userId: customerId,
+              title: 'Support Reply Received: $subject',
+              message: 'An administrator replied to your ticket: "$message"',
+              type: 'support',
+            );
+          } else if (senderRole == 'customer') {
+            await notificationService.notifyAllAdmins(
+              title: 'New Support Reply: $subject',
+              message: 'Customer has replied to ticket: "$message"',
+              type: 'support',
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint('Failed to send support reply notification: $e');
+      }
     } catch (e) {
       debugPrint('Error sending support ticket message: $e');
       rethrow;
@@ -223,6 +263,19 @@ class DatabaseService {
         'licenseRejectionReason': '',
       }).timeout(const Duration(seconds: 5));
 
+      if (finalRole == 'customer') {
+        final notificationService = NotificationService();
+        await notificationService.notifyAllAdmins(
+          title: 'New Customer Registered',
+          message: '$fullName has created a new account.',
+          type: 'customer',
+          icon: '👤',
+          color: '0xFF14B8A6',
+          relatedId: uid,
+          actionRoute: 'Customers',
+        );
+      }
+
       debugPrint('USER SAVED SUCCESSFULLY');
     } catch (e, stack) {
       debugPrint('DATABASE ERROR');
@@ -259,6 +312,18 @@ class DatabaseService {
         'licenseClass': 'Class DA',
         'licenseExpiry': '12 / 2028',
       }).timeout(const Duration(seconds: 5));
+
+      final notificationService = NotificationService();
+      await notificationService.notifyAllAdmins(
+        title: 'New Customer Registered',
+        message: '$name has registered via Google.',
+        type: 'customer',
+        icon: '👤',
+        color: '0xFF14B8A6',
+        relatedId: uid,
+        actionRoute: 'Customers',
+      );
+
       debugPrint('GOOGLE USER SAVED SUCCESSFULLY');
     } catch (e, stack) {
       debugPrint('DATABASE ERROR saving Google user: $e');
@@ -307,6 +372,26 @@ class DatabaseService {
   Future<void> updateUser(String uid, Map<String, dynamic> data) async {
     try {
       await _db.child('users').child(uid).update(data).timeout(const Duration(seconds: 5));
+      if (data.containsKey('licenseImage') && data['licenseStatus'] == 'pending') {
+        final notificationService = NotificationService();
+        String customerName = 'Customer';
+        try {
+          final uSnap = await _db.child('users').child(uid).child('fullName').get();
+          if (uSnap.exists) {
+            customerName = uSnap.value.toString();
+          }
+        } catch (_) {}
+
+        await notificationService.notifyAllAdmins(
+          title: 'Customer Uploaded Driving License',
+          message: '$customerName uploaded their driving license for verification.',
+          type: 'customer',
+          icon: '👤',
+          color: '0xFF14B8A6',
+          relatedId: uid,
+          actionRoute: 'Customers',
+        );
+      }
     } catch (e) {
       debugPrint('Error updating user: $e');
       rethrow;
@@ -361,7 +446,11 @@ class DatabaseService {
           message: isVerified
               ? 'Your driving license has been approved. You are now authorized to book rentals!'
               : 'Your driving license was rejected. Reason: $reason. Please re-upload a clear card photo.',
-          type: 'license',
+          type: 'customer',
+          icon: '👤',
+          color: isVerified ? '0xFF10B981' : '0xFFEF4444',
+          relatedId: uid,
+          actionRoute: 'Dashboard',
         );
       } catch (notifErr) {
         debugPrint('Failed to send automatic license verification notification: $notifErr');
@@ -387,8 +476,58 @@ class DatabaseService {
   Future<void> updateQrPaymentSettings(Map<String, dynamic> settings) async {
     try {
       await _db.child('qr_payment_settings').set(settings).timeout(const Duration(seconds: 5));
+      final notificationService = NotificationService();
+      await notificationService.notifyAllAdmins(
+        title: 'QR Payment Settings Changed',
+        message: 'The system QR payment settings have been modified.',
+        type: 'system',
+        icon: '⚙️',
+        color: '0xFF64748B',
+        relatedId: 'qr_settings',
+        actionRoute: 'QR Payment Settings',
+      );
     } catch (e) {
       debugPrint('Error updating QR settings: $e');
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getContactSettings() async {
+    try {
+      final snapshot = await _db.child('contact_settings').get().timeout(const Duration(seconds: 5));
+      if (snapshot.exists) {
+        return Map<String, dynamic>.from(snapshot.value as Map);
+      }
+    } catch (e) {
+      debugPrint('Error getting contact settings: $e');
+    }
+    return null;
+  }
+
+  Stream<Map<String, dynamic>> getContactSettingsStream() {
+    return _db.child('contact_settings').onValue.map((event) {
+      if (event.snapshot.exists && event.snapshot.value != null) {
+        return Map<String, dynamic>.from(event.snapshot.value as Map);
+      }
+      return {};
+    });
+  }
+
+  Future<void> updateContactSettings(Map<String, dynamic> settings) async {
+    try {
+      await _db.child('contact_settings').set(settings).timeout(const Duration(seconds: 5));
+      final notificationService = NotificationService();
+      await notificationService.notifyAllAdmins(
+        title: 'Contact Information Updated',
+        message: 'The company contact settings have been modified.',
+        type: 'system',
+        icon: '⚙️',
+        color: '0xFF64748B',
+        relatedId: 'contact_settings',
+        actionRoute: 'Contact Settings',
+      );
+    } catch (e) {
+      debugPrint('Error updating contact settings: $e');
       rethrow;
     }
   }
@@ -400,5 +539,18 @@ class DatabaseService {
       debugPrint('Error converting settings image to base64: $e');
       rethrow;
     }
+  }
+
+  Stream<List<UserModel>> getUsersStream() {
+    return _db.child('users').onValue.map((event) {
+      List<UserModel> users = [];
+      if (event.snapshot.exists) {
+        final Map<dynamic, dynamic> data = event.snapshot.value as Map<dynamic, dynamic>;
+        data.forEach((key, value) {
+          users.add(UserModel.fromMap(key.toString(), value as Map<dynamic, dynamic>));
+        });
+      }
+      return users;
+    });
   }
 }
