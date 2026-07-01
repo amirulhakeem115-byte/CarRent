@@ -37,25 +37,28 @@ class _RewardHistoryScreenState extends State<RewardHistoryScreen> {
           .child(user.uid)
           .child('rewardPoints')
           .onValue
-          .listen((event) {
-        if (mounted) {
-          int points = 0;
-          if (event.snapshot.exists && event.snapshot.value != null) {
-            points = int.tryParse(event.snapshot.value.toString()) ?? 0;
-          }
-          setState(() {
-            _currentPoints = points;
-            _loadingBalance = false;
-          });
-        }
-      }, onError: (err) {
-        debugPrint('Error streaming user points balance: $err');
-        if (mounted) {
-          setState(() {
-            _loadingBalance = false;
-          });
-        }
-      });
+          .listen(
+            (event) {
+              if (mounted) {
+                int points = 0;
+                if (event.snapshot.exists && event.snapshot.value != null) {
+                  points = int.tryParse(event.snapshot.value.toString()) ?? 0;
+                }
+                setState(() {
+                  _currentPoints = points;
+                  _loadingBalance = false;
+                });
+              }
+            },
+            onError: (err) {
+              debugPrint('Error streaming user points balance: $err');
+              if (mounted) {
+                setState(() {
+                  _loadingBalance = false;
+                });
+              }
+            },
+          );
     }
   }
 
@@ -78,30 +81,6 @@ class _RewardHistoryScreenState extends State<RewardHistoryScreen> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: isDark ? const Color(0xFF1B2436) : Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'Loyalty Rewards History',
-          style: TextStyle(
-            color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.refresh, color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue),
-            onPressed: () {
-              setState(() => _loadingBalance = true);
-              _subscribeToPoints();
-            },
-          ),
-        ],
-      ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -182,7 +161,11 @@ class _RewardHistoryScreenState extends State<RewardHistoryScreen> {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    const Icon(Icons.info_outline_rounded, color: Colors.white60, size: 14),
+                    const Icon(
+                      Icons.info_outline_rounded,
+                      color: Colors.white60,
+                      size: 14,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -207,7 +190,9 @@ class _RewardHistoryScreenState extends State<RewardHistoryScreen> {
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 12,
-                color: isDark ? const Color(0xFFCBD5E1) : AppColors.secondaryBlue,
+                color: isDark
+                    ? const Color(0xFFCBD5E1)
+                    : AppColors.secondaryBlue,
                 letterSpacing: 0.5,
               ),
             ),
@@ -219,7 +204,11 @@ class _RewardHistoryScreenState extends State<RewardHistoryScreen> {
               stream: _rewardService.getUserTransactionsStream(user.uid),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator(color: AppColors.primaryOrange));
+                  return const Center(
+                    child: CircularProgressIndicator(
+                      color: AppColors.primaryOrange,
+                    ),
+                  );
                 }
 
                 if (snapshot.hasError) {
@@ -247,11 +236,19 @@ class _RewardHistoryScreenState extends State<RewardHistoryScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.stars_rounded, size: 64, color: Colors.grey[200]),
+                          Icon(
+                            Icons.stars_rounded,
+                            size: 64,
+                            color: Colors.grey[200],
+                          ),
                           const SizedBox(height: 16),
                           const Text(
                             'No reward transactions yet.',
-                            style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue, fontSize: 15),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.secondaryBlue,
+                              fontSize: 15,
+                            ),
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 8),
@@ -267,9 +264,13 @@ class _RewardHistoryScreenState extends State<RewardHistoryScreen> {
                 }
 
                 return ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
                   itemCount: txs.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 12),
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final tx = txs[index];
                     final String type = tx['type'] ?? 'Earn';
@@ -286,7 +287,9 @@ class _RewardHistoryScreenState extends State<RewardHistoryScreen> {
                       } catch (_) {}
                     }
 
-                    final formattedDate = DateFormat('dd MMM yyyy, hh:mm a').format(createdAt);
+                    final formattedDate = DateFormat(
+                      'dd MMM yyyy, hh:mm a',
+                    ).format(createdAt);
 
                     IconData itemIcon = Icons.stars_rounded;
                     Color itemColor = AppColors.primaryOrange;
@@ -297,7 +300,9 @@ class _RewardHistoryScreenState extends State<RewardHistoryScreen> {
                       itemColor = Colors.green;
                       labelText = 'Redeemed Discount';
                     } else if (type == 'Adjustment') {
-                      itemIcon = points >= 0 ? Icons.card_giftcard_rounded : Icons.exposure_minus_1_rounded;
+                      itemIcon = points >= 0
+                          ? Icons.card_giftcard_rounded
+                          : Icons.exposure_minus_1_rounded;
                       itemColor = points >= 0 ? Colors.blue : Colors.redAccent;
                       labelText = points >= 0 ? 'Admin Credit' : 'Admin Debit';
                     }
@@ -308,7 +313,9 @@ class _RewardHistoryScreenState extends State<RewardHistoryScreen> {
                         color: Theme.of(context).cardColor,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: isDark ? const Color(0xFF334155) : Colors.grey[100]!,
+                          color: isDark
+                              ? const Color(0xFF334155)
+                              : Colors.grey[100]!,
                         ),
                         boxShadow: [
                           BoxShadow(
@@ -338,7 +345,9 @@ class _RewardHistoryScreenState extends State<RewardHistoryScreen> {
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 14,
-                                    color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
+                                    color: isDark
+                                        ? const Color(0xFFF8FAFC)
+                                        : AppColors.secondaryBlue,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
@@ -378,7 +387,9 @@ class _RewardHistoryScreenState extends State<RewardHistoryScreen> {
                                 style: TextStyle(
                                   fontWeight: FontWeight.w900,
                                   fontSize: 15,
-                                  color: points >= 0 ? AppColors.primaryOrange : Colors.green,
+                                  color: points >= 0
+                                      ? AppColors.primaryOrange
+                                      : Colors.green,
                                 ),
                               ),
                               const SizedBox(height: 4),

@@ -42,7 +42,8 @@ class CustomerResponsiveShell extends StatefulWidget {
   }
 
   @override
-  State<CustomerResponsiveShell> createState() => CustomerResponsiveShellState();
+  State<CustomerResponsiveShell> createState() =>
+      CustomerResponsiveShellState();
 }
 
 class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
@@ -117,31 +118,33 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
     _notificationsSubscription = _notificationService
         .getNotificationsStream(userId)
         .listen((notifs) {
-      if (mounted) {
-        final count = notifs.where((n) => !n.isRead).length;
-        // ignore: avoid_print
-        print("Unread count: $count");
-        for (var notif in notifs) {
-          if (!notif.isRead && !_playedNotificationIds.contains(notif.id)) {
-            if (!isInitial) {
-              // ignore: avoid_print
-              print("Notification received: ${notif.title} - ${notif.message}");
-              // ignore: avoid_print
-              print("Playing notification sound");
-              _playNotificationSound();
-              _showNotificationSnackbar(notif);
+          if (mounted) {
+            final count = notifs.where((n) => !n.isRead).length;
+            // ignore: avoid_print
+            print("Unread count: $count");
+            for (var notif in notifs) {
+              if (!notif.isRead && !_playedNotificationIds.contains(notif.id)) {
+                if (!isInitial) {
+                  // ignore: avoid_print
+                  print(
+                    "Notification received: ${notif.title} - ${notif.message}",
+                  );
+                  // ignore: avoid_print
+                  print("Playing notification sound");
+                  _playNotificationSound();
+                  _showNotificationSnackbar(notif);
+                }
+              }
+              _playedNotificationIds.add(notif.id);
             }
-          }
-          _playedNotificationIds.add(notif.id);
-        }
-        
-        isInitial = false;
 
-        setState(() {
-          _notifications = notifs;
+            isInitial = false;
+
+            setState(() {
+              _notifications = notifs;
+            });
+          }
         });
-      }
-    });
   }
 
   void _playNotificationSound() {
@@ -162,23 +165,28 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
     }
   }
 
-  void _playTone(web.AudioContext ctx, double frequency, double duration, double delay) {
+  void _playTone(
+    web.AudioContext ctx,
+    double frequency,
+    double duration,
+    double delay,
+  ) {
     try {
       final osc = ctx.createOscillator();
       final gainNode = ctx.createGain();
-      
+
       osc.connect(gainNode);
       gainNode.connect(ctx.destination);
-      
+
       osc.frequency.value = frequency;
       osc.type = 'sine';
-      
+
       final startTime = ctx.currentTime + delay;
       final endTime = startTime + duration;
-      
+
       gainNode.gain.setValueAtTime(0.08, startTime);
       gainNode.gain.exponentialRampToValueAtTime(0.001, endTime);
-      
+
       osc.start(startTime);
       osc.stop(endTime);
     } catch (e) {
@@ -251,15 +259,23 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                 onPressed: () async {
                   ScaffoldMessenger.of(context).hideCurrentSnackBar();
                   if (!notif.isRead) {
-                    await _notificationService.markAsRead(notif.userId, notif.id);
+                    await _notificationService.markAsRead(
+                      notif.userId,
+                      notif.id,
+                    );
                   }
-                  if (notif.actionRoute == 'Bookings' || notif.type == 'booking') {
+                  if (notif.actionRoute == 'Bookings' ||
+                      notif.type == 'booking') {
                     setIndex(2);
-                  } else if (notif.actionRoute == 'Payments' || notif.type == 'payment') {
+                  } else if (notif.actionRoute == 'Payments' ||
+                      notif.type == 'payment') {
                     setIndex(5);
-                  } else if (notif.actionRoute == 'Support Inbox' || notif.actionRoute == 'Support' || notif.type == 'support') {
+                  } else if (notif.actionRoute == 'Support Inbox' ||
+                      notif.actionRoute == 'Support' ||
+                      notif.type == 'support') {
                     setIndex(7);
-                  } else if (notif.actionRoute == 'Loyalty Rewards' || notif.type == 'reward') {
+                  } else if (notif.actionRoute == 'Loyalty Rewards' ||
+                      notif.type == 'reward') {
                     setIndex(4);
                   }
                 },
@@ -407,7 +423,9 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w900,
-                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.secondaryBlue,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white
+                            : AppColors.secondaryBlue,
                       ),
                     ),
                   ],
@@ -440,61 +458,6 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
             ),
           ],
         ),
-        bottomNavigationBar: !isDesktop && _customBody == null
-            ? Container(
-                decoration: BoxDecoration(
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, -2),
-                    ),
-                  ],
-                ),
-                child: BottomNavigationBar(
-                  currentIndex: bottomNavIndex,
-                  selectedItemColor: AppColors.primaryOrange,
-                  unselectedItemColor: Colors.blueGrey[400],
-                  showUnselectedLabels: true,
-                  type: BottomNavigationBarType.fixed,
-                  backgroundColor: Theme.of(context).brightness == Brightness.dark
-                      ? const Color(0xFF1B2436)
-                      : Theme.of(context).cardColor,
-                  elevation: 0,
-                  selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-                  unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 11),
-                  onTap: (index) {
-                    setState(() {
-                      if (index == 0) _currentIndex = 0;
-                      if (index == 1) _currentIndex = 1;
-                      if (index == 2) _currentIndex = 2;
-                      if (index == 3) _currentIndex = 6;
-                    });
-                  },
-                  items: const [
-                    BottomNavigationBarItem(
-                      icon: Icon(Icons.dashboard_outlined),
-                      activeIcon: Icon(Icons.dashboard_rounded),
-                      label: 'Dashboard',
-                    ),
-                    BottomNavigationBarItem(
-                      icon: Icon(Icons.search_rounded),
-                      label: 'Search',
-                    ),
-                    BottomNavigationBarItem(
-                      icon: Icon(Icons.calendar_today_outlined),
-                      activeIcon: Icon(Icons.calendar_today_rounded),
-                      label: 'Bookings',
-                    ),
-                    BottomNavigationBarItem(
-                      icon: Icon(Icons.person_outline),
-                      activeIcon: Icon(Icons.person_rounded),
-                      label: 'Profile',
-                    ),
-                  ],
-                ),
-              )
-            : null,
       ),
     );
   }
@@ -519,7 +482,10 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -531,11 +497,14 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                             color: AppColors.secondaryBlue,
                           ),
                         ),
-                        if (_user != null && _notifications.any((n) => !n.isRead))
+                        if (_user != null &&
+                            _notifications.any((n) => !n.isRead))
                           TextButton(
                             onPressed: () async {
                               Navigator.pop(context);
-                              await _notificationService.markAllAsRead(_user!.id);
+                              await _notificationService.markAllAsRead(
+                                _user!.id,
+                              );
                             },
                             child: const Text(
                               'Mark All Read',
@@ -555,22 +524,32 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                       padding: const EdgeInsets.symmetric(vertical: 32),
                       child: Column(
                         children: [
-                          Icon(Icons.notifications_none_rounded, size: 40, color: Colors.grey[300]),
+                          Icon(
+                            Icons.notifications_none_rounded,
+                            size: 40,
+                            color: Colors.grey[300],
+                          ),
                           const SizedBox(height: 12),
                           const Text(
                             'No notifications yet',
-                            style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ],
                       ),
                     )
-                  else ConstrainedBox(
+                  else
+                    ConstrainedBox(
                       constraints: const BoxConstraints(maxHeight: 280),
                       child: ListView.separated(
                         shrinkWrap: true,
                         physics: const ClampingScrollPhysics(),
                         itemCount: recentNotifs.length,
-                        separatorBuilder: (context, index) => const Divider(height: 1),
+                        separatorBuilder: (context, index) =>
+                            const Divider(height: 1),
                         itemBuilder: (context, index) {
                           final notif = recentNotifs[index];
                           final parsedColor = Color(int.parse(notif.color));
@@ -579,38 +558,60 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                             onTap: () async {
                               Navigator.pop(context);
                               if (!notif.isRead) {
-                                await _notificationService.markAsRead(notif.userId, notif.id);
+                                await _notificationService.markAsRead(
+                                  notif.userId,
+                                  notif.id,
+                                );
                               }
-                              if (notif.actionRoute == 'Bookings' || notif.type == 'booking') {
+                              if (notif.actionRoute == 'Bookings' ||
+                                  notif.type == 'booking') {
                                 setIndex(2);
-                              } else if (notif.actionRoute == 'Payments' || notif.type == 'payment') {
+                              } else if (notif.actionRoute == 'Payments' ||
+                                  notif.type == 'payment') {
                                 setIndex(5);
-                              } else if (notif.actionRoute == 'Support Inbox' || notif.actionRoute == 'Support' || notif.type == 'support') {
+                              } else if (notif.actionRoute == 'Support Inbox' ||
+                                  notif.actionRoute == 'Support' ||
+                                  notif.type == 'support') {
                                 setIndex(7);
-                              } else if (notif.actionRoute == 'Loyalty Rewards' || notif.type == 'reward') {
+                              } else if (notif.actionRoute ==
+                                      'Loyalty Rewards' ||
+                                  notif.type == 'reward') {
                                 setIndex(4);
                               }
                             },
                             child: Container(
-                              color: notif.isRead ? Colors.transparent : const Color(0xFFFFF7ED),
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              color: notif.isRead
+                                  ? Colors.transparent
+                                  : const Color(0xFFFFF7ED),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   CircleAvatar(
                                     radius: 14,
-                                    backgroundColor: parsedColor.withValues(alpha: 0.1),
-                                    child: Text(notif.icon, style: const TextStyle(fontSize: 12)),
+                                    backgroundColor: parsedColor.withValues(
+                                      alpha: 0.1,
+                                    ),
+                                    child: Text(
+                                      notif.icon,
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
                                   ),
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           notif.title,
                                           style: TextStyle(
-                                            fontWeight: notif.isRead ? FontWeight.bold : FontWeight.w900,
+                                            fontWeight: notif.isRead
+                                                ? FontWeight.bold
+                                                : FontWeight.w900,
                                             fontSize: 12,
                                             color: AppColors.secondaryBlue,
                                           ),
@@ -622,13 +623,20 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                                           overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
                                             fontSize: 10,
-                                            color: notif.isRead ? Colors.grey[600] : Colors.grey[800],
+                                            color: notif.isRead
+                                                ? Colors.grey[600]
+                                                : Colors.grey[800],
                                           ),
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
-                                          _getRelativeTimeString(notif.createdAt),
-                                          style: const TextStyle(fontSize: 8, color: Colors.grey),
+                                          _getRelativeTimeString(
+                                            notif.createdAt,
+                                          ),
+                                          style: const TextStyle(
+                                            fontSize: 8,
+                                            color: Colors.grey,
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -647,7 +655,8 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const CustomerNotificationsScreen(),
+                          builder: (context) =>
+                              const CustomerNotificationsScreen(),
                         ),
                       ).then((route) {
                         if (route != null && route is String) {
@@ -690,7 +699,11 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            const Icon(Icons.notifications_outlined, color: AppColors.secondaryBlue, size: 20),
+            const Icon(
+              Icons.notifications_outlined,
+              color: AppColors.secondaryBlue,
+              size: 20,
+            ),
             if (unreadCount > 0)
               Positioned(
                 right: -2,
@@ -758,7 +771,9 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w900,
-              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.secondaryBlue,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white
+                  : AppColors.secondaryBlue,
             ),
           ),
           Row(
@@ -778,15 +793,14 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
-                      color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : AppColors.secondaryBlue,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white70
+                          : AppColors.secondaryBlue,
                     ),
                   ),
                   Text(
                     _user?.email ?? '',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Colors.blueGrey[400],
-                    ),
+                    style: TextStyle(fontSize: 10, color: Colors.blueGrey[400]),
                   ),
                 ],
               ),
@@ -831,25 +845,23 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
               children: [
                 _buildSidebarTile(Icons.dashboard_rounded, 'Dashboard', 0),
                 _buildSidebarTile(Icons.search_rounded, 'Search Cars', 1),
-                _buildSidebarTile(Icons.calendar_today_rounded, 'My Bookings', 2),
+                _buildSidebarTile(
+                  Icons.calendar_today_rounded,
+                  'My Bookings',
+                  2,
+                ),
                 _buildSidebarTile(Icons.map_rounded, 'Branches', 3),
                 _buildSidebarTile(Icons.stars_rounded, 'Loyalty Rewards', 4),
                 _buildSidebarTile(Icons.history_rounded, 'History', 5),
-                _buildSidebarTile(Icons.person_rounded, 'Profile', 6),
-                _buildSidebarTile(Icons.support_agent_rounded, 'Support Desk', 7),
+                _buildSidebarTile(
+                  Icons.support_agent_rounded,
+                  'Support Desk',
+                  7,
+                ),
               ],
             ),
           ),
           const Divider(color: Colors.white10, height: 1),
-          ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-            leading: const Icon(Icons.logout, color: Colors.white60),
-            title: const Text(
-              'Logout',
-              style: TextStyle(color: Colors.white60, fontSize: 13, fontWeight: FontWeight.bold),
-            ),
-            onTap: _logout,
-          ),
           const SizedBox(height: 12),
         ],
       ),
@@ -865,7 +877,9 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
         borderRadius: BorderRadius.circular(12),
         clipBehavior: Clip.antiAlias,
         child: ListTile(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           onTap: () {
             setIndex(index);
           },
@@ -923,21 +937,23 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
               children: [
                 _buildDrawerTile(Icons.dashboard_rounded, 'Dashboard', 0),
                 _buildDrawerTile(Icons.search_rounded, 'Search Cars', 1),
-                _buildDrawerTile(Icons.calendar_today_rounded, 'My Bookings', 2),
+                _buildDrawerTile(
+                  Icons.calendar_today_rounded,
+                  'My Bookings',
+                  2,
+                ),
                 _buildDrawerTile(Icons.map_rounded, 'Branches', 3),
                 _buildDrawerTile(Icons.stars_rounded, 'Loyalty Rewards', 4),
                 _buildDrawerTile(Icons.history_rounded, 'History', 5),
-                _buildDrawerTile(Icons.person_rounded, 'Profile', 6),
-                _buildDrawerTile(Icons.support_agent_rounded, 'Support Desk', 7),
+                _buildDrawerTile(
+                  Icons.support_agent_rounded,
+                  'Support Desk',
+                  7,
+                ),
               ],
             ),
           ),
           const Divider(color: Colors.white10),
-          ListTile(
-            leading: const Icon(Icons.logout, color: Colors.white60),
-            title: const Text('Logout', style: TextStyle(color: Colors.white60)),
-            onTap: _logout,
-          ),
           const SizedBox(height: 16),
         ],
       ),
@@ -947,7 +963,10 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
   Widget _buildDrawerTile(IconData icon, String title, int index) {
     final bool isActive = _currentIndex == index;
     return ListTile(
-      leading: Icon(icon, color: isActive ? AppColors.primaryOrange : Colors.white70),
+      leading: Icon(
+        icon,
+        color: isActive ? AppColors.primaryOrange : Colors.white70,
+      ),
       title: Text(
         title,
         style: TextStyle(
