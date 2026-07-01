@@ -2,9 +2,12 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'constants/colors.dart';
 import 'screens/home_screen.dart';
+import 'services/company_settings_provider.dart';
+import 'services/theme_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,7 +45,15 @@ Future<void> main() async {
     }
   }
 
-  runApp(const MyApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => CompanySettingsProvider()),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -50,13 +61,18 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final companyName = context.watch<CompanySettingsProvider>().companyName;
+    final themeProvider = context.watch<ThemeProvider>();
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'CARRENT System',
+      title: '$companyName System',
+      themeMode: themeProvider.themeMode,
       theme: ThemeData(
         useMaterial3: true,
+        brightness: Brightness.light,
         scaffoldBackgroundColor: AppColors.backgroundWhite,
-        colorScheme: ColorScheme.light(
+        colorScheme: const ColorScheme.light(
           primary: AppColors.primaryOrange,
           secondary: AppColors.secondaryBlue,
           surface: AppColors.backgroundWhite,
@@ -78,6 +94,54 @@ class MyApp extends StatelessWidget {
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: const BorderSide(color: AppColors.borderGray),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(
+              color: AppColors.primaryOrange,
+              width: 2,
+            ),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 16,
+          ),
+        ),
+      ),
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF0F172A),
+        cardColor: const Color(0xFF1E293B),
+        dividerColor: const Color(0xFF334155),
+        colorScheme: const ColorScheme.dark(
+          primary: AppColors.primaryOrange,
+          surface: Color(0xFF111827),
+          onSurface: Color(0xFFF8FAFC),
+          onSurfaceVariant: Color(0xFFCBD5E1),
+        ),
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(color: Color(0xFFF8FAFC)),
+          bodyMedium: TextStyle(color: Color(0xFFCBD5E1)),
+          bodySmall: TextStyle(color: Color(0xFF94A3B8)),
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF0F172A),
+          foregroundColor: Color(0xFFF8FAFC),
+          elevation: 0,
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: const Color(0xFF1E293B),
+          labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
+          floatingLabelStyle: const TextStyle(color: AppColors.primaryOrange),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF334155)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF334155)),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),

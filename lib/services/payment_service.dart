@@ -5,6 +5,7 @@ import '../models/payment_model.dart';
 import 'notification_service.dart';
 import 'booking_service.dart';
 import 'reward_service.dart';
+import 'receipt_service.dart';
 
 class PaymentService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref().child('payments');
@@ -234,6 +235,12 @@ class PaymentService {
                   await RewardPointsService().deductPointsForBooking(bookingId);
                 } catch (rewardErr) {
                   debugPrint('[PaymentService] Warning: reward points deduction failed: $rewardErr');
+                }
+                // Trigger automatic receipt check & storage creation
+                try {
+                  await ReceiptService().triggerAutomaticReceiptCheck(bookingId);
+                } catch (receiptErr) {
+                  debugPrint('[PaymentService] Warning: receipt check failed: $receiptErr');
                 }
               } else {
                 await bookingService.updateBookingStatus(bookingId, 'Pending Payment', userId, vehicleId, vehicleName);

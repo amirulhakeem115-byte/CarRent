@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../constants/colors.dart';
+import 'app_logo.dart';
 
 /// A premium, highly customizable loading widget.
 /// Supports inline spinner, centered card with message, and fullscreen overlay modes.
@@ -33,6 +34,10 @@ class LoadingWidget extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
+        if (message != null) ...[
+          const AppLogo(size: 64, fallbackColor: AppColors.primaryOrange),
+          const SizedBox(height: 24),
+        ],
         SizedBox(
           width: size,
           height: size,

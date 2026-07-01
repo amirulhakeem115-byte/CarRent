@@ -4,13 +4,16 @@ import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:web/web.dart' as web;
+import 'package:provider/provider.dart';
 import '../../../constants/colors.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/database_service.dart';
 import '../../../services/notification_service.dart';
+import '../../../services/company_settings_provider.dart';
 import '../../../models/user_model.dart';
 import '../../../models/notification_model.dart';
 import '../../../widgets/app_image.dart';
+import '../../../widgets/app_logo.dart';
 import '../login_screen.dart';
 
 // Import all screens to load them inside the shell
@@ -351,7 +354,7 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
       case 7:
         return 'Support Desk';
       default:
-        return 'CARRENT';
+        return context.watch<CompanySettingsProvider>().companyName;
     }
   }
 
@@ -378,10 +381,10 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
         }
       },
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: !isDesktop
             ? AppBar(
-                backgroundColor: Colors.white,
+                backgroundColor: Theme.of(context).scaffoldBackgroundColor,
                 elevation: 0,
                 centerTitle: false,
                 title: Row(
@@ -401,10 +404,10 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                     const SizedBox(width: 8),
                     Text(
                       _getScreenTitle(),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w900,
-                        color: AppColors.secondaryBlue,
+                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.secondaryBlue,
                       ),
                     ),
                   ],
@@ -423,11 +426,12 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
             if (isDesktop) _buildSidebar(),
             Expanded(
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (isDesktop) _buildHeader(unreadCount),
                   Expanded(
                     child: Container(
-                      color: AppColors.lightGray,
+                      color: Theme.of(context).scaffoldBackgroundColor,
                       child: _getActiveScreen(),
                     ),
                   ),
@@ -453,7 +457,9 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                   unselectedItemColor: Colors.blueGrey[400],
                   showUnselectedLabels: true,
                   type: BottomNavigationBarType.fixed,
-                  backgroundColor: Colors.white,
+                  backgroundColor: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFF1B2436)
+                      : Theme.of(context).cardColor,
                   elevation: 0,
                   selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
                   unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 11),
@@ -736,10 +742,12 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
     return Container(
       height: 70,
       padding: const EdgeInsets.symmetric(horizontal: 32),
-      decoration: const BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(
+        color: Theme.of(context).brightness == Brightness.dark
+            ? const Color(0xFF1B2436)
+            : Theme.of(context).cardColor,
         border: Border(
-          bottom: BorderSide(color: AppColors.borderGray),
+          bottom: BorderSide(color: Theme.of(context).dividerColor),
         ),
       ),
       child: Row(
@@ -747,10 +755,10 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
         children: [
           Text(
             _getScreenTitle(),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w900,
-              color: AppColors.secondaryBlue,
+              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.secondaryBlue,
             ),
           ),
           Row(
@@ -767,10 +775,10 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                 children: [
                   Text(
                     _user?.fullName ?? 'Customer',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
-                      color: AppColors.secondaryBlue,
+                      color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : AppColors.secondaryBlue,
                     ),
                   ),
                   Text(
@@ -792,7 +800,9 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
   Widget _buildSidebar() {
     return Container(
       width: 250,
-      color: AppColors.secondaryBlue,
+      color: Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFF172033)
+          : AppColors.secondaryBlue,
       child: Column(
         children: [
           Container(
@@ -800,22 +810,11 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
             alignment: Alignment.centerLeft,
             child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryOrange.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Icons.directions_car_filled_rounded,
-                    color: AppColors.primaryOrange,
-                    size: 24,
-                  ),
-                ),
+                const AppLogo(size: 24, fallbackColor: Colors.white),
                 const SizedBox(width: 12),
-                const Text(
-                  'CARRENT',
-                  style: TextStyle(
+                Text(
+                  context.watch<CompanySettingsProvider>().companyName,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
@@ -861,26 +860,27 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
     final bool isActive = _currentIndex == index && _customBody == null;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(
+      child: Material(
         color: isActive ? AppColors.primaryOrange : Colors.transparent,
         borderRadius: BorderRadius.circular(12),
-      ),
-      child: ListTile(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        onTap: () {
-          setIndex(index);
-        },
-        leading: Icon(
-          icon,
-          color: isActive ? Colors.white : Colors.blueGrey[300],
-          size: 20,
-        ),
-        title: Text(
-          title,
-          style: TextStyle(
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          onTap: () {
+            setIndex(index);
+          },
+          leading: Icon(
+            icon,
             color: isActive ? Colors.white : Colors.blueGrey[300],
-            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-            fontSize: 13,
+            size: 20,
+          ),
+          title: Text(
+            title,
+            style: TextStyle(
+              color: isActive ? Colors.white : Colors.blueGrey[300],
+              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+              fontSize: 13,
+            ),
           ),
         ),
       ),
@@ -889,30 +889,25 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
 
   Widget _buildDrawer() {
     return Drawer(
-      backgroundColor: AppColors.secondaryBlue,
+      backgroundColor: Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFF172033)
+          : AppColors.secondaryBlue,
       child: Column(
         children: [
           DrawerHeader(
-            decoration: const BoxDecoration(color: AppColors.secondaryBlue),
+            decoration: BoxDecoration(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFF172033)
+                  : AppColors.secondaryBlue,
+            ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryOrange.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.directions_car_filled_rounded,
-                    color: AppColors.primaryOrange,
-                    size: 32,
-                  ),
-                ),
+                const AppLogo(size: 32, fallbackColor: Colors.white),
                 const SizedBox(height: 12),
-                const Text(
-                  'CARRENT SYSTEM',
-                  style: TextStyle(
+                Text(
+                  '${context.watch<CompanySettingsProvider>().companyName} SYSTEM',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w900,
                     fontSize: 18,

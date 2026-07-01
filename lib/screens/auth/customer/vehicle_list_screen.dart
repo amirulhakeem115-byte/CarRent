@@ -17,6 +17,11 @@ class VehicleListScreen extends StatefulWidget {
 }
 
 class _VehicleListScreenState extends State<VehicleListScreen> {
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _textColor => _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+  Color get _subColor => _isDark ? const Color(0xFFCBD5E1) : AppColors.lightText;
+  Color get _borderColor => _isDark ? const Color(0xFF334155) : AppColors.borderGray;
+
   final VehicleService _vehicleService = VehicleService();
   final BranchService _branchService = BranchService();
 
@@ -169,29 +174,29 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.lightGray,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: ModalRoute.of(context)?.settings.name == null &&
               Navigator.of(context).canPop()
           ? AppBar(
-              backgroundColor: Colors.white,
+              backgroundColor: _isDark ? const Color(0xFF1B2436) : Colors.white,
               elevation: 0,
               leading: IconButton(
-                icon: const Icon(Icons.arrow_back_ios_rounded,
-                    color: AppColors.secondaryBlue, size: 20),
+                icon: Icon(Icons.arrow_back_ios_rounded,
+                    color: _textColor, size: 20),
                 onPressed: () => Navigator.pop(context),
               ),
-              title: const Text(
+              title: Text(
                 'Search Cars',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w900,
-                  color: AppColors.secondaryBlue,
+                  color: _textColor,
                 ),
               ),
               bottom: PreferredSize(
                 preferredSize: const Size.fromHeight(1),
                 child: Container(
-                    height: 1, color: AppColors.borderGray),
+                    height: 1, color: _borderColor),
               ),
             )
           : null,
@@ -280,22 +285,22 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
     return Row(
       children: [
         IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.secondaryBlue, size: 24),
+          icon: Icon(Icons.arrow_back, color: _textColor, size: 24),
           onPressed: () => Navigator.pop(context),
         ),
         const SizedBox(width: 8),
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'Explore Fleet',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue, letterSpacing: -0.5),
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: _textColor, letterSpacing: -0.5),
               ),
-              SizedBox(height: 2),
+              const SizedBox(height: 2),
               Text(
                 'Choose from our premium registered cars and start your journey.',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+                style: TextStyle(fontSize: 12, color: _subColor),
               ),
             ],
           ),
@@ -308,9 +313,11 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[100]!),
+        border: Border.all(
+          color: _borderColor,
+        ),
       ),
       child: Row(
         children: [
@@ -318,16 +325,18 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
-                  color: AppColors.lightGray,
+                  color: _isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: TextField(
                   controller: _searchController,
-                  decoration: const InputDecoration(
+                  style: TextStyle(color: _textColor, fontSize: 13),
+                  decoration: InputDecoration(
                     hintText: 'Search brand / model...',
-                    prefixIcon: Icon(Icons.search, size: 20),
+                    hintStyle: TextStyle(color: _isDark ? Colors.white30 : Colors.grey, fontSize: 13),
+                    prefixIcon: Icon(Icons.search, size: 20, color: _subColor),
                     border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   ),
                 ),
               ),
@@ -338,13 +347,13 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
               icon: Badge(
                 label: Text('$_activeFiltersCount'),
                 isLabelVisible: _activeFiltersCount > 0,
-                child: const Icon(Icons.tune, color: AppColors.secondaryBlue),
+                child: Icon(Icons.tune, color: _textColor),
               ),
             ),
           ] else ...[
-            const Text(
+            Text(
               'Select Your Ride',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.secondaryBlue),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: _textColor),
             ),
             const Spacer(),
           ],
@@ -353,11 +362,12 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              color: AppColors.lightGray,
+              color: _isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
               borderRadius: BorderRadius.circular(8),
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
+                dropdownColor: Theme.of(context).cardColor,
                 value: _sortBy,
                 items: const [
                   DropdownMenuItem(value: 'recommended', child: Text('Recommended')),
@@ -370,8 +380,8 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                     setState(() => _sortBy = val);
                   }
                 },
-                style: const TextStyle(color: AppColors.secondaryBlue, fontWeight: FontWeight.bold, fontSize: 12),
-                icon: const Icon(Icons.sort, size: 16, color: AppColors.secondaryBlue),
+                style: TextStyle(color: _textColor, fontWeight: FontWeight.bold, fontSize: 12),
+                icon: Icon(Icons.sort, size: 16, color: _textColor),
               ),
             ),
           ),
@@ -404,9 +414,13 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[100]!),
+        border: Border.all(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? const Color(0xFF334155)
+              : Colors.grey[100]!,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.01),
@@ -557,7 +571,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: _isDark ? const Color(0xFF1E293B) : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -579,9 +593,9 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
+                          Text(
                             'Filters',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue),
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: _textColor),
                           ),
                           TextButton(
                             onPressed: () {
@@ -654,9 +668,9 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
+                          Text(
                             'Daily Budget',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.secondaryBlue),
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: _textColor),
                           ),
                           Text(
                             'RM ${_priceBudget.toStringAsFixed(0)}',
@@ -667,7 +681,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                       SliderTheme(
                         data: SliderTheme.of(context).copyWith(
                           activeTrackColor: AppColors.primaryOrange,
-                          inactiveTrackColor: Colors.grey[200],
+                          inactiveTrackColor: _isDark ? const Color(0xFF0F172A) : Colors.grey[200],
                           thumbColor: AppColors.primaryOrange,
                         ),
                         child: Slider(
@@ -708,7 +722,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
       padding: const EdgeInsets.only(bottom: 6),
       child: Text(
         title,
-        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey),
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _subColor),
       ),
     );
   }
@@ -721,7 +735,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: AppColors.lightGray,
+        color: _isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
         borderRadius: BorderRadius.circular(10),
       ),
       child: DropdownButtonHideUnderline(
@@ -730,8 +744,8 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
           items: items,
           onChanged: onChanged,
           isExpanded: true,
-          style: const TextStyle(color: AppColors.secondaryBlue, fontSize: 13, fontWeight: FontWeight.bold),
-          dropdownColor: Colors.white,
+          style: TextStyle(color: _textColor, fontSize: 13, fontWeight: FontWeight.bold),
+          dropdownColor: Theme.of(context).cardColor,
         ),
       ),
     );
@@ -742,9 +756,13 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
       return Container(
         padding: const EdgeInsets.all(48),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey[100]!),
+          border: Border.all(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xFF334155)
+                : Colors.grey[100]!,
+          ),
         ),
         child: Center(
           child: Column(
@@ -817,9 +835,11 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[100]!),
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: _borderColor,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.015),
@@ -838,7 +858,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                 child: Container(
                   height: 130,
                   width: double.infinity,
-                  color: AppColors.lightGray,
+                  color: _isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
                   child: AppImage(
                     imageSrc: vehicle.mainImage,
                     fit: BoxFit.cover,
@@ -891,7 +911,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                   '${vehicle.brand} ${vehicle.model}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.secondaryBlue),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: _textColor),
                 ),
                 const SizedBox(height: 4),
                 Row(
@@ -917,7 +937,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                const Divider(height: 1),
+                Divider(height: 1, color: _borderColor),
                 const SizedBox(height: 8),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -928,7 +948,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                         const Text('DAILY RATE', style: TextStyle(fontSize: 8, color: Colors.grey, fontWeight: FontWeight.bold)),
                         Text(
                           'RM ${vehicle.pricePerDay.toStringAsFixed(0)}',
-                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: AppColors.secondaryBlue),
+                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: _textColor),
                         ),
                       ],
                     ),
@@ -947,8 +967,8 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                             }
                           : null,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: isAvailable ? AppColors.primaryOrange : Colors.grey[200],
-                        foregroundColor: isAvailable ? Colors.white : Colors.grey[400],
+                        backgroundColor: isAvailable ? AppColors.primaryOrange : (_isDark ? const Color(0xFF0F172A) : Colors.grey[200]),
+                        foregroundColor: isAvailable ? Colors.white : (_isDark ? Colors.white30 : Colors.grey[400]),
                         elevation: 0,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -987,9 +1007,9 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
         return Container(
           height: 140,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey[100]!),
+            border: Border.all(color: _borderColor),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.015),
@@ -1007,7 +1027,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                     child: Container(
                       width: 180,
                       height: double.infinity,
-                      color: AppColors.lightGray,
+                      color: _isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
                       child: AppImage(
                         imageSrc: vehicle.mainImage,
                         fit: BoxFit.cover,
@@ -1063,7 +1083,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                           children: [
                             Text(
                               '${vehicle.brand} ${vehicle.model}',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.secondaryBlue),
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: _textColor),
                             ),
                             const SizedBox(height: 4),
                             Row(
@@ -1093,7 +1113,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                           ],
                         ),
                       ),
-                      const VerticalDivider(width: 24),
+                      VerticalDivider(width: 24, color: _borderColor),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -1101,7 +1121,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                           const Text('DAILY RATE', style: TextStyle(fontSize: 8, color: Colors.grey, fontWeight: FontWeight.bold)),
                           Text(
                             'RM ${vehicle.pricePerDay.toStringAsFixed(0)}',
-                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppColors.secondaryBlue),
+                            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: _textColor),
                           ),
                           const SizedBox(height: 10),
                           ElevatedButton(
@@ -1119,8 +1139,8 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                                   }
                                 : null,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: isAvailable ? AppColors.primaryOrange : Colors.grey[200],
-                              foregroundColor: isAvailable ? Colors.white : Colors.grey[400],
+                              backgroundColor: isAvailable ? AppColors.primaryOrange : (_isDark ? const Color(0xFF0F172A) : Colors.grey[200]),
+                              foregroundColor: isAvailable ? Colors.white : (_isDark ? Colors.white30 : Colors.grey[400]),
                               elevation: 0,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -1147,15 +1167,15 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
-        color: AppColors.lightGray,
+        color: _isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 10, color: AppColors.lightText),
+          Icon(icon, size: 10, color: _subColor),
           const SizedBox(width: 4),
-          Text(text, style: const TextStyle(fontSize: 9, color: AppColors.lightText, fontWeight: FontWeight.bold)),
+          Text(text, style: TextStyle(fontSize: 9, color: _subColor, fontWeight: FontWeight.bold)),
         ],
       ),
     );

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../../../constants/colors.dart';
 import '../../../services/database_service.dart';
+import '../../../services/company_settings_provider.dart';
 
 class ContactSupportScreen extends StatefulWidget {
   const ContactSupportScreen({super.key});
@@ -20,15 +22,10 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
   final _databaseService = DatabaseService();
   bool _submitting = false;
 
-  // Default fallback values shown while stream loads
-  static const Map<String, String> _defaults = {
-    'companyName': 'CARRENT PLATFORM',
-    'supportPhone': '+60 3-2274 1234',
-    'supportEmail': 'support@carrent.com.my',
-    'headquartersAddress':
-        'Level 15, Menara Shell\nJalan Tun Sambanthan, KL Sentral\n50470 Kuala Lumpur, Malaysia',
-    'businessHours': 'Mon - Fri: 9:00 AM - 6:00 PM MYT',
-  };
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _textColor => _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+  Color get _subColor => _isDark ? const Color(0xFFCBD5E1) : AppColors.lightText;
+  Color get _borderColor => _isDark ? const Color(0xFF334155) : AppColors.borderGray;
 
   @override
   void dispose() {
@@ -81,351 +78,354 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
     final double width = MediaQuery.of(context).size.width;
     final bool isDesktop = width > 900;
 
-    return StreamBuilder<Map<String, dynamic>>(
-        stream: _databaseService.getContactSettingsStream(),
-        builder: (context, snapshot) {
-          // Merge Firebase data over defaults
-          final settings = <String, String>{};
-          for (final key in _defaults.keys) {
-            final dynamic raw = snapshot.data?[key];
-            final String val = (raw is String && raw.isNotEmpty) ? raw : _defaults[key]!;
-            settings[key] = val;
-          }
+    final companySettings = context.watch<CompanySettingsProvider>();
+    final String phone = companySettings.companyPhone;
+    final String email = companySettings.companyEmail;
+    final String address = companySettings.companyAddress;
+    final String hours = companySettings.businessHours;
 
-          final String phone = settings['supportPhone']!;
-          final String email = settings['supportEmail']!;
-          final String address = settings['headquartersAddress']!;
-          final String hours = settings['businessHours']!;
-
-          return SingleChildScrollView(
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          // Hero Header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
             child: Column(
               children: [
-
-                // Hero Header
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                  child: Column(
-                    children: [
-                      const Text(
-                        'Contact Support',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.secondaryBlue,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Our team is here to help you get back on the road. Reach out via any of the channels below and we\'ll assist you immediately.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: Colors.grey[600],
-                          height: 1.5,
-                        ),
-                      ),
-                    ],
+                Text(
+                  'Contact Support',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w900,
+                    color: _textColor,
+                    letterSpacing: -0.5,
                   ),
                 ),
-                const SizedBox(height: 48),
-
-                // Two contact cards (Phone + Email) — centered
-                Padding(
-                  padding: EdgeInsets.symmetric(
-                      horizontal: isDesktop ? 60.0 : 20.0),
-                  child: Center(
-                    child: Wrap(
-                      alignment: WrapAlignment.center,
-                      spacing: 24,
-                      runSpacing: 24,
-                      children: [
-                        _buildContactCard(
-                          icon: Icons.phone_in_talk_outlined,
-                          title: 'Phone',
-                          description: 'Available 24/7 for urgent rental assistance.',
-                          actionText: phone,
-                        ),
-                        _buildContactCard(
-                          icon: Icons.email_outlined,
-                          title: 'Email',
-                          description: 'Get a response within 2 business hours.',
-                          actionText: email,
-                        ),
-                      ],
-                    ),
+                const SizedBox(height: 12),
+                Text(
+                  'Our team is here to help you get back on the road. Reach out via any of the channels below and we\'ll assist you immediately.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: _subColor,
+                    height: 1.5,
                   ),
                 ),
-                const SizedBox(height: 60),
-
-                // Send Us a Message form
-                Padding(
-                  padding: EdgeInsets.symmetric(
-                      horizontal: isDesktop ? 60.0 : 20.0),
-                  child: Container(
-                    padding: const EdgeInsets.all(32),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.grey[200]!),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.02),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const Text(
-                            'Send Us a Message',
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.secondaryBlue,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Have a question or feedback? Drop us a line and we\'ll get back to you as soon as possible.',
-                            style: TextStyle(
-                                color: Colors.grey[600], fontSize: 14),
-                          ),
-                          const SizedBox(height: 24),
-                          TextFormField(
-                            controller: _nameController,
-                            decoration: const InputDecoration(
-                              labelText: 'Full Name',
-                              hintText: 'Enter your name',
-                              prefixIcon: Icon(Icons.person_outline),
-                            ),
-                            validator: (val) => val == null || val.trim().isEmpty
-                                ? 'Name is required'
-                                : null,
-                          ),
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            controller: _emailController,
-                            decoration: const InputDecoration(
-                              labelText: 'Email Address',
-                              hintText: 'Enter your email',
-                              prefixIcon: Icon(Icons.email_outlined),
-                            ),
-                            validator: (val) {
-                              if (val == null || val.trim().isEmpty) {
-                                return 'Email is required';
-                              }
-                              if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val)) {
-                                return 'Enter a valid email';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            controller: _subjectController,
-                            decoration: const InputDecoration(
-                              labelText: 'Subject',
-                              hintText: 'What is this regarding?',
-                              prefixIcon: Icon(Icons.subject_outlined),
-                            ),
-                            validator: (val) => val == null || val.trim().isEmpty
-                                ? 'Subject is required'
-                                : null,
-                          ),
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            controller: _messageController,
-                            maxLines: 4,
-                            decoration: const InputDecoration(
-                              labelText: 'Message',
-                              hintText: 'How can we help you?',
-                              prefixIcon: Icon(Icons.message_outlined),
-                            ),
-                            validator: (val) => val == null || val.trim().isEmpty
-                                ? 'Message cannot be empty'
-                                : null,
-                          ),
-                          const SizedBox(height: 24),
-                          SizedBox(
-                            height: 50,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primaryOrange,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12)),
-                              ),
-                              onPressed: _submitting ? null : _submitForm,
-                              child: _submitting
-                                  ? const SizedBox(
-                                      width: 24,
-                                      height: 24,
-                                      child: CircularProgressIndicator(
-                                          color: Colors.white, strokeWidth: 2),
-                                    )
-                                  : const Text('SEND MESSAGE',
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.w900,
-                                          letterSpacing: 1)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 60),
-
-                // My Support Tickets
-                Padding(
-                  padding: EdgeInsets.symmetric(
-                      horizontal: isDesktop ? 60.0 : 20.0),
-                  child: _buildMyTicketsSection(),
-                ),
-                const SizedBox(height: 60),
-
-                // Headquarters block — live from Firebase
-                Padding(
-                  padding: EdgeInsets.symmetric(
-                      horizontal: isDesktop ? 60.0 : 20.0),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.grey[200]!),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.02),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: Flex(
-                        direction:
-                            isDesktop ? Axis.horizontal : Axis.vertical,
-                        children: [
-                          // Address details — live from Firebase
-                          Expanded(
-                            flex: isDesktop ? 1 : 0,
-                            child: Container(
-                              padding: const EdgeInsets.all(40),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Headquarters',
-                                    style: TextStyle(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.secondaryBlue,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 24),
-                                  Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      const Icon(Icons.location_on_outlined,
-                                          color: AppColors.primaryOrange,
-                                          size: 24),
-                                      const SizedBox(width: 16),
-                                      Expanded(
-                                        child: Text(
-                                          address,
-                                          style: TextStyle(
-                                              color: Colors.grey[700],
-                                              height: 1.5,
-                                              fontSize: 14),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 20),
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.access_time,
-                                          color: AppColors.primaryOrange,
-                                          size: 24),
-                                      const SizedBox(width: 16),
-                                      Expanded(
-                                        child: Text(
-                                          hours,
-                                          style: TextStyle(
-                                              color: Colors.grey[700],
-                                              fontSize: 14),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          // Decorative map visual
-                          Expanded(
-                            flex: isDesktop ? 1 : 0,
-                            child: Container(
-                              height: isDesktop ? 260 : 200,
-                              color: const Color(0xFFE2E8F0),
-                              child: Stack(
-                                children: [
-                                  Positioned.fill(
-                                    child: Opacity(
-                                      opacity: 0.15,
-                                      child: Image.network(
-                                        'https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=800',
-                                        fit: BoxFit.cover,
-                                      ),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: const BoxDecoration(
-                                        color: Colors.white,
-                                        shape: BoxShape.circle,
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black26,
-                                            blurRadius: 8,
-                                            offset: Offset(0, 3),
-                                          ),
-                                        ],
-                                      ),
-                                      child: const Icon(
-                                        Icons.directions_car_filled_rounded,
-                                        color: AppColors.primaryOrange,
-                                        size: 36,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 80),
-
-                // Footer
-                _buildFooter(isDesktop),
               ],
             ),
-          );
-        },
-      );
+          ),
+          const SizedBox(height: 48),
+
+          // Two contact cards (Phone + Email) — centered
+          Padding(
+            padding: EdgeInsets.symmetric(
+                horizontal: isDesktop ? 60.0 : 20.0),
+            child: Center(
+              child: Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 24,
+                runSpacing: 24,
+                children: [
+                  _buildContactCard(
+                    icon: Icons.phone_in_talk_outlined,
+                    title: 'Phone',
+                    description: 'Available 24/7 for urgent rental assistance.',
+                    actionText: phone,
+                  ),
+                  _buildContactCard(
+                    icon: Icons.email_outlined,
+                    title: 'Email',
+                    description: 'Get a response within 2 business hours.',
+                    actionText: email,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 60),
+
+          // Send Us a Message form
+          Padding(
+            padding: EdgeInsets.symmetric(
+                horizontal: isDesktop ? 60.0 : 20.0),
+            child: Container(
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                color: Theme.of(context).cardColor,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: _borderColor),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Send Us a Message',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: _textColor,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Have a question or feedback? Drop us a line and we\'ll get back to you as soon as possible.',
+                      style: TextStyle(
+                          color: _subColor, fontSize: 14),
+                    ),
+                    const SizedBox(height: 24),
+                    TextFormField(
+                      controller: _nameController,
+                      style: TextStyle(color: _textColor),
+                      decoration: InputDecoration(
+                        labelText: 'Full Name',
+                        labelStyle: TextStyle(color: _subColor),
+                        hintText: 'Enter your name',
+                        hintStyle: TextStyle(color: _isDark ? Colors.white30 : Colors.grey),
+                        prefixIcon: Icon(Icons.person_outline, color: _subColor),
+                        enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: _borderColor)),
+                      ),
+                      validator: (val) => val == null || val.trim().isEmpty
+                          ? 'Name is required'
+                          : null,
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _emailController,
+                      style: TextStyle(color: _textColor),
+                      decoration: InputDecoration(
+                        labelText: 'Email Address',
+                        labelStyle: TextStyle(color: _subColor),
+                        hintText: 'Enter your email',
+                        hintStyle: TextStyle(color: _isDark ? Colors.white30 : Colors.grey),
+                        prefixIcon: Icon(Icons.email_outlined, color: _subColor),
+                        enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: _borderColor)),
+                      ),
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) {
+                          return 'Email is required';
+                        }
+                        if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val)) {
+                          return 'Enter a valid email';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _subjectController,
+                      style: TextStyle(color: _textColor),
+                      decoration: InputDecoration(
+                        labelText: 'Subject',
+                        labelStyle: TextStyle(color: _subColor),
+                        hintText: 'What is this regarding?',
+                        hintStyle: TextStyle(color: _isDark ? Colors.white30 : Colors.grey),
+                        prefixIcon: Icon(Icons.subject_outlined, color: _subColor),
+                        enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: _borderColor)),
+                      ),
+                      validator: (val) => val == null || val.trim().isEmpty
+                          ? 'Subject is required'
+                          : null,
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _messageController,
+                      maxLines: 4,
+                      style: TextStyle(color: _textColor),
+                      decoration: InputDecoration(
+                        labelText: 'Message',
+                        labelStyle: TextStyle(color: _subColor),
+                        hintText: 'How can we help you?',
+                        hintStyle: TextStyle(color: _isDark ? Colors.white30 : Colors.grey),
+                        prefixIcon: Icon(Icons.message_outlined, color: _subColor),
+                        enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: _borderColor)),
+                      ),
+                      validator: (val) => val == null || val.trim().isEmpty
+                          ? 'Message cannot be empty'
+                          : null,
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      height: 50,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryOrange,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: _submitting ? null : _submitForm,
+                        child: _submitting
+                            ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                    color: Colors.white, strokeWidth: 2),
+                              )
+                            : const Text('SEND MESSAGE',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 1)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 60),
+
+          // My Support Tickets
+          Padding(
+            padding: EdgeInsets.symmetric(
+                horizontal: isDesktop ? 60.0 : 20.0),
+            child: _buildMyTicketsSection(),
+          ),
+          const SizedBox(height: 60),
+
+          // Headquarters block — live from Firebase
+          Padding(
+            padding: EdgeInsets.symmetric(
+                horizontal: isDesktop ? 60.0 : 20.0),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).cardColor,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: _borderColor),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Flex(
+                  direction:
+                      isDesktop ? Axis.horizontal : Axis.vertical,
+                  children: [
+                    // Address details — live from Firebase
+                    Expanded(
+                      flex: isDesktop ? 1 : 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(40),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Headquarters',
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: _textColor,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            Row(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                const Icon(Icons.location_on_outlined,
+                                    color: AppColors.primaryOrange,
+                                    size: 24),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Text(
+                                    address,
+                                    style: TextStyle(
+                                        color: _subColor,
+                                        height: 1.5,
+                                        fontSize: 14),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                            Row(
+                              children: [
+                                const Icon(Icons.access_time,
+                                    color: AppColors.primaryOrange,
+                                    size: 24),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Text(
+                                    hours,
+                                    style: TextStyle(
+                                        color: _subColor,
+                                        fontSize: 14),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // Decorative map visual
+                    Expanded(
+                      flex: isDesktop ? 1 : 0,
+                      child: Container(
+                        height: isDesktop ? 260 : 200,
+                        color: _isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+                        child: Stack(
+                          children: [
+                            Positioned.fill(
+                              child: Opacity(
+                                opacity: 0.15,
+                                child: Image.network(
+                                  'https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=800',
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                            Center(
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: _isDark ? const Color(0xFF0F172A) : Colors.white,
+                                  shape: BoxShape.circle,
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Colors.black26,
+                                      blurRadius: 8,
+                                      offset: Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.directions_car_filled_rounded,
+                                  color: AppColors.primaryOrange,
+                                  size: 36,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 80),
+
+          // Footer
+          _buildFooter(isDesktop),
+        ],
+      ),
+    );
   }
 
   Widget _buildContactCard({
@@ -438,9 +438,9 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
       width: 280,
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F9FA),
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(color: _borderColor),
       ),
       child: Column(
         children: [
@@ -452,10 +452,10 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
           const SizedBox(height: 24),
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 18,
-              color: AppColors.secondaryBlue,
+              color: _textColor,
             ),
           ),
           const SizedBox(height: 8),
@@ -463,7 +463,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
             description,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.grey[500],
+              color: _subColor,
               fontSize: 13,
               height: 1.4,
             ),
@@ -504,32 +504,32 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
+            Text(
               'My Support Tickets',
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
-                color: AppColors.secondaryBlue,
+                color: _textColor,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Track and reply to your conversation with our customer care agents.',
-              style: TextStyle(fontSize: 13, color: Colors.grey),
+              style: TextStyle(fontSize: 13, color: _subColor),
             ),
             const SizedBox(height: 16),
             tickets.isEmpty
                 ? Container(
                     padding: const EdgeInsets.all(32),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF8F9FA),
+                      color: Theme.of(context).cardColor,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.grey[200]!),
+                      border: Border.all(color: _borderColor),
                     ),
                     child: Center(
                       child: Text(
                         'You have not submitted any support tickets yet.',
-                        style: TextStyle(color: Colors.grey[500], fontSize: 13),
+                        style: TextStyle(color: _subColor, fontSize: 13),
                       ),
                     ),
                   )
@@ -564,10 +564,10 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                       }
 
                       return Card(
-                        color: const Color(0xFFF8F9FA),
+                        color: Theme.of(context).cardColor,
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(color: Colors.grey[200]!)),
+                            side: BorderSide(color: _borderColor)),
                         elevation: 0,
                         margin: const EdgeInsets.only(bottom: 12),
                         child: InkWell(
@@ -591,16 +591,16 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                                     children: [
                                       Text(
                                         subject,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 14,
-                                            color: AppColors.secondaryBlue),
+                                            color: _textColor),
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
                                         'Last Active: $fTime',
                                         style: TextStyle(
-                                            color: Colors.grey[500],
+                                            color: _subColor,
                                             fontSize: 11),
                                       ),
                                     ],
@@ -644,18 +644,19 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
+          backgroundColor: _isDark ? const Color(0xFF1E293B) : Colors.white,
           shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: BorderSide(color: _borderColor)),
           title: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
                 child: Text(
                   subject,
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
-                      color: AppColors.secondaryBlue),
+                      color: _textColor),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -707,13 +708,13 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Ticket ID: #${id.toUpperCase()}',
-                    style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                    style: TextStyle(fontSize: 10, color: _subColor)),
                 const Divider(height: 24),
-                const Text('Conversation History',
+                Text('Conversation History',
                     style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
-                        color: AppColors.secondaryBlue)),
+                        color: _textColor)),
                 const SizedBox(height: 8),
                 Expanded(
                   child: StreamBuilder<List<Map<String, dynamic>>>(
@@ -730,7 +731,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                         return Center(
                             child: Text('No messages yet.',
                                 style: TextStyle(
-                                    color: Colors.grey[400], fontSize: 11)));
+                                    color: _subColor, fontSize: 11)));
                       }
                       return ListView.builder(
                         itemCount: messages.length,
@@ -757,7 +758,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                                   horizontal: 12, vertical: 8),
                               decoration: BoxDecoration(
                                 color: isAdmin
-                                    ? Colors.white
+                                    ? (_isDark ? const Color(0xFF0F172A) : Colors.white)
                                     : AppColors.primaryOrange,
                                 borderRadius: BorderRadius.only(
                                   topLeft: const Radius.circular(12),
@@ -770,7 +771,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                                       : Radius.zero,
                                 ),
                                 border: isAdmin
-                                    ? Border.all(color: Colors.grey[200]!)
+                                    ? Border.all(color: _borderColor)
                                     : null,
                               ),
                               child: Column(
@@ -783,7 +784,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                                     r['message'] ?? '',
                                     style: TextStyle(
                                         color: isAdmin
-                                            ? Colors.black
+                                            ? _textColor
                                             : Colors.white,
                                         fontSize: 12),
                                   ),
@@ -792,7 +793,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                                       fRTime,
                                       style: TextStyle(
                                           color: isAdmin
-                                              ? Colors.grey
+                                              ? _subColor
                                               : Colors.white60,
                                           fontSize: 8),
                                     ),
@@ -811,10 +812,13 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                     Expanded(
                       child: TextField(
                         controller: replyController,
-                        decoration: const InputDecoration(
+                        style: TextStyle(color: _textColor, fontSize: 13),
+                        decoration: InputDecoration(
                           hintText: 'Type your reply message...',
-                          contentPadding: EdgeInsets.symmetric(
+                          hintStyle: TextStyle(color: _isDark ? Colors.white30 : Colors.grey, fontSize: 13),
+                          contentPadding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 10),
+                          enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: _borderColor)),
                         ),
                       ),
                     ),
@@ -842,7 +846,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Close'),
+              child: Text('Close', style: TextStyle(color: _isDark ? const Color(0xFF94A3B8) : Colors.grey, fontWeight: FontWeight.bold)),
             ),
           ],
         );
@@ -852,7 +856,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
 
   Widget _buildFooter(bool isDesktop) {
     return Container(
-      color: const Color(0xFFFFFBEB),
+      color: _isDark ? const Color(0xFF1E293B) : const Color(0xFFFFFBEB),
       padding: EdgeInsets.symmetric(
         horizontal: isDesktop ? 60.0 : 20.0,
         vertical: 40.0,
@@ -869,19 +873,19 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                     ? CrossAxisAlignment.start
                     : CrossAxisAlignment.center,
                 children: [
-                  const Text(
-                    'CARRENT PLATFORM',
+                  Text(
+                    CompanySettingsProvider().companyName.toUpperCase(),
                     style: TextStyle(
                       fontWeight: FontWeight.w900,
-                      color: AppColors.secondaryBlue,
+                      color: _textColor,
                       fontSize: 14,
                       letterSpacing: 1,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '© 2026 CARRENT PLATFORM. ALL RIGHTS RESERVED.',
-                    style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                    '© 2026 ${CompanySettingsProvider().companyName.toUpperCase()}. ALL RIGHTS RESERVED.',
+                    style: TextStyle(color: _subColor, fontSize: 11),
                   ),
                 ],
               ),
@@ -911,7 +915,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
       child: Text(
         text,
         style: TextStyle(
-          color: Colors.grey[600],
+          color: _subColor,
           fontSize: 12,
           fontWeight: FontWeight.w600,
         ),

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'dart:ui' show ImageFilter;
+import 'package:provider/provider.dart';
 import '../constants/colors.dart';
 import '../services/auth_service.dart';
 import '../services/database_service.dart';
 import '../services/branch_service.dart';
 import '../services/vehicle_service.dart';
+import '../services/company_settings_provider.dart';
 import '../models/user_model.dart';
 import '../models/vehicle_model.dart';
 import '../models/branch_model.dart';
@@ -15,6 +17,7 @@ import 'auth/customer/vehicle_list_screen.dart';
 import 'auth/customer/vehicle_details_screen.dart';
 import '../widgets/loading_widget.dart';
 import '../widgets/app_image.dart';
+import '../widgets/app_logo.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -222,6 +225,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final double width = MediaQuery.of(context).size.width;
     final bool isDesktop = width > 900;
+    final companyName = context.watch<CompanySettingsProvider>().companyName;
 
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
@@ -260,21 +264,10 @@ class _HomeScreenState extends State<HomeScreen> {
                           cursor: SystemMouseCursors.click,
                           child: Row(
                             children: [
-                              Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primaryOrange.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Icon(
-                                  Icons.directions_car_filled_rounded,
-                                  color: AppColors.primaryOrange,
-                                  size: 28,
-                                ),
-                              ),
+                              const AppLogo(size: 28, fallbackColor: AppColors.primaryOrange),
                               const SizedBox(width: 12),
                               Text(
-                                'CARRENT',
+                                companyName,
                                 style: TextStyle(
                                   fontSize: isDesktop ? 22 : 18,
                                   fontWeight: FontWeight.w900,
@@ -1033,9 +1026,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                const Text(
-                  'At CARRENT, we build a seamless platform designed to redefine vehicle mobility. Whether it is an airport transfer, long-term business leasing, or weekend getaway fleets, we supply top-tier vehicles under clean, transparent terms.',
-                  style: TextStyle(fontSize: 15, color: AppColors.lightText, height: 1.6),
+                Text(
+                  'At ${CompanySettingsProvider().companyName}, we build a seamless platform designed to redefine vehicle mobility. Whether it is an airport transfer, long-term business leasing, or weekend getaway fleets, we supply top-tier vehicles under clean, transparent terms.',
+                  style: const TextStyle(fontSize: 15, color: AppColors.lightText, height: 1.6),
                 ),
                 const SizedBox(height: 32),
                 _buildAboutBullet('Our Mission', 'To empower clients with reliable, well-maintained fleets through frictionless bookings.'),
@@ -1141,7 +1134,7 @@ class _HomeScreenState extends State<HomeScreen> {
               _buildReviewCard(
                 'Amirul A.',
                 'Kuala Lumpur',
-                'Superb service! The Proton X50 was in pristine condition, and the rental process was smooth. Highly recommend CARRENT for their professional fleet!',
+                'Superb service! The Proton X50 was in pristine condition, and the rental process was smooth. Highly recommend ${CompanySettingsProvider().companyName} for their professional fleet!',
                 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=120',
               ),
               _buildReviewCard(
@@ -1340,7 +1333,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 16),
                     _buildContactInfoItem(Icons.phone_outlined, 'Direct Phone Support', '+603-8888 1234 (HQ)'),
                     const SizedBox(height: 16),
-                    _buildContactInfoItem(Icons.mail_outline_rounded, 'Corporate Email Desk', 'support@carrent.com.my'),
+                    _buildContactInfoItem(Icons.mail_outline_rounded, 'Corporate Email Desk', CompanySettingsProvider().companyEmail),
                     const SizedBox(height: 48),
                     // Newsletter Block
                     const Text(
@@ -1368,7 +1361,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           onPressed: () {
                             if (newsletterController.text.trim().isNotEmpty) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Thank you for subscribing to CARRENT!'), backgroundColor: Colors.green),
+                                SnackBar(content: Text('Thank you for subscribing to ${CompanySettingsProvider().companyName}!'), backgroundColor: Colors.green),
                               );
                               newsletterController.clear();
                             }
@@ -1550,22 +1543,18 @@ class _HomeScreenState extends State<HomeScreen> {
                                 color: Colors.white.withValues(alpha: 0.08),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: const Icon(
-                                  Icons.directions_car_filled_rounded,
-                                  color: AppColors.primaryOrange,
-                                  size: 24,
-                              ),
+                              child: const AppLogo(size: 24, fallbackColor: AppColors.primaryOrange),
                             ),
                             const SizedBox(width: 8),
-                            const Text(
-                              'CARRENT',
-                              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 1.5),
+                            Text(
+                              CompanySettingsProvider().companyName,
+                              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 1.5),
                             ),
                           ],
                         ),
                         const SizedBox(height: 20),
                         Text(
-                          'Malaysia\'s premier telematics-driven vehicle network. Experience seamless bookings, transparent payment plans, and professional fleets.',
+                          CompanySettingsProvider().companyDescription,
                           style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13, height: 1.6),
                         ),
                         const SizedBox(height: 24),
@@ -1612,13 +1601,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('CARRENT HQ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.0)),
+                      Text('${CompanySettingsProvider().companyName} HQ', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.0)),
                       const SizedBox(height: 20),
-                      Text('Presint 1 Terminal Hub,', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
-                      Text('62000 Putrajaya, Malaysia', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
+                      Text(CompanySettingsProvider().companyAddress, style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
                       const SizedBox(height: 12),
-                      Text('Phone: +603-8888 1234', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
-                      Text('Email: support@carrent.com.my', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
+                      Text('Phone: ${CompanySettingsProvider().companyPhone}', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
+                      Text('Email: ${CompanySettingsProvider().companyEmail}', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
                     ],
                   ),
                 ],
@@ -1630,7 +1618,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    '© 2026 CARRENT PLATFORM. All rights reserved.',
+                    '© 2026 ${CompanySettingsProvider().companyName}. All rights reserved.',
                     style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
                   ),
                   Text(

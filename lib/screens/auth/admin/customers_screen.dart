@@ -18,6 +18,7 @@ import '../../../widgets/loading_widget.dart';
 import '../../../constants/colors.dart';
 import '../../../widgets/app_image.dart';
 import '../../../services/file_download_helper.dart' if (dart.library.html) '../../../services/file_download_web.dart' as download_helper;
+import '../../../services/company_settings_provider.dart';
 
 class CustomersView extends StatefulWidget {
   const CustomersView({super.key});
@@ -149,14 +150,15 @@ class _CustomersViewState extends State<CustomersView> {
     }
   }
 
-  Future<void> _verifyUserLicense(String uid, bool approve, String reason) async {
+  Future<void> _verifyUserDocument(String uid, String docType, bool approve, String reason) async {
     setState(() => _loading = true);
     try {
-      await _databaseService.verifyLicense(uid, approve, reason: reason);
+      await _databaseService.verifyDocument(uid, docType, approve, reason: reason);
       if (mounted) {
+        final docName = docType == 'license' ? 'Driving License' : 'ID/Passport';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(approve ? 'License approved successfully!' : 'License rejected.'),
+            content: Text(approve ? '$docName approved successfully!' : '$docName rejected.'),
             backgroundColor: approve ? Colors.green : Colors.redAccent,
           ),
         );
@@ -165,7 +167,7 @@ class _CustomersViewState extends State<CustomersView> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to process license verification: $e'), backgroundColor: Colors.redAccent),
+          SnackBar(content: Text('Failed to process verification: $e'), backgroundColor: Colors.redAccent),
         );
       }
       setState(() => _loading = false);
@@ -185,9 +187,9 @@ class _CustomersViewState extends State<CustomersView> {
             Navigator.pop(context);
             _updateUserRoleAndStatus(user.id, role, isActive, accountStatus);
           },
-          onLicenseVerify: (approve, reason) {
+          onVerifyDocument: (docType, approve, reason) {
             Navigator.pop(context);
-            _verifyUserLicense(user.id, approve, reason);
+            _verifyUserDocument(user.id, docType, approve, reason);
           },
         );
       },
@@ -224,9 +226,10 @@ class _CustomersViewState extends State<CustomersView> {
 
     final fileBytes = excelObj.save();
     if (fileBytes != null) {
+      final companyName = CompanySettingsProvider().companyName.replaceAll(' ', '_');
       download_helper.downloadFile(
         Uint8List.fromList(fileBytes),
-        'CARRENT_UserRegistry_Export_${DateTime.now().millisecondsSinceEpoch}.xlsx',
+        '${companyName}_UserRegistry_Export_${DateTime.now().millisecondsSinceEpoch}.xlsx',
       );
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('User Registry exported to Excel!'), backgroundColor: Colors.green),
@@ -258,7 +261,7 @@ class _CustomersViewState extends State<CustomersView> {
               child: pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text('CARRENT CORPORATE USER LEDGER', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 18, color: pdf_lib.PdfColor.fromInt(0xFF0F172A))),
+                  pw.Text('${CompanySettingsProvider().companyName.toUpperCase()} CORPORATE USER LEDGER', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 18, color: pdf_lib.PdfColor.fromInt(0xFF0F172A))),
                   pw.Text('Report Date: ${DateFormat('dd MMM yyyy').format(DateTime.now())}', style: pw.TextStyle(fontSize: 10)),
                 ],
               ),
@@ -279,9 +282,10 @@ class _CustomersViewState extends State<CustomersView> {
     );
 
     final fileBytes = await pdf.save();
+    final companyName = CompanySettingsProvider().companyName.replaceAll(' ', '_');
     download_helper.downloadFile(
       fileBytes,
-      'CARRENT_UserRegistry_Export_${DateTime.now().millisecondsSinceEpoch}.pdf',
+      '${companyName}_UserRegistry_Export_${DateTime.now().millisecondsSinceEpoch}.pdf',
     );
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -350,8 +354,14 @@ class _CustomersViewState extends State<CustomersView> {
     final filteredUsers = _getFilteredUsers();
     final double width = MediaQuery.of(context).size.width;
     final bool isDesktop = width > 1000;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final surfaceColor = isDark ? const Color(0xFF111827) : const Color(0xFFF1F5F9);
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
+    final borderColor = isDark ? const Color(0xFF334155) : Colors.grey.shade200;
 
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -361,31 +371,31 @@ class _CustomersViewState extends State<CustomersView> {
               ? Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('User Management', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue)),
-                          Text('Audit registration credentials, manage user roles, account active statuses, and driving licenses.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                          Text('User Management', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textPrimary)),
+                          Text('Audit registration credentials, manage user roles, account active statuses, and driving licenses.', style: TextStyle(fontSize: 12, color: textSecondary)),
                         ],
                       ),
                     ),
                     const SizedBox(width: 16),
-                    _buildHeaderButtons(),
+                    _buildHeaderButtons(textPrimary: textPrimary),
                   ],
                 )
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Column(
+                    Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('User Management', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue)),
-                        Text('Audit registration credentials, manage user roles, account active statuses, and driving licenses.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        Text('User Management', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textPrimary)),
+                        Text('Audit registration credentials, manage user roles, account active statuses, and driving licenses.', style: TextStyle(fontSize: 12, color: textSecondary)),
                       ],
                     ),
                     const SizedBox(height: 16),
-                    _buildHeaderButtons(),
+                    _buildHeaderButtons(textPrimary: textPrimary),
                   ],
                 ),
           const SizedBox(height: 24),
@@ -399,90 +409,111 @@ class _CustomersViewState extends State<CustomersView> {
             childAspectRatio: isDesktop ? 2.5 : 1.6,
             physics: const NeverScrollableScrollPhysics(),
             children: [
-              _buildStatCard('Total Users', totalUsers.toString(), Icons.people_outline, Colors.indigo),
-              _buildStatCard('Active Users', activeUsers.toString(), Icons.check_circle_outline, Colors.teal),
-              _buildStatCard('Disabled Users', disabledUsers.toString(), Icons.block, Colors.redAccent),
-              _buildStatCard('Pending Licenses', pendingLicenses.toString(), Icons.hourglass_empty_outlined, Colors.orange),
-              _buildStatCard('Approved Licenses', approvedLicenses.toString(), Icons.badge_outlined, Colors.green),
+              _buildStatCard('Total Users', totalUsers.toString(), Icons.people_outline, Colors.indigo, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+              _buildStatCard('Active Users', activeUsers.toString(), Icons.check_circle_outline, Colors.teal, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+              _buildStatCard('Disabled Users', disabledUsers.toString(), Icons.block, Colors.redAccent, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+              _buildStatCard('Pending Licenses', pendingLicenses.toString(), Icons.hourglass_empty_outlined, Colors.orange, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+              _buildStatCard('Approved Licenses', approvedLicenses.toString(), Icons.badge_outlined, Colors.green, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
             ],
           ),
           const SizedBox(height: 24),
 
           // Search & Filter Bar
-          Card(
-            color: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            elevation: 0,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: isDesktop
-                  ? Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _searchController,
-                            decoration: const InputDecoration(
-                              hintText: 'Search registry by user name or email...',
-                              prefixIcon: Icon(Icons.search, size: 20),
-                              contentPadding: EdgeInsets.symmetric(vertical: 8),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        _buildDropdownFilters(),
-                      ],
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        TextField(
-                          controller: _searchController,
-                          decoration: const InputDecoration(
-                            hintText: 'Search registry by user name or email...',
-                            prefixIcon: Icon(Icons.search, size: 20),
-                            contentPadding: EdgeInsets.symmetric(vertical: 8),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        _buildDropdownFilters(),
-                      ],
-                    ),
+          Container(
+            decoration: BoxDecoration(
+              color: cardColor,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: borderColor),
             ),
+            padding: const EdgeInsets.all(16),
+            child: isDesktop
+                ? Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          style: TextStyle(color: textPrimary),
+                          decoration: InputDecoration(
+                            hintText: 'Search registry by user name or email...',
+                            hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.7)),
+                            prefixIcon: Icon(Icons.search, size: 20, color: textSecondary),
+                            contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      _buildDropdownFilters(isDark: isDark, cardColor: surfaceColor, textPrimary: textPrimary, borderColor: borderColor),
+                    ],
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextField(
+                        controller: _searchController,
+                        style: TextStyle(color: textPrimary),
+                        decoration: InputDecoration(
+                          hintText: 'Search registry by user name or email...',
+                          hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.7)),
+                          prefixIcon: Icon(Icons.search, size: 20, color: textSecondary),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildDropdownFilters(isDark: isDark, cardColor: surfaceColor, textPrimary: textPrimary, borderColor: borderColor),
+                    ],
+                  ),
           ),
           const SizedBox(height: 16),
 
           // User Listing Area
-          Expanded(
-            child: filteredUsers.isEmpty
-                ? Center(
+          filteredUsers.isEmpty
+              ? Container(
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: cardColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: borderColor),
+                  ),
+                  child: Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.people_outline_rounded, size: 64, color: Colors.grey[300]),
+                        Icon(Icons.people_outline_rounded, size: 64, color: textSecondary),
                         const SizedBox(height: 16),
-                        const Text('No registered users match selected search query or filters.', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                        Text('No registered users match selected search query or filters.', style: TextStyle(color: textSecondary, fontWeight: FontWeight.bold)),
                       ],
                     ),
-                  )
-                : Card(
-                    color: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    elevation: 0,
-                    child: isDesktop ? _buildDesktopTable(filteredUsers) : _buildMobileList(filteredUsers),
                   ),
-          ),
+                )
+              : Container(
+                  decoration: BoxDecoration(
+                    color: cardColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: borderColor),
+                  ),
+                  child: isDesktop
+                      ? _buildDesktopTable(filteredUsers, isDark: isDark, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor)
+                      : _buildMobileList(filteredUsers, isDark: isDark, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+                ),
         ],
       ),
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
+  Widget _buildStatCard(String label, String value, IconData icon, Color color, {
+    required bool isDark,
+    required Color cardColor,
+    required Color textPrimary,
+    required Color textSecondary,
+    required Color borderColor,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
+        border: Border.all(color: borderColor),
+        boxShadow: isDark ? [] : [
           BoxShadow(color: Colors.black.withValues(alpha: 0.015), blurRadius: 10, offset: const Offset(0, 4)),
         ],
       ),
@@ -491,7 +522,7 @@ class _CustomersViewState extends State<CustomersView> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
+              color: color.withValues(alpha: isDark ? 0.2 : 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: color, size: 20),
@@ -502,9 +533,9 @@ class _CustomersViewState extends State<CustomersView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(label, style: const TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(label, style: TextStyle(color: textSecondary, fontSize: 10, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 4),
-                Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.secondaryBlue)),
+                Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: textPrimary)),
               ],
             ),
           ),
@@ -513,15 +544,15 @@ class _CustomersViewState extends State<CustomersView> {
     );
   }
 
-  Widget _buildHeaderButtons() {
+  Widget _buildHeaderButtons({required Color textPrimary}) {
     return Wrap(
       spacing: 12,
       runSpacing: 12,
       children: [
         OutlinedButton.icon(
           style: OutlinedButton.styleFrom(
-            side: const BorderSide(color: AppColors.secondaryBlue),
-            foregroundColor: AppColors.secondaryBlue,
+            side: BorderSide(color: textPrimary),
+            foregroundColor: textPrimary,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
@@ -544,143 +575,175 @@ class _CustomersViewState extends State<CustomersView> {
     );
   }
 
-  Widget _buildDropdownFilters() {
+  Widget _buildDropdownFilters({required bool isDark, required Color cardColor, required Color textPrimary, required Color borderColor}) {
     return Wrap(
       spacing: 12,
       runSpacing: 12,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        DropdownButton<String>(
-          value: _filterRole,
-          hint: const Text('Role'),
-          items: ['All', 'Admin', 'Customer'].map((r) {
-            return DropdownMenuItem(value: r, child: Text(r));
-          }).toList(),
-          onChanged: (val) {
-            if (val != null) setState(() => _filterRole = val);
-          },
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: borderColor),
+          ),
+          child: DropdownButton<String>(
+            value: _filterRole,
+            dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+            style: TextStyle(color: textPrimary, fontWeight: FontWeight.bold),
+            underline: const SizedBox(),
+            items: ['All', 'Admin', 'Customer'].map((r) {
+              return DropdownMenuItem(value: r, child: Text(r));
+            }).toList(),
+            onChanged: (val) {
+              if (val != null) setState(() => _filterRole = val);
+            },
+          ),
         ),
-        DropdownButton<String>(
-          value: _filterStatus,
-          hint: const Text('Status'),
-          items: ['All', 'Active', 'Disabled'].map((s) {
-            return DropdownMenuItem(value: s, child: Text(s == 'Disabled' ? 'Disabled/Suspended' : s));
-          }).toList(),
-          onChanged: (val) {
-            if (val != null) setState(() => _filterStatus = val);
-          },
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: borderColor),
+          ),
+          child: DropdownButton<String>(
+            value: _filterStatus,
+            dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+            style: TextStyle(color: textPrimary, fontWeight: FontWeight.bold),
+            underline: const SizedBox(),
+            items: ['All', 'Active', 'Disabled'].map((s) {
+              return DropdownMenuItem(value: s, child: Text(s == 'Disabled' ? 'Disabled/Suspended' : s));
+            }).toList(),
+            onChanged: (val) {
+              if (val != null) setState(() => _filterStatus = val);
+            },
+          ),
         ),
-        DropdownButton<String>(
-          value: _filterLicense,
-          hint: const Text('License'),
-          items: ['All', 'Unprovided', 'Pending', 'Approved', 'Rejected'].map((l) {
-            return DropdownMenuItem(value: l, child: Text('License: $l'));
-          }).toList(),
-          onChanged: (val) {
-            if (val != null) setState(() => _filterLicense = val);
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDesktopTable(List<UserModel> users) {
-    return ListView(
-      children: [
-        DataTable(
-          headingRowColor: WidgetStateProperty.all(Colors.grey[50]),
-          columns: const [
-            DataColumn(label: Text('Full Name', style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('Email Address', style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('Phone Number', style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('Role', style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('Account', style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('License Status', style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
-          ],
-          rows: users.map((u) {
-            Color licenseColor = Colors.orange;
-            if (u.licenseStatus == 'approved') licenseColor = Colors.green;
-            if (u.licenseStatus == 'rejected') licenseColor = Colors.red;
-            if (u.licenseStatus == 'unprovided') licenseColor = Colors.grey;
-
-            final accountStatus = u.isActive ? 'ACTIVE' : 'DISABLED';
-
-            return DataRow(
-              cells: [
-                DataCell(
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 14,
-                        backgroundColor: AppColors.secondaryBlue.withValues(alpha: 0.1),
-                        backgroundImage: getAppImageProvider(u.profileImage),
-                        child: u.profileImage.isEmpty ? const Icon(Icons.person, size: 14, color: AppColors.secondaryBlue) : null,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(u.fullName, style: const TextStyle(fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                ),
-                DataCell(Text(u.email)),
-                DataCell(Text(u.phone.isNotEmpty ? u.phone : 'N/A')),
-                DataCell(
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: u.role == 'admin' ? Colors.purple.withValues(alpha: 0.1) : Colors.blue.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      u.role.toUpperCase(),
-                      style: TextStyle(color: u.role == 'admin' ? Colors.purple : Colors.blue, fontSize: 8, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-                DataCell(
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: u.isActive ? Colors.green.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      accountStatus,
-                      style: TextStyle(color: u.isActive ? Colors.green : Colors.red, fontSize: 8, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-                DataCell(
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: licenseColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      u.licenseStatus.toUpperCase(),
-                      style: TextStyle(color: licenseColor, fontSize: 8, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-                DataCell(
-                  IconButton(
-                    icon: const Icon(Icons.edit_note_outlined, color: AppColors.secondaryBlue, size: 20),
-                    tooltip: 'Manage Profile Details',
-                    onPressed: () => _showSpecsDialog(u),
-                  ),
-                ),
-              ],
-            );
-          }).toList(),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: borderColor),
+          ),
+          child: DropdownButton<String>(
+            value: _filterLicense,
+            dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+            style: TextStyle(color: textPrimary, fontWeight: FontWeight.bold),
+            underline: const SizedBox(),
+            items: ['All', 'Unprovided', 'Pending', 'Approved', 'Rejected'].map((l) {
+              return DropdownMenuItem(value: l, child: Text('License: $l'));
+            }).toList(),
+            onChanged: (val) {
+              if (val != null) setState(() => _filterLicense = val);
+            },
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildMobileList(List<UserModel> users) {
-    return ListView.builder(
+  Widget _buildDesktopTable(List<UserModel> users, {required bool isDark, required Color textPrimary, required Color textSecondary, required Color borderColor}) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: DataTable(
+        headingRowColor: WidgetStateProperty.all(isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
+        columns: [
+          DataColumn(label: Text('Full Name', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
+          DataColumn(label: Text('Email Address', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
+          DataColumn(label: Text('Phone Number', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
+          DataColumn(label: Text('Role', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
+          DataColumn(label: Text('Account', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
+          DataColumn(label: Text('License Status', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
+          DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
+        ],
+        rows: users.map((u) {
+          Color licenseColor = Colors.orange;
+          if (u.licenseStatus == 'approved') licenseColor = Colors.green;
+          if (u.licenseStatus == 'rejected') licenseColor = Colors.red;
+          if (u.licenseStatus == 'unprovided') licenseColor = Colors.grey;
+
+          final accountStatus = u.isActive ? 'ACTIVE' : 'DISABLED';
+
+          return DataRow(
+            cells: [
+              DataCell(
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 14,
+                      backgroundColor: AppColors.secondaryBlue.withValues(alpha: isDark ? 0.2 : 0.1),
+                      backgroundImage: getAppImageProvider(u.profileImage),
+                      child: u.profileImage.isEmpty ? Icon(Icons.person, size: 14, color: textPrimary) : null,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(u.fullName, style: TextStyle(fontWeight: FontWeight.w600, color: textPrimary)),
+                  ],
+                ),
+              ),
+              DataCell(Text(u.email, style: TextStyle(color: textPrimary))),
+              DataCell(Text(u.phone.isNotEmpty ? u.phone : 'N/A', style: TextStyle(color: textSecondary))),
+              DataCell(
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: u.role == 'admin' ? Colors.purple.withValues(alpha: 0.15) : Colors.blue.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    u.role.toUpperCase(),
+                    style: TextStyle(color: u.role == 'admin' ? Colors.purple : Colors.blue, fontSize: 8, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              DataCell(
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: u.isActive ? Colors.green.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    accountStatus,
+                    style: TextStyle(color: u.isActive ? Colors.green : Colors.red, fontSize: 8, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              DataCell(
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: licenseColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    u.licenseStatus.toUpperCase(),
+                    style: TextStyle(color: licenseColor, fontSize: 8, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              DataCell(
+                IconButton(
+                  icon: Icon(Icons.edit_note_outlined, color: textPrimary, size: 20),
+                  tooltip: 'Manage Profile Details',
+                  onPressed: () => _showSpecsDialog(u),
+                ),
+              ),
+            ],
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildMobileList(List<UserModel> users, {required bool isDark, required Color textPrimary, required Color textSecondary, required Color borderColor}) {
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       itemCount: users.length,
+      separatorBuilder: (context, index) => Divider(color: borderColor, height: 1),
       itemBuilder: (context, index) {
         final u = users[index];
         Color licenseColor = Colors.orange;
@@ -688,62 +751,56 @@ class _CustomersViewState extends State<CustomersView> {
         if (u.licenseStatus == 'rejected') licenseColor = Colors.red;
         if (u.licenseStatus == 'unprovided') licenseColor = Colors.grey;
 
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          color: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.grey[100]!)),
-          elevation: 0,
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            leading: CircleAvatar(
-              backgroundColor: AppColors.secondaryBlue.withValues(alpha: 0.1),
-              backgroundImage: getAppImageProvider(u.profileImage),
-              child: u.profileImage.isEmpty ? const Icon(Icons.person, color: AppColors.secondaryBlue) : null,
-            ),
-            title: Text(u.fullName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 2),
-                Text(u.email, style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(color: u.role == 'admin' ? Colors.purple.withValues(alpha: 0.1) : Colors.blue.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
-                      child: Text(u.role.toUpperCase(), style: TextStyle(color: u.role == 'admin' ? Colors.purple : Colors.blue, fontSize: 8, fontWeight: FontWeight.bold)),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(color: u.isActive ? Colors.green.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
-                      child: Text(u.isActive ? 'ACTIVE' : 'DISABLED', style: TextStyle(color: u.isActive ? Colors.green : Colors.red, fontSize: 8, fontWeight: FontWeight.bold)),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: licenseColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    u.licenseStatus.toUpperCase(),
-                    style: TextStyle(color: licenseColor, fontSize: 8, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Icon(Icons.arrow_forward_ios, size: 12),
-              ],
-            ),
-            onTap: () => _showSpecsDialog(u),
+        return ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          leading: CircleAvatar(
+            backgroundColor: AppColors.secondaryBlue.withValues(alpha: isDark ? 0.2 : 0.1),
+            backgroundImage: getAppImageProvider(u.profileImage),
+            child: u.profileImage.isEmpty ? Icon(Icons.person, size: 14, color: textPrimary) : null,
           ),
+          title: Text(u.fullName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: textPrimary)),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 2),
+              Text(u.email, style: TextStyle(fontSize: 11, color: textSecondary)),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(color: u.role == 'admin' ? Colors.purple.withValues(alpha: 0.15) : Colors.blue.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(4)),
+                    child: Text(u.role.toUpperCase(), style: TextStyle(color: u.role == 'admin' ? Colors.purple : Colors.blue, fontSize: 8, fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(color: u.isActive ? Colors.green.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(4)),
+                    child: Text(u.isActive ? 'ACTIVE' : 'DISABLED', style: TextStyle(color: u.isActive ? Colors.green : Colors.red, fontSize: 8, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          trailing: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: licenseColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  u.licenseStatus.toUpperCase(),
+                  style: TextStyle(color: licenseColor, fontSize: 8, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Icon(Icons.arrow_forward_ios, size: 12, color: textSecondary),
+            ],
+          ),
+          onTap: () => _showSpecsDialog(u),
         );
       },
     );
@@ -756,14 +813,14 @@ class _UserSpecsDialog extends StatefulWidget {
   final List<BookingModel> bookings;
   final List<PaymentModel> payments;
   final Function(String role, bool isActive, String accountStatus) onSaveSettings;
-  final Function(bool approve, String reason) onLicenseVerify;
+  final Function(String docType, bool approve, String reason) onVerifyDocument;
 
   const _UserSpecsDialog({
     required this.user,
     required this.bookings,
     required this.payments,
     required this.onSaveSettings,
-    required this.onLicenseVerify,
+    required this.onVerifyDocument,
   });
 
   @override
@@ -881,9 +938,15 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
     userBookings.sort((a, b) => b.pickUpDate.compareTo(a.pickUpDate));
     userPayments.sort((a, b) => b.paymentDate.compareTo(a.paymentDate));
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
+    final borderColor = isDark ? const Color(0xFF334155) : Colors.grey.shade200;
+
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      backgroundColor: Colors.white,
+      backgroundColor: cardColor,
       child: Container(
         width: MediaQuery.of(context).size.width * 0.95,
         height: MediaQuery.of(context).size.height * 0.85,
@@ -899,22 +962,22 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
                 children: [
                   CircleAvatar(
                     radius: 24,
-                    backgroundColor: AppColors.secondaryBlue.withValues(alpha: 0.1),
+                    backgroundColor: AppColors.secondaryBlue.withValues(alpha: isDark ? 0.2 : 0.1),
                     backgroundImage: getAppImageProvider(widget.user.profileImage),
-                    child: widget.user.profileImage.isEmpty ? const Icon(Icons.person, color: AppColors.secondaryBlue) : null,
+                    child: widget.user.profileImage.isEmpty ? Icon(Icons.person, color: textPrimary) : null,
                   ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(widget.user.fullName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
-                        Text(widget.user.email, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                        Text(widget.user.fullName, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textPrimary)),
+                        Text(widget.user.email, style: TextStyle(fontSize: 12, color: textSecondary)),
                       ],
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close, color: Colors.grey),
+                    icon: Icon(Icons.close, color: textSecondary),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -924,7 +987,7 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
               // Navigation Tabs
               TabBar(
                 labelColor: AppColors.primaryOrange,
-                unselectedLabelColor: AppColors.lightText,
+                unselectedLabelColor: textSecondary,
                 indicatorColor: AppColors.primaryOrange,
                 labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                 tabs: [
@@ -949,11 +1012,15 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
                 ),
               ),
 
-              const Divider(height: 24),
+              Divider(height: 24, color: borderColor),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: textPrimary,
+                      side: BorderSide(color: borderColor),
+                    ),
                     onPressed: () => Navigator.pop(context),
                     child: const Text('Cancel'),
                   ),
@@ -979,6 +1046,17 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
   }
 
   Widget _buildProfileTab() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surfaceColor = isDark ? const Color(0xFF111827) : const Color(0xFFF1F5F9);
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
+    final borderColor = isDark ? const Color(0xFF334155) : Colors.grey.shade200;
+
+    Color idBadgeColor = Colors.orange;
+    if (widget.user.idStatus == 'approved') idBadgeColor = Colors.green;
+    if (widget.user.idStatus == 'rejected') idBadgeColor = Colors.red;
+    if (widget.user.idStatus == 'unprovided') idBadgeColor = Colors.grey;
+
     Color licenseColor = Colors.orange;
     if (widget.user.licenseStatus == 'approved') licenseColor = Colors.green;
     if (widget.user.licenseStatus == 'rejected') licenseColor = Colors.red;
@@ -989,14 +1067,20 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Access Controls row
-          const Text('SYSTEM ACCOUNT SECURITY CONTROLS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: Colors.grey)),
+          Text('SYSTEM ACCOUNT SECURITY CONTROLS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: textSecondary)),
           const SizedBox(height: 12),
           LayoutBuilder(
             builder: (context, constraints) {
               final isNarrow = constraints.maxWidth < 450;
               final roleDropdown = DropdownButtonFormField<String>(
                 initialValue: _selectedRole,
-                decoration: const InputDecoration(labelText: 'System Access Role'),
+                dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                style: TextStyle(color: textPrimary),
+                decoration: InputDecoration(
+                  labelText: 'System Access Role',
+                  labelStyle: TextStyle(color: textSecondary),
+                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: borderColor)),
+                ),
                 items: const [
                   DropdownMenuItem(value: 'customer', child: Text('Customer')),
                   DropdownMenuItem(value: 'admin', child: Text('Admin Manager')),
@@ -1012,7 +1096,13 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
               
               final statusDropdown = DropdownButtonFormField<String>(
                 initialValue: _selectedStatus,
-                decoration: const InputDecoration(labelText: 'Account Login Status'),
+                dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                style: TextStyle(color: textPrimary),
+                decoration: InputDecoration(
+                  labelText: 'Account Login Status',
+                  labelStyle: TextStyle(color: textSecondary),
+                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: borderColor)),
+                ),
                 items: const [
                   DropdownMenuItem(value: 'Active', child: Text('Active (Allow Access)')),
                   DropdownMenuItem(value: 'Disabled', child: Text('Disabled (Block Access)')),
@@ -1048,22 +1138,128 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
           const SizedBox(height: 20),
 
           // User details block
-          const Text('USER REGISTRATION PARAMETERS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: Colors.grey)),
+          Text('USER REGISTRATION PARAMETERS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: textSecondary)),
           const SizedBox(height: 8),
           _buildRowDetails('Phone Number', widget.user.phone.isNotEmpty ? widget.user.phone : 'N/A'),
           _buildRowDetails('Residential Address', widget.user.address),
           _buildRowDetails('Registration Timestamp', _formatDate(widget.user.createdAt)),
           const SizedBox(height: 20),
 
-          // License Verification section
-          const Text('DRIVING LICENSE VERIFICATION DETAILS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: Colors.grey)),
+          // ID/Passport Verification section
+          Text('NATIONAL ID / PASSPORT VERIFICATION DETAILS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: textSecondary)),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.grey[50],
+              color: surfaceColor,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey[200]!),
+              border: Border.all(color: borderColor),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      widget.user.idNumber.isNotEmpty ? '${widget.user.idType}: ${widget.user.idNumber}' : 'No ID/Passport number provided',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: textPrimary),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: idBadgeColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        widget.user.idStatus.toUpperCase(),
+                        style: TextStyle(color: idBadgeColor, fontSize: 9, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text('Uploaded on: ${widget.user.idUploadDate.isNotEmpty ? widget.user.idUploadDate : "N/A"}', style: TextStyle(color: textSecondary, fontSize: 12)),
+                if (widget.user.idStatus == 'rejected' && widget.user.idRejectionReason.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Rejection Reason: ${widget.user.idRejectionReason}',
+                    style: const TextStyle(color: Colors.red, fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                ],
+                if (widget.user.idImage.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text('ID Image Preview (Click to Zoom):', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: textSecondary)),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () => _showImageLightbox(context, widget.user.idImage),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: AppImage(
+                        imageSrc: widget.user.idImage,
+                        height: 90,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        placeholder: Container(
+                          height: 90,
+                          color: surfaceColor,
+                          alignment: Alignment.center,
+                          child: const Icon(Icons.picture_as_pdf, color: Colors.redAccent),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (widget.user.idStatus == 'pending') ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.redAccent,
+                              side: const BorderSide(color: Colors.redAccent),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            onPressed: () {
+                              _showDocumentRejectionDialog(context, 'id');
+                            },
+                            icon: const Icon(Icons.cancel_outlined, size: 14),
+                            label: const Text('Reject ID', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            onPressed: () {
+                              widget.onVerifyDocument('id', true, '');
+                            },
+                            icon: const Icon(Icons.check_circle_outline, size: 14),
+                            label: const Text('Approve ID', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // License Verification section
+          Text('DRIVING LICENSE VERIFICATION DETAILS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: textSecondary)),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: surfaceColor,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: borderColor),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1073,12 +1269,12 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
                   children: [
                     Text(
                       widget.user.licenseNumber != null ? 'License: ${widget.user.licenseNumber}' : 'No license number provided',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.secondaryBlue),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: textPrimary),
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: licenseColor.withValues(alpha: 0.1),
+                        color: licenseColor.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
@@ -1089,7 +1285,11 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
                   ],
                 ),
                 const SizedBox(height: 6),
-                Text('Class: ${widget.user.licenseClass} | Expiry: ${widget.user.licenseExpiry}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                Text('Class: ${widget.user.licenseClass} | Expiry: ${widget.user.licenseExpiry}', style: TextStyle(color: textSecondary, fontSize: 12)),
+                if (widget.user.licenseUploadDate.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text('Uploaded on: ${widget.user.licenseUploadDate}', style: TextStyle(color: textSecondary, fontSize: 11)),
+                ],
                 if (widget.user.licenseStatus == 'rejected' && widget.user.licenseRejectionReason.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(
@@ -1099,7 +1299,7 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
                 ],
                 if (widget.user.licenseImage.isNotEmpty) ...[
                   const SizedBox(height: 12),
-                  const Text('License Image Preview (Click to Zoom):', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
+                  Text('License Image Preview (Click to Zoom):', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: textSecondary)),
                   const SizedBox(height: 8),
                   GestureDetector(
                     onTap: () => _showImageLightbox(context, widget.user.licenseImage),
@@ -1112,7 +1312,7 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
                         fit: BoxFit.cover,
                         placeholder: Container(
                           height: 90,
-                          color: Colors.grey[200],
+                          color: surfaceColor,
                           alignment: Alignment.center,
                           child: const Icon(Icons.picture_as_pdf, color: Colors.redAccent),
                         ),
@@ -1120,40 +1320,41 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  // Verifications controls
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.redAccent,
-                            side: const BorderSide(color: Colors.redAccent),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  if (widget.user.licenseStatus == 'pending') ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.redAccent,
+                              side: const BorderSide(color: Colors.redAccent),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            onPressed: () {
+                              _showDocumentRejectionDialog(context, 'license');
+                            },
+                            icon: const Icon(Icons.cancel_outlined, size: 14),
+                            label: const Text('Reject License', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                           ),
-                          onPressed: () {
-                            _showRejectionDialog(context);
-                          },
-                          icon: const Icon(Icons.cancel_outlined, size: 14),
-                          label: const Text('Reject License', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            onPressed: () {
+                              widget.onVerifyDocument('license', true, '');
+                            },
+                            icon: const Icon(Icons.check_circle_outline, size: 14),
+                            label: const Text('Approve License', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                           ),
-                          onPressed: () {
-                            widget.onLicenseVerify(true, '');
-                          },
-                          icon: const Icon(Icons.check_circle_outline, size: 14),
-                          label: const Text('Approve License', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+                  ],
                 ],
               ],
             ),
@@ -1163,18 +1364,25 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
     );
   }
 
-  void _showRejectionDialog(BuildContext context) {
+  void _showDocumentRejectionDialog(BuildContext context, String docType) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+
     showDialog(
       context: context,
       builder: (dialogContext) {
+        final docName = docType == 'license' ? 'License' : 'ID/Passport';
         return AlertDialog(
+          backgroundColor: cardColor,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('License Rejection Reason', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+          title: Text('$docName Rejection Reason', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary)),
           content: TextField(
             controller: _rejectionReasonController,
+            style: TextStyle(color: textPrimary),
             decoration: const InputDecoration(
               labelText: 'Rejection Reason',
-              hintText: 'e.g. Photo blurry or license expired',
+              hintText: 'e.g. Photo blurry or document expired',
             ),
           ),
           actions: [
@@ -1193,7 +1401,7 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
                   return;
                 }
                 Navigator.pop(dialogContext);
-                widget.onLicenseVerify(false, reason);
+                widget.onVerifyDocument(docType, false, reason);
               },
               child: const Text('Submit Rejection'),
             ),
@@ -1204,18 +1412,22 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
   }
 
   Widget _buildRowDetails(String label, String value) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          Text(label, style: TextStyle(fontSize: 12, color: textSecondary)),
           const SizedBox(width: 20),
           Expanded(
             child: Text(
               value,
               textAlign: TextAlign.end,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textPrimary),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
@@ -1226,14 +1438,20 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
   }
 
   Widget _buildBookingsTab(List<BookingModel> bookings) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF111827) : Colors.white;
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
+    final borderColor = isDark ? const Color(0xFF334155) : Colors.grey.shade200;
+
     if (bookings.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.directions_car_filled_outlined, size: 48, color: Colors.grey[300]),
+            Icon(Icons.directions_car_filled_outlined, size: 48, color: textSecondary),
             const SizedBox(height: 12),
-            const Text('No booking reservations registered for this user.', style: TextStyle(color: Colors.grey, fontSize: 13)),
+            Text('No booking reservations registered for this user.', style: TextStyle(color: textSecondary, fontSize: 13)),
           ],
         ),
       );
@@ -1253,15 +1471,15 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
 
         return Card(
           margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
-          color: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.grey[200]!)),
+          color: cardColor,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: borderColor)),
           elevation: 0,
           child: ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             title: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(b.vehicleName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.secondaryBlue)),
+                Text(b.vehicleName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: textPrimary)),
                 Text('RM ${b.totalPrice.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.primaryOrange, fontSize: 12)),
               ],
             ),
@@ -1269,13 +1487,13 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 4),
-                Text('Duration: $startStr - $endStr', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                Text('Ref ID: #${b.id.substring(0, b.id.length > 8 ? 8 : b.id.length).toUpperCase()}', style: TextStyle(color: Colors.grey[600], fontSize: 10, fontWeight: FontWeight.bold)),
+                Text('Duration: $startStr - $endStr', style: TextStyle(fontSize: 11, color: textSecondary)),
+                Text('Ref ID: #${b.id.substring(0, b.id.length > 8 ? 8 : b.id.length).toUpperCase()}', style: TextStyle(color: textSecondary.withValues(alpha: 0.8), fontSize: 10, fontWeight: FontWeight.bold)),
               ],
             ),
             trailing: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+              decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6)),
               child: Text(b.status.toUpperCase(), style: TextStyle(color: statusColor, fontSize: 8, fontWeight: FontWeight.bold)),
             ),
           ),
@@ -1285,14 +1503,20 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
   }
 
   Widget _buildPaymentsTab(List<PaymentModel> payments) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF111827) : Colors.white;
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
+    final borderColor = isDark ? const Color(0xFF334155) : Colors.grey.shade200;
+
     if (payments.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.payment_outlined, size: 48, color: Colors.grey[300]),
+            Icon(Icons.payment_outlined, size: 48, color: textSecondary),
             const SizedBox(height: 12),
-            const Text('No payment transaction history found for this user.', style: TextStyle(color: Colors.grey, fontSize: 13)),
+            Text('No payment transaction history found for this user.', style: TextStyle(color: textSecondary, fontSize: 13)),
           ],
         ),
       );
@@ -1311,29 +1535,29 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
 
         return Card(
           margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
-          color: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.grey[200]!)),
+          color: cardColor,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: borderColor)),
           elevation: 0,
           child: ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             title: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('RM ${p.amount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.secondaryBlue)),
-                Text(p.paymentMethod.toUpperCase(), style: const TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
+                Text('RM ${p.amount.toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: textPrimary)),
+                Text(p.paymentMethod.toUpperCase(), style: TextStyle(color: textSecondary, fontSize: 10, fontWeight: FontWeight.bold)),
               ],
             ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 4),
-                Text('Settled Date: $payDate', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                Text('Tx Ref: #${p.id.substring(0, p.id.length > 8 ? 8 : p.id.length).toUpperCase()}', style: TextStyle(color: Colors.grey[600], fontSize: 10, fontWeight: FontWeight.bold)),
+                Text('Settled Date: $payDate', style: TextStyle(fontSize: 11, color: textSecondary)),
+                Text('Tx Ref: #${p.id.substring(0, p.id.length > 8 ? 8 : p.id.length).toUpperCase()}', style: TextStyle(color: textSecondary.withValues(alpha: 0.8), fontSize: 10, fontWeight: FontWeight.bold)),
               ],
             ),
             trailing: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+              decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6)),
               child: Text(p.status.toUpperCase(), style: TextStyle(color: statusColor, fontSize: 8, fontWeight: FontWeight.bold)),
             ),
           ),

@@ -89,6 +89,11 @@
       ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'"
     },
 
+    "company_settings": {
+      ".read": "true",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'"
+    },
+
     "maintenance_jobs": {
       ".read": "auth != null",
       ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'"

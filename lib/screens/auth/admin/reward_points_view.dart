@@ -26,6 +26,11 @@ class _RewardPointsViewState extends State<RewardPointsView> with SingleTickerPr
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (mounted) {
+        setState(() {});
+      }
+    });
     _loadCustomers();
   }
 
@@ -63,12 +68,19 @@ class _RewardPointsViewState extends State<RewardPointsView> with SingleTickerPr
     showDialog(
       context: context,
       builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final dialogBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+        final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+        final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
+        final chipBg = isDark ? const Color(0xFF334155) : Colors.grey[100];
+
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
+              backgroundColor: dialogBg,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               title: Text('Adjust Points: ${customer.fullName}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary)),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -83,10 +95,10 @@ class _RewardPointsViewState extends State<RewardPointsView> with SingleTickerPr
                             label: const Center(child: Text('Add Points')),
                             selected: isAdding,
                             selectedColor: Colors.blue.withValues(alpha: 0.15),
-                            backgroundColor: Colors.grey[100],
+                            backgroundColor: chipBg,
                             labelStyle: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                color: isAdding ? Colors.blue : AppColors.secondaryBlue),
+                                color: isAdding ? Colors.blue : textPrimary),
                             onSelected: (_) => setDialogState(() => isAdding = true),
                           ),
                         ),
@@ -96,10 +108,10 @@ class _RewardPointsViewState extends State<RewardPointsView> with SingleTickerPr
                             label: const Center(child: Text('Deduct Points')),
                             selected: !isAdding,
                             selectedColor: Colors.redAccent.withValues(alpha: 0.15),
-                            backgroundColor: Colors.grey[100],
+                            backgroundColor: chipBg,
                             labelStyle: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                color: !isAdding ? Colors.redAccent : AppColors.secondaryBlue),
+                                color: !isAdding ? Colors.redAccent : textPrimary),
                             onSelected: (_) => setDialogState(() => isAdding = false),
                           ),
                         ),
@@ -109,8 +121,10 @@ class _RewardPointsViewState extends State<RewardPointsView> with SingleTickerPr
                     TextField(
                       controller: pointsController,
                       keyboardType: TextInputType.number,
+                      style: TextStyle(color: textPrimary),
                       decoration: InputDecoration(
                         labelText: 'Points Count',
+                        labelStyle: TextStyle(color: textSecondary),
                         errorText: errorText,
                       ),
                       onChanged: (val) {
@@ -130,9 +144,12 @@ class _RewardPointsViewState extends State<RewardPointsView> with SingleTickerPr
                     TextField(
                       controller: reasonController,
                       maxLines: 2,
-                      decoration: const InputDecoration(
+                      style: TextStyle(color: textPrimary),
+                      decoration: InputDecoration(
                         labelText: 'Reason for Adjustment',
+                        labelStyle: TextStyle(color: textSecondary),
                         hintText: 'e.g. Loyalty program bonus, correction...',
+                        hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.7)),
                       ),
                     ),
                   ],
@@ -141,7 +158,7 @@ class _RewardPointsViewState extends State<RewardPointsView> with SingleTickerPr
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
+                  child: Text('Cancel', style: TextStyle(color: textSecondary)),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
@@ -203,114 +220,133 @@ class _RewardPointsViewState extends State<RewardPointsView> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: const Color(0xFFF1F5F9),
-      child: StreamBuilder<List<Map<String, dynamic>>>(
-        stream: _rewardService.getAllTransactionsStream(),
-        builder: (context, ledgerSnapshot) {
-          final txs = ledgerSnapshot.data ?? [];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
+    final borderColor = isDark ? const Color(0xFF334155) : Colors.grey.shade200;
 
-          // Compute system rewards aggregates
-          int totalIssued = 0;
-          int totalRedeemed = 0;
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: _rewardService.getAllTransactionsStream(),
+      builder: (context, ledgerSnapshot) {
+        final txs = ledgerSnapshot.data ?? [];
 
-          for (var tx in txs) {
-            final int points = tx['points'] ?? 0;
-            final String type = tx['type'] ?? '';
-            if (type == 'Earn' || (type == 'Adjustment' && points > 0)) {
-              totalIssued += points;
-            } else if (type == 'Redeem' || (type == 'Adjustment' && points < 0)) {
-              totalRedeemed += points.abs();
-            }
+        // Compute system rewards aggregates
+        int totalIssued = 0;
+        int totalRedeemed = 0;
+
+        for (var tx in txs) {
+          final int points = tx['points'] ?? 0;
+          final String type = tx['type'] ?? '';
+          if (type == 'Earn' || (type == 'Adjustment' && points > 0)) {
+            totalIssued += points;
+          } else if (type == 'Redeem' || (type == 'Adjustment' && points < 0)) {
+            totalRedeemed += points.abs();
           }
+        }
 
-          return Column(
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Header
+              Text(
+                'Reward Points Manager',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textPrimary),
+              ),
+              Text(
+                'Monitor customer reward points balance, adjustments, and global transaction logs.',
+                style: TextStyle(fontSize: 12, color: textSecondary),
+              ),
+              const SizedBox(height: 24),
+
               // 1. Stats Overview Panel
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final isWide = constraints.maxWidth > 700;
-                    if (isWide) {
-                      return Row(
-                        children: [
-                          Expanded(
-                            child: _buildMetricCard(
-                              title: 'Total Points Issued',
-                              value: '$totalIssued',
-                              icon: Icons.stars_rounded,
-                              color: AppColors.primaryOrange,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: _buildMetricCard(
-                              title: 'Total Points Redeemed',
-                              value: '$totalRedeemed',
-                              icon: Icons.shopping_bag_outlined,
-                              color: Colors.green,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: _buildMetricCard(
-                              title: 'Total Customers',
-                              value: '${_customers.length}',
-                              icon: Icons.people_outline_rounded,
-                              color: const Color(0xFF3B82F6),
-                            ),
-                          ),
-                        ],
-                      );
-                    } else {
-                      return GridView.count(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                        shrinkWrap: true,
-                        childAspectRatio: 1.6,
-                        physics: const NeverScrollableScrollPhysics(),
-                        children: [
-                          _buildMetricCard(
-                            title: 'Points Issued',
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isWide = constraints.maxWidth > 700;
+                  if (isWide) {
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: _buildMetricCard(
+                            title: 'Total Points Issued',
                             value: '$totalIssued',
                             icon: Icons.stars_rounded,
                             color: AppColors.primaryOrange,
+                            isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor,
                           ),
-                          _buildMetricCard(
-                            title: 'Points Redeemed',
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _buildMetricCard(
+                            title: 'Total Points Redeemed',
                             value: '$totalRedeemed',
                             icon: Icons.shopping_bag_outlined,
                             color: Colors.green,
+                            isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor,
                           ),
-                          _buildMetricCard(
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _buildMetricCard(
                             title: 'Total Customers',
                             value: '${_customers.length}',
                             icon: Icons.people_outline_rounded,
                             color: const Color(0xFF3B82F6),
+                            isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor,
                           ),
-                        ],
-                      );
-                    }
-                  },
-                ),
+                        ),
+                      ],
+                    );
+                  } else {
+                    return GridView.count(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      shrinkWrap: true,
+                      childAspectRatio: 1.6,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: [
+                        _buildMetricCard(
+                          title: 'Points Issued',
+                          value: '$totalIssued',
+                          icon: Icons.stars_rounded,
+                          color: AppColors.primaryOrange,
+                          isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor,
+                        ),
+                        _buildMetricCard(
+                          title: 'Points Redeemed',
+                          value: '$totalRedeemed',
+                          icon: Icons.shopping_bag_outlined,
+                          color: Colors.green,
+                          isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor,
+                        ),
+                        _buildMetricCard(
+                          title: 'Total Customers',
+                          value: '${_customers.length}',
+                          icon: Icons.people_outline_rounded,
+                          color: const Color(0xFF3B82F6),
+                          isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor,
+                        ),
+                      ],
+                    );
+                  }
+                },
               ),
+              const SizedBox(height: 24),
 
               // Tab Menu Header
               Container(
-                margin: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(16),
-                    topRight: Radius.circular(16),
-                  ),
+                decoration: BoxDecoration(
+                  color: cardColor,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  border: Border.all(color: borderColor),
                 ),
                 child: TabBar(
                   controller: _tabController,
                   labelColor: AppColors.primaryOrange,
-                  unselectedLabelColor: AppColors.lightText,
+                  unselectedLabelColor: textSecondary,
                   indicatorColor: AppColors.primaryOrange,
                   indicatorWeight: 3,
                   labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
@@ -321,37 +357,38 @@ class _RewardPointsViewState extends State<RewardPointsView> with SingleTickerPr
                 ),
               ),
 
-              // Tab Body View
-              Expanded(
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 24),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.only(
-                      bottomLeft: Radius.circular(16),
-                      bottomRight: Radius.circular(16),
-                    ),
-                  ),
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildCustomerTab(),
-                      _buildLedgerTab(txs),
-                    ],
-                  ),
+              // Tab Body View (rendered directly instead of TabBarView for natural height and scrolling)
+              Container(
+                decoration: BoxDecoration(
+                  color: cardColor,
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+                  border: Border.all(color: borderColor),
                 ),
+                child: _tabController.index == 0
+                    ? _buildCustomerTab(isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor)
+                    : _buildLedgerTab(txs, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
               ),
-              const SizedBox(height: 24),
             ],
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildCustomerTab() {
+  Widget _buildCustomerTab({
+    required bool isDark,
+    required Color cardColor,
+    required Color textPrimary,
+    required Color textSecondary,
+    required Color borderColor,
+  }) {
     if (_loadingCustomers) {
-      return const Center(child: LoadingWidget(message: 'Loading customer loyalty list...'));
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32.0),
+          child: LoadingWidget(message: 'Loading customer loyalty list...'),
+        ),
+      );
     }
 
     final filtered = _customers.where((u) {
@@ -369,11 +406,12 @@ class _RewardPointsViewState extends State<RewardPointsView> with SingleTickerPr
             children: [
               Expanded(
                 child: TextField(
+                  style: TextStyle(color: textPrimary),
                   decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.search, size: 18),
+                    prefixIcon: Icon(Icons.search, size: 18, color: textSecondary),
                     hintText: 'Search customer by name or email...',
+                    hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.7)),
                     contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   onChanged: (val) {
                     setState(() {
@@ -384,7 +422,7 @@ class _RewardPointsViewState extends State<RewardPointsView> with SingleTickerPr
               ),
               const SizedBox(width: 12),
               IconButton(
-                icon: const Icon(Icons.refresh, color: AppColors.secondaryBlue),
+                icon: Icon(Icons.refresh, color: textPrimary),
                 onPressed: _loadCustomers,
                 tooltip: 'Refresh Customers',
               ),
@@ -393,86 +431,103 @@ class _RewardPointsViewState extends State<RewardPointsView> with SingleTickerPr
         ),
 
         // List
-        Expanded(
-          child: filtered.isEmpty
-              ? const Center(
-                  child: Text('No customers found matching search filter.', style: TextStyle(color: Colors.grey)))
-              : ListView.separated(
-                  padding: const EdgeInsets.only(bottom: 24),
-                  itemCount: filtered.length,
-                  separatorBuilder: (context, index) => const Divider(height: 1),
-                  itemBuilder: (context, index) {
-                    final customer = filtered[index];
-                    return ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                      leading: CircleAvatar(
-                        backgroundColor: AppColors.secondaryBlue.withValues(alpha: 0.05),
-                        child: const Icon(Icons.person_rounded, color: AppColors.secondaryBlue),
-                      ),
-                      title: Text(customer.fullName, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
-                      subtitle: Text(customer.email, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: AppColors.primaryOrange.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.stars_rounded, color: AppColors.primaryOrange, size: 14),
-                                const SizedBox(width: 6),
-                                Text(
-                                  '${customer.rewardPoints} Points',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.primaryOrange,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          OutlinedButton.icon(
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: AppColors.secondaryBlue),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
-                            icon: const Icon(Icons.edit_note, size: 14, color: AppColors.secondaryBlue),
-                            label: const Text('Adjust', style: TextStyle(fontSize: 11, color: AppColors.secondaryBlue, fontWeight: FontWeight.bold)),
-                            onPressed: () => _showAdjustmentDialog(customer),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
+        filtered.isEmpty
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32.0),
+                  child: Text('No customers found matching search filter.', style: TextStyle(color: textSecondary)),
                 ),
-        ),
+              )
+            : ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(bottom: 24),
+                itemCount: filtered.length,
+                separatorBuilder: (context, index) => Divider(height: 1, color: borderColor),
+                itemBuilder: (context, index) {
+                  final customer = filtered[index];
+                  return ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    leading: CircleAvatar(
+                      backgroundColor: AppColors.secondaryBlue.withValues(alpha: isDark ? 0.2 : 0.05),
+                      child: Icon(Icons.person_rounded, color: textPrimary),
+                    ),
+                    title: Text(customer.fullName, style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary)),
+                    subtitle: Text(customer.email, style: TextStyle(fontSize: 12, color: textSecondary)),
+                    trailing: Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 12,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryOrange.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.stars_rounded, color: AppColors.primaryOrange, size: 14),
+                              const SizedBox(width: 6),
+                              Text(
+                                '${customer.rewardPoints} Points',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primaryOrange,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: textSecondary),
+                            foregroundColor: textPrimary,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          icon: Icon(Icons.edit_note, size: 14, color: textPrimary),
+                          label: Text('Adjust', style: TextStyle(fontSize: 11, color: textPrimary, fontWeight: FontWeight.bold)),
+                          onPressed: () => _showAdjustmentDialog(customer),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
       ],
     );
   }
 
-  Widget _buildLedgerTab(List<Map<String, dynamic>> txs) {
+  Widget _buildLedgerTab(List<Map<String, dynamic>> txs, {
+    required bool isDark,
+    required Color cardColor,
+    required Color textPrimary,
+    required Color textSecondary,
+    required Color borderColor,
+  }) {
     if (txs.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.stars_rounded, size: 56, color: Colors.grey[200]),
-            const SizedBox(height: 12),
-            const Text('No transactions recorded in system', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.stars_rounded, size: 56, color: textSecondary.withValues(alpha: 0.3)),
+              const SizedBox(height: 12),
+              Text('No transactions recorded in system', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary)),
+            ],
+          ),
         ),
       );
     }
 
     return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.all(20),
       itemCount: txs.length,
-      separatorBuilder: (context, index) => const Divider(height: 1),
+      separatorBuilder: (context, index) => Divider(height: 1, color: borderColor),
       itemBuilder: (context, index) {
         final tx = txs[index];
         final String userId = tx['userId'] ?? '';
@@ -519,7 +574,7 @@ class _RewardPointsViewState extends State<RewardPointsView> with SingleTickerPr
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: itemColor.withValues(alpha: 0.1),
+                  color: itemColor.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(itemIcon, color: itemColor, size: 18),
@@ -531,16 +586,16 @@ class _RewardPointsViewState extends State<RewardPointsView> with SingleTickerPr
                   children: [
                     Text(
                       labelText,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.secondaryBlue),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: textPrimary),
                     ),
                     const SizedBox(height: 2),
-                    Text(userDisplay, style: TextStyle(color: Colors.grey[600], fontSize: 11, fontWeight: FontWeight.bold)),
+                    Text(userDisplay, style: TextStyle(color: textSecondary, fontSize: 11, fontWeight: FontWeight.bold)),
                     if (bookingId.isNotEmpty)
-                      Text('Booking ID: #${bookingId.toUpperCase()}', style: const TextStyle(color: Colors.grey, fontSize: 10)),
+                      Text('Booking ID: #${bookingId.toUpperCase()}', style: TextStyle(color: textSecondary, fontSize: 10)),
                     if (reason.isNotEmpty)
-                      Text('Reason: $reason', style: const TextStyle(color: Colors.grey, fontSize: 10, fontStyle: FontStyle.italic)),
+                      Text('Reason: $reason', style: TextStyle(color: textSecondary, fontSize: 10, fontStyle: FontStyle.italic)),
                     const SizedBox(height: 4),
-                    Text(formattedDate, style: TextStyle(color: Colors.grey[400], fontSize: 9)),
+                    Text(formattedDate, style: TextStyle(color: textSecondary.withValues(alpha: 0.7), fontSize: 9)),
                   ],
                 ),
               ),
@@ -556,7 +611,7 @@ class _RewardPointsViewState extends State<RewardPointsView> with SingleTickerPr
                     ),
                   ),
                   const SizedBox(height: 2),
-                  Text('Balance: $balanceAfter', style: TextStyle(color: Colors.grey[500], fontSize: 10)),
+                  Text('Balance: $balanceAfter', style: TextStyle(color: textSecondary, fontSize: 10)),
                 ],
               ),
             ],
@@ -571,16 +626,21 @@ class _RewardPointsViewState extends State<RewardPointsView> with SingleTickerPr
     required String value,
     required IconData icon,
     required Color color,
+    required bool isDark,
+    required Color cardColor,
+    required Color textPrimary,
+    required Color textSecondary,
+    required Color borderColor,
   }) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!),
-        boxShadow: [
+        border: Border.all(color: borderColor),
+        boxShadow: isDark ? [] : [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.01),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -589,24 +649,29 @@ class _RewardPointsViewState extends State<RewardPointsView> with SingleTickerPr
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title.toUpperCase(),
-                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 0.5),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                value,
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue),
-              ),
-            ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title.toUpperCase(),
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: textSecondary, letterSpacing: 0.5),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  value,
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textPrimary),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
           ),
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
+              color: color.withValues(alpha: isDark ? 0.2 : 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: color, size: 24),

@@ -5,6 +5,7 @@ import '../models/booking_model.dart';
 import 'notification_service.dart';
 import 'vehicle_service.dart';
 import 'reward_service.dart';
+import 'receipt_service.dart';
 
 class BookingService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref().child('bookings');
@@ -243,6 +244,13 @@ class BookingService {
           await RewardPointsService().awardPointsForBooking(bookingId);
         } catch (rewardErr) {
           debugPrint('[BookingService] Warning: reward points award failed: $rewardErr');
+        }
+
+        // Trigger automatic receipt check & storage creation
+        try {
+          await ReceiptService().triggerAutomaticReceiptCheck(bookingId);
+        } catch (receiptErr) {
+          debugPrint('[BookingService] Warning: receipt check failed: $receiptErr');
         }
       } else if (statusLower == 'cancelled') {
         title = 'Booking Cancelled';

@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:web/web.dart' as web;
 
 void downloadFile(Uint8List bytes, String fileName) {
-  final blob = web.Blob([bytes.toJS].toJS);
+  final blob = web.Blob([bytes.toJS].toJS, web.BlobPropertyBag(type: 'application/pdf'));
   final url = web.URL.createObjectURL(blob);
   final anchor = web.document.createElement('a') as web.HTMLAnchorElement;
   anchor.href = url;
@@ -14,5 +14,11 @@ void downloadFile(Uint8List bytes, String fileName) {
 }
 
 void openUrl(String url) {
+  web.window.open(url, '_blank');
+}
+
+void viewPdfInNewTab(Uint8List bytes, String fileName) {
+  final blob = web.Blob([bytes.toJS].toJS, web.BlobPropertyBag(type: 'application/pdf'));
+  final url = web.URL.createObjectURL(blob);
   web.window.open(url, '_blank');
 }

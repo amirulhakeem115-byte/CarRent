@@ -5,6 +5,9 @@ import '../../../models/booking_model.dart';
 import '../../../models/vehicle_model.dart';
 import 'customer_responsive_shell.dart';
 import '../../../widgets/app_image.dart';
+import '../../../services/receipt_service.dart';
+import '../../../services/company_settings_provider.dart';
+import '../../../widgets/app_logo.dart';
 
 class BookingConfirmationScreen extends StatelessWidget {
   final BookingModel booking;
@@ -24,18 +27,24 @@ class BookingConfirmationScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final double width = MediaQuery.of(context).size.width;
     final bool isDesktop = width > 850;
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final dateTimeFormat = DateFormat('dd MMM yyyy, hh:mm a');
 
     final int days = booking.rentalDays <= 0 ? 1 : booking.rentalDays;
     final int pointsEarned = (booking.totalPrice / 10).floor();
 
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey[600]!;
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final borderTheme = isDark ? const Color(0xFF334155) : AppColors.borderGray.withValues(alpha: 0.8);
+
     return Scaffold(
-      backgroundColor: AppColors.lightGray,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? const Color(0xFF1B2436) : Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.secondaryBlue, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: textPrimary, size: 20),
           onPressed: () {
             final shell = CustomerResponsiveShell.of(context);
             if (shell != null) {
@@ -44,12 +53,12 @@ class BookingConfirmationScreen extends StatelessWidget {
             Navigator.pop(context);
           },
         ),
-        title: const Text(
+        title: Text(
           'Booking Confirmation',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w900,
-            color: AppColors.secondaryBlue,
+            color: textPrimary,
           ),
         ),
       ),
@@ -62,27 +71,15 @@ class BookingConfirmationScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
                 child: Column(
                   children: [
-                    // SUCCESS HEADER
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.green.withValues(alpha: 0.2), width: 4),
-                      ),
-                      child: const Icon(
-                        Icons.check_circle_rounded,
-                        color: Colors.green,
-                        size: 48,
-                      ),
-                    ),
+                    // SUCCESS HEADER WITH MICRO-ANIMATED CHECK
+                    const AnimatedCheckIcon(),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       'Booking Successful!',
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w900,
-                        color: AppColors.secondaryBlue,
+                        color: textPrimary,
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -90,7 +87,7 @@ class BookingConfirmationScreen extends StatelessWidget {
                     Text(
                       'Your vehicle reservation is confirmed and ready.',
                       style: TextStyle(
-                        color: Colors.grey[600],
+                        color: textSecondary,
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
@@ -101,9 +98,9 @@ class BookingConfirmationScreen extends StatelessWidget {
                     // DETAILS CARD
                     Container(
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: cardBg,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppColors.borderGray.withValues(alpha: 0.8)),
+                        border: Border.all(color: borderTheme),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.02),
@@ -140,120 +137,148 @@ class BookingConfirmationScreen extends StatelessWidget {
                                                   fit: BoxFit.cover,
                                                   placeholder: Container(
                                                     height: 180,
-                                                    color: AppColors.lightGray,
+                                                    color: isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
                                                     child: const Icon(Icons.car_rental, size: 60, color: Colors.grey),
                                                   ),
                                                 )
                                               : Container(
                                                   height: 180,
-                                                  color: AppColors.lightGray,
-                                                  child: const Icon(Icons.car_rental, size: 60, color: Colors.grey),
+                                                  width: double.infinity,
+                                                  color: isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
+                                                  child: const Icon(Icons.directions_car, size: 80, color: Colors.grey),
                                                 ),
                                         ),
-                                        const SizedBox(height: 16),
-                                        Text(
-                                          vehicle.brand,
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppColors.primaryOrange,
-                                            letterSpacing: 0.5,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
+                                        const SizedBox(height: 20),
                                         Text(
                                           '${vehicle.brand} ${vehicle.model}',
-                                          style: const TextStyle(
-                                            fontSize: 18,
+                                          style: TextStyle(
+                                            fontSize: 20,
                                             fontWeight: FontWeight.w900,
-                                            color: AppColors.secondaryBlue,
+                                            color: textPrimary,
                                           ),
                                         ),
-                                        const SizedBox(height: 12),
+                                        const SizedBox(height: 8),
                                         Row(
                                           children: [
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                              decoration: BoxDecoration(
-                                                color: Colors.green.withValues(alpha: 0.1),
-                                                borderRadius: BorderRadius.circular(8),
-                                              ),
-                                              child: const Row(
-                                                children: [
-                                                  Icon(Icons.check, color: Colors.green, size: 14),
-                                                  SizedBox(width: 4),
-                                                  Text(
-                                                    'Confirmed',
-                                                    style: TextStyle(
-                                                      color: Colors.green,
-                                                      fontSize: 11,
-                                                      fontWeight: FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                ],
+                                            const Icon(Icons.tag_rounded, size: 14, color: AppColors.primaryOrange),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              vehicle.plateNumber.toUpperCase(),
+                                              style: TextStyle(
+                                                color: textSecondary,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13,
+                                                letterSpacing: 0.5,
                                               ),
                                             ),
-                                            const SizedBox(width: 8),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                              decoration: BoxDecoration(
-                                                color: AppColors.lightGray,
-                                                borderRadius: BorderRadius.circular(8),
-                                                border: Border.all(color: AppColors.borderGray),
-                                              ),
-                                              child: Text(
-                                                vehicle.transmission,
-                                                style: const TextStyle(
-                                                  color: AppColors.secondaryBlue,
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              ),
+                                            const SizedBox(width: 16),
+                                            const Icon(Icons.color_lens_outlined, size: 14, color: Colors.grey),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              vehicle.color,
+                                              style: TextStyle(color: textSecondary, fontSize: 13),
                                             ),
                                           ],
                                         ),
+                                        const SizedBox(height: 16),
+                                        const Divider(color: Colors.white10),
+                                        const SizedBox(height: 16),
+                                        _infoBlock(Icons.my_location, 'Pick Up & Return Hub', vehicle.branchName.isNotEmpty ? vehicle.branchName : 'HQ Central Branch', isDark),
                                       ],
                                     ),
                                   ),
-
-                                  if (isDesktop) const SizedBox(width: 40) else const SizedBox(height: 32),
-
-                                  // RIGHT PANEL - Invoice details
+                                  if (isDesktop) ...[
+                                    const SizedBox(width: 40),
+                                    Container(width: 1, height: 320, color: isDark ? const Color(0xFF334155) : AppColors.borderGray),
+                                    const SizedBox(width: 40),
+                                  ] else ...[
+                                    const SizedBox(height: 24),
+                                    const Divider(),
+                                    const SizedBox(height: 24),
+                                  ],
+                                  // RIGHT PANEL - Booking & Payment Info
                                   Expanded(
                                     flex: isDesktop ? 6 : 0,
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        const Text(
-                                          'RENTAL DETAILS',
+                                        Text(
+                                          'RESERVATION DETAILS',
                                           style: TextStyle(
                                             fontSize: 11,
-                                            fontWeight: FontWeight.w800,
-                                            color: AppColors.lightText,
-                                            letterSpacing: 0.8,
+                                            fontWeight: FontWeight.bold,
+                                            color: textSecondary,
+                                            letterSpacing: 0.5,
                                           ),
                                         ),
                                         const SizedBox(height: 16),
-                                        _buildInvoiceRow('Booking ID', booking.id, isCode: true),
-                                        _buildInvoiceRow('Pickup Location', vehicle.branchName.isNotEmpty ? vehicle.branchName : 'Main Corporate Hub'),
-                                        _buildInvoiceRow('Pickup Date & Time', dateTimeFormat.format(booking.pickUpDate)),
-                                        _buildInvoiceRow('Return Date & Time', dateTimeFormat.format(booking.returnDate)),
-                                        _buildInvoiceRow('Rental Duration', '$days Day${days == 1 ? "" : "s"}'),
-                                        _buildInvoiceRow('Payment Method', paymentMethod),
-                                        _buildInvoiceRow('Payment Status', paymentStatus, highlightValue: true),
-                                        const Divider(height: 24),
-                                        _buildInvoiceRow(
-                                          'Total Amount Paid',
-                                          'RM ${booking.totalPrice.toStringAsFixed(2)}',
-                                          isPrice: true,
+                                        _detailRow('Booking Reference', booking.id.toUpperCase(), isDark, isCode: true),
+                                        _detailRow('Status', booking.status, isDark, highlightValue: true),
+                                        _detailRow('Check-in Date', dateTimeFormat.format(booking.pickUpDate), isDark),
+                                        _detailRow('Check-out Date', dateTimeFormat.format(booking.returnDate), isDark),
+                                        _detailRow('Rental Duration', '$days Day${days == 1 ? '' : 's'}', isDark),
+                                        const SizedBox(height: 16),
+                                        const Divider(color: Colors.white10),
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          'PAYMENT SUMMARY',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: textSecondary,
+                                            letterSpacing: 0.5,
+                                          ),
                                         ),
-                                        _buildInvoiceRow(
-                                          'Loyalty Points Earned',
-                                          '+$pointsEarned Points',
-                                          isPoints: true,
-                                        ),
+                                        const SizedBox(height: 16),
+                                        _detailRow('Payment Method', paymentMethod, isDark),
+                                        _detailRow('Points Redeemed', '${booking.pointsRedeemed} Points', isDark, isPoints: booking.pointsRedeemed > 0),
+                                        _detailRow('Total Rent Price', 'RM ${booking.totalPrice.toStringAsFixed(2)}', isDark, isPrice: true),
+                                        if (booking.depositAmount > 0)
+                                          _detailRow('Deposit Paid', 'RM ${booking.depositAmount.toStringAsFixed(2)}', isDark, highlightValue: true),
                                       ],
                                     ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Action Panel at bottom of details card
+                            Container(
+                              color: isDark ? const Color(0xFF0F172A) : AppColors.lightGray.withValues(alpha: 0.5),
+                              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                              child: Flex(
+                                direction: isDesktop ? Axis.horizontal : Axis.vertical,
+                                children: [
+                                  const Icon(Icons.stars_rounded, color: Colors.amber, size: 24),
+                                  const SizedBox(width: 12, height: 8),
+                                  Expanded(
+                                    child: RichText(
+                                      textAlign: isDesktop ? TextAlign.start : TextAlign.center,
+                                      text: TextSpan(
+                                        style: TextStyle(color: isDark ? const Color(0xFFCBD5E1) : AppColors.secondaryBlue, fontSize: 13, height: 1.4),
+                                        children: [
+                                          const TextSpan(text: 'Congratulations! You earned '),
+                                          TextSpan(
+                                            text: '$pointsEarned loyalty points',
+                                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                                          ),
+                                          const TextSpan(text: ' from this reservation transaction.'),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  if (!isDesktop) const SizedBox(height: 16),
+                                  OutlinedButton.icon(
+                                    style: OutlinedButton.styleFrom(
+                                      side: const BorderSide(color: AppColors.primaryOrange),
+                                      foregroundColor: AppColors.primaryOrange,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    ),
+                                    onPressed: () {
+                                      ReceiptService().viewReceipt(context, booking.id);
+                                    },
+                                    icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                                    label: const Text('Digital Invoice', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                                   ),
                                 ],
                               ),
@@ -262,115 +287,106 @@ class BookingConfirmationScreen extends StatelessWidget {
                         ),
                       ),
                     ),
+                    const SizedBox(height: 32),
 
-                    const SizedBox(height: 40),
-
-                    // ACTIONS CARD
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppColors.borderGray.withValues(alpha: 0.8)),
-                      ),
-                      child: Column(
-                        children: [
-                          const Text(
-                            'What would you like to do next?',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.secondaryBlue,
-                            ),
+                    // ACTION BUTTONS
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryOrange,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
                           ),
-                          const SizedBox(height: 20),
-                          Flex(
-                            direction: isDesktop ? Axis.horizontal : Axis.vertical,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primaryOrange,
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                                  elevation: 0,
-                                ),
-                                onPressed: () {
-                                  final shell = CustomerResponsiveShell.of(context);
-                                  if (shell != null) {
-                                    shell.setIndex(2); // Switches to My Bookings tab
-                                  }
-                                  Navigator.pop(context);
-                                },
-                                icon: const Icon(Icons.receipt_long_rounded, size: 18),
-                                label: const Text('View My Booking', style: TextStyle(fontWeight: FontWeight.bold)),
-                              ),
-                              if (isDesktop) const SizedBox(width: 16) else const SizedBox(height: 12),
-                              OutlinedButton.icon(
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppColors.secondaryBlue,
-                                  side: const BorderSide(color: AppColors.borderGray, width: 1.5),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                                ),
-                                onPressed: () {
-                                  final shell = CustomerResponsiveShell.of(context);
-                                  if (shell != null) {
-                                    shell.setIndex(1); // Switches to Search Cars tab
-                                  }
-                                  Navigator.pop(context);
-                                },
-                                icon: const Icon(Icons.directions_car_rounded, size: 18),
-                                label: const Text('Browse More Cars', style: TextStyle(fontWeight: FontWeight.bold)),
-                              ),
-                              if (isDesktop) const SizedBox(width: 16) else const SizedBox(height: 12),
-                              TextButton.icon(
-                                style: TextButton.styleFrom(
-                                  foregroundColor: AppColors.lightText,
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                                ),
-                                onPressed: () {
-                                  final shell = CustomerResponsiveShell.of(context);
-                                  if (shell != null) {
-                                    shell.setIndex(0); // Switches to Dashboard
-                                  }
-                                  Navigator.pop(context);
-                                },
-                                icon: const Icon(Icons.dashboard_rounded, size: 18),
-                                label: const Text('Return to Dashboard', style: TextStyle(fontWeight: FontWeight.bold)),
-                              ),
-                            ],
+                          onPressed: () {
+                            final shell = CustomerResponsiveShell.of(context);
+                            if (shell != null) {
+                              shell.setIndex(0);
+                            }
+                            Navigator.pop(context);
+                          },
+                          icon: const Icon(Icons.home_outlined),
+                          label: const Text('Return Home', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        ),
+                        const SizedBox(width: 16),
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: textPrimary),
+                            foregroundColor: textPrimary,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
-                        ],
-                      ),
+                          onPressed: () {
+                            final shell = CustomerResponsiveShell.of(context);
+                            if (shell != null) {
+                              shell.setIndex(2); // Index of "My Bookings"
+                            }
+                            Navigator.pop(context);
+                          },
+                          icon: const Icon(Icons.calendar_month_outlined),
+                          label: const Text('My Bookings', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
             ),
-            _buildFooter(isDesktop),
+            _buildFooter(isDesktop, isDark),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildInvoiceRow(
-    String label,
-    String value, {
-    bool isCode = false,
-    bool isPrice = false,
-    bool isPoints = false,
-    bool highlightValue = false,
-  }) {
-    TextStyle valueStyle = const TextStyle(
+  Widget _infoBlock(IconData icon, String label, String value, bool isDark) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppColors.primaryOrange.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: AppColors.primaryOrange, size: 16),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _detailRow(String label, String value, bool isDark, {bool isCode = false, bool isPrice = false, bool isPoints = false, bool highlightValue = false}) {
+    TextStyle valueStyle = TextStyle(
       fontWeight: FontWeight.w700,
-      color: AppColors.secondaryBlue,
+      color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
       fontSize: 13,
     );
 
@@ -378,7 +394,7 @@ class BookingConfirmationScreen extends StatelessWidget {
       valueStyle = TextStyle(
         fontFamily: 'monospace',
         fontWeight: FontWeight.bold,
-        color: AppColors.secondaryBlue.withValues(alpha: 0.8),
+        color: isDark ? const Color(0xFFCBD5E1) : AppColors.secondaryBlue.withValues(alpha: 0.8),
         fontSize: 12,
       );
     } else if (isPrice) {
@@ -408,9 +424,9 @@ class BookingConfirmationScreen extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
-              color: AppColors.lightText,
+              color: isDark ? const Color(0xFF94A3B8) : AppColors.lightText,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -431,9 +447,9 @@ class BookingConfirmationScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildFooter(bool isDesktop) {
+  Widget _buildFooter(bool isDesktop, bool isDark) {
     return Container(
-      color: const Color(0xFFFFFBEB),
+      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFFFFBEB),
       padding: EdgeInsets.symmetric(
         horizontal: isDesktop ? 60.0 : 20.0,
         vertical: 40.0,
@@ -448,18 +464,25 @@ class BookingConfirmationScreen extends StatelessWidget {
               Column(
                 crossAxisAlignment: isDesktop ? CrossAxisAlignment.start : CrossAxisAlignment.center,
                 children: [
-                  const Text(
-                    'CARRENT PLATFORM',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.secondaryBlue,
-                      fontSize: 14,
-                      letterSpacing: 1,
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AppLogo(size: 16, fallbackColor: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue),
+                      const SizedBox(width: 8),
+                      Text(
+                        CompanySettingsProvider().companyName.toUpperCase(),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
+                          fontSize: 14,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '© 2026 CARRENT PLATFORM. ALL RIGHTS RESERVED.',
+                    '© 2026 ${CompanySettingsProvider().companyName.toUpperCase()}. ALL RIGHTS RESERVED.',
                     style: TextStyle(color: Colors.grey[500], fontSize: 11),
                   ),
                 ],
@@ -493,6 +516,58 @@ class BookingConfirmationScreen extends StatelessWidget {
           color: Colors.grey[600],
           fontSize: 12,
           fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+class AnimatedCheckIcon extends StatefulWidget {
+  const AnimatedCheckIcon({super.key});
+
+  @override
+  State<AnimatedCheckIcon> createState() => _AnimatedCheckIconState();
+}
+
+class _AnimatedCheckIconState extends State<AnimatedCheckIcon> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _scaleAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.elasticOut,
+    );
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaleTransition(
+      scale: _scaleAnimation,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.green.withValues(alpha: 0.1),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.green.withValues(alpha: 0.2), width: 4),
+        ),
+        child: const Icon(
+          Icons.check_circle_rounded,
+          color: Colors.green,
+          size: 48,
         ),
       ),
     );

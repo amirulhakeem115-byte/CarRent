@@ -28,6 +28,10 @@ class CustomerHomeScreen extends StatefulWidget {
 }
 
 class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _textColor => _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+  Color get _subColor => _isDark ? const Color(0xFFCBD5E1) : AppColors.lightText;
+
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
   final VehicleService _vehicleService = VehicleService();
@@ -566,9 +570,13 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.borderGray),
+        border: Border.all(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? const Color(0xFF334155)
+              : AppColors.borderGray,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -594,10 +602,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     child: const Icon(Icons.payment_rounded, color: AppColors.primaryOrange, size: 16),
                   ),
                   const SizedBox(width: 8),
-                  const Text(
+                  Text(
                     'LAST PAYMENT SUMMARY',
                     style: TextStyle(
-                      color: AppColors.secondaryBlue,
+                      color: _textColor,
                       fontSize: 11,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 0.5,
@@ -624,7 +632,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             ],
           ),
           const SizedBox(height: 14),
-          const Divider(height: 1, color: AppColors.borderGray),
+          Divider(height: 1, color: _isDark ? const Color(0xFF334155) : AppColors.borderGray),
           const SizedBox(height: 14),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -634,10 +642,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 children: [
                   Text(
                     vehicleName,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
-                      color: AppColors.secondaryBlue,
+                      color: _textColor,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -645,9 +653,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     children: [
                       Text(
                         '${DateFormat('dd MMM yyyy').format(lastPayment.paymentDate)} at ${lastPayment.paymentTime ?? DateFormat('HH:mm:ss').format(lastPayment.paymentDate)}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
-                          color: AppColors.lightText,
+                          color: _subColor,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -662,9 +670,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                       const SizedBox(width: 8),
                       Text(
                         lastPayment.paymentMethod,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
-                          color: AppColors.lightText,
+                          color: _subColor,
                         ),
                       ),
                     ],
@@ -695,7 +703,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -719,17 +727,17 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           const SizedBox(height: 10),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w900,
               fontSize: 16,
-              color: AppColors.secondaryBlue,
+              color: _textColor,
             ),
           ),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 10,
-              color: AppColors.lightText,
+              color: _subColor,
             ),
           ),
         ],
@@ -768,12 +776,12 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Quick Actions',
           style: TextStyle(
             fontWeight: FontWeight.w800,
             fontSize: 16,
-            color: AppColors.secondaryBlue,
+            color: _textColor,
           ),
         ),
         const SizedBox(height: 14),
@@ -799,8 +807,13 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xFF334155)
+                : AppColors.borderGray,
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.04),
@@ -826,10 +839,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
-                color: AppColors.secondaryBlue,
+                color: _textColor,
               ),
             ),
           ],
@@ -842,12 +855,12 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Active Journey',
           style: TextStyle(
             fontWeight: FontWeight.w800,
             fontSize: 16,
-            color: AppColors.secondaryBlue,
+            color: _textColor,
           ),
         ),
         const SizedBox(height: 14),
@@ -856,9 +869,13 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.borderGray),
+              border: Border.all(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? const Color(0xFF334155)
+                    : AppColors.borderGray,
+              ),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.04),
@@ -872,27 +889,27 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppColors.lightGray,
+                    color: _isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.directions_car_outlined,
-                      color: AppColors.borderGray, size: 36),
+                  child: Icon(Icons.directions_car_outlined,
+                      color: _isDark ? const Color(0xFF334155) : AppColors.borderGray, size: 36),
                 ),
                 const SizedBox(height: 14),
-                const Text(
+                Text(
                   'No Active Booking',
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 15,
-                    color: AppColors.secondaryBlue,
+                    color: _textColor,
                   ),
                 ),
                 const SizedBox(height: 6),
-                const Text(
+                Text(
                   'Browse our premium fleet and book your next ride.',
                   textAlign: TextAlign.center,
                   style:
-                      TextStyle(fontSize: 12, color: AppColors.lightText),
+                      TextStyle(fontSize: 12, color: _subColor),
                 ),
                 const SizedBox(height: 18),
                 ElevatedButton(
@@ -1121,12 +1138,12 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
+            Text(
               'Available Cars',
               style: TextStyle(
                 fontWeight: FontWeight.w800,
                 fontSize: 16,
-                color: AppColors.secondaryBlue,
+                color: _textColor,
               ),
             ),
             TextButton(
@@ -1186,8 +1203,13 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
       child: Container(
         width: 170,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xFF334155)
+                : AppColors.borderGray,
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.06),
@@ -1238,18 +1260,18 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     '${vehicle.brand} ${vehicle.model}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.w800,
                       fontSize: 13,
-                      color: AppColors.secondaryBlue,
+                      color: _textColor,
                     ),
                   ),
                   const SizedBox(height: 3),
                   Text(
                     vehicle.category,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 10,
-                      color: AppColors.lightText,
+                      color: _subColor,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -1300,12 +1322,12 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
+            Text(
               'Recent Payments',
               style: TextStyle(
                 fontWeight: FontWeight.w800,
                 fontSize: 16,
-                color: AppColors.secondaryBlue,
+                color: _textColor,
               ),
             ),
             TextButton(
@@ -1364,11 +1386,16 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     }
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? const Color(0xFF334155)
+              : AppColors.borderGray,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -1395,16 +1422,16 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
               children: [
                 Text(
                   payment.paymentMethod.toUpperCase(),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
-                    color: AppColors.secondaryBlue,
+                    color: _textColor,
                   ),
                 ),
                 Text(
                   DateFormat('dd MMM yyyy').format(payment.paymentDate),
-                  style: const TextStyle(
-                      fontSize: 10, color: AppColors.lightText),
+                  style: TextStyle(
+                      fontSize: 10, color: _subColor),
                 ),
               ],
             ),
@@ -1414,10 +1441,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             children: [
               Text(
                 'RM ${payment.amount.toStringAsFixed(2)}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.w900,
                   fontSize: 14,
-                  color: AppColors.secondaryBlue,
+                  color: _textColor,
                 ),
               ),
               Container(

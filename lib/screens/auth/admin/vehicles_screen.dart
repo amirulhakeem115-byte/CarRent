@@ -168,263 +168,207 @@ class _VehiclesViewState extends State<VehiclesView> {
 
     final double width = MediaQuery.of(context).size.width;
     final bool isDesktop = width > 1100;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final surfaceColor = isDark ? const Color(0xFF111827) : const Color(0xFFF1F5F9);
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
+    final borderColor = isDark ? const Color(0xFF334155) : Colors.grey.shade200;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Title Header row
-            isDesktop
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Title Header row
+          isDesktop
+              ? Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Fleet Inventory', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textPrimary)),
+                          Text('Manage vehicle assets, pricing models, and branch allocations.', style: TextStyle(fontSize: 12, color: textSecondary)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    _buildAddVehicleButton(),
+                  ],
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Fleet Inventory', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textPrimary)),
+                        Text('Manage vehicle assets, pricing models, and branch allocations.', style: TextStyle(fontSize: 12, color: textSecondary)),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    _buildAddVehicleButton(),
+                  ],
+                ),
+          const SizedBox(height: 24),
+
+          // Statistics Grid
+          GridView.count(
+            crossAxisCount: isDesktop ? 4 : 2,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            shrinkWrap: true,
+            childAspectRatio: isDesktop ? 2.2 : 1.5,
+            physics: const NeverScrollableScrollPhysics(),
+            children: [
+              _buildStatCard('Total Vehicles', totalVehicles.toString(), Icons.directions_car, Colors.indigo, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+              _buildStatCard('Available Units', availableVehicles.toString(), Icons.check_circle_outline, Colors.green, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+              _buildStatCard('Rented / Active Booked', rentedVehicles.toString(), Icons.car_rental, Colors.orange, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+              _buildStatCard('Under Maintenance', maintenanceVehiclesCount.toString(), Icons.build_circle_outlined, Colors.redAccent, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          // Filters & Search Box Container
+          Container(
+            decoration: BoxDecoration(
+              color: cardColor,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: borderColor),
+            ),
+            padding: const EdgeInsets.all(16),
+            child: isDesktop
                 ? Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Fleet Inventory', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue)),
-                            Text('Manage vehicle assets, pricing models, and branch allocations.', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                          ],
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          style: TextStyle(color: textPrimary),
+                          decoration: InputDecoration(
+                            hintText: 'Search by make, model, or plate number...',
+                            hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.7)),
+                            prefixIcon: Icon(Icons.search, size: 20, color: textSecondary),
+                            contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 16),
-                      _buildAddVehicleButton(),
+                      _buildCategoryDropdown(isDark: isDark, cardColor: surfaceColor, textPrimary: textPrimary, borderColor: borderColor),
+                      const SizedBox(width: 12),
+                      _buildStatusDropdown(isDark: isDark, cardColor: surfaceColor, textPrimary: textPrimary, borderColor: borderColor),
                     ],
                   )
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      TextField(
+                        controller: _searchController,
+                        style: TextStyle(color: textPrimary),
+                        decoration: InputDecoration(
+                          hintText: 'Search by make, model, or plate number...',
+                          hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.7)),
+                          prefixIcon: Icon(Icons.search, size: 20, color: textSecondary),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
                         children: [
-                          Text('Fleet Inventory', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue)),
-                          Text('Manage vehicle assets, pricing models, and branch allocations.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                          Expanded(child: _buildCategoryDropdown(isDark: isDark, cardColor: surfaceColor, textPrimary: textPrimary, borderColor: borderColor)),
+                          const SizedBox(width: 12),
+                          Expanded(child: _buildStatusDropdown(isDark: isDark, cardColor: surfaceColor, textPrimary: textPrimary, borderColor: borderColor)),
                         ],
                       ),
-                      const SizedBox(height: 16),
-                      _buildAddVehicleButton(),
                     ],
                   ),
-            const SizedBox(height: 24),
+          ),
+          const SizedBox(height: 16),
 
-            // Statistics Grid
-            GridView.count(
-              crossAxisCount: isDesktop ? 4 : 2,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              shrinkWrap: true,
-              childAspectRatio: isDesktop ? 2.2 : 1.5,
-              physics: const NeverScrollableScrollPhysics(),
-              children: [
-                _buildStatCard('Total Vehicles', totalVehicles.toString(), Icons.directions_car, Colors.indigo),
-                _buildStatCard('Available Units', availableVehicles.toString(), Icons.check_circle_outline, Colors.green),
-                _buildStatCard('Rented / Active Booked', rentedVehicles.toString(), Icons.car_rental, Colors.orange),
-                _buildStatCard('Under Maintenance', maintenanceVehiclesCount.toString(), Icons.build_circle_outlined, Colors.redAccent),
-              ],
-            ),
-            const SizedBox(height: 24),
+          // Vehicles list container
+          filteredVehicles.isEmpty
+              ? Container(
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: cardColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: borderColor),
+                  ),
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.directions_car, size: 64, color: textSecondary),
+                        const SizedBox(height: 16),
+                        Text('No fleet assets found matching filters.', style: TextStyle(color: textSecondary)),
+                      ],
+                    ),
+                  ),
+                )
+              : ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: filteredVehicles.length,
+                  itemBuilder: (context, index) {
+                    final vehicle = filteredVehicles[index];
+                    
+                    Color statusColor = Colors.green;
+                    String statusLabel = 'AVAILABLE';
+                    final statusLower = vehicle.status.toLowerCase();
+                    if (statusLower == 'maintenance') {
+                      statusColor = Colors.redAccent;
+                      statusLabel = 'MAINTENANCE';
+                    } else if (statusLower == 'booked') {
+                      statusColor = Colors.orange;
+                      statusLabel = 'BOOKED';
+                    } else if (statusLower == 'inactive') {
+                      statusColor = Colors.grey;
+                      statusLabel = 'INACTIVE';
+                    }
 
-            // Filters & Search Box Card
-            Card(
-              color: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              elevation: 0,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: isDesktop
-                    ? Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _searchController,
-                              decoration: const InputDecoration(
-                                hintText: 'Search by make, model, or plate number...',
-                                prefixIcon: Icon(Icons.search, size: 20),
-                                contentPadding: EdgeInsets.symmetric(vertical: 8),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          _buildCategoryDropdown(),
-                          const SizedBox(width: 12),
-                          _buildStatusDropdown(),
-                        ],
-                      )
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          TextField(
-                            controller: _searchController,
-                            decoration: const InputDecoration(
-                              hintText: 'Search by make, model, or plate number...',
-                              prefixIcon: Icon(Icons.search, size: 20),
-                              contentPadding: EdgeInsets.symmetric(vertical: 8),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(child: _buildCategoryDropdown()),
-                              const SizedBox(width: 12),
-                              Expanded(child: _buildStatusDropdown()),
-                            ],
-                          ),
-                        ],
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: cardColor,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: borderColor),
                       ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Vehicles list container
-            Expanded(
-              child: filteredVehicles.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.directions_car, size: 64, color: Colors.grey[300]),
-                          const SizedBox(height: 16),
-                          Text('No fleet assets found matching filters.', style: TextStyle(color: Colors.grey[500])),
-                        ],
-                      ),
-                    )
-                  : ListView.builder(
-                      itemCount: filteredVehicles.length,
-                      itemBuilder: (context, index) {
-                        final vehicle = filteredVehicles[index];
-                        
-                        Color statusColor = Colors.green;
-                        String statusLabel = 'AVAILABLE';
-                        final statusLower = vehicle.status.toLowerCase();
-                        if (statusLower == 'maintenance') {
-                          statusColor = Colors.redAccent;
-                          statusLabel = 'MAINTENANCE';
-                        } else if (statusLower == 'booked') {
-                          statusColor = Colors.orange;
-                          statusLabel = 'BOOKED';
-                        } else if (statusLower == 'inactive') {
-                          statusColor = Colors.grey;
-                          statusLabel = 'INACTIVE';
-                        }
-
-                        return Card(
-                          color: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          elevation: 0,
-                          margin: const EdgeInsets.only(bottom: 16),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: isDesktop
-                                ? Row(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(16),
+                      child: isDesktop
+                          ? Row(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: AppImage(
+                                    imageSrc: vehicle.mainImage,
+                                    height: 80,
+                                    width: 110,
+                                    fit: BoxFit.cover,
+                                    placeholder: Container(
+                                      height: 80,
+                                      width: 110,
+                                      color: surfaceColor,
+                                      child: Icon(Icons.directions_car, color: textSecondary),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(12),
-                                        child: AppImage(
-                                          imageSrc: vehicle.mainImage,
-                                          height: 80,
-                                          width: 110,
-                                          fit: BoxFit.cover,
-                                          placeholder: Container(
-                                            height: 80,
-                                            width: 110,
-                                            color: Colors.grey[200],
-                                            child: const Icon(Icons.directions_car, color: Colors.grey),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 16),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              children: [
-                                                Text(
-                                                  '${vehicle.brand} ${vehicle.model}',
-                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.secondaryBlue),
-                                                ),
-                                                const SizedBox(width: 8),
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                                  decoration: BoxDecoration(
-                                                    color: statusColor.withValues(alpha: 0.1),
-                                                    borderRadius: BorderRadius.circular(6),
-                                                  ),
-                                                  child: Text(
-                                                    statusLabel,
-                                                    style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 9),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              'Plate: ${vehicle.plateNumber} | Category: ${vehicle.category} | Hub: ${vehicle.branchName.isNotEmpty ? vehicle.branchName : "General Hub"}',
-                                              style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                                            ),
-                                            const SizedBox(height: 8),
-                                            Row(
-                                              children: [
-                                                Text(
-                                                  'RM ${vehicle.pricePerDay.toStringAsFixed(0)} / day',
-                                                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryOrange, fontSize: 14),
-                                                ),
-                                                const SizedBox(width: 24),
-                                                const Text('Change Status:', style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold)),
-                                                const SizedBox(width: 8),
-                                                _buildChangeStatusDropdown(vehicle),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      Column(
-                                        children: [
-                                          IconButton(
-                                            icon: const Icon(Icons.edit_outlined, color: Colors.indigo, size: 20),
-                                            onPressed: () => _showAddEditVehicleDialog(vehicle: vehicle),
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
-                                            onPressed: () => _deleteVehicle(vehicle.id),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  )
-                                : Column(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                                    children: [
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(12),
-                                        child: AppImage(
-                                          imageSrc: vehicle.mainImage,
-                                          height: 150,
-                                          width: double.infinity,
-                                          fit: BoxFit.cover,
-                                          placeholder: Container(
-                                            height: 150,
-                                            width: double.infinity,
-                                            color: Colors.grey[200],
-                                            child: const Icon(Icons.directions_car, color: Colors.grey),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 12),
                                       Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
                                           Text(
                                             '${vehicle.brand} ${vehicle.model}',
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.secondaryBlue),
+                                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textPrimary),
                                           ),
+                                          const SizedBox(width: 8),
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                             decoration: BoxDecoration(
-                                              color: statusColor.withValues(alpha: 0.1),
+                                              color: statusColor.withValues(alpha: 0.15),
                                               borderRadius: BorderRadius.circular(6),
                                             ),
                                             child: Text(
@@ -436,48 +380,119 @@ class _VehiclesViewState extends State<VehiclesView> {
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        'Plate: ${vehicle.plateNumber} | Category: ${vehicle.category}\nHub: ${vehicle.branchName.isNotEmpty ? vehicle.branchName : "General Hub"}',
-                                        style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                                        'Plate: ${vehicle.plateNumber} | Category: ${vehicle.category} | Hub: ${vehicle.branchName.isNotEmpty ? vehicle.branchName : "General Hub"}',
+                                        style: TextStyle(color: textSecondary, fontSize: 12),
                                       ),
                                       const SizedBox(height: 8),
-                                      Text(
-                                        'RM ${vehicle.pricePerDay.toStringAsFixed(0)} / day',
-                                        style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryOrange, fontSize: 15),
-                                      ),
-                                      const Divider(height: 20),
                                       Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
-                                          Row(
-                                            children: [
-                                              const Text('Status:', style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold)),
-                                              const SizedBox(width: 8),
-                                              _buildChangeStatusDropdown(vehicle),
-                                            ],
+                                          Text(
+                                            'RM ${vehicle.pricePerDay.toStringAsFixed(0)} / day',
+                                            style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryOrange, fontSize: 14),
                                           ),
-                                          Row(
-                                            children: [
-                                              IconButton(
-                                                icon: const Icon(Icons.edit_outlined, color: Colors.indigo, size: 20),
-                                                onPressed: () => _showAddEditVehicleDialog(vehicle: vehicle),
-                                              ),
-                                              IconButton(
-                                                icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
-                                                onPressed: () => _deleteVehicle(vehicle.id),
-                                              ),
-                                            ],
-                                          ),
+                                          const SizedBox(width: 24),
+                                          Text('Change Status:', style: TextStyle(fontSize: 11, color: textSecondary, fontWeight: FontWeight.bold)),
+                                          const SizedBox(width: 8),
+                                          _buildChangeStatusDropdown(vehicle, isDark: isDark, cardColor: surfaceColor, textPrimary: textPrimary, borderColor: borderColor),
                                         ],
                                       ),
                                     ],
                                   ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
+                                ),
+                                Column(
+                                  children: [
+                                    IconButton(
+                                      icon: Icon(Icons.edit_outlined, color: textPrimary, size: 20),
+                                      onPressed: () => _showAddEditVehicleDialog(vehicle: vehicle),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+                                      onPressed: () => _deleteVehicle(vehicle.id),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            )
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: AppImage(
+                                    imageSrc: vehicle.mainImage,
+                                    height: 150,
+                                    width: double.infinity,
+                                    fit: BoxFit.cover,
+                                    placeholder: Container(
+                                      height: 150,
+                                      width: double.infinity,
+                                      color: surfaceColor,
+                                      child: Icon(Icons.directions_car, color: textSecondary),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      '${vehicle.brand} ${vehicle.model}',
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textPrimary),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: statusColor.withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        statusLabel,
+                                        style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 9),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Plate: ${vehicle.plateNumber} | Category: ${vehicle.category}\nHub: ${vehicle.branchName.isNotEmpty ? vehicle.branchName : "General Hub"}',
+                                  style: TextStyle(color: textSecondary, fontSize: 12),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'RM ${vehicle.pricePerDay.toStringAsFixed(0)} / day',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryOrange, fontSize: 15),
+                                ),
+                                Divider(height: 20, color: borderColor),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text('Status:', style: TextStyle(fontSize: 11, color: textSecondary, fontWeight: FontWeight.bold)),
+                                        const SizedBox(width: 8),
+                                        _buildChangeStatusDropdown(vehicle, isDark: isDark, cardColor: surfaceColor, textPrimary: textPrimary, borderColor: borderColor),
+                                      ],
+                                    ),
+                                    Row(
+                                      children: [
+                                        IconButton(
+                                          icon: Icon(Icons.edit_outlined, color: textPrimary, size: 20),
+                                          onPressed: () => _showAddEditVehicleDialog(vehicle: vehicle),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+                                          onPressed: () => _deleteVehicle(vehicle.id),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                    );
+                  },
+                ),
+        ],
       ),
     );
   }
@@ -496,18 +511,21 @@ class _VehiclesViewState extends State<VehiclesView> {
     );
   }
 
-  Widget _buildCategoryDropdown() {
+  Widget _buildCategoryDropdown({required bool isDark, required Color cardColor, required Color textPrimary, required Color borderColor}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: cardColor,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor),
       ),
       child: DropdownButton<String>(
         value: _categoryFilter,
         underline: const SizedBox(),
+        dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        style: TextStyle(color: textPrimary, fontWeight: FontWeight.bold, fontSize: 13),
         items: ['All', 'Economy', 'Sedan', 'SUV', 'MPV'].map((s) {
-          return DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)));
+          return DropdownMenuItem(value: s, child: Text(s));
         }).toList(),
         onChanged: (val) {
           if (val != null) {
@@ -520,18 +538,21 @@ class _VehiclesViewState extends State<VehiclesView> {
     );
   }
 
-  Widget _buildStatusDropdown() {
+  Widget _buildStatusDropdown({required bool isDark, required Color cardColor, required Color textPrimary, required Color borderColor}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: cardColor,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor),
       ),
       child: DropdownButton<String>(
         value: _statusFilter,
         underline: const SizedBox(),
+        dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        style: TextStyle(color: textPrimary, fontWeight: FontWeight.bold, fontSize: 13),
         items: ['All', 'Available', 'Booked', 'Maintenance', 'Inactive'].map((s) {
-          return DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)));
+          return DropdownMenuItem(value: s, child: Text(s));
         }).toList(),
         onChanged: (val) {
           if (val != null) {
@@ -544,14 +565,14 @@ class _VehiclesViewState extends State<VehiclesView> {
     );
   }
 
-  Widget _buildChangeStatusDropdown(VehicleModel vehicle) {
+  Widget _buildChangeStatusDropdown(VehicleModel vehicle, {required bool isDark, required Color cardColor, required Color textPrimary, required Color borderColor}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8),
       height: 32,
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: cardColor,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[300]!),
+        border: Border.all(color: borderColor),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
@@ -559,7 +580,8 @@ class _VehiclesViewState extends State<VehiclesView> {
               ? vehicle.status
               : 'Available',
           icon: const Icon(Icons.arrow_drop_down, size: 16),
-          style: const TextStyle(fontSize: 11, color: Colors.black, fontWeight: FontWeight.bold),
+          dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          style: TextStyle(fontSize: 11, color: textPrimary, fontWeight: FontWeight.bold),
           onChanged: (val) async {
             if (val != null) {
               await _vehicleService.updateVehicleStatus(vehicle.id, val);
@@ -577,13 +599,20 @@ class _VehiclesViewState extends State<VehiclesView> {
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
+  Widget _buildStatCard(String label, String value, IconData icon, Color color, {
+    required bool isDark,
+    required Color cardColor,
+    required Color textPrimary,
+    required Color textSecondary,
+    required Color borderColor,
+  }) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
+        border: Border.all(color: borderColor),
+        boxShadow: isDark ? [] : [
           BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4)),
         ],
       ),
@@ -592,7 +621,7 @@ class _VehiclesViewState extends State<VehiclesView> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
+              color: color.withValues(alpha: isDark ? 0.2 : 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: color, size: 24),
@@ -603,9 +632,9 @@ class _VehiclesViewState extends State<VehiclesView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold)),
+                Text(label, style: TextStyle(color: textSecondary, fontSize: 11, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.secondaryBlue)),
+                Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textPrimary)),
               ],
             ),
           ),
@@ -746,8 +775,9 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       title: Text(isEdit ? 'Edit Vehicle Spec' : 'Add New Vehicle', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
-      content: SizedBox(
-        width: 500, // Constrain width properly to avoid hit test / no size errors
+      content: Container(
+        width: MediaQuery.of(context).size.width * 0.9,
+        constraints: const BoxConstraints(maxWidth: 500),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,

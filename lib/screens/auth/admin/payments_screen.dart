@@ -14,6 +14,7 @@ import '../../../services/payment_service.dart';
 import '../../../services/booking_service.dart';
 import '../../../widgets/loading_widget.dart';
 import '../../../services/file_download_helper.dart' if (dart.library.html) '../../../services/file_download_web.dart' as download_helper;
+import '../../../services/company_settings_provider.dart';
 
 class PaymentsView extends StatefulWidget {
   const PaymentsView({super.key});
@@ -243,7 +244,8 @@ class _PaymentsViewState extends State<PaymentsView> {
 
     final fileBytes = excelObj.save();
     if (fileBytes != null) {
-      download_helper.downloadFile(Uint8List.fromList(fileBytes), 'CARRENT_Payments_Report_${DateTime.now().millisecondsSinceEpoch}.xlsx');
+      final companyName = CompanySettingsProvider().companyName.replaceAll(' ', '_');
+      download_helper.downloadFile(Uint8List.fromList(fileBytes), '${companyName}_Payments_Report_${DateTime.now().millisecondsSinceEpoch}.xlsx');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Payments report downloaded in Excel format!'), backgroundColor: Colors.green),
       );
@@ -272,7 +274,7 @@ class _PaymentsViewState extends State<PaymentsView> {
               child: pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text('CARRENT PAYMENTS LEDGER', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 20, color: pdf_lib.PdfColor.fromInt(0xFF1A237E))),
+                  pw.Text('${CompanySettingsProvider().companyName.toUpperCase()} PAYMENTS LEDGER', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 20, color: pdf_lib.PdfColor.fromInt(0xFF1A237E))),
                   pw.Text('Generated: ${DateFormat('dd MMM yyyy').format(DateTime.now())}', style: pw.TextStyle(fontSize: 10)),
                 ],
               ),
@@ -294,7 +296,8 @@ class _PaymentsViewState extends State<PaymentsView> {
 
     final messenger = ScaffoldMessenger.of(context);
     final fileBytes = await pdf.save();
-    download_helper.downloadFile(fileBytes, 'CARRENT_Payments_Report_${DateTime.now().millisecondsSinceEpoch}.pdf');
+    final companyName = CompanySettingsProvider().companyName.replaceAll(' ', '_');
+    download_helper.downloadFile(fileBytes, '${companyName}_Payments_Report_${DateTime.now().millisecondsSinceEpoch}.pdf');
     messenger.showSnackBar(
       const SnackBar(content: Text('Payments report downloaded in PDF format!'), backgroundColor: Colors.green),
     );
@@ -458,8 +461,14 @@ class _PaymentsViewState extends State<PaymentsView> {
 
     final double width = MediaQuery.of(context).size.width;
     final bool isDesktop = width > 1100;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final surfaceColor = isDark ? const Color(0xFF111827) : const Color(0xFFF1F5F9);
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
+    final borderColor = isDark ? const Color(0xFF334155) : Colors.grey.shade200;
 
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -468,11 +477,11 @@ class _PaymentsViewState extends State<PaymentsView> {
               ? Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Column(
+                    Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Payments Ledger', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue)),
-                        Text('Verify customer deposits, issue refunds, and audit revenue streams.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        Text('Payments Ledger', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textPrimary)),
+                        Text('Verify customer deposits, issue refunds, and audit revenue streams.', style: TextStyle(fontSize: 12, color: textSecondary)),
                       ],
                     ),
                     Row(
@@ -507,8 +516,8 @@ class _PaymentsViewState extends State<PaymentsView> {
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Payments Ledger', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue)),
-                    const Text('Verify customer deposits, issue refunds, and audit revenue streams.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    Text('Payments Ledger', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: textPrimary)),
+                    Text('Verify customer deposits, issue refunds, and audit revenue streams.', style: TextStyle(fontSize: 12, color: textSecondary)),
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -553,91 +562,104 @@ class _PaymentsViewState extends State<PaymentsView> {
             childAspectRatio: isDesktop ? 2.2 : 1.5,
             physics: const NeverScrollableScrollPhysics(),
             children: [
-              _buildStatCard('Total Revenue', 'RM ${totalRevenue.toStringAsFixed(2)}', Icons.monetization_on, Colors.green),
-              _buildStatCard('Pending Verification', pendingCount.toString(), Icons.hourglass_top, Colors.orange),
-              _buildStatCard('Cleared Payments', successCount.toString(), Icons.check_circle, Colors.teal),
-              _buildStatCard('Failed / Refunded', failedCount.toString(), Icons.cancel_outlined, Colors.redAccent),
+              _buildStatCard('Total Revenue', 'RM ${totalRevenue.toStringAsFixed(2)}', Icons.monetization_on, Colors.green, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+              _buildStatCard('Pending Verification', pendingCount.toString(), Icons.hourglass_top, Colors.orange, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+              _buildStatCard('Cleared Payments', successCount.toString(), Icons.check_circle, Colors.teal, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+              _buildStatCard('Failed / Refunded', failedCount.toString(), Icons.cancel_outlined, Colors.redAccent, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
             ],
           ),
           const SizedBox(height: 24),
 
-          Card(
-            color: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            elevation: 0,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      decoration: const InputDecoration(
-                        hintText: 'Search ledger by customer, vehicle, payment ID, booking ID, or reference...',
-                        prefixIcon: Icon(Icons.search, size: 20),
-                        contentPadding: EdgeInsets.symmetric(vertical: 8),
-                      ),
+          Container(
+            decoration: BoxDecoration(
+              color: cardColor,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: borderColor),
+            ),
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    style: TextStyle(color: textPrimary),
+                    decoration: InputDecoration(
+                      hintText: 'Search ledger by customer, vehicle, payment ID, or reference...',
+                      hintStyle: TextStyle(color: textSecondary),
+                      prefixIcon: Icon(Icons.search, size: 20, color: textSecondary),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 8),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 16),
 
-          Expanded(
-            child: filteredPayments.isEmpty
-                ? Center(
+          filteredPayments.isEmpty
+              ? Container(
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: cardColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: borderColor),
+                  ),
+                  child: Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.payment_outlined, size: 64, color: Colors.grey[300]),
+                        Icon(Icons.payment_outlined, size: 64, color: textSecondary),
                         const SizedBox(height: 16),
-                        Text('No transactions found matching reference.', style: TextStyle(color: Colors.grey[500])),
+                        Text('No transactions found matching reference.', style: TextStyle(color: textSecondary)),
                       ],
                     ),
-                  )
-                : Card(
-                    color: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    elevation: 0,
-                    child: isDesktop ? _buildDesktopTable(filteredPayments, bookingMap) : _buildMobileList(filteredPayments, bookingMap),
                   ),
-          ),
+                )
+              : Container(
+                  decoration: BoxDecoration(
+                    color: cardColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: borderColor),
+                  ),
+                  child: isDesktop
+                      ? _buildDesktopTable(filteredPayments, bookingMap, isDark: isDark, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor, surfaceColor: surfaceColor)
+                      : _buildMobileList(filteredPayments, bookingMap, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+                ),
         ],
       ),
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
+  Widget _buildStatCard(String label, String value, IconData icon, Color color, {
+    required bool isDark, required Color cardColor, required Color textPrimary, required Color textSecondary, required Color borderColor,
+  }) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4)),
-        ],
+        border: Border.all(color: borderColor),
+        boxShadow: isDark ? [] : [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4))],
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
+              color: color.withValues(alpha: isDark ? 0.2 : 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: color, size: 24),
+            child: Icon(icon, color: color, size: 22),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold)),
+                Text(label, style: TextStyle(color: textSecondary, fontSize: 10, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.secondaryBlue)),
+                Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: textPrimary), overflow: TextOverflow.ellipsis),
               ],
             ),
           ),
@@ -646,19 +668,22 @@ class _PaymentsViewState extends State<PaymentsView> {
     );
   }
 
-  Widget _buildDesktopTable(List<PaymentModel> payments, Map<String, BookingModel> bookingMap) {
-    return ListView(
-      children: [
-        DataTable(
-          headingRowColor: WidgetStateProperty.all(Colors.grey[50]),
-          columns: const [
-            DataColumn(label: Text('Customer Name', style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('Vehicle', style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('Amount (RM)', style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('Payment Date', style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('Receipt Preview', style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold))),
+  Widget _buildDesktopTable(List<PaymentModel> payments, Map<String, BookingModel> bookingMap, {
+    required bool isDark, required Color textPrimary, required Color textSecondary, required Color borderColor, required Color surfaceColor,
+  }) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: DataTable(
+          headingRowColor: WidgetStateProperty.all(isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
+          dividerThickness: 1,
+          columns: [
+            DataColumn(label: Text('Customer Name', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
+            DataColumn(label: Text('Vehicle', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
+            DataColumn(label: Text('Amount (RM)', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
+            DataColumn(label: Text('Payment Date', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
+            DataColumn(label: Text('Receipt Preview', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
+            DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
+            DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
           ],
           rows: payments.map((p) {
             Color statusColor = Colors.orange;
@@ -681,10 +706,10 @@ class _PaymentsViewState extends State<PaymentsView> {
 
             return DataRow(
               cells: [
-                DataCell(Text(customerName, style: const TextStyle(fontWeight: FontWeight.w600))),
-                DataCell(Text(vehicleName)),
-                DataCell(Text('RM ${p.amount.toStringAsFixed(2)}')),
-                DataCell(Text(dateFormat.format(p.paymentDate))),
+                DataCell(Text(customerName, style: TextStyle(fontWeight: FontWeight.w600, color: textPrimary))),
+                DataCell(Text(vehicleName, style: TextStyle(color: textPrimary))),
+                DataCell(Text('RM ${p.amount.toStringAsFixed(2)}', style: TextStyle(color: textPrimary))),
+                DataCell(Text(dateFormat.format(p.paymentDate), style: TextStyle(color: textSecondary))),
                 DataCell(
                   Center(
                     child: GestureDetector(
@@ -693,9 +718,9 @@ class _PaymentsViewState extends State<PaymentsView> {
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey[300]!),
+                          border: Border.all(color: borderColor),
                           borderRadius: BorderRadius.circular(6),
-                          color: Colors.grey[50],
+                          color: surfaceColor,
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(6),
@@ -741,13 +766,16 @@ class _PaymentsViewState extends State<PaymentsView> {
               ],
             );
           }).toList(),
-        ),
-      ],
+      ),
     );
   }
 
-  Widget _buildMobileList(List<PaymentModel> payments, Map<String, BookingModel> bookingMap) {
+  Widget _buildMobileList(List<PaymentModel> payments, Map<String, BookingModel> bookingMap, {
+    required bool isDark, required Color cardColor, required Color textPrimary, required Color textSecondary, required Color borderColor,
+  }) {
     return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       itemCount: payments.length,
       itemBuilder: (context, index) {
         final p = payments[index];
@@ -770,9 +798,9 @@ class _PaymentsViewState extends State<PaymentsView> {
         final vehicleName = booking?.vehicleName ?? 'Unknown';
 
         return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          color: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.grey[200]!)),
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          color: cardColor,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: borderColor)),
           elevation: 0,
           child: ListTile(
             leading: GestureDetector(
@@ -781,9 +809,9 @@ class _PaymentsViewState extends State<PaymentsView> {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey[350]!),
+                  border: Border.all(color: borderColor),
                   borderRadius: BorderRadius.circular(8),
-                  color: Colors.grey[50],
+                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),

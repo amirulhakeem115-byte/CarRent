@@ -12,6 +12,7 @@ import '../../../models/booking_model.dart';
 import '../../../models/payment_model.dart';
 import '../../../models/maintenance_job_model.dart';
 import '../../../services/file_download_helper.dart' if (dart.library.html) '../../../services/file_download_web.dart' as download_helper;
+import '../../../services/company_settings_provider.dart';
 
 class ReportsView extends StatelessWidget {
   final List<BookingModel> bookings;
@@ -180,7 +181,8 @@ class ReportsView extends StatelessWidget {
 
     final fileBytes = excelObj.save();
     if (fileBytes != null) {
-      download_helper.downloadFile(Uint8List.fromList(fileBytes), 'CARRENT_${type}_Report_${DateTime.now().millisecondsSinceEpoch}.xlsx');
+      final companyName = CompanySettingsProvider().companyName.replaceAll(' ', '_');
+      download_helper.downloadFile(Uint8List.fromList(fileBytes), '${companyName}_${type}_Report_${DateTime.now().millisecondsSinceEpoch}.xlsx');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('$type report downloaded in Excel format!'), backgroundColor: Colors.green),
       );
@@ -268,7 +270,7 @@ class ReportsView extends StatelessWidget {
               child: pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text('CARRENT PLATFORM REPORT', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 22, color: pdf_lib.PdfColor.fromInt(0xFF1A237E))),
+                  pw.Text('${CompanySettingsProvider().companyName.toUpperCase()} PLATFORM REPORT', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 22, color: pdf_lib.PdfColor.fromInt(0xFF1A237E))),
                   pw.Text('Generated: ${DateFormat('dd MMM yyyy').format(DateTime.now())}', style: pw.TextStyle(fontSize: 10, color: pdf_lib.PdfColor.fromInt(0xFF757575))),
                 ],
               ),
@@ -298,7 +300,8 @@ class ReportsView extends StatelessWidget {
     );
 
     final fileBytes = await pdf.save();
-    download_helper.downloadFile(fileBytes, 'CARRENT_${type}_Report_${DateTime.now().millisecondsSinceEpoch}.pdf');
+    final companyName = CompanySettingsProvider().companyName.replaceAll(' ', '_');
+    download_helper.downloadFile(fileBytes, '${companyName}_${type}_Report_${DateTime.now().millisecondsSinceEpoch}.pdf');
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('$type report downloaded in PDF format!'), backgroundColor: Colors.green),
@@ -308,6 +311,11 @@ class ReportsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
+    final borderColor = isDark ? const Color(0xFF334155) : Colors.grey.shade200;
     final double width = MediaQuery.of(context).size.width;
     final bool isDesktop = width > 900;
 
@@ -316,17 +324,17 @@ class ReportsView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Operations Reports Center',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue),
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: textPrimary),
           ),
-          const Text(
-            'Download and export operational ledgers of the CARRENT system in Excel and PDF format.',
-            style: TextStyle(fontSize: 13, color: Colors.grey),
+          Text(
+            'Download and export operational ledgers of the ${CompanySettingsProvider().companyName} system in Excel and PDF format.',
+            style: TextStyle(fontSize: 13, color: textSecondary),
           ),
           const SizedBox(height: 24),
 
-          // Cards Row
+          // Stats Cards Row
           GridView.count(
             crossAxisCount: isDesktop ? 5 : 2,
             shrinkWrap: true,
@@ -335,18 +343,18 @@ class ReportsView extends StatelessWidget {
             mainAxisSpacing: 16,
             childAspectRatio: isDesktop ? 1.5 : 1.3,
             children: [
-              _buildMetricCard('Total Vehicles', '${vehicles.length}', Icons.directions_car, Colors.blue),
-              _buildMetricCard('Total Bookings', '${bookings.length}', Icons.book_online, Colors.purple),
-              _buildMetricCard('Registered Customers', '${users.where((u) => u.role == 'customer').length}', Icons.people, Colors.teal),
-              _buildMetricCard('Completed Jobs', '${maintenanceJobs.where((j) => j.status == 'Completed').length}', Icons.build_circle_outlined, Colors.redAccent),
-              _buildMetricCard('Approved Payments', '${payments.where((p) => p.status == 'paid' || p.status == 'approved').length}', Icons.monetization_on, Colors.green),
+              _buildMetricCard('Total Vehicles', '${vehicles.length}', Icons.directions_car, Colors.blue, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+              _buildMetricCard('Total Bookings', '${bookings.length}', Icons.book_online, Colors.purple, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+              _buildMetricCard('Registered Customers', '${users.where((u) => u.role == 'customer').length}', Icons.people, Colors.teal, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+              _buildMetricCard('Completed Jobs', '${maintenanceJobs.where((j) => j.status == 'Completed').length}', Icons.build_circle_outlined, Colors.redAccent, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+              _buildMetricCard('Approved Payments', '${payments.where((p) => p.status == 'paid' || p.status == 'approved').length}', Icons.monetization_on, Colors.green, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
             ],
           ),
           const SizedBox(height: 32),
 
-          const Text(
+          Text(
             'Available Report Modules',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textPrimary),
           ),
           const SizedBox(height: 16),
 
@@ -359,46 +367,11 @@ class ReportsView extends StatelessWidget {
             mainAxisSpacing: 20,
             childAspectRatio: isDesktop ? 2.4 : 2.0,
             children: [
-              _buildReportModule(
-                context,
-                'Revenue & Earnings Ledger',
-                'Aggregated record of all verified payment history, billing methods, and transactional reports.',
-                'Revenue',
-                '${payments.length} Records',
-                Colors.green,
-              ),
-              _buildReportModule(
-                context,
-                'Bookings & Rental Contracts',
-                'Comprehensive list of all rentals, user contacts, vehicle information, and approval statuses.',
-                'Bookings',
-                '${bookings.length} Records',
-                Colors.purple,
-              ),
-              _buildReportModule(
-                context,
-                'Fleet Directory Index',
-                'List of all vehicle properties, plate numbers, categories, daily rates, and availability statuses.',
-                'Vehicles',
-                '${vehicles.length} Records',
-                Colors.blue,
-              ),
-              _buildReportModule(
-                context,
-                'Customer Verification Ledger',
-                'Summary index of all registered customer profiles, emails, phone numbers, and driving license verification states.',
-                'Customers',
-                '${users.where((u) => u.role == 'customer').length} Records',
-                Colors.teal,
-              ),
-              _buildReportModule(
-                context,
-                'Vehicle Maintenance Logs',
-                'Work orders, schedules, mechanical repair listings, statuses, and accumulated costs.',
-                'Maintenance',
-                '${maintenanceJobs.length} Records',
-                Colors.redAccent,
-              ),
+              _buildReportModule(context, 'Revenue & Earnings Ledger', 'Aggregated record of all verified payment history, billing methods, and transactional reports.', 'Revenue', '${payments.length} Records', Colors.green, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+              _buildReportModule(context, 'Bookings & Rental Contracts', 'Comprehensive list of all rentals, user contacts, vehicle information, and approval statuses.', 'Bookings', '${bookings.length} Records', Colors.purple, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+              _buildReportModule(context, 'Fleet Directory Index', 'List of all vehicle properties, plate numbers, categories, daily rates, and availability statuses.', 'Vehicles', '${vehicles.length} Records', Colors.blue, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+              _buildReportModule(context, 'Customer Verification Ledger', 'Summary index of all registered customer profiles, emails, phone numbers, and driving license verification states.', 'Customers', '${users.where((u) => u.role == 'customer').length} Records', Colors.teal, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+              _buildReportModule(context, 'Vehicle Maintenance Logs', 'Work orders, schedules, mechanical repair listings, statuses, and accumulated costs.', 'Maintenance', '${maintenanceJobs.length} Records', Colors.redAccent, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
             ],
           ),
         ],
@@ -406,13 +379,16 @@ class ReportsView extends StatelessWidget {
     );
   }
 
-  Widget _buildMetricCard(String label, String value, IconData icon, Color color) {
+  Widget _buildMetricCard(String label, String value, IconData icon, Color color, {
+    required bool isDark, required Color cardColor, required Color textPrimary, required Color textSecondary, required Color borderColor,
+  }) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(color: borderColor),
+        boxShadow: isDark ? [] : [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -421,40 +397,27 @@ class ReportsView extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(label, style: const TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
+              Flexible(child: Text(label, style: TextStyle(color: textSecondary, fontSize: 10, fontWeight: FontWeight.bold))),
               Icon(icon, color: color, size: 18),
             ],
           ),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue),
-          ),
+          Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: textPrimary)),
         ],
       ),
     );
   }
 
   Widget _buildReportModule(
-    BuildContext context,
-    String name,
-    String description,
-    String type,
-    String count,
-    Color color,
-  ) {
+    BuildContext context, String name, String description, String type, String count, Color color, {
+    required bool isDark, required Color cardColor, required Color textPrimary, required Color textSecondary, required Color borderColor,
+  }) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.01),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(color: borderColor),
+        boxShadow: isDark ? [] : [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 8, offset: const Offset(0, 4))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -468,17 +431,9 @@ class ReportsView extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      name,
-                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: AppColors.secondaryBlue),
-                    ),
+                    Text(name, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: textPrimary)),
                     const SizedBox(height: 4),
-                    Text(
-                      description,
-                      style: const TextStyle(color: Colors.grey, fontSize: 11),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    Text(description, style: TextStyle(color: textSecondary, fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
                   ],
                 ),
               ),
@@ -486,13 +441,10 @@ class ReportsView extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
+                  color: color.withValues(alpha: isDark ? 0.2 : 0.1),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: Text(
-                  count,
-                  style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
-                ),
+                child: Text(count, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
               ),
             ],
           ),

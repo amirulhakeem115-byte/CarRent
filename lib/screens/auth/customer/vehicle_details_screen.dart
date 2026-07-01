@@ -28,6 +28,9 @@ class VehicleDetailsScreen extends StatefulWidget {
 
 class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
   final ReviewService _reviewService = ReviewService();
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _textColor => _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+  Color get _subColor => _isDark ? const Color(0xFFCBD5E1) : AppColors.lightText;
 
   List<ReviewModel> _reviews = [];
   double _avgRating = 0.0;
@@ -111,7 +114,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
         : [_vehicle.mainImage];
 
     return Scaffold(
-      backgroundColor: AppColors.lightGray,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: widget.hideAppBar ? null : const CustomAppBar(),
       body: SingleChildScrollView(
         child: Padding(
@@ -126,7 +129,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
               Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back, color: AppColors.secondaryBlue, size: 24),
+                    icon: Icon(Icons.arrow_back, color: _textColor, size: 24),
                     onPressed: () {
                       final shell = CustomerResponsiveShell.of(context);
                       if (shell != null) {
@@ -139,10 +142,10 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                   const SizedBox(width: 8),
                   Text(
                     '${_vehicle.brand} ${_vehicle.model}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w900,
-                      color: AppColors.secondaryBlue,
+                      color: _textColor,
                     ),
                   ),
                 ],
@@ -248,9 +251,11 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.borderGray),
+        border: Border.all(
+          color: _isDark ? const Color(0xFF334155) : AppColors.borderGray,
+        ),
         boxShadow: [
           BoxShadow(
             color: AppColors.cardShadow,
@@ -365,9 +370,11 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.borderGray),
+        border: Border.all(
+          color: _isDark ? const Color(0xFF334155) : AppColors.borderGray,
+        ),
         boxShadow: [
           BoxShadow(
             color: AppColors.cardShadow,
@@ -385,10 +392,10 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
               Expanded(
                 child: Text(
                   '${_vehicle.brand} ${_vehicle.model}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
-                    color: AppColors.secondaryBlue,
+                    color: _textColor,
                   ),
                 ),
               ),
@@ -420,21 +427,21 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                   const SizedBox(width: 4),
                   Text(
                     _avgRating > 0 ? _avgRating.toStringAsFixed(1) : "4.8",
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.secondaryBlue),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _textColor),
                   ),
                   const SizedBox(width: 6),
                   Text(
                     '(${_reviews.length} reviews)',
-                    style: const TextStyle(fontSize: 12, color: AppColors.lightText),
+                    style: TextStyle(fontSize: 12, color: _subColor),
                   ),
                 ],
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  const Text(
+                  Text(
                     'DAILY RATE',
-                    style: TextStyle(fontSize: 9, color: AppColors.lightText, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                    style: TextStyle(fontSize: 9, color: _subColor, fontWeight: FontWeight.bold, letterSpacing: 0.5),
                   ),
                   Text(
                     'RM ${_vehicle.pricePerDay.toStringAsFixed(0)}/Day',
@@ -487,9 +494,11 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.borderGray),
+        border: Border.all(
+          color: _isDark ? const Color(0xFF334155) : AppColors.borderGray,
+        ),
         boxShadow: [
           BoxShadow(
             color: AppColors.cardShadow,
@@ -501,12 +510,12 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Specifications',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w900,
-              color: AppColors.secondaryBlue,
+              color: _textColor,
             ),
           ),
           const SizedBox(height: 16),
@@ -541,9 +550,11 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: AppColors.lightGray,
+        color: _isDark ? const Color(0xFF1E293B) : AppColors.lightGray,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderGray),
+        border: Border.all(
+          color: _isDark ? const Color(0xFF334155) : AppColors.borderGray,
+        ),
       ),
       child: Row(
         children: [
@@ -563,14 +574,14 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(color: AppColors.lightText, fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                  style: TextStyle(color: _subColor, fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 0.5),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
                 Text(
                   value,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppColors.secondaryBlue),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: _textColor),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -586,9 +597,11 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.borderGray),
+        border: Border.all(
+          color: _isDark ? const Color(0xFF334155) : AppColors.borderGray,
+        ),
         boxShadow: [
           BoxShadow(
             color: AppColors.cardShadow,
@@ -600,16 +613,16 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Description',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: _textColor),
           ),
           const SizedBox(height: 12),
           Text(
             _vehicle.description.isNotEmpty
                 ? _vehicle.description
                 : 'No description provided for this vehicle.',
-            style: const TextStyle(color: AppColors.lightText, height: 1.6, fontSize: 13),
+            style: TextStyle(color: _subColor, height: 1.6, fontSize: 13),
           ),
         ],
       ),
@@ -620,9 +633,11 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.borderGray),
+        border: Border.all(
+          color: _isDark ? const Color(0xFF334155) : AppColors.borderGray,
+        ),
         boxShadow: [
           BoxShadow(
             color: AppColors.cardShadow,
@@ -634,19 +649,19 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Car Equipment & Features',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w900,
-              color: AppColors.secondaryBlue,
+              color: _textColor,
             ),
           ),
           const SizedBox(height: 16),
           _vehicle.equipment.isEmpty
-              ? const Text(
+              ? Text(
                   'Standard package inclusions.',
-                  style: TextStyle(color: AppColors.lightText, fontSize: 12),
+                  style: TextStyle(color: _subColor, fontSize: 12),
                 )
               : Wrap(
                   spacing: 16,
@@ -661,8 +676,8 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                           Expanded(
                             child: Text(
                               item,
-                              style: const TextStyle(
-                                color: AppColors.secondaryBlue,
+                              style: TextStyle(
+                                color: _textColor,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 12,
                               ),
@@ -684,9 +699,11 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.borderGray),
+        border: Border.all(
+          color: _isDark ? const Color(0xFF334155) : AppColors.borderGray,
+        ),
         boxShadow: [
           BoxShadow(
             color: AppColors.cardShadow,
@@ -698,24 +715,24 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Maintenance Records',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: _textColor),
           ),
           const SizedBox(height: 16),
           _maintenanceJobs.isEmpty
-              ? const Center(
+              ? Center(
                   child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                     child: Text(
                       'No public maintenance logs recorded.',
-                      style: TextStyle(color: AppColors.lightText, fontSize: 12),
+                      style: TextStyle(color: _subColor, fontSize: 12),
                     ),
                   ),
                 )
               : Container(
                   decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.borderGray),
+                    border: Border.all(color: _isDark ? const Color(0xFF334155) : AppColors.borderGray),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: ClipRRect(
@@ -729,7 +746,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                       },
                       children: [
                         TableRow(
-                          decoration: const BoxDecoration(color: AppColors.secondaryBlue),
+                          decoration: BoxDecoration(color: _isDark ? const Color(0xFF1B2436) : AppColors.secondaryBlue),
                           children: [
                             _buildTableHeaderCell('SERVICE TYPE'),
                             _buildTableHeaderCell('DESCRIPTION'),
@@ -739,8 +756,8 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                         ),
                         ..._maintenanceJobs.map((record) {
                           return TableRow(
-                            decoration: const BoxDecoration(
-                              border: Border(bottom: BorderSide(color: AppColors.borderGray)),
+                            decoration: BoxDecoration(
+                              border: Border(bottom: BorderSide(color: _isDark ? const Color(0xFF334155) : AppColors.borderGray)),
                             ),
                             children: [
                               _buildTableCell(record.title, isBold: true),
@@ -776,13 +793,14 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
   }
 
   Widget _buildTableCell(String text, {bool isBold = false}) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
       child: Text(
         text,
         textAlign: TextAlign.center,
         style: TextStyle(
-          color: AppColors.secondaryBlue,
+          color: isDark ? const Color(0xFFCBD5E1) : AppColors.secondaryBlue,
           fontSize: 11,
           fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
         ),

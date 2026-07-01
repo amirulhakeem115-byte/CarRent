@@ -28,6 +28,12 @@ class _AdminTrackingViewState extends State<AdminTrackingView> {
   Widget build(BuildContext context) {
     final double width = MediaQuery.of(context).size.width;
     final bool isDesktop = width > 950;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final surfaceColor = isDark ? const Color(0xFF111827) : const Color(0xFFF1F5F9);
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
+    final borderColor = isDark ? const Color(0xFF334155) : Colors.grey.shade200;
 
     final filtered = widget.vehicles.where((v) {
       final name = '${v.brand} ${v.model}'.toLowerCase();
@@ -42,8 +48,8 @@ class _AdminTrackingViewState extends State<AdminTrackingView> {
           Container(
             width: 320,
             decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(right: BorderSide(color: Colors.grey[200]!)),
+              color: cardColor,
+              border: Border(right: BorderSide(color: borderColor)),
             ),
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -59,12 +65,12 @@ class _AdminTrackingViewState extends State<AdminTrackingView> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'Fleet GPS Center',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
-                    color: AppColors.secondaryBlue,
+                    color: textPrimary,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -74,20 +80,21 @@ class _AdminTrackingViewState extends State<AdminTrackingView> {
                       _searchQuery = val;
                     });
                   },
+                  style: TextStyle(color: textPrimary),
                   decoration: InputDecoration(
                     hintText: 'Search brand or plate...',
-                    prefixIcon: const Icon(Icons.search, size: 20),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.7)),
+                    prefixIcon: Icon(Icons.search, size: 20, color: textSecondary),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   ),
                 ),
                 const SizedBox(height: 16),
                 Expanded(
                   child: filtered.isEmpty
-                      ? const Center(child: Text('No vehicles found'))
+                      ? Center(child: Text('No vehicles found', style: TextStyle(color: textSecondary)))
                       : ListView.separated(
                           itemCount: filtered.length,
-                          separatorBuilder: (_, index) => const Divider(height: 1),
+                          separatorBuilder: (_, index) => Divider(height: 1, color: borderColor),
                           itemBuilder: (context, index) {
                             final vehicle = filtered[index];
                             final loc = widget.liveLocations[vehicle.id];
@@ -103,20 +110,20 @@ class _AdminTrackingViewState extends State<AdminTrackingView> {
                                 child: Container(
                                   width: 48,
                                   height: 36,
-                                  color: Colors.grey[100],
+                                  color: surfaceColor,
                                   child: AppImage(
                                     imageSrc: vehicle.mainImage,
-                                    placeholder: const Icon(Icons.directions_car, size: 20, color: Colors.grey),
+                                    placeholder: Icon(Icons.directions_car, size: 20, color: textSecondary),
                                   ),
                                 ),
                               ),
                               title: Text(
                                 '${vehicle.brand} ${vehicle.model}',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.secondaryBlue),
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: textPrimary),
                               ),
                               subtitle: Text(
                                 '${vehicle.plateNumber} • ${speed.toStringAsFixed(0)} km/h',
-                                style: TextStyle(fontSize: 11, color: isMoving ? Colors.green : Colors.grey),
+                                style: TextStyle(fontSize: 11, color: isMoving ? Colors.green : textSecondary),
                               ),
                               onTap: () {
                                 final tv = {
@@ -177,9 +184,7 @@ class _AdminTrackingViewState extends State<AdminTrackingView> {
                             });
                             _mapController.move(LatLng(lat, lng), 13);
                           },
-                          child: MouseRegion(
-                            cursor: SystemMouseCursors.click,
-                            child: Stack(
+                           child: Stack(
                               alignment: Alignment.center,
                               children: [
                                 Container(
@@ -193,10 +198,10 @@ class _AdminTrackingViewState extends State<AdminTrackingView> {
                                 Container(
                                   width: 24,
                                   height: 24,
-                                  decoration: const BoxDecoration(
-                                    color: Colors.white,
+                                  decoration: BoxDecoration(
+                                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
                                     shape: BoxShape.circle,
-                                    boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 1))],
+                                    boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 1))],
                                   ),
                                   child: Padding(
                                     padding: const EdgeInsets.all(2.0),
@@ -211,7 +216,6 @@ class _AdminTrackingViewState extends State<AdminTrackingView> {
                                 ),
                               ],
                             ),
-                          ),
                         ),
                       );
                     }).toList(),
@@ -229,10 +233,10 @@ class _AdminTrackingViewState extends State<AdminTrackingView> {
                     width: 300,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: cardColor,
                       borderRadius: BorderRadius.circular(16),
-                      boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4))],
-                      border: Border.all(color: Colors.grey[200]!),
+                      boxShadow: isDark ? [] : const [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4))],
+                      border: Border.all(color: borderColor),
                     ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -241,9 +245,9 @@ class _AdminTrackingViewState extends State<AdminTrackingView> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('Active Vehicle Detail', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue, fontSize: 13)),
+                            Text('Active Vehicle Detail', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary, fontSize: 13)),
                             IconButton(
-                              icon: const Icon(Icons.close, size: 16),
+                              icon: Icon(Icons.close, size: 16, color: textSecondary),
                               onPressed: () => setState(() => _selectedVehicle = null),
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(),
@@ -258,10 +262,10 @@ class _AdminTrackingViewState extends State<AdminTrackingView> {
                               child: Container(
                                 width: 70,
                                 height: 50,
-                                color: Colors.grey[100],
+                                color: surfaceColor,
                                 child: AppImage(
                                   imageSrc: (_selectedVehicle!['vehicle'] as VehicleModel).mainImage,
-                                  placeholder: const Icon(Icons.directions_car),
+                                  placeholder: Icon(Icons.directions_car, color: textSecondary),
                                 ),
                               ),
                             ),
@@ -272,11 +276,11 @@ class _AdminTrackingViewState extends State<AdminTrackingView> {
                                 children: [
                                   Text(
                                     '${(_selectedVehicle!['vehicle'] as VehicleModel).brand} ${(_selectedVehicle!['vehicle'] as VehicleModel).model}',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.secondaryBlue),
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textPrimary),
                                   ),
                                   Text(
                                     (_selectedVehicle!['vehicle'] as VehicleModel).plateNumber,
-                                    style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold),
+                                    style: TextStyle(fontSize: 12, color: textSecondary, fontWeight: FontWeight.bold),
                                   ),
                                 ],
                               ),
@@ -284,12 +288,12 @@ class _AdminTrackingViewState extends State<AdminTrackingView> {
                           ],
                         ),
                         const SizedBox(height: 12),
-                        const Divider(height: 1),
+                        Divider(height: 1, color: borderColor),
                         const SizedBox(height: 12),
-                        _buildOverlayDetailRow('GPS Latitude', _selectedVehicle!['latitude'].toStringAsFixed(6)),
-                        _buildOverlayDetailRow('GPS Longitude', _selectedVehicle!['longitude'].toStringAsFixed(6)),
-                        _buildOverlayDetailRow('Current Speed', '${_selectedVehicle!['speed'].toStringAsFixed(0)} km/h'),
-                        _buildOverlayDetailRow('Telematics Feed', 'Active (Teltonika GPS)'),
+                        _buildOverlayDetailRow('GPS Latitude', _selectedVehicle!['latitude'].toStringAsFixed(6), textSecondary, textPrimary),
+                        _buildOverlayDetailRow('GPS Longitude', _selectedVehicle!['longitude'].toStringAsFixed(6), textSecondary, textPrimary),
+                        _buildOverlayDetailRow('Current Speed', '${_selectedVehicle!['speed'].toStringAsFixed(0)} km/h', textSecondary, textPrimary),
+                        _buildOverlayDetailRow('Telematics Feed', 'Active (Teltonika GPS)', textSecondary, textPrimary),
                       ],
                     ),
                   ),
@@ -301,14 +305,14 @@ class _AdminTrackingViewState extends State<AdminTrackingView> {
     );
   }
 
-  Widget _buildOverlayDetailRow(String label, String value) {
+  Widget _buildOverlayDetailRow(String label, String value, Color labelColor, Color valColor) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppColors.secondaryBlue)),
+          Text(label, style: TextStyle(color: labelColor, fontSize: 11)),
+          Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: valColor)),
         ],
       ),
     );

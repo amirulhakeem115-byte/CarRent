@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import '../../../services/theme_provider.dart';
 import '../../../constants/colors.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/database_service.dart';
@@ -254,6 +256,8 @@ class _AdminProfileViewState extends State<AdminProfileView> {
   Widget build(BuildContext context) {
     final double width = MediaQuery.of(context).size.width;
     final bool isDesktop = width > 950;
+    final themeProvider = context.watch<ThemeProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (_loading && _adminUser == null) {
       return const Center(child: LoadingWidget(message: 'Retrieving Admin Profile settings...'));
@@ -278,19 +282,24 @@ class _AdminProfileViewState extends State<AdminProfileView> {
         ? DateFormat('dd MMMM yyyy').format(DateTime.parse(_adminUser!.createdAt))
         : 'Unknown';
 
+    final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
+    final borderColor = isDark ? const Color(0xFF334155) : Colors.grey.shade200;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header info
-          const Text(
+          Text(
             'Admin Profile Settings',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue),
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: textPrimary),
           ),
-          const Text(
+          Text(
             'Manage security, credentials, details, and view fleet operations achievements.',
-            style: TextStyle(fontSize: 13, color: Colors.grey),
+            style: TextStyle(fontSize: 13, color: textSecondary),
           ),
           const SizedBox(height: 24),
 
@@ -300,25 +309,26 @@ class _AdminProfileViewState extends State<AdminProfileView> {
                 children: [
                   // Picture Box Card
                   _buildCard(
+                    isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor,
                     child: Column(
                       children: [
                         const SizedBox(height: 8),
                         CircleAvatar(
                           radius: 54,
-                          backgroundColor: AppColors.secondaryBlue.withValues(alpha: 0.1),
+                          backgroundColor: AppColors.secondaryBlue.withValues(alpha: isDark ? 0.2 : 0.1),
                           backgroundImage: getAppImageProvider(_adminUser?.profileImage),
                           child: _adminUser?.profileImage.isNotEmpty != true
-                              ? const Icon(Icons.person, size: 54, color: AppColors.secondaryBlue)
+                              ? Icon(Icons.person, size: 54, color: textPrimary)
                               : null,
                         ),
                         const SizedBox(height: 16),
                         Text(
                           _adminUser?.fullName ?? 'Administrator',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppColors.secondaryBlue),
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: textPrimary),
                         ),
                         Text(
                           'Super Administrator',
-                          style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                          style: TextStyle(color: textSecondary, fontSize: 12),
                         ),
                         const SizedBox(height: 20),
                         Row(
@@ -353,20 +363,83 @@ class _AdminProfileViewState extends State<AdminProfileView> {
                   const SizedBox(height: 24),
 
                   // Fleet Activity Stats Card
-                  _buildCard(
+                   _buildCard(
                     title: 'Account Activity Logs',
                     icon: Icons.history,
+                    isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor,
                     child: Column(
                       children: [
-                        _buildStatRow('Created Date', joinDate, Icons.calendar_today, Colors.blue),
-                        const Divider(),
-                        _buildStatRow('Last Telematics Login', _lastLoginTime, Icons.login, Colors.green),
-                        const Divider(),
-                        _buildStatRow('Total Fleet Vehicles', '$_totalVehicles units', Icons.directions_car, Colors.indigo),
-                        const Divider(),
-                        _buildStatRow('Approved Rental Bookings', '$_totalBookingsApproved contracts', Icons.book_online, Colors.purple),
-                        const Divider(),
-                        _buildStatRow('Processed Fleet Revenues', '$_totalPaymentsApproved transactions', Icons.monetization_on, Colors.teal),
+                        _buildStatRow('Created Date', joinDate, Icons.calendar_today, Colors.blue, textPrimary: textPrimary, textSecondary: textSecondary),
+                        Divider(color: borderColor),
+                        _buildStatRow('Last Telematics Login', _lastLoginTime, Icons.login, Colors.green, textPrimary: textPrimary, textSecondary: textSecondary),
+                        Divider(color: borderColor),
+                        _buildStatRow('Total Fleet Vehicles', '$_totalVehicles units', Icons.directions_car, Colors.indigo, textPrimary: textPrimary, textSecondary: textSecondary),
+                        Divider(color: borderColor),
+                        _buildStatRow('Approved Rental Bookings', '$_totalBookingsApproved contracts', Icons.book_online, Colors.purple, textPrimary: textPrimary, textSecondary: textSecondary),
+                        Divider(color: borderColor),
+                        _buildStatRow('Processed Fleet Revenues', '$_totalPaymentsApproved transactions', Icons.monetization_on, Colors.teal, textPrimary: textPrimary, textSecondary: textSecondary),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  _buildCard(
+                    title: 'Theme Settings',
+                    icon: Icons.brightness_6_outlined,
+                    isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'THEME MODE',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: isDark ? Colors.grey[400] : Colors.grey[600]),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                themeProvider.themeMode == ThemeMode.system
+                                    ? 'System Default'
+                                    : themeProvider.themeMode == ThemeMode.light
+                                        ? 'Light Mode'
+                                        : 'Dark Mode',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? Colors.white : AppColors.secondaryBlue,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        DropdownButton<ThemeMode>(
+                          value: themeProvider.themeMode,
+                          onChanged: (mode) {
+                            if (mode != null) {
+                              themeProvider.setThemeMode(mode);
+                            }
+                          },
+                          dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                          style: TextStyle(
+                            color: isDark ? Colors.white : AppColors.secondaryBlue,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: ThemeMode.system,
+                              child: Text('System'),
+                            ),
+                            DropdownMenuItem(
+                              value: ThemeMode.light,
+                              child: Text('Light'),
+                            ),
+                            DropdownMenuItem(
+                              value: ThemeMode.dark,
+                              child: Text('Dark'),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -379,6 +452,7 @@ class _AdminProfileViewState extends State<AdminProfileView> {
                   _buildCard(
                     title: 'Personal Information Details',
                     icon: Icons.person_outline_outlined,
+                    isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor,
                     child: Form(
                       key: _formKey,
                       child: Column(
@@ -434,6 +508,7 @@ class _AdminProfileViewState extends State<AdminProfileView> {
                   _buildCard(
                     title: 'Account Security Settings',
                     icon: Icons.lock_outline,
+                    isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor,
                     child: Form(
                       key: _securityFormKey,
                       child: Column(
@@ -515,20 +590,23 @@ class _AdminProfileViewState extends State<AdminProfileView> {
     );
   }
 
-  Widget _buildCard({String? title, IconData? icon, required Widget child}) {
+  Widget _buildCard({
+    String? title,
+    IconData? icon,
+    required Widget child,
+    required bool isDark,
+    required Color cardColor,
+    required Color textPrimary,
+    required Color textSecondary,
+    required Color borderColor,
+  }) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-        border: Border.all(color: Colors.grey[200]!),
+        boxShadow: isDark ? [] : [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4))],
+        border: Border.all(color: borderColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -537,13 +615,10 @@ class _AdminProfileViewState extends State<AdminProfileView> {
             Row(
               children: [
                 if (icon != null) ...[
-                  Icon(icon, color: AppColors.secondaryBlue, size: 20),
+                  Icon(icon, color: textPrimary, size: 20),
                   const SizedBox(width: 8),
                 ],
-                Text(
-                  title,
-                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppColors.secondaryBlue),
-                ),
+                Text(title, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: textPrimary)),
               ],
             ),
             const SizedBox(height: 16),
@@ -554,7 +629,7 @@ class _AdminProfileViewState extends State<AdminProfileView> {
     );
   }
 
-  Widget _buildStatRow(String label, String value, IconData icon, Color color) {
+  Widget _buildStatRow(String label, String value, IconData icon, Color color, {required Color textPrimary, required Color textSecondary}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
@@ -569,14 +644,8 @@ class _AdminProfileViewState extends State<AdminProfileView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  label,
-                  style: const TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  value,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.secondaryBlue),
-                ),
+                Text(label, style: TextStyle(fontSize: 11, color: textSecondary, fontWeight: FontWeight.bold)),
+                Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: textPrimary)),
               ],
             ),
           ),

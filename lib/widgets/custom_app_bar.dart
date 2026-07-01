@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../constants/colors.dart';
 import '../screens/auth/customer/home_screen.dart';
 import '../screens/auth/customer/vehicle_list_screen.dart';
 import '../screens/auth/customer/profile_screen.dart';
 import '../screens/auth/customer/contact_support_screen.dart';
+import '../services/company_settings_provider.dart';
+import 'app_logo.dart';
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   const CustomAppBar({super.key});
@@ -44,33 +47,22 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
               },
               child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.directions_car,
-                      color: AppColors.secondaryBlue,
-                      size: 24,
-                    ),
-                  ),
+                  const AppLogo(size: 24, fallbackColor: AppColors.secondaryBlue),
                   const SizedBox(width: 10),
-                  const Column(
+                  Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'CARRENT',
-                        style: TextStyle(
+                        context.watch<CompanySettingsProvider>().companyName,
+                        style: const TextStyle(
                           color: AppColors.secondaryBlue,
                           fontWeight: FontWeight.w900,
                           fontSize: 20,
                           letterSpacing: 1.5,
                         ),
                       ),
-                      Text(
+                      const Text(
                         'SINCE 2026',
                         style: TextStyle(
                           color: AppColors.secondaryBlue,

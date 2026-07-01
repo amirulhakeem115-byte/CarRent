@@ -74,22 +74,27 @@ class _RewardHistoryScreenState extends State<RewardHistoryScreen> {
       );
     }
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: AppColors.backgroundWhite,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? const Color(0xFF1B2436) : Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.secondaryBlue),
+          icon: Icon(Icons.arrow_back, color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           'Loyalty Rewards History',
-          style: TextStyle(color: AppColors.secondaryBlue, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: AppColors.secondaryBlue),
+            icon: Icon(Icons.refresh, color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue),
             onPressed: () {
               setState(() => _loadingBalance = true);
               _subscribeToPoints();
@@ -195,14 +200,14 @@ class _RewardHistoryScreenState extends State<RewardHistoryScreen> {
             ),
           ),
 
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
             child: Text(
               'TRANSACTION LEDGER',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 12,
-                color: AppColors.secondaryBlue,
+                color: isDark ? const Color(0xFFCBD5E1) : AppColors.secondaryBlue,
                 letterSpacing: 0.5,
               ),
             ),
@@ -300,9 +305,11 @@ class _RewardHistoryScreenState extends State<RewardHistoryScreen> {
                     return Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Theme.of(context).cardColor,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.grey[100]!),
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF334155) : Colors.grey[100]!,
+                        ),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.015),
@@ -328,10 +335,10 @@ class _RewardHistoryScreenState extends State<RewardHistoryScreen> {
                               children: [
                                 Text(
                                   labelText,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 14,
-                                    color: AppColors.secondaryBlue,
+                                    color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
                                   ),
                                 ),
                                 const SizedBox(height: 4),

@@ -31,6 +31,11 @@ class BranchesMapScreen extends StatefulWidget {
 }
 
 class _BranchesMapScreenState extends State<BranchesMapScreen> {
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _textColor => _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+  Color get _subColor => _isDark ? const Color(0xFFCBD5E1) : AppColors.lightText;
+  Color get _borderColor => _isDark ? const Color(0xFF334155) : AppColors.borderGray;
+
   final BranchService _branchService = BranchService();
   final MapController _mapController = MapController();
   StreamSubscription<List<BranchModel>>? _branchesSubscription;
@@ -277,18 +282,18 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
     final bool isDesktop = width > 900;
 
     final branchesAppBar = AppBar(
-      backgroundColor: Colors.white,
+      backgroundColor: _isDark ? const Color(0xFF1B2436) : Colors.white,
       elevation: 0,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_rounded, color: AppColors.secondaryBlue, size: 20),
+        icon: Icon(Icons.arrow_back_ios_rounded, color: _textColor, size: 20),
         onPressed: () => Navigator.pop(context),
       ),
-      title: const Text(
+      title: Text(
         'Rental Hubs',
         style: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w900,
-          color: AppColors.secondaryBlue,
+          color: _textColor,
         ),
       ),
     );
@@ -313,7 +318,7 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
               children: [
                 const Icon(Icons.error_outline, size: 64, color: Colors.redAccent),
                 const SizedBox(height: 16),
-                Text(_error!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                Text(_error!, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: _textColor)),
                 const SizedBox(height: 24),
                 ElevatedButton(
                   onPressed: _subscribeBranches,
@@ -332,7 +337,7 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
     }
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: branchesAppBar,
       body: isDesktop ? _buildDesktopLayout() : _buildMobileLayout(),
     );
@@ -348,9 +353,9 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
           flex: 4,
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               border: Border(
-                right: BorderSide(color: Colors.grey[200]!, width: 1),
+                right: BorderSide(color: _borderColor, width: 1),
               ),
             ),
             child: Column(
@@ -465,9 +470,10 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
             right: 16,
             bottom: 20,
             child: Card(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
+                side: BorderSide(color: _borderColor),
               ),
               elevation: 8,
               shadowColor: Colors.black.withValues(alpha: 0.15),
@@ -483,15 +489,15 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
                         Expanded(
                           child: Text(
                             _selectedBranch!.branchName,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: AppColors.secondaryBlue,
+                              color: _textColor,
                             ),
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.close, color: Colors.grey),
+                          icon: Icon(Icons.close, color: _subColor),
                           onPressed: () => setState(() => _selectedBranch = null),
                         ),
                       ],
@@ -499,7 +505,7 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
                     const SizedBox(height: 4),
                     Text(
                       _selectedBranch!.address,
-                      style: const TextStyle(color: Colors.grey, fontSize: 13, height: 1.4),
+                      style: TextStyle(color: _subColor, fontSize: 13, height: 1.4),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -510,14 +516,14 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
                         const SizedBox(width: 6),
                         Text(
                           _selectedBranch!.phone,
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _textColor),
                         ),
                         const Spacer(),
-                        const Icon(Icons.access_time, size: 14, color: Colors.grey),
+                        Icon(Icons.access_time, size: 14, color: _subColor),
                         const SizedBox(width: 6),
                         Text(
                           _selectedBranch!.operatingHours,
-                          style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                          style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: _subColor),
                         ),
                       ],
                     ),
@@ -546,7 +552,7 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
                         const SizedBox(width: 12),
                         IconButton(
                           style: IconButton.styleFrom(
-                            backgroundColor: AppColors.lightGray,
+                            backgroundColor: _isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
                             padding: const EdgeInsets.all(12),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
@@ -557,7 +563,7 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
                               'https://www.google.com/maps/search/?api=1&query=${_selectedBranch!.latitude},${_selectedBranch!.longitude}',
                             );
                           },
-                          icon: const Icon(Icons.map_outlined, color: AppColors.secondaryBlue),
+                          icon: Icon(Icons.map_outlined, color: _textColor),
                           tooltip: 'Open in Maps',
                         ),
                       ],
@@ -834,44 +840,46 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
             children: [
               if (Navigator.canPop(context)) ...[
                 IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.secondaryBlue, size: 18),
+                  icon: Icon(Icons.arrow_back_ios_new_rounded, color: _textColor, size: 18),
                   onPressed: () => Navigator.pop(context),
                 ),
                 const SizedBox(width: 4),
               ],
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Branches & Hubs',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
-                    color: AppColors.secondaryBlue,
+                    color: _textColor,
                   ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Locate and request route navigation to our official service centers across Malaysia.',
-            style: TextStyle(fontSize: 12, color: AppColors.lightText, height: 1.4),
+            style: TextStyle(fontSize: 12, color: _subColor, height: 1.4),
           ),
           const SizedBox(height: 20),
           TextField(
             controller: _searchController,
+            style: TextStyle(color: _textColor, fontSize: 13),
             decoration: InputDecoration(
               hintText: 'Search rental hubs by name...',
-              prefixIcon: const Icon(Icons.search, color: AppColors.lightText),
+              hintStyle: TextStyle(color: _isDark ? Colors.white30 : Colors.grey, fontSize: 13),
+              prefixIcon: Icon(Icons.search, color: _subColor),
               filled: true,
-              fillColor: AppColors.lightGray,
+              fillColor: _isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
               contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.borderGray.withValues(alpha: 0.8)),
+                borderSide: BorderSide(color: _borderColor),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.borderGray.withValues(alpha: 0.8)),
+                borderSide: BorderSide(color: _borderColor),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -879,7 +887,7 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
               ),
               suffixIcon: _searchQuery.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Icons.clear, color: AppColors.lightText),
+                      icon: Icon(Icons.clear, color: _subColor),
                       onPressed: () {
                         _searchController.clear();
                         setState(() {
@@ -897,7 +905,7 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
               Expanded(
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.secondaryBlue,
+                    backgroundColor: AppColors.primaryOrange,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -974,12 +982,12 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isSelected
                   ? AppColors.primaryOrange
-                  : AppColors.borderGray.withValues(alpha: 0.8),
+                  : _borderColor,
               width: isSelected ? 1.5 : 1,
             ),
             boxShadow: [
@@ -1016,12 +1024,12 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
                       decoration: BoxDecoration(
                         color: isSelected
                             ? AppColors.primaryOrange.withValues(alpha: 0.1)
-                            : AppColors.lightGray,
+                            : (_isDark ? const Color(0xFF0F172A) : AppColors.lightGray),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
                         Icons.location_on_rounded,
-                        color: isSelected ? AppColors.primaryOrange : AppColors.secondaryBlue,
+                        color: isSelected ? AppColors.primaryOrange : _textColor,
                         size: 20,
                       ),
                     ),
@@ -1036,9 +1044,9 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
                               Expanded(
                                 child: Text(
                                   branch.branchName,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontWeight: FontWeight.w800,
-                                    color: AppColors.secondaryBlue,
+                                    color: _textColor,
                                     fontSize: 14,
                                   ),
                                 ),
@@ -1066,9 +1074,9 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
                           const SizedBox(height: 6),
                           Text(
                             branch.address,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: AppColors.lightText,
+                              color: _subColor,
                               height: 1.4,
                             ),
                             maxLines: 2,
@@ -1077,24 +1085,24 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
                           const SizedBox(height: 10),
                           Row(
                             children: [
-                              const Icon(Icons.phone_outlined, size: 13, color: AppColors.lightText),
+                              Icon(Icons.phone_outlined, size: 13, color: _subColor),
                               const SizedBox(width: 4),
                               Text(
                                 branch.phone,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11,
-                                  color: AppColors.lightText,
+                                  color: _subColor,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
                               const Spacer(),
-                              const Icon(Icons.access_time_outlined, size: 13, color: AppColors.lightText),
+                              Icon(Icons.access_time_outlined, size: 13, color: _subColor),
                               const SizedBox(width: 4),
                               Text(
                                 branch.operatingHours,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11,
-                                  color: AppColors.lightText,
+                                  color: _subColor,
                                   fontStyle: FontStyle.italic,
                                 ),
                               ),
@@ -1149,7 +1157,7 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
           const SizedBox(height: 16),
           Text(
             branch.branchName,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue),
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: _textColor),
           ),
           const SizedBox(height: 8),
           Container(
@@ -1164,39 +1172,39 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          const Text('ADDRESS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.lightText, letterSpacing: 0.5)),
+          Text('ADDRESS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _subColor, letterSpacing: 0.5)),
           const SizedBox(height: 6),
-          Text(branch.address, style: const TextStyle(fontSize: 13, color: AppColors.secondaryBlue, height: 1.4, fontWeight: FontWeight.w600)),
+          Text(branch.address, style: TextStyle(fontSize: 13, color: _textColor, height: 1.4, fontWeight: FontWeight.w600)),
           const SizedBox(height: 20),
-          const Text('CONTACT INFORMATION', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.lightText, letterSpacing: 0.5)),
+          Text('CONTACT INFORMATION', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _subColor, letterSpacing: 0.5)),
           const SizedBox(height: 6),
           Row(
             children: [
-              const Icon(Icons.phone_outlined, size: 16, color: AppColors.lightText),
+              Icon(Icons.phone_outlined, size: 16, color: _subColor),
               const SizedBox(width: 8),
-              Text(branch.phone, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+              Text(branch.phone, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _textColor)),
             ],
           ),
           const SizedBox(height: 20),
-          const Text('OPERATING HOURS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.lightText, letterSpacing: 0.5)),
+          Text('OPERATING HOURS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _subColor, letterSpacing: 0.5)),
           const SizedBox(height: 6),
           Row(
             children: [
-              const Icon(Icons.access_time_outlined, size: 16, color: AppColors.lightText),
+              Icon(Icons.access_time_outlined, size: 16, color: _subColor),
               const SizedBox(width: 8),
-              Text(branch.operatingHours, style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: AppColors.secondaryBlue, fontWeight: FontWeight.w600)),
+              Text(branch.operatingHours, style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: _textColor, fontWeight: FontWeight.w600)),
             ],
           ),
           const SizedBox(height: 20),
           if (isValid) ...[
-            const Text('LOCATION ANALYSIS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.lightText, letterSpacing: 0.5)),
+            Text('LOCATION ANALYSIS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _subColor, letterSpacing: 0.5)),
             const SizedBox(height: 6),
             Text(
               'Approx. Straight-line distance: ${distance.toStringAsFixed(1)} km away',
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue),
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _textColor),
             ),
           ],
-          const Divider(height: 40),
+          Divider(height: 40, color: _borderColor),
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryOrange,
@@ -1218,8 +1226,8 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
           const SizedBox(height: 12),
           OutlinedButton.icon(
             style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.secondaryBlue,
-              side: const BorderSide(color: AppColors.borderGray),
+              foregroundColor: _textColor,
+              side: BorderSide(color: _borderColor),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),

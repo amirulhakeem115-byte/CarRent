@@ -3,6 +3,7 @@ import 'package:carrent_system/models/payment_model.dart';
 import 'package:carrent_system/models/maintenance_job_model.dart';
 import 'package:carrent_system/models/notification_model.dart';
 import 'package:carrent_system/models/branch_model.dart';
+import 'package:carrent_system/models/user_model.dart';
 
 void main() {
   group('PaymentModel Tests', () {
@@ -240,6 +241,55 @@ void main() {
       expect(branch.longitude, 101.7916);
       expect(branch.operatingHours, '09:00 AM - 09:00 PM');
       expect(branch.status, 'Active');
+    });
+  });
+
+  group('UserModel Tests', () {
+    test('fromMap and toMap should serialize and deserialize Passport and National ID fields correctly', () {
+      final mockData = {
+        'fullName': 'John Doe',
+        'email': 'john@example.com',
+        'phone': '12345678',
+        'address': 'Kuala Lumpur',
+        'role': 'customer',
+        'isActive': true,
+        'accountStatus': 'active',
+        'idNumber': '990101-14-5566',
+        'idType': 'National ID',
+        'idImage': 'data:image/jpeg;base64,mockId',
+        'idStatus': 'pending',
+        'idUploadDate': '25 / 06 / 2026',
+        'idRejectionReason': '',
+        'idReviewedBy': '',
+        'idReviewedDate': '',
+        'licenseNumber': 'L12345678',
+        'licenseClass': 'Class D',
+        'licenseExpiry': '31 / 12 / 2030',
+        'licenseImage': 'data:image/jpeg;base64,mockLicense',
+        'licenseStatus': 'pending',
+        'licenseUploadDate': '25 / 06 / 2026',
+        'licenseRejectionReason': '',
+        'licenseReviewedBy': '',
+        'licenseReviewedDate': '',
+        'createdAt': '2026-06-25T12:00:00Z',
+      };
+
+      final user = UserModel.fromMap('user_99', mockData);
+
+      expect(user.id, 'user_99');
+      expect(user.fullName, 'John Doe');
+      expect(user.idNumber, '990101-14-5566');
+      expect(user.idType, 'National ID');
+      expect(user.idStatus, 'pending');
+      expect(user.idImage, 'data:image/jpeg;base64,mockId');
+      expect(user.licenseStatus, 'pending');
+
+      final mapped = user.toMap();
+      expect(mapped['idNumber'], '990101-14-5566');
+      expect(mapped['idType'], 'National ID');
+      expect(mapped['idStatus'], 'pending');
+      expect(mapped['idImage'], 'data:image/jpeg;base64,mockId');
+      expect(mapped['licenseStatus'], 'pending');
     });
   });
 }

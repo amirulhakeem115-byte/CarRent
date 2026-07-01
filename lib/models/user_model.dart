@@ -19,6 +19,21 @@ class UserModel {
   final String licenseExpiry;
   final int rewardPoints;
 
+  // Additional license metadata
+  final String licenseUploadDate;
+  final String licenseReviewedBy;
+  final String licenseReviewedDate;
+
+  // Passport/National ID fields
+  final String idNumber;
+  final String idType; // 'National ID', 'Passport'
+  final String idImage;
+  final String idStatus; // 'unprovided', 'pending', 'approved', 'rejected'
+  final String idUploadDate;
+  final String idRejectionReason;
+  final String idReviewedBy;
+  final String idReviewedDate;
+
   bool get isAdmin => role == 'admin';
 
   UserModel({
@@ -39,6 +54,17 @@ class UserModel {
     this.licenseClass = 'Class DA',
     this.licenseExpiry = '12 / 2028',
     this.rewardPoints = 0,
+    this.licenseUploadDate = '',
+    this.licenseReviewedBy = '',
+    this.licenseReviewedDate = '',
+    this.idNumber = '',
+    this.idType = 'National ID',
+    this.idImage = '',
+    this.idStatus = 'unprovided',
+    this.idUploadDate = '',
+    this.idRejectionReason = '',
+    this.idReviewedBy = '',
+    this.idReviewedDate = '',
   });
 
   factory UserModel.fromMap(
@@ -68,6 +94,17 @@ class UserModel {
       rewardPoints: data['rewardPoints'] is int
           ? data['rewardPoints'] as int
           : int.tryParse(data['rewardPoints']?.toString() ?? '') ?? 0,
+      licenseUploadDate: data['licenseUploadDate'] ?? '',
+      licenseReviewedBy: data['licenseReviewedBy'] ?? '',
+      licenseReviewedDate: data['licenseReviewedDate'] ?? '',
+      idNumber: data['idNumber'] ?? '',
+      idType: data['idType'] ?? 'National ID',
+      idImage: data['idImage'] ?? '',
+      idStatus: data['idStatus'] ?? 'unprovided',
+      idUploadDate: data['idUploadDate'] ?? '',
+      idRejectionReason: data['idRejectionReason'] ?? '',
+      idReviewedBy: data['idReviewedBy'] ?? '',
+      idReviewedDate: data['idReviewedDate'] ?? '',
     );
   }
 
@@ -89,6 +126,17 @@ class UserModel {
       'licenseClass': licenseClass,
       'licenseExpiry': licenseExpiry,
       'rewardPoints': rewardPoints,
+      'licenseUploadDate': licenseUploadDate,
+      'licenseReviewedBy': licenseReviewedBy,
+      'licenseReviewedDate': licenseReviewedDate,
+      'idNumber': idNumber,
+      'idType': idType,
+      'idImage': idImage,
+      'idStatus': idStatus,
+      'idUploadDate': idUploadDate,
+      'idRejectionReason': idRejectionReason,
+      'idReviewedBy': idReviewedBy,
+      'idReviewedDate': idReviewedDate,
     };
   }
 }

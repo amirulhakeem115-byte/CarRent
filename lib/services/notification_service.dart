@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -117,70 +118,91 @@ class NotificationService {
       return Stream.value([]);
     }
 
-    if (userId == currentUser.uid) {
-      // ignore: avoid_print
-      print("Customer UID: ${currentUser.uid}");
-      // ignore: avoid_print
-      print("Listening to: notifications filtered by userId: ${currentUser.uid}");
+    final controller = StreamController<List<NotificationModel>>.broadcast();
+    StreamSubscription<DatabaseEvent>? personalSub;
+    StreamSubscription<DatabaseEvent>? adminSub;
+    List<NotificationModel> personalList = [];
+    List<NotificationModel> adminList = [];
 
-      Query query = _baseDb.orderByChild('userId').equalTo(currentUser.uid);
-      if (limit != null) {
-        query = query.limitToLast(limit);
+    void emitMerged() {
+      if (controller.isClosed) return;
+      final Map<String, NotificationModel> merged = {};
+      for (var n in personalList) {
+        merged[n.id] = n;
       }
-      return query.onValue.map((event) {
-        List<NotificationModel> notifications = [];
-        if (event.snapshot.exists && event.snapshot.value != null) {
+      for (var n in adminList) {
+        merged[n.id] = n;
+      }
+      final list = merged.values.toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      if (limit != null && list.length > limit) {
+        controller.add(list.take(limit).toList());
+      } else {
+        controller.add(list);
+      }
+    }
+
+    // 1. Immediately subscribe to personal notifications
+    Query personalQuery = _baseDb.orderByChild('userId').equalTo(currentUser.uid);
+    if (limit != null) {
+      personalQuery = personalQuery.limitToLast(limit);
+    }
+    personalSub = personalQuery.onValue.listen((event) {
+      personalList = [];
+      if (event.snapshot.exists && event.snapshot.value != null) {
+        try {
           final Map<dynamic, dynamic> data = event.snapshot.value as Map<dynamic, dynamic>;
           data.forEach((key, value) {
-            notifications.add(NotificationModel.fromMap(key.toString(), value as Map<dynamic, dynamic>));
+            personalList.add(NotificationModel.fromMap(key.toString(), value as Map<dynamic, dynamic>));
           });
+        } catch (e) {
+          debugPrint('Error parsing personal notifications: $e');
         }
-        notifications.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        // ignore: avoid_print
-        print("Notification received: ${notifications.length} item(s)");
-        return notifications;
-      });
-    }
-
-    return _getNotificationsStreamWithRoleCheck(userId, currentUser, limit);
-  }
-
-  Stream<List<NotificationModel>> _getNotificationsStreamWithRoleCheck(String userId, User currentUser, int? limit) async* {
-    String currentRole = 'customer';
-    try {
-      final roleSnap = await FirebaseDatabase.instance.ref().child('users').child(currentUser.uid).child('role').get().timeout(const Duration(seconds: 3));
-      if (roleSnap.exists) {
-        currentRole = roleSnap.value.toString();
       }
-    } catch (_) {}
+      emitMerged();
+    });
 
-    String targetUserId = userId;
-    if (currentRole != 'admin') {
-      targetUserId = currentUser.uid;
-    }
+    // 2. Fetch role asynchronously and optionally subscribe to 'admin' topic
+    FirebaseDatabase.instance
+        .ref()
+        .child('users')
+        .child(currentUser.uid)
+        .child('role')
+        .get()
+        .then((roleSnap) {
+      if (controller.isClosed) return;
+      final role = roleSnap.exists ? roleSnap.value.toString() : 'customer';
 
-    // ignore: avoid_print
-    print("Customer UID: $targetUserId");
-    // ignore: avoid_print
-    print("Listening to: notifications filtered by userId: $targetUserId");
-
-    Query query = _baseDb.orderByChild('userId').equalTo(targetUserId);
-    if (limit != null) {
-      query = query.limitToLast(limit);
-    }
-    yield* query.onValue.map((event) {
-      List<NotificationModel> notifications = [];
-      if (event.snapshot.exists && event.snapshot.value != null) {
-        final Map<dynamic, dynamic> data = event.snapshot.value as Map<dynamic, dynamic>;
-        data.forEach((key, value) {
-          notifications.add(NotificationModel.fromMap(key.toString(), value as Map<dynamic, dynamic>));
+      if (role == 'admin') {
+        Query adminQuery = _baseDb.orderByChild('userId').equalTo('admin');
+        if (limit != null) {
+          adminQuery = adminQuery.limitToLast(limit);
+        }
+        adminSub = adminQuery.onValue.listen((event) {
+          adminList = [];
+          if (event.snapshot.exists && event.snapshot.value != null) {
+            try {
+              final Map<dynamic, dynamic> data = event.snapshot.value as Map<dynamic, dynamic>;
+              data.forEach((key, value) {
+                adminList.add(NotificationModel.fromMap(key.toString(), value as Map<dynamic, dynamic>));
+              });
+            } catch (e) {
+              debugPrint('Error parsing admin notifications: $e');
+            }
+          }
+          emitMerged();
         });
       }
-      notifications.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      // ignore: avoid_print
-      print("Notification received: ${notifications.length} item(s)");
-      return notifications;
+    }).catchError((e) {
+      debugPrint('Error checking user role for notification stream: $e');
     });
+
+    controller.onCancel = () {
+      personalSub?.cancel();
+      adminSub?.cancel();
+    };
+
+    return controller.stream;
   }
 
   Future<void> markAsRead(String userId, String id) async {
@@ -346,29 +368,54 @@ class NotificationService {
       } catch (_) {}
 
       if (currentRole != 'admin') {
-        debugPrint('[NotificationService] [notifyAllAdmins] Customer user cannot read user list to notify admins. Skipping.');
+        // Fallback for customer actions: write directly to 'admin' topic
+        await createNotification(
+          userId: 'admin',
+          title: title,
+          message: message,
+          type: type,
+          icon: icon,
+          color: color,
+          relatedId: relatedId,
+          actionRoute: actionRoute,
+        );
         return;
       }
 
-      final snapshot = await FirebaseDatabase.instance.ref().child('users').get();
-      if (snapshot.exists) {
-        final Map<dynamic, dynamic> users = snapshot.value as Map<dynamic, dynamic>;
-        for (var entry in users.entries) {
-          final userData = entry.value as Map<dynamic, dynamic>;
-          final role = userData['role'] ?? 'customer';
-          if (role == 'admin') {
-            await createNotification(
-              userId: entry.key.toString(),
-              title: title,
-              message: message,
-              type: type,
-              icon: icon,
-              color: color,
-              relatedId: relatedId,
-              actionRoute: actionRoute,
-            );
+      // If caller is admin, try to create individual notifications for each admin
+      try {
+        final snapshot = await FirebaseDatabase.instance.ref().child('users').get().timeout(const Duration(seconds: 5));
+        if (snapshot.exists) {
+          final Map<dynamic, dynamic> users = snapshot.value as Map<dynamic, dynamic>;
+          for (var entry in users.entries) {
+            final userData = entry.value as Map<dynamic, dynamic>;
+            final role = userData['role'] ?? 'customer';
+            if (role == 'admin') {
+              await createNotification(
+                userId: entry.key.toString(),
+                title: title,
+                message: message,
+                type: type,
+                icon: icon,
+                color: color,
+                relatedId: relatedId,
+                actionRoute: actionRoute,
+              );
+            }
           }
         }
+      } catch (e) {
+        // Fallback if users list reading is permission-denied
+        await createNotification(
+          userId: 'admin',
+          title: title,
+          message: message,
+          type: type,
+          icon: icon,
+          color: color,
+          relatedId: relatedId,
+          actionRoute: actionRoute,
+        );
       }
     } catch (e) {
       debugPrint('Error notifying all admins: $e');

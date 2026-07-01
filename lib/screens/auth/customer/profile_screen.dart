@@ -2,7 +2,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../../../constants/colors.dart';
+import '../../../services/theme_provider.dart';
+import '../../../widgets/custom_textfield.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/database_service.dart';
 import '../../../services/booking_service.dart';
@@ -57,11 +60,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // Image Picker
   final _picker = ImagePicker();
 
+  // Identity and License Controllers
+  final _idNumberController = TextEditingController();
+  String _selectedIdType = 'National ID';
+  XFile? _idImageFile;
+  bool _uploadingId = false;
+
+  final _licenseNumberController = TextEditingController();
+  String _selectedLicenseClass = 'Class D';
+  DateTime? _licenseExpiryDate;
+  XFile? _licenseImageFile;
+  bool _uploadingLicense = false;
+
   @override
   void initState() {
     super.initState();
     _loadProfileData();
     receipt_upload.registerPlatformDropzone();
+  }
+
+  @override
+  void dispose() {
+    _idNumberController.dispose();
+    _licenseNumberController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadProfileData() async {
@@ -82,6 +104,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (mounted) {
           setState(() {
             _loading = false;
+            if (_idNumberController.text.isEmpty) {
+              _idNumberController.text = _user?.idNumber ?? '';
+            }
+            if (_user?.idType.isNotEmpty == true) {
+              _selectedIdType = _user!.idType;
+            }
+            if (_licenseNumberController.text.isEmpty && _user?.licenseNumber != null) {
+              _licenseNumberController.text = _user!.licenseNumber!;
+            }
+            if (_user?.licenseClass.isNotEmpty == true) {
+              _selectedLicenseClass = _user!.licenseClass;
+            }
+            if (_user?.licenseExpiry.isNotEmpty == true) {
+              try {
+                _licenseExpiryDate = DateFormat('dd / MM / yyyy').parse(_user!.licenseExpiry);
+              } catch (_) {}
+            }
           });
         }
 
@@ -406,6 +445,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final double width = MediaQuery.of(context).size.width;
     final bool isDesktop = width > 900;
+    final themeProvider = context.watch<ThemeProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (_loading) {
       return const Center(
@@ -463,14 +504,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               child: Column(
                 children: [
+                  _buildVerificationReminderCard(isDark),
                   // Profile Header Banner Card (Image Reference 2)
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: Theme.of(context).cardColor,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.grey[200]!),
+                      border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.grey[200]!),
                     ),
                     child: Row(
                       children: [
@@ -507,16 +549,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             children: [
                               Text(
                                 _user?.fullName.isNotEmpty == true ? _user!.fullName : 'Username',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 22,
                                   fontWeight: FontWeight.bold,
-                                  color: AppColors.secondaryBlue,
+                                  color: isDark ? Colors.white : AppColors.secondaryBlue,
                                 ),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 _user?.email ?? '',
-                                style: TextStyle(color: Colors.grey[500], fontSize: 13),
+                                style: TextStyle(color: isDark ? const Color(0xFFCBD5E1) : Colors.grey[500], fontSize: 13),
                               ),
                               const SizedBox(height: 6),
                               Row(
@@ -597,42 +639,101 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 _buildDetailRow('RESIDENTIAL ADDRESS', _user?.address ?? 'N/A'),
                               ],
                             ),
-                             const SizedBox(height: 16),
-                             _buildInfoCard(
-                               title: 'Loyalty Rewards',
-                               icon: Icons.stars_rounded,
-                               children: [
-                                 Row(
-                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                   children: [
-                                     Column(
-                                       crossAxisAlignment: CrossAxisAlignment.start,
-                                       children: [
-                                         const Text('CURRENT BALANCE', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
-                                         const SizedBox(height: 4),
-                                         Text('${_user?.rewardPoints ?? 0} Points', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryOrange, fontSize: 16)),
-                                       ],
-                                     ),
-                                     ElevatedButton.icon(
-                                       style: ElevatedButton.styleFrom(
-                                         backgroundColor: AppColors.secondaryBlue,
-                                         foregroundColor: Colors.white,
-                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                       ),
-                                       icon: const Icon(Icons.history, size: 14),
-                                       label: const Text('View Ledger', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                       onPressed: () {
-                                         Navigator.push(
-                                           context,
-                                           MaterialPageRoute(builder: (context) => const RewardHistoryScreen()),
-                                         );
-                                       },
-                                     ),
-                                   ],
-                                 ),
-                               ],
-                             ),
+                            const SizedBox(height: 16),
+                            
+                            // 2. Loyalty Rewards
+                            _buildInfoCard(
+                              title: 'Loyalty Rewards',
+                              icon: Icons.stars_rounded,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text('CURRENT BALANCE', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
+                                        const SizedBox(height: 4),
+                                        Text('${_user?.rewardPoints ?? 0} Points', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryOrange, fontSize: 16)),
+                                      ],
+                                    ),
+                                    ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppColors.secondaryBlue,
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                      ),
+                                      icon: const Icon(Icons.history, size: 14),
+                                      label: const Text('View Ledger', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(builder: (context) => const RewardHistoryScreen()),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+
+                            // 3. Theme Settings
+                            _buildInfoCard(
+                              title: 'Theme Settings',
+                              icon: Icons.brightness_6_outlined,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text('THEME MODE', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            themeProvider.themeMode == ThemeMode.system
+                                                ? 'System Default'
+                                                : themeProvider.themeMode == ThemeMode.light
+                                                    ? 'Light Mode'
+                                                    : 'Dark Mode',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              color: isDark ? Colors.white : AppColors.secondaryBlue,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    DropdownButton<ThemeMode>(
+                                      value: themeProvider.themeMode,
+                                      onChanged: (mode) {
+                                        if (mode != null) {
+                                          themeProvider.setThemeMode(mode);
+                                        }
+                                      },
+                                      dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                      style: TextStyle(
+                                        color: isDark ? Colors.white : AppColors.secondaryBlue,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      items: const [
+                                        DropdownMenuItem(value: ThemeMode.system, child: Text('System')),
+                                        DropdownMenuItem(value: ThemeMode.light, child: Text('Light')),
+                                        DropdownMenuItem(value: ThemeMode.dark, child: Text('Dark')),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+
+                            // 4. Identity Verification
+                            _buildIdentityVerificationCard(isDark),
                           ],
                         ),
                       ),
@@ -645,9 +746,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: Container(
                           padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: Theme.of(context).cardColor,
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.grey[200]!),
+                            border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.grey[200]!),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -655,9 +756,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Text(
+                                  Text(
                                     'Recent Bookings',
-                                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue),
+                                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : AppColors.secondaryBlue),
                                   ),
                                   TextButton(
                                     onPressed: _loadProfileData,
@@ -671,9 +772,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 margin: const EdgeInsets.only(bottom: 20),
                                 padding: const EdgeInsets.all(16),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFF8F9FA),
+                                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8F9FA),
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.grey[200]!),
+                                  border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.grey[200]!),
                                 ),
                                 child: GridView.count(
                                   shrinkWrap: true,
@@ -723,8 +824,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         final payment = paymentList.isNotEmpty ? paymentList.first : null;
 
                                         return Card(
-                                          color: const Color(0xFFF8F9FA),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8F9FA),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: isDark ? const Color(0xFF334155) : Colors.grey[200]!)),
                                           elevation: 0,
                                           margin: const EdgeInsets.only(bottom: 12),
                                           child: Padding(
@@ -1440,13 +1541,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required IconData icon,
     required List<Widget> children,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.grey[200]!),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1457,12 +1559,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(width: 8),
               Text(
                 title,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : AppColors.secondaryBlue,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 16),
-          const Divider(),
+          Divider(color: isDark ? const Color(0xFF334155) : null),
           const SizedBox(height: 16),
           ...children,
         ],
@@ -1471,11 +1577,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildStatMiniTile(String label, String value, IconData icon, Color color) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF0F172A) : Colors.white,
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.grey[200]!),
         boxShadow: [
           BoxShadow(color: Colors.black.withValues(alpha: 0.01), blurRadius: 4, offset: const Offset(0, 2)),
         ],
@@ -1495,7 +1603,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 Text(label, style: const TextStyle(fontSize: 9, color: Colors.grey, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 2),
-                Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue), maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.white : AppColors.secondaryBlue), maxLines: 1, overflow: TextOverflow.ellipsis),
               ],
             ),
           ),
@@ -1505,6 +1613,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildDetailRow(String label, String value) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
       child: Column(
@@ -1517,10 +1626,562 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 4),
           Text(
             value,
-            style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue, fontSize: 14),
+            style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white : AppColors.secondaryBlue, fontSize: 14),
           ),
         ],
       ),
+    );
+  }
+
+  // --- IDENTITY & LICENSE UPLOAD FUNCTIONS ---
+  Future<void> _pickIdImage() async {
+    try {
+      final picked = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 50,
+        maxWidth: 800,
+        maxHeight: 800,
+      );
+      if (picked != null) {
+        setState(() {
+          _idImageFile = picked;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error picking ID image: $e');
+    }
+  }
+
+  Future<void> _pickLicenseImage() async {
+    try {
+      final picked = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 50,
+        maxWidth: 800,
+        maxHeight: 800,
+      );
+      if (picked != null) {
+        setState(() {
+          _licenseImageFile = picked;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error picking license image: $e');
+    }
+  }
+
+  Future<void> _submitIdVerification() async {
+    if (_user == null) return;
+    if (_idNumberController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your National ID or Passport number.'), backgroundColor: Colors.redAccent),
+      );
+      return;
+    }
+    if (_idImageFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select/upload your ID card or Passport photo.'), backgroundColor: Colors.redAccent),
+      );
+      return;
+    }
+
+    setState(() => _uploadingId = true);
+    try {
+      final bytes = await _idImageFile!.readAsBytes();
+      final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+      
+      await _databaseService.updateUser(_user!.id, {
+        'idNumber': _idNumberController.text.trim().toUpperCase(),
+        'idType': _selectedIdType,
+        'idImage': base64Image,
+        'idStatus': 'pending',
+        'idUploadDate': DateFormat('dd / MM / yyyy').format(DateTime.now()),
+        'idRejectionReason': '',
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ID/Passport uploaded for verification successfully!'), backgroundColor: Colors.green),
+        );
+      }
+      _loadProfileData();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to upload ID/Passport: $e'), backgroundColor: Colors.redAccent),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _uploadingId = false);
+      }
+    }
+  }
+
+  Future<void> _submitLicenseVerification() async {
+    if (_user == null) return;
+    if (_licenseNumberController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your Driving License number.'), backgroundColor: Colors.redAccent),
+      );
+      return;
+    }
+    if (_licenseExpiryDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select your license expiry date.'), backgroundColor: Colors.redAccent),
+      );
+      return;
+    }
+    if (_licenseImageFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select/upload your driving license card photo.'), backgroundColor: Colors.redAccent),
+      );
+      return;
+    }
+
+    setState(() => _uploadingLicense = true);
+    try {
+      final bytes = await _licenseImageFile!.readAsBytes();
+      final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+      
+      await _databaseService.updateUser(_user!.id, {
+        'licenseNumber': _licenseNumberController.text.trim().toUpperCase(),
+        'licenseClass': _selectedLicenseClass,
+        'licenseExpiry': DateFormat('dd / MM / yyyy').format(_licenseExpiryDate!),
+        'licenseImage': base64Image,
+        'licenseStatus': 'pending',
+        'licenseUploadDate': DateFormat('dd / MM / yyyy').format(DateTime.now()),
+        'licenseRejectionReason': '',
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Driving License uploaded for verification successfully!'), backgroundColor: Colors.green),
+        );
+      }
+      _loadProfileData();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to upload driving license: $e'), backgroundColor: Colors.redAccent),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _uploadingLicense = false);
+      }
+    }
+  }
+
+  Future<void> _selectLicenseExpiryDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().add(const Duration(days: 365)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 3650)),
+      builder: (context, child) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Theme(
+          data: isDark
+              ? ThemeData.dark().copyWith(
+                  colorScheme: const ColorScheme.dark(
+                    primary: AppColors.primaryOrange,
+                    surface: Color(0xFF1E293B),
+                  ),
+                )
+              : ThemeData.light().copyWith(
+                  colorScheme: const ColorScheme.light(
+                    primary: AppColors.secondaryBlue,
+                  ),
+                ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        _licenseExpiryDate = picked;
+      });
+    }
+  }
+
+  Widget _buildVerificationReminderCard(bool isDark) {
+    if (_user == null) return const SizedBox.shrink();
+    
+    final bool hasLicenseApproved = _user!.licenseStatus == 'approved';
+    final bool hasIdApproved = _user!.idStatus == 'approved';
+    
+    if (hasLicenseApproved && hasIdApproved) {
+      return const SizedBox.shrink();
+    }
+    
+    List<String> missing = [];
+    if (!hasIdApproved) missing.add('Passport or National ID');
+    if (!hasLicenseApproved) missing.add('Driving License');
+    
+    final missingText = missing.join(' and ');
+    
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFFFF8E1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : Colors.orangeAccent.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.info_outline_rounded,
+            color: isDark ? AppColors.primaryOrange : Colors.orange[800],
+            size: 24,
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Identity Verification Recommended',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: isDark ? Colors.white : Colors.orange[900],
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Verify your identity by uploading your $missingText to help us keep your account secure.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isDark ? const Color(0xFFCBD5E1) : Colors.orange[800],
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryOrange,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  ),
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Scroll down to Identity Verification section below to upload documents.'),
+                        backgroundColor: AppColors.primaryOrange,
+                      ),
+                    );
+                  },
+                  child: const Text(
+                    'Upload Documents',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIdentityVerificationCard(bool isDark) {
+    if (_user == null) return const SizedBox.shrink();
+
+    final idStatus = _user!.idStatus;
+    final licenseStatus = _user!.licenseStatus;
+
+    return _buildInfoCard(
+      title: 'Identity Verification',
+      icon: Icons.verified_user_outlined,
+      children: [
+        // Document 1: ID / Passport
+        _buildDocumentVerificationRow(
+          title: 'National ID or Passport',
+          status: idStatus,
+          rejectionReason: _user!.idRejectionReason,
+          isDark: isDark,
+          uploadWidget: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('ID Type', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
+              const SizedBox(height: 4),
+              DropdownButtonFormField<String>(
+                initialValue: _selectedIdType,
+                decoration: InputDecoration(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                items: const [
+                  DropdownMenuItem(value: 'National ID', child: Text('National ID / IC')),
+                  DropdownMenuItem(value: 'Passport', child: Text('International Passport')),
+                ],
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() => _selectedIdType = val);
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+              const Text('Document Number', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
+              const SizedBox(height: 4),
+              CustomTextField(
+                controller: _idNumberController,
+                labelText: '',
+                hintText: 'Enter ID or Passport Number',
+                prefixIcon: Icons.badge_outlined,
+              ),
+              const SizedBox(height: 12),
+              const Text('Document Photo Card', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
+              const SizedBox(height: 4),
+              InkWell(
+                onTap: _pickIdImage,
+                child: Container(
+                  height: 110,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
+                    borderRadius: BorderRadius.circular(12),
+                    color: isDark ? const Color(0xFF1E293B) : Colors.grey[50],
+                  ),
+                  alignment: Alignment.center,
+                  child: _idImageFile == null
+                      ? const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.add_photo_alternate_outlined, size: 24, color: AppColors.primaryOrange),
+                            SizedBox(height: 4),
+                            Text('Upload document photo', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                          ],
+                        )
+                      : const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.check_circle_outline, size: 28, color: Colors.green),
+                            SizedBox(height: 4),
+                            Text('Document Selected', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green)),
+                          ],
+                        ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryOrange,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: _uploadingId ? null : _submitIdVerification,
+                child: _uploadingId
+                    ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Text('Submit ID / Passport', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        ),
+        
+        const SizedBox(height: 24),
+        const Divider(),
+        const SizedBox(height: 16),
+
+        // Document 2: Driving License
+        _buildDocumentVerificationRow(
+          title: 'Driving License',
+          status: licenseStatus,
+          rejectionReason: _user!.licenseRejectionReason,
+          isDark: isDark,
+          uploadWidget: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('License Number', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
+              const SizedBox(height: 4),
+              CustomTextField(
+                controller: _licenseNumberController,
+                labelText: '',
+                hintText: 'Enter License Number',
+                prefixIcon: Icons.card_membership_outlined,
+              ),
+              const SizedBox(height: 12),
+              const Text('License Classification Class', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
+              const SizedBox(height: 4),
+              DropdownButtonFormField<String>(
+                initialValue: _selectedLicenseClass.contains('DA') ? 'Class DA (Automatic Car)' : 'Class D (Car)',
+                decoration: InputDecoration(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                items: const [
+                  DropdownMenuItem(value: 'Class D (Car)', child: Text('Class D (Car)')),
+                  DropdownMenuItem(value: 'Class DA (Automatic Car)', child: Text('Class DA (Automatic Car)')),
+                  DropdownMenuItem(value: 'Class B2 (Motorcycle)', child: Text('Class B2 (Motorcycle)')),
+                ],
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() => _selectedLicenseClass = '${val.split(' ')[0]} ${val.split(' ')[1]}');
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+              const Text('Expiry Date', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
+              const SizedBox(height: 4),
+              InkWell(
+                onTap: _selectLicenseExpiryDate,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        _licenseExpiryDate == null
+                            ? 'Select Expiry Date'
+                            : DateFormat('dd / MM / yyyy').format(_licenseExpiryDate!),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: _licenseExpiryDate == null ? Colors.grey : (isDark ? Colors.white : Colors.black),
+                        ),
+                      ),
+                      const Icon(Icons.calendar_today, size: 14, color: AppColors.primaryOrange),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text('License Card Photo', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
+              const SizedBox(height: 4),
+              InkWell(
+                onTap: _pickLicenseImage,
+                child: Container(
+                  height: 110,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
+                    borderRadius: BorderRadius.circular(12),
+                    color: isDark ? const Color(0xFF1E293B) : Colors.grey[50],
+                  ),
+                  alignment: Alignment.center,
+                  child: _licenseImageFile == null
+                      ? const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.add_photo_alternate_outlined, size: 24, color: AppColors.primaryOrange),
+                            SizedBox(height: 4),
+                            Text('Upload license photo', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                          ],
+                        )
+                      : const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.check_circle_outline, size: 28, color: Colors.green),
+                            SizedBox(height: 4),
+                            Text('Card Photo Selected', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green)),
+                          ],
+                        ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryOrange,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: _uploadingLicense ? null : _submitLicenseVerification,
+                child: _uploadingLicense
+                    ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Text('Submit Driving License', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDocumentVerificationRow({
+    required String title,
+    required String status,
+    required String rejectionReason,
+    required bool isDark,
+    required Widget uploadWidget,
+  }) {
+    Color statusColor = Colors.grey;
+    String statusText = 'Not Uploaded';
+
+    if (status == 'pending') {
+      statusColor = Colors.orange;
+      statusText = 'Pending Review';
+    } else if (status == 'approved') {
+      statusColor = Colors.green;
+      statusText = 'Approved';
+    } else if (status == 'rejected') {
+      statusColor = Colors.red;
+      statusText = 'Rejected';
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: isDark ? Colors.white : AppColors.secondaryBlue,
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: statusColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                statusText,
+                style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        if (status == 'rejected' && rejectionReason.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.redAccent.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              'Reason: $rejectionReason',
+              style: const TextStyle(color: Colors.redAccent, fontSize: 11),
+            ),
+          ),
+        ],
+        if (status == 'pending') ...[
+          const SizedBox(height: 12),
+          const Text(
+            'Documents submitted and awaiting verification review.',
+            style: TextStyle(color: Colors.grey, fontSize: 12),
+          ),
+        ],
+        if (status == 'unprovided' || status == 'rejected') ...[
+          const SizedBox(height: 16),
+          uploadWidget,
+        ],
+      ],
     );
   }
 }

@@ -90,12 +90,15 @@ class _BookingsViewState extends State<BookingsView> {
 
   void _showBookingDetails(BookingModel booking) {
     final dateFormat = DateFormat('dd MMM yyyy');
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final sheetBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      backgroundColor: Colors.white,
+      backgroundColor: sheetBg,
       builder: (context) {
         Color statusColor = Colors.orange;
         if (booking.status == 'approved') statusColor = Colors.green;
@@ -105,9 +108,7 @@ class _BookingsViewState extends State<BookingsView> {
 
         return Padding(
           padding: EdgeInsets.only(
-            top: 24,
-            left: 24,
-            right: 24,
+            top: 24, left: 24, right: 24,
             bottom: MediaQuery.of(context).viewInsets.bottom + 24,
           ),
           child: SingleChildScrollView(
@@ -118,7 +119,7 @@ class _BookingsViewState extends State<BookingsView> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Reservation Specification', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+                    Text('Reservation Specification', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textPrimary)),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
@@ -130,19 +131,17 @@ class _BookingsViewState extends State<BookingsView> {
                   ],
                 ),
                 const SizedBox(height: 20),
-                
-                _buildDetailRow('Reservation Ref ID', booking.id),
-                _buildDetailRow('Vehicle Name', booking.vehicleName),
-                _buildDetailRow('Customer Name', booking.userName),
-                _buildDetailRow('Customer Phone', booking.userPhone),
-                _buildDetailRow('Rental Duration', '${dateFormat.format(booking.pickUpDate)} to ${dateFormat.format(booking.returnDate)} (${booking.rentalDays} days)'),
-                _buildDetailRow('Deposit Lodged', 'RM ${booking.depositAmount.toStringAsFixed(2)}'),
-                _buildDetailRow('Total Cost', 'RM ${booking.totalPrice.toStringAsFixed(2)}'),
+                _buildDetailRow(context, 'Reservation Ref ID', booking.id),
+                _buildDetailRow(context, 'Vehicle Name', booking.vehicleName),
+                _buildDetailRow(context, 'Customer Name', booking.userName),
+                _buildDetailRow(context, 'Customer Phone', booking.userPhone),
+                _buildDetailRow(context, 'Rental Duration', '${dateFormat.format(booking.pickUpDate)} to ${dateFormat.format(booking.returnDate)} (${booking.rentalDays} days)'),
+                _buildDetailRow(context, 'Deposit Lodged', 'RM ${booking.depositAmount.toStringAsFixed(2)}'),
+                _buildDetailRow(context, 'Total Cost', 'RM ${booking.totalPrice.toStringAsFixed(2)}'),
                 if (booking.notes != null && booking.notes!.isNotEmpty)
-                  _buildDetailRow('Special Remarks', booking.notes!, isItalic: true),
-                  
+                  _buildDetailRow(context, 'Special Remarks', booking.notes!, isItalic: true),
                 const Divider(height: 32),
-                const Text('Transition Rental State', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.secondaryBlue)),
+                Text('Transition Rental State', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textPrimary)),
                 const SizedBox(height: 12),
                 Wrap(
                   spacing: 12,
@@ -206,7 +205,10 @@ class _BookingsViewState extends State<BookingsView> {
     );
   }
 
-  Widget _buildDetailRow(String label, String value, {bool isItalic = false}) {
+  Widget _buildDetailRow(BuildContext context, String label, String value, {bool isItalic = false}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -214,7 +216,7 @@ class _BookingsViewState extends State<BookingsView> {
         children: [
           Expanded(
             flex: 3,
-            child: Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.w500)),
+            child: Text(label, style: TextStyle(color: textSecondary, fontSize: 13, fontWeight: FontWeight.w500)),
           ),
           Expanded(
             flex: 7,
@@ -224,7 +226,7 @@ class _BookingsViewState extends State<BookingsView> {
                 fontWeight: FontWeight.bold,
                 fontSize: 13,
                 fontStyle: isItalic ? FontStyle.italic : FontStyle.normal,
-                color: AppColors.secondaryBlue,
+                color: textPrimary,
               ),
             ),
           ),
@@ -271,23 +273,27 @@ class _BookingsViewState extends State<BookingsView> {
 
     final double width = MediaQuery.of(context).size.width;
     final bool isDesktop = width > 1100;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final surfaceColor = isDark ? const Color(0xFF111827) : const Color(0xFFF1F5F9);
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
+    final borderColor = isDark ? const Color(0xFF334155) : Colors.grey.shade200;
 
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header Row
-          const Column(
+          Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Reservation Registry', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue)),
-              Text('Audit rental schedules, verify security deposits, and handover keys.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+              Text('Reservation Registry', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textPrimary)),
+              Text('Audit rental schedules, verify security deposits, and handover keys.', style: TextStyle(fontSize: 12, color: textSecondary)),
             ],
           ),
           const SizedBox(height: 24),
 
-          // Statistics Grid
           GridView.count(
             crossAxisCount: isDesktop ? 4 : 2,
             crossAxisSpacing: 16,
@@ -296,111 +302,125 @@ class _BookingsViewState extends State<BookingsView> {
             childAspectRatio: isDesktop ? 2.2 : 1.5,
             physics: const NeverScrollableScrollPhysics(),
             children: [
-              _buildStatCard('Total Bookings', totalBookings.toString(), Icons.book_online, Colors.indigo),
-              _buildStatCard('Active / Ongoing', activeBookings.toString(), Icons.directions_car, Colors.orange),
-              _buildStatCard('Completed Trips', completedBookings.toString(), Icons.done_all, Colors.green),
-              _buildStatCard('Cancelled / Denied', cancelledBookings.toString(), Icons.cancel_presentation_outlined, Colors.redAccent),
+              _buildStatCard('Total Bookings', totalBookings.toString(), Icons.book_online, Colors.indigo, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+              _buildStatCard('Active / Ongoing', activeBookings.toString(), Icons.directions_car, Colors.orange, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+              _buildStatCard('Completed Trips', completedBookings.toString(), Icons.done_all, Colors.green, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+              _buildStatCard('Cancelled / Denied', cancelledBookings.toString(), Icons.cancel_presentation_outlined, Colors.redAccent, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
             ],
           ),
           const SizedBox(height: 24),
 
-          // Filters Card
-          Card(
-            color: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            elevation: 0,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: isDesktop
-                  ? Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _searchController,
-                            decoration: const InputDecoration(
-                              hintText: 'Search by booking ID, vehicle model, or customer name...',
-                              prefixIcon: Icon(Icons.search, size: 20),
-                              contentPadding: EdgeInsets.symmetric(vertical: 8),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        _buildStatusFilterDropdown(),
-                      ],
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        TextField(
-                          controller: _searchController,
-                          decoration: const InputDecoration(
-                            hintText: 'Search by booking ID, vehicle model, or customer name...',
-                            prefixIcon: Icon(Icons.search, size: 20),
-                            contentPadding: EdgeInsets.symmetric(vertical: 8),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        _buildStatusFilterDropdown(),
-                      ],
-                    ),
+          Container(
+            decoration: BoxDecoration(
+              color: cardColor,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: borderColor),
             ),
+            padding: const EdgeInsets.all(16),
+            child: isDesktop
+                ? Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          style: TextStyle(color: textPrimary),
+                          decoration: InputDecoration(
+                            hintText: 'Search by booking ID, vehicle model, or customer name...',
+                            hintStyle: TextStyle(color: textSecondary),
+                            prefixIcon: Icon(Icons.search, size: 20, color: textSecondary),
+                            contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      _buildStatusFilterDropdown(isDark: isDark, cardColor: surfaceColor, textPrimary: textPrimary, borderColor: borderColor),
+                    ],
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextField(
+                        controller: _searchController,
+                        style: TextStyle(color: textPrimary),
+                        decoration: InputDecoration(
+                          hintText: 'Search by booking ID, vehicle or customer...',
+                          hintStyle: TextStyle(color: textSecondary),
+                          prefixIcon: Icon(Icons.search, size: 20, color: textSecondary),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildStatusFilterDropdown(isDark: isDark, cardColor: surfaceColor, textPrimary: textPrimary, borderColor: borderColor),
+                    ],
+                  ),
           ),
           const SizedBox(height: 16),
 
           // List / Table view
-          Expanded(
-            child: filteredBookings.isEmpty
-                ? Center(
+          filteredBookings.isEmpty
+              ? Container(
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: cardColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: borderColor),
+                  ),
+                  child: Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.calendar_today_outlined, size: 64, color: Colors.grey[400]),
+                        Icon(Icons.calendar_today_outlined, size: 64, color: textSecondary),
                         const SizedBox(height: 16),
-                        Text('No reservations found matching search queries.', style: TextStyle(color: Colors.grey[500])),
+                        Text('No reservations found matching search queries.', style: TextStyle(color: textSecondary)),
                       ],
                     ),
-                  )
-                : Card(
-                    color: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    elevation: 0,
-                    child: isDesktop ? _buildDesktopTable(filteredBookings) : _buildMobileList(filteredBookings),
                   ),
-          ),
+                )
+              : Container(
+                  decoration: BoxDecoration(
+                    color: cardColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: borderColor),
+                  ),
+                  child: isDesktop
+                      ? _buildDesktopTable(filteredBookings, isDark: isDark, textPrimary: textPrimary, textSecondary: textSecondary)
+                      : _buildMobileList(filteredBookings, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+                ),
         ],
       ),
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
+  Widget _buildStatCard(String label, String value, IconData icon, Color color, {
+    required bool isDark, required Color cardColor, required Color textPrimary, required Color textSecondary, required Color borderColor,
+  }) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4)),
-        ],
+        border: Border.all(color: borderColor),
+        boxShadow: isDark ? [] : [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4))],
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
+              color: color.withValues(alpha: isDark ? 0.2 : 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: color, size: 24),
+            child: Icon(icon, color: color, size: 22),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold)),
+                Text(label, style: TextStyle(color: textSecondary, fontSize: 10, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.secondaryBlue)),
+                Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: textPrimary), overflow: TextOverflow.ellipsis),
               ],
             ),
           ),
@@ -409,67 +429,57 @@ class _BookingsViewState extends State<BookingsView> {
     );
   }
 
-  Widget _buildDesktopTable(List<BookingModel> bookings) {
-    return ListView(
-      children: [
-        DataTable(
-          headingRowColor: WidgetStateProperty.all(Colors.grey[50]),
-          columns: const [
-            DataColumn(label: Text('Booking ID', style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('Customer', style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('Vehicle', style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('Pickup Date', style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('Return Date', style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('Amount (RM)', style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('Detail', style: TextStyle(fontWeight: FontWeight.bold))),
-          ],
-          rows: bookings.map((b) {
-            Color statusColor = Colors.orange;
-            if (b.status == 'approved') statusColor = Colors.green;
-            if (b.status == 'ongoing') statusColor = Colors.blue;
-            if (b.status == 'completed') statusColor = Colors.indigo;
-            if (b.status == 'cancelled' || b.status == 'rejected') statusColor = Colors.redAccent;
-
-            final dateFormat = DateFormat('yyyy-MM-dd');
-
-            return DataRow(
-              cells: [
-                DataCell(Text(b.id.substring(0, b.id.length > 8 ? 8 : b.id.length), style: const TextStyle(fontWeight: FontWeight.w600))),
-                DataCell(Text(b.userName)),
-                DataCell(Text(b.vehicleName)),
-                DataCell(Text(dateFormat.format(b.pickUpDate))),
-                DataCell(Text(dateFormat.format(b.returnDate))),
-                DataCell(Text('RM ${b.totalPrice.toStringAsFixed(2)}')),
-                DataCell(
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      b.status.toUpperCase(),
-                      style: TextStyle(color: statusColor, fontSize: 9, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-                DataCell(
-                  IconButton(
-                    icon: const Icon(Icons.visibility_outlined, color: AppColors.secondaryBlue, size: 18),
-                    onPressed: () => _showBookingDetails(b),
-                  ),
-                ),
-              ],
-            );
-          }).toList(),
-        ),
-      ],
+  Widget _buildDesktopTable(List<BookingModel> bookings, {required bool isDark, required Color textPrimary, required Color textSecondary}) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: DataTable(
+        headingRowColor: WidgetStateProperty.all(isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
+        dividerThickness: 1,
+        columns: [
+          DataColumn(label: Text('Booking ID', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
+          DataColumn(label: Text('Customer', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
+          DataColumn(label: Text('Vehicle', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
+          DataColumn(label: Text('Pickup Date', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
+          DataColumn(label: Text('Return Date', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
+          DataColumn(label: Text('Amount (RM)', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
+          DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
+          DataColumn(label: Text('Detail', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
+        ],
+        rows: bookings.map((b) {
+          Color statusColor = Colors.orange;
+          if (b.status == 'approved') statusColor = Colors.green;
+          if (b.status == 'ongoing') statusColor = Colors.blue;
+          if (b.status == 'completed') statusColor = Colors.indigo;
+          if (b.status == 'cancelled' || b.status == 'rejected') statusColor = Colors.redAccent;
+          final dateFormat = DateFormat('yyyy-MM-dd');
+          return DataRow(cells: [
+            DataCell(Text(b.id.substring(0, b.id.length > 8 ? 8 : b.id.length), style: TextStyle(fontWeight: FontWeight.w600, color: textPrimary))),
+            DataCell(Text(b.userName, style: TextStyle(color: textPrimary))),
+            DataCell(Text(b.vehicleName, style: TextStyle(color: textPrimary))),
+            DataCell(Text(dateFormat.format(b.pickUpDate), style: TextStyle(color: textSecondary))),
+            DataCell(Text(dateFormat.format(b.returnDate), style: TextStyle(color: textSecondary))),
+            DataCell(Text('RM ${b.totalPrice.toStringAsFixed(2)}', style: TextStyle(color: textPrimary))),
+            DataCell(
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
+                child: Text(b.status.toUpperCase(), style: TextStyle(color: statusColor, fontSize: 9, fontWeight: FontWeight.bold)),
+              ),
+            ),
+            DataCell(IconButton(
+              icon: Icon(Icons.visibility_outlined, color: textPrimary, size: 18),
+              onPressed: () => _showBookingDetails(b),
+            )),
+          ]);
+        }).toList(),
+      ),
     );
   }
 
-  Widget _buildMobileList(List<BookingModel> bookings) {
+  Widget _buildMobileList(List<BookingModel> bookings, {required bool isDark, required Color cardColor, required Color textPrimary, required Color textSecondary, required Color borderColor}) {
     return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       itemCount: bookings.length,
       itemBuilder: (context, index) {
         final b = bookings[index];
@@ -478,69 +488,47 @@ class _BookingsViewState extends State<BookingsView> {
         if (b.status == 'ongoing') statusColor = Colors.blue;
         if (b.status == 'completed') statusColor = Colors.indigo;
         if (b.status == 'cancelled' || b.status == 'rejected') statusColor = Colors.redAccent;
-
         final dateFormat = DateFormat('yyyy-MM-dd');
-
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          color: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.grey[200]!)),
-          elevation: 0,
-          child: ListTile(
-            title: Text(b.vehicleName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 4),
-                Text('Customer: ${b.userName}', style: const TextStyle(fontSize: 12)),
-                Text('Date: ${dateFormat.format(b.pickUpDate)} to ${dateFormat.format(b.returnDate)}', style: const TextStyle(fontSize: 12)),
-                Text('Amount: RM ${b.totalPrice.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primaryOrange)),
-              ],
-            ),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    b.status.toUpperCase(),
-                    style: TextStyle(color: statusColor, fontSize: 9, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Icon(Icons.chevron_right, size: 16),
-              ],
-            ),
-            onTap: () => _showBookingDetails(b),
+        return ListTile(
+          title: Text(b.vehicleName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textPrimary)),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 4),
+              Text('Customer: ${b.userName}', style: TextStyle(fontSize: 12, color: textSecondary)),
+              Text('${dateFormat.format(b.pickUpDate)} → ${dateFormat.format(b.returnDate)}', style: TextStyle(fontSize: 12, color: textSecondary)),
+              Text('RM ${b.totalPrice.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primaryOrange)),
+            ],
           ),
+          trailing: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
+            child: Text(b.status.toUpperCase(), style: TextStyle(color: statusColor, fontSize: 9, fontWeight: FontWeight.bold)),
+          ),
+          onTap: () => _showBookingDetails(b),
         );
       },
     );
   }
 
-  Widget _buildStatusFilterDropdown() {
+  Widget _buildStatusFilterDropdown({required bool isDark, required Color cardColor, required Color textPrimary, required Color borderColor}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: cardColor,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor),
       ),
       child: DropdownButton<String>(
         value: _selectedFilter,
         underline: const SizedBox(),
+        dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        style: TextStyle(color: textPrimary, fontSize: 13, fontWeight: FontWeight.bold),
         items: ['All', 'Pending', 'Approved', 'Ongoing', 'Completed', 'Cancelled'].map((s) {
-          return DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)));
+          return DropdownMenuItem(value: s, child: Text(s, style: TextStyle(color: textPrimary, fontSize: 13)));
         }).toList(),
         onChanged: (val) {
-          if (val != null) {
-            setState(() {
-              _selectedFilter = val;
-            });
-          }
+          if (val != null) setState(() => _selectedFilter = val);
         },
       ),
     );

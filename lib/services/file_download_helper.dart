@@ -7,3 +7,7 @@ void downloadFile(Uint8List bytes, String fileName) {
 void openUrl(String url) {
   // Stub for opening URLs.
 }
+
+void viewPdfInNewTab(Uint8List bytes, String fileName) {
+  // Stub for desktop/mobile platforms.
+}

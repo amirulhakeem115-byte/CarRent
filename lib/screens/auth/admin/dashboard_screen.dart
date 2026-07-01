@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' hide Path;
 import 'package:intl/intl.dart';
@@ -30,7 +31,7 @@ import 'branches_screen.dart';
 import 'support_inbox_screen.dart';
 import 'vehicle_maintenance_screen.dart';
 import 'qr_settings_view.dart';
-import 'contact_settings_view.dart';
+import 'company_settings_view.dart';
 import 'admin_profile_view.dart';
 import 'reports_view.dart';
 import 'admin_tracking_view.dart';
@@ -41,6 +42,9 @@ import '../../../models/maintenance_job_model.dart';
 import '../login_screen.dart';
 import '../../../widgets/loading_widget.dart';
 import '../../../widgets/app_image.dart';
+import '../../../widgets/app_logo.dart';
+import '../../../services/company_settings_provider.dart';
+import 'package:provider/provider.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -50,6 +54,7 @@ class AdminDashboardScreen extends StatefulWidget {
 }
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
@@ -80,7 +85,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   final int _adminNotificationsLimit = 15;
 
   final Set<String> _playedNotificationIds = {};
-  late final DateTime _dashboardLoadTime;
+  bool _notificationsInitialized = false;
 
   // Real-time admin state and tracking properties
   UserModel? _adminUser;
@@ -93,13 +98,20 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   final TrackingService _trackingService = TrackingService();
 
   void _playNotificationSound() {
-    if (!kIsWeb) return;
-    try {
-      final audioCtx = web.AudioContext();
-      _playTone(audioCtx, 880, 0.1, 0.0);
-      _playTone(audioCtx, 1200, 0.25, 0.08);
-    } catch (e) {
-      debugPrint('Web Audio API error: $e');
+    if (kIsWeb) {
+      try {
+        final audioCtx = web.AudioContext();
+        _playTone(audioCtx, 880, 0.1, 0.0);
+        _playTone(audioCtx, 1200, 0.25, 0.08);
+      } catch (e) {
+        debugPrint('Web Audio API error: $e');
+      }
+    } else {
+      try {
+        SystemSound.play(SystemSoundType.alert);
+      } catch (e) {
+        debugPrint('Failed to play system sound: $e');
+      }
     }
   }
 
@@ -131,15 +143,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final currentUser = _authService.currentUser;
     if (currentUser != null) {
       _adminNotificationsSubscription?.cancel();
-      _adminNotificationsSubscription = _notificationService.getNotificationsStream(currentUser.uid, limit: _adminNotificationsLimit).listen((notifs) {
+      _adminNotificationsSubscription = _notificationService
+          .getNotificationsStream(currentUser.uid, limit: _adminNotificationsLimit)
+          .listen((notifs) {
         if (mounted) {
-          // Play sound logic for newly arrived notifications
-          for (var notif in notifs) {
-            if (!notif.isRead && 
-                notif.createdAt.isAfter(_dashboardLoadTime) && 
-                !_playedNotificationIds.contains(notif.id)) {
+          if (!_notificationsInitialized) {
+            // First load: populate already played IDs so we do not alarm for old notifications
+            for (var notif in notifs) {
               _playedNotificationIds.add(notif.id);
-              _playNotificationSound();
+            }
+            _notificationsInitialized = true;
+          } else {
+            // Subsequent loads: play sound for newly arrived unread notifications
+            for (var notif in notifs) {
+              if (!notif.isRead && !_playedNotificationIds.contains(notif.id)) {
+                _playedNotificationIds.add(notif.id);
+                _playNotificationSound();
+              }
             }
           }
           setState(() {
@@ -180,7 +200,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _dashboardLoadTime = DateTime.now();
     _loadDashboardData();
     _subscribeNotifications();
     _subscribeTracking();
@@ -385,7 +404,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: const Color(0xFFF1F5F9),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
       body: Row(
         children: [
@@ -414,169 +433,122 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildActiveBody(bool isDesktop) {
+    Widget tabContent;
     switch (_activeTab) {
       case 'Dashboard':
-        return Column(
-          children: [
-            _buildHeader(isDesktop),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildTopStatsGrid(isDesktop),
-                    const SizedBox(height: 24),
-                    _buildMiddleSection(isDesktop),
-                    const SizedBox(height: 24),
-                    _buildBottomSection(isDesktop),
-                  ],
-                ),
-              ),
+        tabContent = Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildTopStatsGrid(isDesktop),
+                const SizedBox(height: 24),
+                _buildMiddleSection(isDesktop),
+                const SizedBox(height: 24),
+                _buildBottomSection(isDesktop),
+              ],
             ),
-          ],
+          ),
         );
+        break;
       case 'Cars':
-        return Column(
-          children: [
-            _buildHeader(isDesktop),
-            const Expanded(child: VehiclesView()),
-          ],
-        );
+        tabContent = const Expanded(child: VehiclesView());
+        break;
       case 'Bookings':
-        return Column(
-          children: [
-            _buildHeader(isDesktop),
-            const Expanded(child: BookingsView()),
-          ],
-        );
+        tabContent = const Expanded(child: BookingsView());
+        break;
       case 'Customers':
-        return Column(
-          children: [
-            _buildHeader(isDesktop),
-            const Expanded(child: CustomersView()),
-          ],
-        );
+        tabContent = const Expanded(child: CustomersView());
+        break;
       case 'Payments':
-        return Column(
-          children: [
-            _buildHeader(isDesktop),
-            const Expanded(child: PaymentsView()),
-          ],
-        );
+        tabContent = const Expanded(child: PaymentsView());
+        break;
       case 'Reward Points':
-        return Column(
-          children: [
-            _buildHeader(isDesktop),
-            const Expanded(child: RewardPointsView()),
-          ],
-        );
+        tabContent = const Expanded(child: RewardPointsView());
+        break;
       case 'Vehicle Tracking':
-        return Column(
-          children: [
-            _buildHeader(isDesktop),
-            Expanded(
-              child: AdminTrackingView(
-                vehicles: _vehicles,
-                liveLocations: _liveLocations,
-              ),
-            ),
-          ],
+        tabContent = Expanded(
+          child: AdminTrackingView(
+            vehicles: _vehicles,
+            liveLocations: _liveLocations,
+          ),
         );
+        break;
       case 'Vehicle Maintenance':
-        return Column(
-          children: [
-            _buildHeader(isDesktop),
-            const Expanded(child: VehicleMaintenanceView()),
-          ],
-        );
+        tabContent = const Expanded(child: VehicleMaintenanceView());
+        break;
       case 'Locations':
-        return Column(
-          children: [
-            _buildHeader(isDesktop),
-            const Expanded(child: BranchesView()),
-          ],
-        );
+        tabContent = const Expanded(child: BranchesView());
+        break;
       case 'Reports':
-        return Column(
-          children: [
-            _buildHeader(isDesktop),
-            Expanded(
-              child: ReportsView(
-                bookings: _bookings,
-                payments: _payments,
-                vehicles: _vehicles,
-                users: _users,
-                maintenanceJobs: _maintenanceJobs,
-              ),
-            ),
-          ],
+        tabContent = Expanded(
+          child: ReportsView(
+            bookings: _bookings,
+            payments: _payments,
+            vehicles: _vehicles,
+            users: _users,
+            maintenanceJobs: _maintenanceJobs,
+          ),
         );
+        break;
       case 'Support Inbox':
-        return Column(
-          children: [
-            _buildHeader(isDesktop),
-            const Expanded(child: SupportInboxView()),
-          ],
-        );
+        tabContent = const Expanded(child: SupportInboxView());
+        break;
       case 'QR Payment Settings':
-        return Column(
-          children: [
-            _buildHeader(isDesktop),
-            const Expanded(child: QrSettingsView()),
-          ],
-        );
-      case 'Contact Settings':
-        return Column(
-          children: [
-            _buildHeader(isDesktop),
-            const Expanded(child: ContactSettingsView()),
-          ],
-        );
+        tabContent = const Expanded(child: QrSettingsView());
+        break;
+      case 'Company Settings':
+        tabContent = const Expanded(child: CompanySettingsView());
+        break;
       case 'Admin Profile':
-        return Column(
-          children: [
-            _buildHeader(isDesktop),
-            const Expanded(child: AdminProfileView()),
-          ],
-        );
+        tabContent = const Expanded(child: AdminProfileView());
+        break;
       case 'Notifications':
-        return Column(
-          children: [
-            _buildHeader(isDesktop),
-            Expanded(
-              child: AdminNotificationsView(
-                onNavigateTab: (route, relatedId) {
-                  setState(() {
-                    _activeTab = route;
-                  });
-                  if (relatedId != null && relatedId.isNotEmpty) {
-                    if (route == 'Bookings') {
-                      try {
-                        final booking = _bookings.firstWhere((b) => b.id == relatedId);
-                        _showBookingDetailsDialog(booking);
-                      } catch (_) {}
-                    } else if (route == 'Payments') {
-                      try {
-                        final payment = _payments.firstWhere((p) => p.id == relatedId);
-                        _showPaymentDetailsDialog(payment);
-                      } catch (_) {}
-                    }
-                  }
-                },
-              ),
-            ),
-          ],
+        tabContent = Expanded(
+          child: AdminNotificationsView(
+            onNavigateTab: (route, relatedId) {
+              setState(() {
+                _activeTab = route;
+              });
+              if (relatedId != null && relatedId.isNotEmpty) {
+                if (route == 'Bookings') {
+                  try {
+                    final booking = _bookings.firstWhere((b) => b.id == relatedId);
+                    _showBookingDetailsDialog(booking);
+                  } catch (_) {}
+                } else if (route == 'Payments') {
+                  try {
+                    final payment = _payments.firstWhere((p) => p.id == relatedId);
+                    _showPaymentDetailsDialog(payment);
+                  } catch (_) {}
+                }
+              }
+            },
+          ),
         );
+        break;
       default:
-        return const Center(child: Text('Unknown Tab'));
+        tabContent = const Expanded(
+          child: Center(
+            child: Text('Unknown Tab'),
+          ),
+        );
     }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildHeader(isDesktop),
+        tabContent,
+      ],
+    );
   }
 
   Widget _buildSidebar(BuildContext context) {
     return Container(
       width: 250,
-      color: const Color(0xFF0F172A), // Dark charcoal premium color
+      color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF172033) : AppColors.secondaryBlue,
       child: Column(
         children: [
           Container(
@@ -584,11 +556,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             alignment: Alignment.centerLeft,
             child: Row(
               children: [
-                const Icon(Icons.directions_car_filled, color: AppColors.primaryOrange, size: 28),
+                const AppLogo(size: 28, fallbackColor: AppColors.primaryOrange),
                 const SizedBox(width: 8),
-                const Text(
-                  'CARRENT',
-                  style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 1.5),
+                Text(
+                  context.watch<CompanySettingsProvider>().companyName,
+                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 1.5),
                 ),
               ],
             ),
@@ -611,7 +583,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 _buildSidebarTile(Icons.notifications_none_outlined, 'Notifications', () => setState(() => _activeTab = 'Notifications')),
                 _buildSidebarTile(Icons.mail_outline_rounded, 'Support Inbox', () => setState(() => _activeTab = 'Support Inbox')),
                 _buildSidebarTile(Icons.qr_code_2, 'QR Payment Settings', () => setState(() => _activeTab = 'QR Payment Settings')),
-                _buildSidebarTile(Icons.contact_support_outlined, 'Contact Settings', () => setState(() => _activeTab = 'Contact Settings')),
+                _buildSidebarTile(Icons.settings_outlined, 'Company Settings', () => setState(() => _activeTab = 'Company Settings')),
                 _buildSidebarTile(Icons.person_outline, 'Admin Profile', () => setState(() => _activeTab = 'Admin Profile')),
               ],
             ),
@@ -690,9 +662,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Widget _buildHeader(bool isDesktop) {
     final unreadCount = _adminNotifications.where((n) => !n.isRead).length;
     final String formattedDate = DateFormat('dd MMM yyyy').format(DateTime.now());
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
-      color: Colors.white,
+      color: isDark ? const Color(0xFF1B2436) : Theme.of(context).cardColor,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -702,7 +675,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               children: [
                 if (!isDesktop) ...[
                   IconButton(
-                    icon: const Icon(Icons.menu, color: AppColors.secondaryBlue),
+                    icon: Icon(Icons.menu, color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue),
                     onPressed: () => _scaffoldKey.currentState?.openDrawer(),
                   ),
                   const SizedBox(width: 8),
@@ -714,15 +687,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     children: [
                       Text(
                         _activeTab == 'Dashboard' ? 'Dashboard Overview' : _activeTab,
-                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue),
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         _activeTab == 'Dashboard'
                             ? 'Welcome back, ${_adminUser?.fullName ?? "Administrator"} 👋'
-                            : 'CARRENT Platform Management',
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                            : '${context.watch<CompanySettingsProvider>().companyName} Platform Management',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark ? const Color(0xFFCBD5E1) : Colors.grey,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -741,20 +721,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: Colors.grey[100],
+                    color: isDark ? const Color(0xFF1E293B) : Colors.grey[100],
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey[200]!),
+                    border: Border.all(
+                      color: isDark ? const Color(0xFF334155) : Colors.grey[200]!,
+                    ),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.calendar_today, size: 14, color: AppColors.secondaryBlue),
+                      Icon(Icons.calendar_today, size: 14, color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue),
                       const SizedBox(width: 8),
                       Text(
                         formattedDate,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.secondaryBlue,
+                          color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
                         ),
                       ),
                     ],
@@ -762,10 +744,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 ),
                 const SizedBox(width: 16),
               ],
-
+ 
               // Refresh Button
               IconButton(
-                icon: const Icon(Icons.refresh, color: AppColors.secondaryBlue),
+                icon: Icon(Icons.refresh, color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue),
                 onPressed: _loadDashboardData,
                 tooltip: 'Refresh Data',
               ),
@@ -788,7 +770,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       padding: EdgeInsets.zero,
                       child: Container(
                         width: 380,
-                        color: Colors.white,
+                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -801,10 +783,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 children: [
                                   Text(
                                     'Notifications ($dropdownUnread)',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontWeight: FontWeight.w900,
                                       fontSize: 15,
-                                      color: AppColors.secondaryBlue,
+                                      color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
                                     ),
                                   ),
                                   if (currentUser != null && _adminNotifications.any((n) => !n.isRead))
@@ -830,7 +812,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 ],
                               ),
                             ),
-                            const Divider(height: 1),
+                            Divider(height: 1, color: isDark ? const Color(0xFF334155) : Colors.grey[200]!),
                             // List of 10 items
                             if (recentNotifs.isEmpty)
                               Padding(
@@ -838,11 +820,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.notifications_none_rounded, size: 40, color: Colors.grey[300]),
+                                    Icon(Icons.notifications_none_rounded, size: 40, color: isDark ? const Color(0xFF334155) : Colors.grey[300]),
                                     const SizedBox(height: 12),
                                     Text(
                                       'No notifications yet',
-                                      style: TextStyle(color: Colors.grey[500], fontSize: 12, fontWeight: FontWeight.bold),
+                                      style: TextStyle(color: isDark ? const Color(0xFFCBD5E1) : Colors.grey[500], fontSize: 12, fontWeight: FontWeight.bold),
                                     ),
                                   ],
                                 ),
@@ -854,7 +836,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   shrinkWrap: true,
                                   physics: const ClampingScrollPhysics(),
                                   itemCount: recentNotifs.length,
-                                  separatorBuilder: (context, index) => const Divider(height: 1),
+                                  separatorBuilder: (context, index) => Divider(height: 1, color: isDark ? const Color(0xFF334155) : Colors.grey[200]!),
                                   itemBuilder: (context, index) {
                                     final notif = recentNotifs[index];
                                     final parsedColor = Color(int.parse(notif.color));
@@ -886,14 +868,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                         }
                                       },
                                       child: Container(
-                                        color: notif.isRead ? Colors.transparent : const Color(0xFFFFF7ED),
+                                        color: notif.isRead ? Colors.transparent : (isDark ? const Color(0xFF2D251E) : const Color(0xFFFFF7ED)),
                                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                         child: Row(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             CircleAvatar(
                                               radius: 16,
-                                              backgroundColor: parsedColor.withValues(alpha: 0.1),
+                                              backgroundColor: parsedColor.withValues(alpha: isDark ? 0.2 : 0.1),
                                               child: Text(notif.icon, style: const TextStyle(fontSize: 14)),
                                             ),
                                             const SizedBox(width: 12),
@@ -906,7 +888,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                                     style: TextStyle(
                                                       fontWeight: notif.isRead ? FontWeight.bold : FontWeight.w900,
                                                       fontSize: 12,
-                                                      color: AppColors.secondaryBlue,
+                                                      color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
                                                     ),
                                                   ),
                                                   const SizedBox(height: 4),
@@ -917,13 +899,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                                     style: TextStyle(
                                                       fontSize: 10,
                                                       height: 1.3,
-                                                      color: notif.isRead ? Colors.grey[600] : Colors.grey[800],
+                                                      color: notif.isRead ? (isDark ? const Color(0xFFCBD5E1) : Colors.grey[600]) : (isDark ? const Color(0xFFF8FAFC) : Colors.grey[800]),
                                                     ),
                                                   ),
                                                   const SizedBox(height: 6),
                                                   Text(
                                                     _getRelativeTimeString(notif.createdAt),
-                                                    style: const TextStyle(fontSize: 8, color: Colors.grey, fontWeight: FontWeight.w500),
+                                                    style: TextStyle(fontSize: 8, color: isDark ? const Color(0xFFCBD5E1) : Colors.grey, fontWeight: FontWeight.w500),
                                                   ),
                                                 ],
                                               ),
@@ -945,7 +927,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   },
                                 ),
                               ),
-                            const Divider(height: 1),
+                            Divider(height: 1, color: isDark ? const Color(0xFF334155) : Colors.grey[200]!),
                             // Footer Button
                             InkWell(
                               onTap: () {
@@ -957,11 +939,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               child: Container(
                                 padding: const EdgeInsets.symmetric(vertical: 12),
                                 alignment: Alignment.center,
-                                color: Colors.grey[50],
-                                child: const Text(
+                                color: isDark ? const Color(0xFF0F172A) : Colors.grey[50],
+                                child: Text(
                                   'View All Notifications',
                                   style: TextStyle(
-                                    color: AppColors.secondaryBlue,
+                                    color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 12,
                                   ),
@@ -977,13 +959,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.grey[100],
+                    color: isDark ? const Color(0xFF1E293B) : Colors.grey[100],
                     shape: BoxShape.circle,
                   ),
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      const Icon(Icons.notifications_outlined, color: AppColors.secondaryBlue, size: 24),
+                      Icon(Icons.notifications_outlined, color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue, size: 24),
                       if (unreadCount > 0)
                         Positioned(
                           right: -2,
@@ -1249,7 +1231,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -1258,7 +1240,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             offset: const Offset(0, 4),
           ),
         ],
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(
+          color: _isDark ? const Color(0xFF334155) : Colors.grey[200]!,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1300,7 +1284,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   fit: BoxFit.scaleDown,
                   child: Text(
                     value,
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue),
                   ),
                 ),
               ],
@@ -1373,9 +1357,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final chartCard = Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(
+          color: _isDark ? const Color(0xFF334155) : Colors.grey[200]!,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1383,9 +1369,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Revenue Overview',
-                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppColors.secondaryBlue),
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 16,
+                  color: _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
+                ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -1405,6 +1395,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               painter: RevenueOverviewLineChartPainter(
                 values: monthlyRevenue,
                 labels: const ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                isDark: _isDark,
               ),
               child: Container(),
             ),
@@ -1416,9 +1407,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final statusCard = Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(
+          color: _isDark ? const Color(0xFF334155) : Colors.grey[200]!,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1426,9 +1419,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Bookings Status',
-                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppColors.secondaryBlue),
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 16,
+                  color: _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
+                ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -1461,7 +1458,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           const Text('Total', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
                           Text(
                             '$totalBookingsCount',
-                            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue),
+                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue),
                           ),
                           const Text('Bookings', style: TextStyle(fontSize: 8, color: Colors.grey, fontWeight: FontWeight.bold)),
                         ],
@@ -1523,7 +1520,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue),
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue),
                 ),
                 Text(
                   '$count (${pct.toStringAsFixed(0)}%)',
@@ -1612,9 +1609,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final mapCard = Container(
       height: 380,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(
+          color: _isDark ? const Color(0xFF334155) : Colors.grey[200]!,
+        ),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -1622,15 +1621,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         children: [
           Container(
             padding: const EdgeInsets.all(16),
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.gps_fixed, color: AppColors.primaryOrange, size: 18),
-                    SizedBox(width: 8),
-                    Text('Live Vehicle Tracking', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: AppColors.secondaryBlue)),
+                    const Icon(Icons.gps_fixed, color: AppColors.primaryOrange, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Live Vehicle Tracking',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 15,
+                        color: _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
+                      ),
+                    ),
                   ],
                 ),
                 if (trackedVehicles.isNotEmpty)
@@ -1689,40 +1695,37 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                       _selectedTrackedVehicle = tv;
                                     });
                                   },
-                                  child: MouseRegion(
-                                    cursor: SystemMouseCursors.click,
-                                    child: Stack(
-                                      alignment: Alignment.center,
-                                      children: [
-                                        Container(
-                                          width: 38,
-                                          height: 38,
-                                          decoration: BoxDecoration(
-                                            color: AppColors.primaryOrange.withValues(alpha: 0.2),
-                                            shape: BoxShape.circle,
-                                          ),
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      Container(
+                                        width: 38,
+                                        height: 38,
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primaryOrange.withValues(alpha: 0.2),
+                                          shape: BoxShape.circle,
                                         ),
-                                        Container(
-                                          width: 24,
-                                          height: 24,
-                                          decoration: const BoxDecoration(
-                                            color: Colors.white,
-                                            shape: BoxShape.circle,
-                                            boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 1))],
-                                          ),
-                                          child: Padding(
-                                            padding: const EdgeInsets.all(2.0),
-                                            child: Container(
-                                              decoration: const BoxDecoration(
-                                                color: AppColors.primaryOrange,
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: const Icon(Icons.directions_car, color: Colors.white, size: 12),
+                                      ),
+                                      Container(
+                                        width: 24,
+                                        height: 24,
+                                        decoration: const BoxDecoration(
+                                          color: Colors.white,
+                                          shape: BoxShape.circle,
+                                          boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 1))],
+                                        ),
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(2.0),
+                                          child: Container(
+                                            decoration: const BoxDecoration(
+                                              color: AppColors.primaryOrange,
+                                              shape: BoxShape.circle,
                                             ),
+                                            child: const Icon(Icons.directions_car, color: Colors.white, size: 12),
                                           ),
                                         ),
-                                      ],
-                                    ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               );
@@ -1738,10 +1741,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             width: 260,
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: _isDark ? const Color(0xFF1E293B) : Colors.white,
                               borderRadius: BorderRadius.circular(12),
                               boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 2))],
-                              border: Border.all(color: Colors.grey[100]!),
+                              border: Border.all(color: _isDark ? const Color(0xFF334155) : Colors.grey[100]!),
                             ),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
@@ -1750,7 +1753,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    const Text('Live Vehicle Telematics', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppColors.secondaryBlue)),
+                                    Text('Live Vehicle Telematics', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue)),
                                     IconButton(
                                       icon: const Icon(Icons.close, size: 14),
                                       onPressed: () => setState(() => _selectedTrackedVehicle = null),
@@ -1767,7 +1770,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                       child: Container(
                                         width: 50,
                                         height: 38,
-                                        color: Colors.grey[100],
+                                        color: _isDark ? const Color(0xFF111827) : Colors.grey[100],
                                         child: AppImage(
                                           imageSrc: (_selectedTrackedVehicle!['vehicle'] as VehicleModel).mainImage,
                                           placeholder: const Icon(Icons.directions_car, size: 14),
@@ -1781,7 +1784,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                         children: [
                                           Text(
                                             '${(_selectedTrackedVehicle!['vehicle'] as VehicleModel).brand} ${(_selectedTrackedVehicle!['vehicle'] as VehicleModel).model}',
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.secondaryBlue),
+                                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue),
                                           ),
                                           Text(
                                             (_selectedTrackedVehicle!['vehicle'] as VehicleModel).plateNumber,
@@ -1803,7 +1806,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   width: double.infinity,
                                   child: ElevatedButton(
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.secondaryBlue,
+                                      backgroundColor: _isDark ? AppColors.primaryOrange : AppColors.secondaryBlue,
                                       foregroundColor: Colors.white,
                                       padding: const EdgeInsets.symmetric(vertical: 8),
                                       elevation: 0,
@@ -1828,9 +1831,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       height: 380,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(
+          color: _isDark ? const Color(0xFF334155) : Colors.grey[200]!,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1838,7 +1843,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Recent Bookings', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppColors.secondaryBlue)),
+              Text(
+                'Recent Bookings',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 16,
+                  color: _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
+                ),
+              ),
               TextButton(
                 onPressed: () => setState(() => _activeTab = 'Bookings'),
                 child: const Text('View All', style: TextStyle(color: AppColors.primaryOrange, fontWeight: FontWeight.bold, fontSize: 12)),
@@ -1877,7 +1889,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           child: Container(
                             width: 48,
                             height: 36,
-                            color: Colors.grey[100],
+                            color: _isDark ? const Color(0xFF111827) : Colors.grey[100],
                             child: AppImage(
                               imageSrc: vehicleImg,
                               placeholder: const Icon(Icons.directions_car, color: Colors.grey, size: 20),
@@ -1886,7 +1898,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         ),
                         title: Text(
                           booking.vehicleName,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.secondaryBlue),
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue),
                         ),
                         subtitle: Text(
                           '${booking.userName} • ${DateFormat('dd MMM').format(booking.pickUpDate)}',
@@ -1896,7 +1908,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           crossAxisAlignment: CrossAxisAlignment.end,
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text('RM ${booking.totalPrice.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.secondaryBlue)),
+                            Text('RM ${booking.totalPrice.toStringAsFixed(0)}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue)),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
@@ -1942,7 +1954,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
-          Text(value, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+          Text(value, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue)),
         ],
       ),
     );
@@ -1956,14 +1968,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       height: 280,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(
+          color: _isDark ? const Color(0xFF334155) : Colors.grey[200]!,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Quick Actions', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppColors.secondaryBlue)),
+          Text(
+            'Quick Actions',
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+              color: _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
+            ),
+          ),
           const SizedBox(height: 16),
           Expanded(
             child: GridView.count(
@@ -2035,9 +2056,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             height: 280,
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey[200]!),
+              border: Border.all(
+                color: _isDark ? const Color(0xFF334155) : Colors.grey[200]!,
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2093,9 +2116,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       height: 280,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(
+          color: _isDark ? const Color(0xFF334155) : Colors.grey[200]!,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2103,7 +2128,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Recent Payments', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppColors.secondaryBlue)),
+              Text(
+                'Recent Payments',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 16,
+                  color: _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
+                ),
+              ),
               TextButton(
                 onPressed: () => setState(() => _activeTab = 'Payments'),
                 child: const Text('View All', style: TextStyle(color: AppColors.primaryOrange, fontWeight: FontWeight.bold, fontSize: 12)),
@@ -2222,12 +2254,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   void _showVehicleDetailsDialog(VehicleModel vehicle) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final surfaceColor = isDark ? const Color(0xFF111827) : const Color(0xFFF1F5F9);
+
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
+          backgroundColor: cardColor,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('${vehicle.brand} ${vehicle.model}', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+          title: Text('${vehicle.brand} ${vehicle.model}', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary)),
           content: Container(
             width: MediaQuery.of(context).size.width * 0.9,
             constraints: const BoxConstraints(maxWidth: 450),
@@ -2243,7 +2281,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         child: Container(
                           height: 150,
                           width: 250,
-                          color: Colors.grey[100],
+                          color: surfaceColor,
                           child: AppImage(imageSrc: vehicle.mainImage),
                         ),
                       ),
@@ -2274,12 +2312,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   void _showBookingDetailsDialog(BookingModel booking) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
+          backgroundColor: cardColor,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Booking Details', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+          title: Text('Booking Details', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary)),
           content: Container(
             width: MediaQuery.of(context).size.width * 0.9,
             constraints: const BoxConstraints(maxWidth: 450),
@@ -2315,12 +2358,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   void _showPaymentDetailsDialog(PaymentModel payment) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
+          backgroundColor: cardColor,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Transaction Details', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+          title: Text('Transaction Details', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary)),
           content: Container(
             width: MediaQuery.of(context).size.width * 0.9,
             constraints: const BoxConstraints(maxWidth: 450),
@@ -2352,14 +2400,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildDetailDialogRow(String label, String value) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('$label: ', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)),
+          Text('$label: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: textSecondary)),
           Expanded(
-            child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: AppColors.secondaryBlue)),
+            child: Text(value, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: textPrimary)),
           ),
         ],
       ),
@@ -2371,6 +2423,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final messageController = TextEditingController();
     String target = 'all_customers';
     final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
     
     showDialog(
       context: context,
@@ -2378,8 +2433,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
+              backgroundColor: cardColor,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: const Text('Send Broadcast Notification', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+              title: Text('Send Broadcast Notification', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary)),
               content: Container(
                 width: MediaQuery.of(context).size.width * 0.9,
                 constraints: const BoxConstraints(maxWidth: 450),
@@ -2389,17 +2445,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     children: [
                       TextField(
                         controller: titleController,
+                        style: TextStyle(color: textPrimary),
                         decoration: const InputDecoration(labelText: 'Notification Title', border: OutlineInputBorder()),
                       ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: messageController,
+                        style: TextStyle(color: textPrimary),
                         maxLines: 3,
                         decoration: const InputDecoration(labelText: 'Notification Message', border: OutlineInputBorder()),
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
                         initialValue: target,
+                        dropdownColor: cardColor,
+                        style: TextStyle(color: textPrimary),
                         decoration: const InputDecoration(labelText: 'Recipient Target', border: OutlineInputBorder()),
                         items: const [
                           DropdownMenuItem(value: 'all_customers', child: Text('All Customers')),
@@ -2501,8 +2561,9 @@ class BookingSelectionDialogContent extends StatelessWidget {
 class RevenueOverviewLineChartPainter extends CustomPainter {
   final List<double> values;
   final List<String> labels;
+  final bool isDark;
 
-  RevenueOverviewLineChartPainter({required this.values, required this.labels});
+  RevenueOverviewLineChartPainter({required this.values, required this.labels, required this.isDark});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -2522,7 +2583,7 @@ class RevenueOverviewLineChartPainter extends CustomPainter {
 
     // Draw horizontal grid lines
     final paintGrid = Paint()
-      ..color = Colors.grey[200]!
+      ..color = isDark ? const Color(0xFF334155) : Colors.grey[200]!
       ..strokeWidth = 1.0;
     
     for (int i = 0; i <= 4; i++) {

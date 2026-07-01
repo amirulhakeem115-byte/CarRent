@@ -184,191 +184,215 @@ class _QrSettingsViewState extends State<QrSettingsView> {
       );
     }
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final surfaceColor = isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9);
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
+    final borderColor = isDark ? const Color(0xFF334155) : Colors.grey.shade200;
     final double width = MediaQuery.of(context).size.width;
     final bool isDesktop = width > 800;
 
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'QR Payment Settings',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue),
-              ),
-              Text(
-                'Configure the DuitNow bank details and QR codes shown to customers during checkout.',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-
-          // Main Form and Assets Container
-          Expanded(
-            child: SingleChildScrollView(
-              child: Builder(
-                builder: (context) {
-                  final formCard = Card(
-                    color: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    elevation: 0,
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text('QR Payments Enabled', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.secondaryBlue)),
-                              Switch(
-                                value: _isEnabled,
-                                activeThumbColor: AppColors.primaryOrange,
-                                onChanged: (val) {
-                                  setState(() {
-                                    _isEnabled = val;
-                                  });
-                                },
-                              ),
-                            ],
-                          ),
-                          const Divider(height: 24),
-                          TextField(
-                            controller: _bankNameController,
-                            decoration: const InputDecoration(
-                              labelText: 'Bank Name',
-                              hintText: 'e.g., Maybank, CIMB Bank',
-                              prefixIcon: Icon(Icons.account_balance_outlined),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          TextField(
-                            controller: _accountNameController,
-                            decoration: const InputDecoration(
-                              labelText: 'Account Holder Name',
-                              hintText: 'e.g., CARRENT SDN BHD',
-                              prefixIcon: Icon(Icons.person_outline),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          TextField(
-                            controller: _accountNumberController,
-                            decoration: const InputDecoration(
-                              labelText: 'Bank Account Number',
-                              hintText: 'e.g., 514012345678',
-                              prefixIcon: Icon(Icons.credit_card_outlined),
-                            ),
-                          ),
-                          const SizedBox(height: 32),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 50,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.secondaryBlue,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
-                              onPressed: _saving ? null : _saveSettings,
-                              child: _saving
-                                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                  : const Text('Save QR Credentials', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                            ),
-                          ),
-                        ],
+          isDesktop
+              ? Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('QR Payment Settings', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textPrimary)),
+                        Text('Configure DuitNow bank details and QR codes shown during checkout.', style: TextStyle(fontSize: 12, color: textSecondary)),
+                      ],
+                    ),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryOrange,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      ),
+                      onPressed: _saving ? null : _saveSettings,
+                      icon: _saving
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : const Icon(Icons.save_outlined, size: 18),
+                      label: const Text('Save Settings', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('QR Payment Settings', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: textPrimary)),
+                    Text('Configure DuitNow bank details and QR codes shown during checkout.', style: TextStyle(fontSize: 12, color: textSecondary)),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryOrange,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        onPressed: _saving ? null : _saveSettings,
+                        icon: _saving
+                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                            : const Icon(Icons.save_outlined, size: 18),
+                        label: const Text('Save Settings', style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
                     ),
-                  );
+                  ],
+                ),
+          const SizedBox(height: 24),
 
-                  final assetColumn = Column(
-                    children: [
-                      _buildAssetUploadCard('Company DuitNow QR', _qrCodeUrl, true),
-                      const SizedBox(height: 20),
-                      _buildAssetUploadCard('Bank Logo/Icon', _bankLogoUrl, false),
-                    ],
-                  );
+          // Main Form and Assets
+          Builder(
+            builder: (context) {
+              final formCard = Container(
+                decoration: BoxDecoration(
+                  color: cardColor,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: borderColor),
+                ),
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('QR Payments Enabled', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textPrimary)),
+                        Switch(
+                          value: _isEnabled,
+                          activeThumbColor: AppColors.primaryOrange,
+                          onChanged: (val) => setState(() => _isEnabled = val),
+                        ),
+                      ],
+                    ),
+                    Divider(height: 24, color: borderColor),
+                    TextField(
+                      controller: _bankNameController,
+                      style: TextStyle(color: textPrimary),
+                      decoration: const InputDecoration(
+                        labelText: 'Bank Name',
+                        hintText: 'e.g., Maybank, CIMB Bank',
+                        prefixIcon: Icon(Icons.account_balance_outlined),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _accountNameController,
+                      style: TextStyle(color: textPrimary),
+                      decoration: const InputDecoration(
+                        labelText: 'Account Holder Name',
+                        hintText: 'e.g., CARRENT SDN BHD',
+                        prefixIcon: Icon(Icons.person_outline),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _accountNumberController,
+                      style: TextStyle(color: textPrimary),
+                      decoration: const InputDecoration(
+                        labelText: 'Bank Account Number',
+                        hintText: 'e.g., 514012345678',
+                        prefixIcon: Icon(Icons.credit_card_outlined),
+                      ),
+                    ),
+                  ],
+                ),
+              );
 
-                  return isDesktop
-                      ? Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(flex: 6, child: formCard),
-                            const SizedBox(width: 24),
-                            Expanded(flex: 4, child: assetColumn),
-                          ],
-                        )
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            formCard,
-                            const SizedBox(height: 24),
-                            assetColumn,
-                          ],
-                        );
-                },
-              ),
-            ),
+              final assetColumn = Column(
+                children: [
+                  _buildAssetUploadCard('Company DuitNow QR', _qrCodeUrl, true, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor, surfaceColor: surfaceColor),
+                  const SizedBox(height: 20),
+                  _buildAssetUploadCard('Bank Logo/Icon', _bankLogoUrl, false, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor, surfaceColor: surfaceColor),
+                ],
+              );
+
+              return isDesktop
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(flex: 6, child: formCard),
+                        const SizedBox(width: 24),
+                        Expanded(flex: 4, child: assetColumn),
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        formCard,
+                        const SizedBox(height: 24),
+                        assetColumn,
+                      ],
+                    );
+            },
           ),
         ],
       ),
     );
   }
 
-  Widget _buildAssetUploadCard(String label, String? url, bool isQr) {
-    return Card(
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      elevation: 0,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.secondaryBlue)),
-            const SizedBox(height: 12),
-            Container(
-              height: 150,
-              decoration: BoxDecoration(
-                color: Colors.grey[50],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey[200]!),
-              ),
-              child: url != null && url.isNotEmpty
-                  ? AppImage(
-                      imageSrc: url,
-                      fit: BoxFit.contain,
-                      placeholder: const Center(child: Icon(Icons.broken_image, size: 50, color: Colors.grey)),
-                    )
-                  : Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(isQr ? Icons.qr_code_2 : Icons.image_search, size: 48, color: Colors.grey[400]),
-                          const SizedBox(height: 8),
-                          Text('No asset selected', style: TextStyle(color: Colors.grey[500], fontSize: 12)),
-                        ],
-                      ),
+  Widget _buildAssetUploadCard(String label, String? url, bool isQr, {
+    required bool isDark, required Color cardColor, required Color textPrimary, required Color textSecondary, required Color borderColor, required Color surfaceColor,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor),
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textPrimary)),
+          const SizedBox(height: 12),
+          Container(
+            height: 150,
+            decoration: BoxDecoration(
+              color: surfaceColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: borderColor),
+            ),
+            child: url != null && url.isNotEmpty
+                ? AppImage(
+                    imageSrc: url,
+                    fit: BoxFit.contain,
+                    placeholder: Center(child: Icon(Icons.broken_image, size: 50, color: textSecondary)),
+                  )
+                : Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(isQr ? Icons.qr_code_2 : Icons.image_search, size: 48, color: textSecondary),
+                        const SizedBox(height: 8),
+                        Text('No asset selected', style: TextStyle(color: textSecondary, fontSize: 12)),
+                      ],
                     ),
+                  ),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: AppColors.primaryOrange),
+              foregroundColor: AppColors.primaryOrange,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              padding: const EdgeInsets.symmetric(vertical: 12),
             ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: AppColors.primaryOrange),
-                foregroundColor: AppColors.primaryOrange,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-              onPressed: _saving ? null : () => _pickImage(isQr),
-              icon: const Icon(Icons.upload_file, size: 18),
-              label: Text(url != null && url.isNotEmpty ? 'Replace Image' : 'Upload Image'),
-            ),
-          ],
-        ),
+            onPressed: _saving ? null : () => _pickImage(isQr),
+            icon: const Icon(Icons.upload_file, size: 18),
+            label: Text(url != null && url.isNotEmpty ? 'Replace Image' : 'Upload Image'),
+          ),
+        ],
       ),
     );
   }

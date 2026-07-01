@@ -421,44 +421,74 @@ class DatabaseService {
     return users;
   }
 
-  Future<void> verifyLicense(String uid, bool isVerified, {String reason = ''}) async {
+  Future<void> verifyDocument(String uid, String docType, bool isApproved, {String reason = ''}) async {
     try {
-      await _db.child('users').child(uid).update({
-        'isVerified': isVerified,
-        'licenseStatus': isVerified ? 'approved' : 'rejected',
-        'licenseRejectionReason': isVerified ? '' : reason,
+      final now = DateTime.now().toIso8601String();
+      final reviewer = FirebaseAuth.instance.currentUser?.email ?? 'Admin';
+      
+      final userSnap = await _db.child('users').child(uid).get().timeout(const Duration(seconds: 5));
+      if (!userSnap.exists) return;
+      final data = userSnap.value as Map<dynamic, dynamic>;
+      
+      String newLicenseStatus = data['licenseStatus'] ?? 'unprovided';
+      String newIdStatus = data['idStatus'] ?? 'unprovided';
+      
+      final Map<String, dynamic> updates = {};
+      
+      if (docType == 'license') {
+        newLicenseStatus = isApproved ? 'approved' : 'rejected';
+        updates['licenseStatus'] = newLicenseStatus;
+        updates['licenseRejectionReason'] = isApproved ? '' : reason;
+        updates['licenseReviewedBy'] = reviewer;
+        updates['licenseReviewedDate'] = now;
+      } else if (docType == 'id') {
+        newIdStatus = isApproved ? 'approved' : 'rejected';
+        updates['idStatus'] = newIdStatus;
+        updates['idRejectionReason'] = isApproved ? '' : reason;
+        updates['idReviewedBy'] = reviewer;
+        updates['idReviewedDate'] = now;
+      }
+      
+      final finalIsVerified = (newLicenseStatus == 'approved' && newIdStatus == 'approved');
+      updates['isVerified'] = finalIsVerified;
+      
+      await _db.child('users').child(uid).update(updates).timeout(const Duration(seconds: 5));
+      
+      await _db.child('verifications').child(uid).child(docType).set({
+        'userId': uid,
+        'docType': docType,
+        'status': isApproved ? 'approved' : 'rejected',
+        'rejectionReason': isApproved ? '' : reason,
+        'reviewedBy': reviewer,
+        'updatedAt': now,
       }).timeout(const Duration(seconds: 5));
       
-      // Seed a record in license_verifications/
-      await _db.child('license_verifications').child(uid).set({
-        'userId': uid,
-        'status': isVerified ? 'approved' : 'rejected',
-        'rejectionReason': isVerified ? '' : reason,
-        'updatedAt': DateTime.now().toIso8601String(),
-      }).timeout(const Duration(seconds: 5));
-
-      // Trigger automatic notification creation
       try {
         final notificationService = NotificationService();
+        final docName = docType == 'license' ? 'Driving License' : 'Identity Document';
         await notificationService.createNotification(
           userId: uid,
-          title: isVerified ? 'License Approved' : 'License Rejected',
-          message: isVerified
-              ? 'Your driving license has been approved. You are now authorized to book rentals!'
-              : 'Your driving license was rejected. Reason: $reason. Please re-upload a clear card photo.',
+          title: isApproved ? '$docName Approved' : '$docName Rejected',
+          message: isApproved
+              ? 'Your $docName has been approved.'
+              : 'Your $docName was rejected. Reason: $reason. Please re-upload.',
           type: 'customer',
           icon: '👤',
-          color: isVerified ? '0xFF10B981' : '0xFFEF4444',
+          color: isApproved ? '0xFF10B981' : '0xFFEF4444',
           relatedId: uid,
           actionRoute: 'Dashboard',
         );
       } catch (notifErr) {
-        debugPrint('Failed to send automatic license verification notification: $notifErr');
+        debugPrint('Failed to send automatic verification notification: $notifErr');
       }
     } catch (e) {
-      debugPrint('Error verifying license: $e');
+      debugPrint('Error verifying document: $e');
       rethrow;
     }
+  }
+
+  Future<void> verifyLicense(String uid, bool isVerified, {String reason = ''}) async {
+    await verifyDocument(uid, 'license', isVerified, reason: reason);
   }
 
   Future<Map<String, dynamic>?> getQrPaymentSettings() async {
@@ -494,18 +524,18 @@ class DatabaseService {
 
   Future<Map<String, dynamic>?> getContactSettings() async {
     try {
-      final snapshot = await _db.child('contact_settings').get().timeout(const Duration(seconds: 5));
+      final snapshot = await _db.child('company_settings').get().timeout(const Duration(seconds: 5));
       if (snapshot.exists) {
         return Map<String, dynamic>.from(snapshot.value as Map);
       }
     } catch (e) {
-      debugPrint('Error getting contact settings: $e');
+      debugPrint('Error getting company settings: $e');
     }
     return null;
   }
 
   Stream<Map<String, dynamic>> getContactSettingsStream() {
-    return _db.child('contact_settings').onValue.map((event) {
+    return _db.child('company_settings').onValue.map((event) {
       if (event.snapshot.exists && event.snapshot.value != null) {
         return Map<String, dynamic>.from(event.snapshot.value as Map);
       }
@@ -515,19 +545,19 @@ class DatabaseService {
 
   Future<void> updateContactSettings(Map<String, dynamic> settings) async {
     try {
-      await _db.child('contact_settings').set(settings).timeout(const Duration(seconds: 5));
+      await _db.child('company_settings').set(settings).timeout(const Duration(seconds: 5));
       final notificationService = NotificationService();
       await notificationService.notifyAllAdmins(
-        title: 'Contact Information Updated',
-        message: 'The company contact settings have been modified.',
+        title: 'Company Settings Updated',
+        message: 'The company configurations have been modified.',
         type: 'system',
         icon: '⚙️',
         color: '0xFF64748B',
-        relatedId: 'contact_settings',
-        actionRoute: 'Contact Settings',
+        relatedId: 'company_settings',
+        actionRoute: 'Company Settings',
       );
     } catch (e) {
-      debugPrint('Error updating contact settings: $e');
+      debugPrint('Error updating company settings: $e');
       rethrow;
     }
   }

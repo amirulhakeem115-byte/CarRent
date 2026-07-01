@@ -7,6 +7,7 @@ import '../../../services/booking_service.dart';
 import '../../../services/payment_service.dart';
 import '../../../models/booking_model.dart';
 import '../../../models/payment_model.dart';
+import '../../../services/receipt_service.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -17,6 +18,11 @@ class HistoryScreen extends StatefulWidget {
 
 class _HistoryScreenState extends State<HistoryScreen>
     with SingleTickerProviderStateMixin {
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _textColor => _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+  Color get _subColor => _isDark ? const Color(0xFFCBD5E1) : AppColors.lightText;
+  Color get _borderColor => _isDark ? const Color(0xFF334155) : AppColors.borderGray;
+
   final AuthService _authService = AuthService();
   final BookingService _bookingService = BookingService();
   final PaymentService _paymentService = PaymentService();
@@ -118,6 +124,51 @@ class _HistoryScreenState extends State<HistoryScreen>
     );
   }
 
+  void _showReceiptOptions(BookingModel booking) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: _isDark ? const Color(0xFF1E293B) : Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Receipt Options',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _textColor),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Booking ID: #${booking.id.toUpperCase()}',
+                style: TextStyle(fontSize: 11, color: _subColor),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Icon(Icons.visibility, color: _textColor),
+                title: Text('View Receipt', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: _textColor)),
+                onTap: () {
+                  Navigator.pop(context);
+                  ReceiptService().viewReceipt(context, booking.id);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.download, color: AppColors.primaryOrange),
+                title: Text('Download PDF', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: _textColor)),
+                onTap: () {
+                  Navigator.pop(context);
+                  ReceiptService().downloadReceipt(context, booking.id);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildBookingsList() {
     if (_bookings.isEmpty) {
       return _buildEmptyState(
@@ -135,8 +186,11 @@ class _HistoryScreenState extends State<HistoryScreen>
         return Container(
           margin: const EdgeInsets.only(bottom: 14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: _borderColor,
+            ),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.05),
@@ -156,12 +210,12 @@ class _HistoryScreenState extends State<HistoryScreen>
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: AppColors.lightGray,
+                        color: _isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.directions_car_filled_rounded,
-                        color: AppColors.secondaryBlue,
+                        color: _textColor,
                         size: 24,
                       ),
                     ),
@@ -172,18 +226,18 @@ class _HistoryScreenState extends State<HistoryScreen>
                         children: [
                           Text(
                             b.vehicleName,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 15,
-                              color: AppColors.secondaryBlue,
+                              color: _textColor,
                             ),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             'Booking #${b.id.substring(0, 8).toUpperCase()}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
-                              color: AppColors.lightText,
+                              color: _subColor,
                             ),
                           ),
                         ],
@@ -193,7 +247,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                   ],
                 ),
                 const SizedBox(height: 14),
-                const Divider(height: 1, color: AppColors.borderGray),
+                Divider(height: 1, color: _borderColor),
                 const SizedBox(height: 14),
                 Row(
                   children: [
@@ -224,21 +278,52 @@ class _HistoryScreenState extends State<HistoryScreen>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Total Amount',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                        fontWeight: FontWeight.w500,
-                      ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Total Amount',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _subColor,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Text(
+                          'RM ${b.totalPrice.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 16,
+                            color: AppColors.primaryOrange,
+                          ),
+                        ),
+                      ],
                     ),
-                    Text(
-                      'RM ${b.totalPrice.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 16,
-                        color: AppColors.primaryOrange,
-                      ),
+                    Builder(
+                      builder: (context) {
+                        final paymentList = _payments.where((p) => p.bookingId == b.id).toList();
+                        final payment = paymentList.isNotEmpty ? paymentList.first : null;
+                        final isPaid = b.status.toLowerCase() == 'completed' || 
+                            (payment != null && (
+                                payment.paymentStatus?.toLowerCase() == 'approved' || 
+                                payment.status.toLowerCase() == 'approved' || 
+                                payment.paymentStatus?.toLowerCase() == 'paid' || 
+                                payment.status.toLowerCase() == 'paid'
+                            ));
+                        if (isPaid) {
+                          return OutlinedButton.icon(
+                            onPressed: () => _showReceiptOptions(b),
+                            icon: const Icon(Icons.receipt_long_rounded, size: 12, color: AppColors.primaryOrange),
+                            label: const Text('Receipt', style: TextStyle(color: AppColors.primaryOrange, fontSize: 11, fontWeight: FontWeight.bold)),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: AppColors.primaryOrange),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
                     ),
                   ],
                 ),
@@ -331,8 +416,11 @@ class _HistoryScreenState extends State<HistoryScreen>
         return Container(
           margin: const EdgeInsets.only(bottom: 14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: _borderColor,
+            ),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.05),
@@ -368,18 +456,18 @@ class _HistoryScreenState extends State<HistoryScreen>
                         children: [
                           Text(
                             vehicleName,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 14,
-                              color: AppColors.secondaryBlue,
+                              color: _textColor,
                             ),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             'Booking Reference: #${p.bookingId.substring(0, p.bookingId.length > 8 ? 8 : p.bookingId.length).toUpperCase()}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
-                              color: AppColors.lightText,
+                              color: _subColor,
                             ),
                           ),
                         ],
@@ -389,7 +477,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                   ],
                 ),
                 const SizedBox(height: 14),
-                const Divider(height: 1, color: AppColors.borderGray),
+                Divider(height: 1, color: _borderColor),
                 const SizedBox(height: 14),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -437,9 +525,9 @@ class _HistoryScreenState extends State<HistoryScreen>
                           width: 64,
                           height: 64,
                           decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey[200]!),
+                            border: Border.all(color: _borderColor),
                             borderRadius: BorderRadius.circular(12),
-                            color: Colors.grey[50],
+                            color: _isDark ? const Color(0xFF0F172A) : Colors.grey[50],
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(10),
@@ -456,27 +544,43 @@ class _HistoryScreenState extends State<HistoryScreen>
                   ],
                 ),
                 const SizedBox(height: 14),
-                const Divider(height: 1, color: AppColors.borderGray),
+                Divider(height: 1, color: _borderColor),
                 const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Total Settled',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                        fontWeight: FontWeight.w500,
-                      ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Payment Amount',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: _subColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'RM ${p.amount.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 16,
+                            color: AppColors.primaryOrange,
+                          ),
+                        ),
+                      ],
                     ),
-                    Text(
-                      'RM ${p.amount.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 16,
-                        color: AppColors.primaryOrange,
+                    if (p.receiptImage != null && p.receiptImage!.isNotEmpty)
+                      OutlinedButton.icon(
+                        onPressed: () => _openReceiptLightbox(p),
+                        icon: const Icon(Icons.receipt_rounded, size: 12, color: AppColors.primaryOrange),
+                        label: const Text('View Uploaded Receipt', style: TextStyle(color: AppColors.primaryOrange, fontSize: 11, fontWeight: FontWeight.bold)),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: AppColors.primaryOrange),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
                       ),
-                    ),
                   ],
                 ),
                 if (p.rejectionReason != null && p.rejectionReason!.isNotEmpty)
@@ -524,21 +628,21 @@ class _HistoryScreenState extends State<HistoryScreen>
       children: [
         Row(
           children: [
-            Icon(icon, size: 12, color: AppColors.lightText),
+            Icon(icon, size: 12, color: _subColor),
             const SizedBox(width: 4),
             Text(
               label,
-              style: const TextStyle(fontSize: 10, color: AppColors.lightText),
+              style: TextStyle(fontSize: 10, color: _subColor),
             ),
           ],
         ),
         const SizedBox(height: 3),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w700,
-            color: AppColors.secondaryBlue,
+            color: _textColor,
           ),
         ),
       ],
@@ -558,27 +662,27 @@ class _HistoryScreenState extends State<HistoryScreen>
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: AppColors.lightGray,
+                color: _isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, size: 48, color: AppColors.borderGray),
+              child: Icon(icon, size: 48, color: _isDark ? const Color(0xFF334155) : AppColors.borderGray),
             ),
             const SizedBox(height: 20),
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w800,
                 fontSize: 18,
-                color: AppColors.secondaryBlue,
+                color: _textColor,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
-                color: AppColors.lightText,
+                color: _subColor,
               ),
             ),
           ],
@@ -592,11 +696,11 @@ class _HistoryScreenState extends State<HistoryScreen>
     return Column(
       children: [
         Container(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           child: TabBar(
             controller: _tabController,
             labelColor: AppColors.primaryOrange,
-            unselectedLabelColor: AppColors.lightText,
+            unselectedLabelColor: _subColor,
             indicatorColor: AppColors.primaryOrange,
             indicatorWeight: 3,
             labelStyle:

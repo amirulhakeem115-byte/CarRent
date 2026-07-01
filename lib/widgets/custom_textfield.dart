@@ -32,17 +32,21 @@ class CustomTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
+        border: isDark ? Border.all(color: const Color(0xFF334155), width: 1.0) : null,
       ),
       child: TextFormField(
         controller: controller,
@@ -53,15 +57,17 @@ class CustomTextField extends StatelessWidget {
         focusNode: focusNode,
         onTap: onTap,
         onChanged: onChanged,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.w500,
-          color: Color(0xFF2C3E50),
+          color: isDark ? Colors.white : const Color(0xFF2C3E50),
         ),
         decoration: InputDecoration(
           labelText: labelText,
           hintText: hintText,
-          prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: const Color(0xFF5C6BC0)) : null,
+          prefixIcon: prefixIcon != null
+              ? Icon(prefixIcon, color: isDark ? const Color(0xFFF97316) : const Color(0xFF5C6BC0))
+              : null,
           suffixIcon: suffixIcon,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
@@ -71,11 +77,11 @@ class CustomTextField extends StatelessWidget {
           fillColor: Colors.transparent,
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           labelStyle: TextStyle(
-            color: Colors.grey[600],
+            color: isDark ? const Color(0xFF94A3B8) : Colors.grey[600],
             fontSize: 14,
           ),
           hintStyle: TextStyle(
-            color: Colors.grey[400],
+            color: isDark ? const Color(0xFF64748B) : Colors.grey[400],
             fontSize: 14,
           ),
           errorBorder: OutlineInputBorder(

@@ -164,13 +164,19 @@ class _BranchesViewState extends State<BranchesView> {
   }
 
   Future<void> _deleteBranch(String id) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final dialogBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Remove Branch'),
-        content: const Text('Are you sure you want to remove this branch from locations listing?'),
+        backgroundColor: dialogBg,
+        title: Text('Remove Branch', style: TextStyle(color: textPrimary, fontWeight: FontWeight.bold)),
+        content: Text('Are you sure you want to remove this branch from locations listing?', style: TextStyle(color: textSecondary)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel', style: TextStyle(color: textSecondary))),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
             onPressed: () => Navigator.pop(context, true),
@@ -190,52 +196,66 @@ class _BranchesViewState extends State<BranchesView> {
     showDialog(
       context: context,
       builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final dialogBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+        final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+        final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
+
         return AlertDialog(
+          backgroundColor: dialogBg,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text(branch.branchName, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(branch.address, style: const TextStyle(fontSize: 13, height: 1.4)),
-              const SizedBox(height: 8),
-              Row(
+          title: Text(branch.branchName, style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary)),
+          content: Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.phone, size: 14, color: AppColors.primaryOrange),
-                  const SizedBox(width: 6),
-                  Text(branch.phone, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  const Icon(Icons.access_time, size: 14, color: Colors.blueGrey),
-                  const SizedBox(width: 6),
-                  Text(branch.operatingHours, style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic)),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  const Icon(Icons.info_outline, size: 14, color: Colors.blue),
-                  const SizedBox(width: 6),
-                  Text('Status: ${branch.status}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  const Icon(Icons.location_on, size: 14, color: Colors.blue),
-                  const SizedBox(width: 6),
-                  Text(
-                    isValid
-                        ? 'GPS: ${branch.latitude.toStringAsFixed(4)}, ${branch.longitude.toStringAsFixed(4)}'
-                        : 'GPS: Missing/Invalid coordinates',
-                    style: TextStyle(fontSize: 12, color: isValid ? Colors.grey : Colors.red, fontWeight: isValid ? FontWeight.normal : FontWeight.bold),
+                  Text(branch.address, style: TextStyle(fontSize: 13, height: 1.4, color: textPrimary)),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Icon(Icons.phone, size: 14, color: AppColors.primaryOrange),
+                      const SizedBox(width: 6),
+                      Flexible(child: Text(branch.phone, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textPrimary))),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.access_time, size: 14, color: textSecondary),
+                      const SizedBox(width: 6),
+                      Flexible(child: Text(branch.operatingHours, style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: textPrimary))),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.info_outline, size: 14, color: Colors.blue),
+                      const SizedBox(width: 6),
+                      Flexible(child: Text('Status: ${branch.status}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textPrimary))),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on, size: 14, color: Colors.blue),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          isValid
+                              ? 'GPS: ${branch.latitude.toStringAsFixed(4)}, ${branch.longitude.toStringAsFixed(4)}'
+                              : 'GPS: Missing/Invalid coordinates',
+                          style: TextStyle(fontSize: 12, color: isValid ? textSecondary : Colors.red, fontWeight: isValid ? FontWeight.normal : FontWeight.bold),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
           actions: [
             if (isValid)
@@ -248,7 +268,7 @@ class _BranchesViewState extends State<BranchesView> {
               ),
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Close'),
+              child: Text('Close', style: TextStyle(color: textSecondary)),
             ),
           ],
         );
@@ -279,10 +299,15 @@ class _BranchesViewState extends State<BranchesView> {
 
     final double width = MediaQuery.of(context).size.width;
     final bool isDesktop = width > 1000;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
+    final borderColor = isDark ? const Color(0xFF334155) : Colors.grey.shade200;
 
     final validMapBranches = _branches.where((b) => _isValidLatLng(b.latitude, b.longitude)).toList();
 
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -292,12 +317,12 @@ class _BranchesViewState extends State<BranchesView> {
               ? Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Locations & Branches', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue)),
-                          Text('Configure corporate branch details, latitude coordinates, and live pins.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                          Text('Locations & Branches', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textPrimary)),
+                          Text('Configure corporate branch details, latitude coordinates, and live pins.', style: TextStyle(fontSize: 12, color: textSecondary)),
                         ],
                       ),
                     ),
@@ -308,11 +333,11 @@ class _BranchesViewState extends State<BranchesView> {
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Column(
+                    Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Locations & Branches', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue)),
-                        Text('Configure corporate branch details, latitude coordinates, and live pins.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        Text('Locations & Branches', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textPrimary)),
+                        Text('Configure corporate branch details, latitude coordinates, and live pins.', style: TextStyle(fontSize: 12, color: textSecondary)),
                       ],
                     ),
                     if (!_isFormActive) ...[
@@ -332,138 +357,155 @@ class _BranchesViewState extends State<BranchesView> {
             childAspectRatio: isDesktop ? 5.5 : 3.5,
             physics: const NeverScrollableScrollPhysics(),
             children: [
-              _buildStatCard('Total Seeded Branches', _branches.length.toString(), Icons.storefront, Colors.indigo),
-              _buildStatCard('Active Hubs (Map Pins)', validMapBranches.where((b) => b.status == 'Active').length.toString(), Icons.pin_drop, Colors.green),
+              _buildStatCard('Total Seeded Branches', _branches.length.toString(), Icons.storefront, Colors.indigo, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+              _buildStatCard('Active Hubs (Map Pins)', validMapBranches.where((b) => b.status == 'Active').length.toString(), Icons.pin_drop, Colors.green, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
             ],
           ),
           const SizedBox(height: 24),
 
           // Split panel: Left (List or Form) and Right (Map)
-          Expanded(
-            child: Flex(
-              direction: isDesktop ? Axis.horizontal : Axis.vertical,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Left Panel: Form or List
-                Expanded(
-                  flex: isDesktop ? 5 : 1,
-                  child: _isFormActive ? _buildBranchForm() : _buildBranchList(),
-                ),
-                if (isDesktop) const SizedBox(width: 24) else const SizedBox(height: 24),
-
-                // Right Panel: Interactive map
-                Expanded(
-                  flex: isDesktop ? 6 : 1,
-                  child: Stack(
+          isDesktop
+              ? SizedBox(
+                  height: 600,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Card(
-                        color: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        elevation: 0,
-                        child: Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: FlutterMap(
-                              mapController: _mapController,
-                              options: MapOptions(
-                                initialCenter: validMapBranches.isNotEmpty 
-                                    ? LatLng(validMapBranches.first.latitude, validMapBranches.first.longitude) 
-                                    : const LatLng(3.0166, 101.7916),
-                                initialZoom: 7.0,
-                                onTap: (tapPosition, point) {
-                                  if (_isSelectingLocationFromMap) {
-                                    setState(() {
-                                      _latController.text = point.latitude.toStringAsFixed(6);
-                                      _lngController.text = point.longitude.toStringAsFixed(6);
-                                      _isSelectingLocationFromMap = false;
-                                    });
-                                  }
-                                },
-                              ),
-                              children: [
-                                TileLayer(
-                                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                                  userAgentPackageName: 'com.carrent.app',
-                                ),
-                                MarkerLayer(
-                                  markers: [
-                                    ...validMapBranches.map((branch) {
-                                      final isActive = branch.status == 'Active';
-                                      return Marker(
-                                        point: LatLng(branch.latitude, branch.longitude),
-                                        width: 40,
-                                        height: 40,
-                                        child: GestureDetector(
-                                          onTap: () => _showBranchInfo(branch),
-                                          child: Icon(
-                                            Icons.location_on,
-                                            color: isActive ? AppColors.primaryOrange : Colors.grey,
-                                            size: 32,
-                                          ),
-                                        ),
-                                      );
-                                    }),
-                                    if (_isFormActive) ...[
-                                      // Render a temporary target marker if admin entered/selected valid lat/lng
-                                      (() {
-                                        final double? lat = double.tryParse(_latController.text);
-                                        final double? lng = double.tryParse(_lngController.text);
-                                        if (_isValidLatLng(lat, lng)) {
-                                          return Marker(
-                                            point: LatLng(lat!, lng!),
-                                            width: 40,
-                                            height: 40,
-                                            child: const Icon(
-                                              Icons.add_location_alt,
-                                              color: Colors.redAccent,
-                                              size: 36,
-                                            ),
-                                          );
-                                        }
-                                        return null;
-                                      })()
-                                    ].whereType<Marker>(),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                      // Left Panel: Form or List
+                      Expanded(
+                        flex: 5,
+                        child: _isFormActive ? _buildBranchForm(isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor) : _buildBranchList(isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
                       ),
-                      if (_isSelectingLocationFromMap)
-                        Positioned(
-                          top: 16,
-                          left: 16,
-                          right: 16,
-                          child: Card(
-                            color: Colors.redAccent,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            child: const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.touch_app, color: Colors.white),
-                                  SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      'Click anywhere on the map to set the branch coordinates!',
-                                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
+                      const SizedBox(width: 24),
+                      // Right Panel: Interactive map
+                      Expanded(
+                        flex: 6,
+                        child: _buildMapWidget(validMapBranches, cardColor: cardColor, borderColor: borderColor),
+                      ),
                     ],
                   ),
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Top: Form or List
+                    _isFormActive ? _buildBranchForm(isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor) : _buildBranchList(isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+                    const SizedBox(height: 24),
+                    // Bottom: Map
+                    SizedBox(
+                      height: 350,
+                      child: _buildMapWidget(validMapBranches, cardColor: cardColor, borderColor: borderColor),
+                    ),
+                  ],
+                ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMapWidget(List<BranchModel> validMapBranches, {required Color cardColor, required Color borderColor}) {
+    return Stack(
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: borderColor),
+          ),
+          padding: const EdgeInsets.all(8.0),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: validMapBranches.isNotEmpty 
+                    ? LatLng(validMapBranches.first.latitude, validMapBranches.first.longitude) 
+                    : const LatLng(3.0166, 101.7916),
+                initialZoom: 7.0,
+                onTap: (tapPosition, point) {
+                  if (_isSelectingLocationFromMap) {
+                    setState(() {
+                      _latController.text = point.latitude.toStringAsFixed(6);
+                      _lngController.text = point.longitude.toStringAsFixed(6);
+                      _isSelectingLocationFromMap = false;
+                    });
+                  }
+                },
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.carrent.app',
+                ),
+                MarkerLayer(
+                  markers: [
+                    ...validMapBranches.map((branch) {
+                      final isActive = branch.status == 'Active';
+                      return Marker(
+                        point: LatLng(branch.latitude, branch.longitude),
+                        width: 40,
+                        height: 40,
+                        child: GestureDetector(
+                          onTap: () => _showBranchInfo(branch),
+                          child: Icon(
+                            Icons.location_on,
+                            color: isActive ? AppColors.primaryOrange : Colors.grey,
+                            size: 32,
+                          ),
+                        ),
+                      );
+                    }),
+                    if (_isFormActive) ...[
+                      // Render a temporary target marker if admin entered/selected valid lat/lng
+                      (() {
+                        final double? lat = double.tryParse(_latController.text);
+                        final double? lng = double.tryParse(_lngController.text);
+                        if (_isValidLatLng(lat, lng)) {
+                          return Marker(
+                            point: LatLng(lat!, lng!),
+                            width: 40,
+                            height: 40,
+                            child: const Icon(
+                              Icons.add_location_alt,
+                              color: Colors.redAccent,
+                              size: 36,
+                            ),
+                          );
+                        }
+                        return null;
+                      })()
+                    ].whereType<Marker>(),
+                  ],
                 ),
               ],
             ),
           ),
-        ],
-      ),
+        ),
+        if (_isSelectingLocationFromMap)
+          Positioned(
+            top: 16,
+            left: 16,
+            right: 16,
+            child: Card(
+              color: Colors.redAccent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  children: [
+                    Icon(Icons.touch_app, color: Colors.white),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Click anywhere on the map to set coordinates!',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -481,38 +523,56 @@ class _BranchesViewState extends State<BranchesView> {
     );
   }
 
-  Widget _buildBranchList() {
-    return Card(
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      elevation: 0,
+  Widget _buildBranchList({
+    required bool isDark,
+    required Color cardColor,
+    required Color textPrimary,
+    required Color textSecondary,
+    required Color borderColor,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor),
+      ),
+      padding: const EdgeInsets.all(12),
       child: _branches.isEmpty
-          ? const Center(child: Text('No branches registered.'))
-          : ListView.builder(
+          ? Center(child: Text('No branches registered.', style: TextStyle(color: textSecondary)))
+          : ListView.separated(
+              shrinkWrap: true,
               itemCount: _branches.length,
+              separatorBuilder: (context, index) => Divider(color: borderColor),
               itemBuilder: (context, index) {
                 final branch = _branches[index];
                 final isValid = _isValidLatLng(branch.latitude, branch.longitude);
                 final isActive = branch.status == 'Active';
 
                 return ListTile(
+                  contentPadding: EdgeInsets.zero,
                   leading: CircleAvatar(
-                    backgroundColor: isActive ? AppColors.lightGray : Colors.grey[200],
-                    child: Icon(Icons.location_on_outlined, color: isActive ? AppColors.primaryOrange : Colors.grey, size: 20),
+                    backgroundColor: isActive ? AppColors.primaryOrange.withValues(alpha: 0.15) : textSecondary.withValues(alpha: 0.15),
+                    child: Icon(Icons.location_on_outlined, color: isActive ? AppColors.primaryOrange : textSecondary, size: 20),
                   ),
                   title: Row(
                     children: [
-                      Text(branch.name, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+                      Expanded(
+                        child: Text(
+                          branch.branchName,
+                          style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                       const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: isActive ? Colors.green.withValues(alpha: 0.1) : Colors.grey.withValues(alpha: 0.1),
+                          color: isActive ? Colors.green.withValues(alpha: 0.15) : textSecondary.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           branch.status.toUpperCase(),
-                          style: TextStyle(color: isActive ? Colors.green : Colors.grey, fontSize: 8, fontWeight: FontWeight.bold),
+                          style: TextStyle(color: isActive ? Colors.green : textSecondary, fontSize: 8, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ],
@@ -520,7 +580,7 @@ class _BranchesViewState extends State<BranchesView> {
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(branch.address, style: const TextStyle(fontSize: 12)),
+                      Text(branch.address, style: TextStyle(fontSize: 12, color: textSecondary)),
                       if (!isValid)
                         const Padding(
                           padding: EdgeInsets.only(top: 4.0),
@@ -532,7 +592,7 @@ class _BranchesViewState extends State<BranchesView> {
                             ],
                           ),
                         ),
-                      Text('Phone: ${branch.phone} | GPS: ${branch.latitude.toStringAsFixed(3)}, ${branch.longitude.toStringAsFixed(3)}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                      Text('Phone: ${branch.phone} | GPS: ${branch.latitude.toStringAsFixed(3)}, ${branch.longitude.toStringAsFixed(3)}', style: TextStyle(fontSize: 11, color: textSecondary)),
                     ],
                   ),
                   trailing: Row(
@@ -546,7 +606,7 @@ class _BranchesViewState extends State<BranchesView> {
                           },
                         ),
                       IconButton(
-                        icon: const Icon(Icons.edit_outlined, color: Colors.indigo, size: 18),
+                        icon: Icon(Icons.edit_outlined, color: textPrimary, size: 18),
                         onPressed: () => _activateForm(branch: branch),
                       ),
                       IconButton(
@@ -562,139 +622,168 @@ class _BranchesViewState extends State<BranchesView> {
     );
   }
 
-  Widget _buildBranchForm() {
+  Widget _buildBranchForm({
+    required bool isDark,
+    required Color cardColor,
+    required Color textPrimary,
+    required Color textSecondary,
+    required Color borderColor,
+  }) {
     final isEdit = _editingBranch != null;
-    return Card(
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      elevation: 0,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  isEdit ? 'Edit Branch' : 'Add Branch Location',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue),
+    return Container(
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor),
+      ),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                isEdit ? 'Edit Branch' : 'Add Branch Location',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
+              ),
+              IconButton(
+                icon: Icon(Icons.close, color: textSecondary),
+                onPressed: _cancelForm,
+              ),
+            ],
+          ),
+          Divider(height: 24, color: borderColor),
+          TextField(
+            controller: _nameController,
+            style: TextStyle(color: textPrimary),
+            decoration: const InputDecoration(labelText: 'Branch Name', hintText: 'e.g. Kajang Hub'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _addressController,
+            style: TextStyle(color: textPrimary),
+            decoration: const InputDecoration(labelText: 'Address', hintText: 'Full physical address'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _phoneController,
+            style: TextStyle(color: textPrimary),
+            decoration: const InputDecoration(labelText: 'Phone Number', hintText: 'e.g. +603-87391234'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _hoursController,
+            style: TextStyle(color: textPrimary),
+            decoration: const InputDecoration(labelText: 'Operating Hours', hintText: 'e.g. 09:00 AM - 09:00 PM'),
+          ),
+          const SizedBox(height: 12),
+          
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _latController,
+                  style: TextStyle(color: textPrimary),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: 'Latitude'),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close, color: Colors.grey),
-                  onPressed: _cancelForm,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: _lngController,
+                  style: TextStyle(color: textPrimary),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: 'Longitude'),
                 ),
-              ],
-            ),
-            const Divider(height: 24),
-            TextField(
-              controller: _nameController,
-              decoration: const InputDecoration(labelText: 'Branch Name', hintText: 'e.g. Kajang Hub'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _addressController,
-              decoration: const InputDecoration(labelText: 'Address', hintText: 'Full physical address'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _phoneController,
-              decoration: const InputDecoration(labelText: 'Phone Number', hintText: 'e.g. +603-87391234'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _hoursController,
-              decoration: const InputDecoration(labelText: 'Operating Hours', hintText: 'e.g. 09:00 AM - 09:00 PM'),
-            ),
-            const SizedBox(height: 12),
-            
-            // Coordinates Row with "Select from map" trigger
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _latController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'Latitude'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: _lngController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'Longitude'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            ElevatedButton.icon(
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
-                backgroundColor: _isSelectingLocationFromMap ? Colors.redAccent : AppColors.lightGray,
-                foregroundColor: _isSelectingLocationFromMap ? Colors.white : AppColors.secondaryBlue,
+                backgroundColor: _isSelectingLocationFromMap ? Colors.redAccent : (isDark ? const Color(0xFF334155) : AppColors.lightGray),
+                foregroundColor: _isSelectingLocationFromMap ? Colors.white : textPrimary,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
               ),
               onPressed: () {
                 setState(() {
                   _isSelectingLocationFromMap = !_isSelectingLocationFromMap;
                 });
               },
-              icon: Icon(_isSelectingLocationFromMap ? Icons.touch_app : Icons.map),
-              label: Text(_isSelectingLocationFromMap ? 'TAPPING ACTIVE...' : 'Select Location Directly From Map'),
+              icon: Icon(_isSelectingLocationFromMap ? Icons.touch_app : Icons.map, size: 16),
+              label: Text(
+                _isSelectingLocationFromMap ? 'TAPPING ACTIVE...' : 'Select Location Directly From Map',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
             ),
-            const SizedBox(height: 16),
+          ),
+          const SizedBox(height: 16),
 
-            // Status Dropdown
-            DropdownButtonFormField<String>(
-              initialValue: _status,
-              decoration: const InputDecoration(labelText: 'Branch Status'),
-              items: ['Active', 'Inactive'].map((s) {
-                return DropdownMenuItem(value: s, child: Text(s));
-              }).toList(),
-              onChanged: (val) {
-                if (val != null) {
-                  setState(() => _status = val);
-                }
-              },
-            ),
-            const SizedBox(height: 24),
+          DropdownButtonFormField<String>(
+            initialValue: _status,
+            dropdownColor: cardColor,
+            style: TextStyle(color: textPrimary, fontWeight: FontWeight.bold),
+            decoration: const InputDecoration(labelText: 'Branch Status'),
+            items: ['Active', 'Inactive'].map((s) {
+              return DropdownMenuItem(value: s, child: Text(s));
+            }).toList(),
+            onChanged: (val) {
+              if (val != null) {
+                setState(() => _status = val);
+              }
+            },
+          ),
+          const SizedBox(height: 24),
 
-            // Form actions
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _cancelForm,
-                    child: const Text('Cancel'),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: borderColor),
+                    foregroundColor: textSecondary,
                   ),
+                  onPressed: _cancelForm,
+                  child: const Text('Cancel'),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryOrange,
-                      foregroundColor: Colors.white,
-                    ),
-                    onPressed: _saveForm,
-                    child: const Text('Save Branch'),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryOrange,
+                    foregroundColor: Colors.white,
                   ),
+                  onPressed: _saveForm,
+                  child: const Text('Save Branch'),
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
+  Widget _buildStatCard(String label, String value, IconData icon, Color color, {
+    required bool isDark,
+    required Color cardColor,
+    required Color textPrimary,
+    required Color textSecondary,
+    required Color borderColor,
+  }) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
+        border: Border.all(color: borderColor),
+        boxShadow: isDark ? [] : [
           BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4)),
         ],
       ),
@@ -703,7 +792,7 @@ class _BranchesViewState extends State<BranchesView> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
+              color: color.withValues(alpha: isDark ? 0.2 : 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: color, size: 24),
@@ -714,9 +803,9 @@ class _BranchesViewState extends State<BranchesView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold)),
+                Text(label, style: TextStyle(color: textSecondary, fontSize: 11, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.secondaryBlue)),
+                Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textPrimary)),
               ],
             ),
           ),

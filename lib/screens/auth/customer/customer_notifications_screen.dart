@@ -9,6 +9,7 @@ import '../../../models/booking_model.dart';
 import '../../../models/payment_model.dart';
 import '../../../widgets/loading_widget.dart';
 import 'reward_history_screen.dart';
+import '../../../services/receipt_service.dart';
 
 class CustomerNotificationsScreen extends StatefulWidget {
   const CustomerNotificationsScreen({super.key});
@@ -34,6 +35,11 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
     'general'
   ];
 
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _textColor => _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+  Color get _subColor => _isDark ? const Color(0xFFCBD5E1) : AppColors.lightText;
+  Color get _borderColor => _isDark ? const Color(0xFF334155) : AppColors.borderGray;
+
   @override
   Widget build(BuildContext context) {
     final currentUser = _auth.currentUser;
@@ -45,21 +51,21 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
     }
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundWhite,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: _isDark ? const Color(0xFF1B2436) : Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.secondaryBlue),
+          icon: Icon(Icons.arrow_back, color: _textColor),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           'Notifications Centre',
-          style: TextStyle(color: AppColors.secondaryBlue, fontWeight: FontWeight.bold),
+          style: TextStyle(color: _textColor, fontWeight: FontWeight.bold),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: AppColors.secondaryBlue),
+            icon: Icon(Icons.refresh, color: _textColor),
             onPressed: () => setState(() {}),
           ),
         ],
@@ -117,7 +123,7 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
                   children: [
                     Text(
                       'Showing ${filteredNotifs.length} alerts ($unreadCount unread)',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.secondaryBlue),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: _textColor),
                     ),
                     if (_searchQuery.isNotEmpty || _selectedType != 'All' || _selectedStatus != 'All')
                       TextButton(
@@ -160,9 +166,9 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
       margin: const EdgeInsets.fromLTRB(20, 10, 20, 10),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[100]!),
+        border: Border.all(color: _borderColor),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.015),
@@ -176,13 +182,19 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
           // Search input field
           TextField(
             onChanged: (val) => setState(() => _searchQuery = val),
+            style: TextStyle(color: _textColor, fontSize: 13),
             decoration: InputDecoration(
               hintText: 'Search notifications...',
-              prefixIcon: const Icon(Icons.search, size: 20),
+              hintStyle: TextStyle(color: _isDark ? Colors.white30 : Colors.grey, fontSize: 13),
+              prefixIcon: Icon(Icons.search, size: 20, color: _subColor),
               contentPadding: const EdgeInsets.symmetric(vertical: 8),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey[200]!),
+                borderSide: BorderSide(color: _borderColor),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: _borderColor),
               ),
             ),
           ),
@@ -194,10 +206,13 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
               Expanded(
                 child: DropdownButtonFormField<String>(
                   initialValue: _selectedType,
-                  decoration: const InputDecoration(
+                  dropdownColor: Theme.of(context).cardColor,
+                  style: TextStyle(color: _textColor, fontSize: 12),
+                  decoration: InputDecoration(
                     labelText: 'Category',
-                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    border: OutlineInputBorder(),
+                    labelStyle: TextStyle(color: _subColor, fontSize: 12),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    border: const OutlineInputBorder(),
                   ),
                   items: _typesList.map((t) {
                     return DropdownMenuItem(
@@ -214,10 +229,13 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
               Expanded(
                 child: DropdownButtonFormField<String>(
                   initialValue: _selectedStatus,
-                  decoration: const InputDecoration(
+                  dropdownColor: Theme.of(context).cardColor,
+                  style: TextStyle(color: _textColor, fontSize: 12),
+                  decoration: InputDecoration(
                     labelText: 'Status',
-                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    border: OutlineInputBorder(),
+                    labelStyle: TextStyle(color: _subColor, fontSize: 12),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    border: const OutlineInputBorder(),
                   ),
                   items: const [
                     DropdownMenuItem(value: 'All', child: Text('All Status', style: TextStyle(fontSize: 12))),
@@ -266,16 +284,16 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.notifications_off_outlined, size: 64, color: Colors.grey[300]),
+          Icon(Icons.notifications_off_outlined, size: 64, color: _isDark ? const Color(0xFF334155) : Colors.grey[300]),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'No matching notifications',
-            style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue),
+            style: TextStyle(fontWeight: FontWeight.bold, color: _textColor),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Try adjusting your search query or filters.',
-            style: TextStyle(color: Colors.grey, fontSize: 12),
+            style: TextStyle(color: _subColor, fontSize: 12),
           ),
         ],
       ),
@@ -286,80 +304,87 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
     final parsedColor = Color(int.parse(notif.color));
     final formattedDate = DateFormat('dd MMM, hh:mm a').format(notif.createdAt);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: notif.isRead ? Colors.white : const Color(0xFFFFF7ED),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: notif.isRead ? Colors.grey[200]! : AppColors.primaryOrange.withValues(alpha: 0.15),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.01),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
+    return Material(
+      color: Colors.transparent,
+      child: Ink(
+        decoration: BoxDecoration(
+          color: notif.isRead
+              ? Theme.of(context).cardColor
+              : (_isDark ? const Color(0xFF2C2420) : const Color(0xFFFFF7ED)),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: notif.isRead
+                ? _borderColor
+                : AppColors.primaryOrange.withValues(alpha: 0.25),
           ),
-        ],
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: CircleAvatar(
-          radius: 20,
-          backgroundColor: parsedColor.withValues(alpha: 0.1),
-          child: Text(notif.icon, style: const TextStyle(fontSize: 16)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.01),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(
-                notif.title,
-                style: TextStyle(
-                  fontWeight: notif.isRead ? FontWeight.bold : FontWeight.w900,
-                  fontSize: 13,
-                  color: AppColors.secondaryBlue,
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          leading: CircleAvatar(
+            radius: 20,
+            backgroundColor: parsedColor.withValues(alpha: 0.1),
+            child: Text(notif.icon, style: const TextStyle(fontSize: 16)),
+          ),
+          title: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  notif.title,
+                  style: TextStyle(
+                    fontWeight: notif.isRead ? FontWeight.bold : FontWeight.w900,
+                    fontSize: 13,
+                    color: _textColor,
+                  ),
                 ),
               ),
-            ),
-            Text(
-              formattedDate,
-              style: const TextStyle(fontSize: 9, color: Colors.grey),
-            ),
-          ],
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Text(
-            notif.message,
-            style: TextStyle(
-              fontSize: 11,
-              height: 1.3,
-              color: notif.isRead ? Colors.grey[600] : Colors.grey[800],
+              Text(
+                formattedDate,
+                style: TextStyle(fontSize: 9, color: _subColor),
+              ),
+            ],
+          ),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              notif.message,
+              style: TextStyle(
+                fontSize: 11,
+                height: 1.3,
+                color: notif.isRead ? _subColor : _textColor,
+              ),
             ),
           ),
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: Icon(
-                notif.isRead ? Icons.mark_as_unread_outlined : Icons.mark_chat_read_outlined,
-                color: Colors.grey[600],
-                size: 16,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: Icon(
+                  notif.isRead ? Icons.mark_as_unread_outlined : Icons.mark_chat_read_outlined,
+                  color: _subColor,
+                  size: 16,
+                ),
+                onPressed: () async {
+                  await _notificationService.toggleReadStatus(userId, notif.id, !notif.isRead);
+                },
               ),
-              onPressed: () async {
-                await _notificationService.toggleReadStatus(userId, notif.id, !notif.isRead);
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete_outline_rounded, color: Colors.grey, size: 16),
-              onPressed: () async {
-                await _notificationService.deleteNotification(userId, notif.id);
-              },
-            ),
-          ],
+              IconButton(
+                icon: Icon(Icons.delete_outline_rounded, color: _subColor, size: 16),
+                onPressed: () async {
+                  await _notificationService.deleteNotification(userId, notif.id);
+                },
+              ),
+            ],
+          ),
+          onTap: () => _handleNotificationTap(notif, userId),
         ),
-        onTap: () => _handleNotificationTap(notif, userId),
       ),
     );
   }
@@ -407,12 +432,28 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
 
     try {
       final snap = await FirebaseDatabase.instance.ref().child('bookings').child(bookingId).get();
+      // Fetch payments
+      final paySnap = await FirebaseDatabase.instance.ref().child('payments').orderByChild('bookingId').equalTo(bookingId).get();
+      bool isPaid = false;
+      if (paySnap.exists && paySnap.value != null) {
+        final Map pMap = paySnap.value as Map;
+        for (var pValue in pMap.values) {
+          if (pValue is Map) {
+            final pStatus = (pValue['paymentStatus'] ?? pValue['status'] ?? '').toString().toLowerCase();
+            if (pStatus == 'approved' || pStatus == 'paid') {
+              isPaid = true;
+              break;
+            }
+          }
+        }
+      }
+
       if (context.mounted) Navigator.pop(context); // Close loading indicator
 
       if (snap.exists && snap.value != null) {
         final booking = BookingModel.fromMap(bookingId, snap.value as Map<dynamic, dynamic>);
         if (context.mounted) {
-          _showBookingDetailsDialog(context, booking);
+          _showBookingDetailsDialog(context, booking, isPaid: isPaid);
         }
       } else {
         if (context.mounted) {
@@ -456,10 +497,11 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
     }
   }
 
-  void _showBookingDetailsDialog(BuildContext context, BookingModel booking) {
+  void _showBookingDetailsDialog(BuildContext context, BookingModel booking, {bool isPaid = false}) {
     final dateFormat = DateFormat('dd MMM yyyy');
     showModalBottomSheet(
       context: context,
+      backgroundColor: _isDark ? const Color(0xFF1E293B) : Colors.white,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (context) {
@@ -477,7 +519,7 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Booking Specification', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+                  Text('Booking Specification', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _textColor)),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
@@ -497,12 +539,58 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
               _buildDetailRow('Total Price Paid', 'RM ${booking.totalPrice.toStringAsFixed(2)}'),
               if (booking.notes != null && booking.notes!.isNotEmpty)
                 _buildDetailRow('Remarks', booking.notes!),
+              if (isPaid) ...[
+                const SizedBox(height: 16),
+                Divider(color: _borderColor),
+                const SizedBox(height: 12),
+                Text('Receipt Documents', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _textColor)),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryOrange,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          elevation: 0,
+                        ),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          ReceiptService().viewReceipt(context, booking.id);
+                        },
+                        icon: const Icon(Icons.visibility, size: 14),
+                        label: const Text('View', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _isDark ? const Color(0xFF0F172A) : AppColors.secondaryBlue,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          elevation: 0,
+                        ),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          ReceiptService().downloadReceipt(context, booking.id);
+                        },
+                        icon: const Icon(Icons.download, size: 14),
+                        label: const Text('Download', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.secondaryBlue,
+                    backgroundColor: AppColors.primaryOrange,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     padding: const EdgeInsets.symmetric(vertical: 14),
@@ -522,6 +610,7 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
     final dateFormat = DateFormat('dd MMM yyyy, hh:mm a');
     showModalBottomSheet(
       context: context,
+      backgroundColor: _isDark ? const Color(0xFF1E293B) : Colors.white,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (context) {
@@ -539,7 +628,7 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Payment Transaction', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+                  Text('Payment Transaction', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _textColor)),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
@@ -565,7 +654,7 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.secondaryBlue,
+                    backgroundColor: AppColors.primaryOrange,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     padding: const EdgeInsets.symmetric(vertical: 14),
@@ -589,7 +678,7 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
         children: [
           Expanded(
             flex: 4,
-            child: Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w500)),
+            child: Text(label, style: TextStyle(color: _subColor, fontSize: 12, fontWeight: FontWeight.w500)),
           ),
           Expanded(
             flex: 6,
@@ -599,7 +688,7 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
                 fontWeight: FontWeight.bold,
                 fontSize: 12,
                 fontStyle: isItalic ? FontStyle.italic : FontStyle.normal,
-                color: AppColors.secondaryBlue,
+                color: _textColor,
               ),
             ),
           ),
