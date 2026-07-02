@@ -29,8 +29,10 @@ class CustomerHomeScreen extends StatefulWidget {
 
 class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   bool get _isDark => Theme.of(context).brightness == Brightness.dark;
-  Color get _textColor => _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
-  Color get _subColor => _isDark ? const Color(0xFFCBD5E1) : AppColors.lightText;
+  Color get _textColor =>
+      _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+  Color get _subColor =>
+      _isDark ? const Color(0xFFCBD5E1) : AppColors.lightText;
 
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
@@ -68,39 +70,49 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         .child(currentUser.uid)
         .onValue
         .listen((event) {
-      if (event.snapshot.exists && event.snapshot.value is Map) {
-        if (mounted) {
-          setState(() {
-            _user = UserModel.fromMap(
-              currentUser.uid,
-              event.snapshot.value as Map<dynamic, dynamic>,
-            );
-          });
-        }
-      }
-    });
+          if (event.snapshot.exists && event.snapshot.value is Map) {
+            if (mounted) {
+              setState(() {
+                _user = UserModel.fromMap(
+                  currentUser.uid,
+                  event.snapshot.value as Map<dynamic, dynamic>,
+                );
+              });
+            }
+          }
+        });
 
     _bookingsSubscription?.cancel();
-    _bookingsSubscription = _bookingService.getBookingsStream().listen((allBookings) {
+    _bookingsSubscription = _bookingService.getBookingsStream().listen((
+      allBookings,
+    ) {
       if (mounted) {
         setState(() {
-          _bookings = allBookings.where((b) => b.userId == currentUser.uid).toList();
+          _bookings = allBookings
+              .where((b) => b.userId == currentUser.uid)
+              .toList();
           _bookings.sort((a, b) => b.createdAt.compareTo(a.createdAt));
         });
       }
     });
 
     _paymentsSubscription?.cancel();
-    _paymentsSubscription = _paymentService.getPaymentsStream().listen((allPayments) {
+    _paymentsSubscription = _paymentService.getPaymentsStream().listen((
+      allPayments,
+    ) {
       if (mounted) {
         setState(() {
-          _payments = allPayments.where((p) => p.userId == currentUser.uid).toList();
+          _payments = allPayments
+              .where((p) => p.userId == currentUser.uid)
+              .toList();
         });
       }
     });
 
     _vehiclesSubscription?.cancel();
-    _vehiclesSubscription = _vehicleService.getVehiclesStream().listen((allVehicles) {
+    _vehiclesSubscription = _vehicleService.getVehiclesStream().listen((
+      allVehicles,
+    ) {
       if (mounted) {
         setState(() {
           _vehicles = allVehicles;
@@ -127,7 +139,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     try {
       final currentUser = _authService.currentUser;
       if (currentUser != null) {
-        _user = await _databaseService.getUser(currentUser.uid).timeout(const Duration(seconds: 5));
+        _user = await _databaseService
+            .getUser(currentUser.uid)
+            .timeout(const Duration(seconds: 5));
         if (_user == null) {
           throw Exception("User data not found in database");
         }
@@ -140,27 +154,30 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
 
         // Load bookings, payments, and vehicles in background (non-blocking)
         Future.wait([
-          _bookingService.getUserBookings(currentUser.uid),
-          _paymentService.getUserPayments(currentUser.uid),
-          _vehicleService.getVehicles(),
-        ]).timeout(const Duration(seconds: 10)).then((results) {
-          if (mounted) {
-            setState(() {
-              _bookings = results[0] as List<BookingModel>;
-              _payments = results[1] as List<PaymentModel>;
-              _vehicles = results[2] as List<VehicleModel>;
-            });
-          }
-        }).catchError((err) {
-          debugPrint('Error loading dashboard background data: $err');
-          if (mounted) {
-            setState(() {
-              if (_vehicles.isEmpty) {
-                _vehicles = [];
+              _bookingService.getUserBookings(currentUser.uid),
+              _paymentService.getUserPayments(currentUser.uid),
+              _vehicleService.getVehicles(),
+            ])
+            .timeout(const Duration(seconds: 10))
+            .then((results) {
+              if (mounted) {
+                setState(() {
+                  _bookings = results[0] as List<BookingModel>;
+                  _payments = results[1] as List<PaymentModel>;
+                  _vehicles = results[2] as List<VehicleModel>;
+                });
+              }
+            })
+            .catchError((err) {
+              debugPrint('Error loading dashboard background data: $err');
+              if (mounted) {
+                setState(() {
+                  if (_vehicles.isEmpty) {
+                    _vehicles = [];
+                  }
+                });
               }
             });
-          }
-        });
       }
     } catch (e) {
       if (mounted) {
@@ -193,13 +210,21 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.cloud_off,
-                  color: AppColors.primaryOrange, size: 56),
+              const Icon(
+                Icons.cloud_off,
+                color: AppColors.primaryOrange,
+                size: 56,
+              ),
               const SizedBox(height: 16),
-              Text(_error!,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.secondaryBlue)),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: AppColors.secondaryBlue,
+                ),
+              ),
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: _loadData,
@@ -207,7 +232,8 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   backgroundColor: AppColors.primaryOrange,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 child: const Text('Retry'),
               ),
@@ -218,15 +244,29 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     }
 
     final activeBookings = _bookings
-        .where((b) =>
-            ['pending', 'approved', 'confirmed', 'active', 'ongoing',
-             'Pending', 'Approved', 'Confirmed', 'Active', 'Ongoing',
-             'Pending Payment'].contains(b.status))
+        .where(
+          (b) => [
+            'pending',
+            'approved',
+            'confirmed',
+            'active',
+            'ongoing',
+            'Pending',
+            'Approved',
+            'Confirmed',
+            'Active',
+            'Ongoing',
+            'Pending Payment',
+          ].contains(b.status),
+        )
         .toList();
-    final currentBooking =
-        activeBookings.isNotEmpty ? activeBookings.first : null;
-    final availableVehicles =
-        _vehicles.where((v) => v.status.toLowerCase() == 'available').take(8).toList();
+    final currentBooking = activeBookings.isNotEmpty
+        ? activeBookings.first
+        : null;
+    final availableVehicles = _vehicles
+        .where((v) => v.status.toLowerCase() == 'available')
+        .take(8)
+        .toList();
 
     return RefreshIndicator(
       onRefresh: _loadData,
@@ -244,8 +284,6 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildStatsRow(),
-                  const SizedBox(height: 20),
-                  _buildRewardsCard(),
                   const SizedBox(height: 20),
                   _buildLastPaymentCard(),
                   const SizedBox(height: 24),
@@ -271,8 +309,8 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     final greeting = hour < 12
         ? 'Good Morning'
         : hour < 17
-            ? 'Good Afternoon'
-            : 'Good Evening';
+        ? 'Good Afternoon'
+        : 'Good Evening';
 
     return Container(
       width: double.infinity,
@@ -289,15 +327,6 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         children: [
           Row(
             children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: Colors.white.withValues(alpha: 0.15),
-                backgroundImage: getAppImageProvider(_user?.profileImage),
-                child: _user?.profileImage.isNotEmpty != true
-                    ? const Icon(Icons.person,
-                        size: 24, color: Colors.white)
-                    : null,
-              ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -324,52 +353,44 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   ],
                 ),
               ),
+              // Loyalty Points - moved to app bar beside notification
+              GestureDetector(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.stars_rounded,
+                        color: AppColors.primaryOrange,
+                        size: 14,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${_user?.rewardPoints ?? 0}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
             ],
           ),
           const SizedBox(height: 20),
-          // Search bar
-          GestureDetector(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (context) => const VehicleListScreen()),
-            ).then((_) => _loadData()),
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.15)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.search_rounded,
-                      color: Colors.white70, size: 20),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Text(
-                      'Search cars, brands, categories...',
-                      style: TextStyle(
-                        color: Colors.white54,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryOrange,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(Icons.tune_rounded,
-                        color: Colors.white, size: 14),
-                  ),
-                ],
-              ),
-            ),
-          ),
         ],
       ),
     );
@@ -377,12 +398,19 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
 
   Widget _buildStatsRow() {
     final totalBookings = _bookings.length;
-    final totalSpent = _payments.fold<double>(
-      0.0, (sum, p) => sum + p.amount,
-    );
+    final totalSpent = _payments.fold<double>(0.0, (sum, p) => sum + p.amount);
     final activeCount = _bookings
-        .where((b) => ['pending', 'approved', 'confirmed', 'active',
-                       'Pending', 'Approved', 'Confirmed'].contains(b.status))
+        .where(
+          (b) => [
+            'pending',
+            'approved',
+            'confirmed',
+            'active',
+            'Pending',
+            'Approved',
+            'Confirmed',
+          ].contains(b.status),
+        )
         .length;
 
     return Row(
@@ -414,111 +442,6 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildRewardsCard() {
-    final points = _user?.rewardPoints ?? 0;
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const RewardHistoryScreen()),
-        );
-      },
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF1E293B), Color(0xFF334155)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF1E293B).withValues(alpha: 0.25),
-              blurRadius: 15,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryOrange.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Icon(Icons.stars_rounded, color: AppColors.primaryOrange, size: 14),
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'LOYALTY PROGRAM',
-                        style: TextStyle(
-                          color: AppColors.primaryOrange,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.0,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'My Reward Points',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Tap to view your points ledger & redemption history',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 16),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white12),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.stars_rounded, color: AppColors.primaryOrange, size: 24),
-                  const SizedBox(width: 8),
-                  Text(
-                    '$points',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -599,7 +522,11 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                       color: AppColors.primaryOrange.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.payment_rounded, color: AppColors.primaryOrange, size: 16),
+                    child: const Icon(
+                      Icons.payment_rounded,
+                      color: AppColors.primaryOrange,
+                      size: 16,
+                    ),
                   ),
                   const SizedBox(width: 8),
                   Text(
@@ -614,7 +541,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 ],
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
@@ -632,7 +562,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             ],
           ),
           const SizedBox(height: 14),
-          Divider(height: 1, color: _isDark ? const Color(0xFF334155) : AppColors.borderGray),
+          Divider(
+            height: 1,
+            color: _isDark ? const Color(0xFF334155) : AppColors.borderGray,
+          ),
           const SizedBox(height: 14),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -653,10 +586,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     children: [
                       Text(
                         '${DateFormat('dd MMM yyyy').format(lastPayment.paymentDate)} at ${lastPayment.paymentTime ?? DateFormat('HH:mm:ss').format(lastPayment.paymentDate)}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: _subColor,
-                        ),
+                        style: TextStyle(fontSize: 11, color: _subColor),
                       ),
                       const SizedBox(width: 8),
                       Container(
@@ -670,10 +600,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                       const SizedBox(width: 8),
                       Text(
                         lastPayment.paymentMethod,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: _subColor,
-                        ),
+                        style: TextStyle(fontSize: 11, color: _subColor),
                       ),
                     ],
                   ),
@@ -733,13 +660,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
               color: _textColor,
             ),
           ),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              color: _subColor,
-            ),
-          ),
+          Text(label, style: TextStyle(fontSize: 10, color: _subColor)),
         ],
       ),
     );
@@ -787,14 +708,14 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         const SizedBox(height: 14),
         Row(
           children: actions
-              .map((a) => Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.only(
-                        right: a == actions.last ? 0 : 10,
-                      ),
-                      child: _buildQuickActionCard(a),
-                    ),
-                  ))
+              .map(
+                (a) => Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(right: a == actions.last ? 0 : 10),
+                    child: _buildQuickActionCard(a),
+                  ),
+                ),
+              )
               .toList(),
         ),
       ],
@@ -889,11 +810,18 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: _isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
+                    color: _isDark
+                        ? const Color(0xFF0F172A)
+                        : AppColors.lightGray,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.directions_car_outlined,
-                      color: _isDark ? const Color(0xFF334155) : AppColors.borderGray, size: 36),
+                  child: Icon(
+                    Icons.directions_car_outlined,
+                    color: _isDark
+                        ? const Color(0xFF334155)
+                        : AppColors.borderGray,
+                    size: 36,
+                  ),
                 ),
                 const SizedBox(height: 14),
                 Text(
@@ -908,28 +836,32 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 Text(
                   'Browse our premium fleet and book your next ride.',
                   textAlign: TextAlign.center,
-                  style:
-                      TextStyle(fontSize: 12, color: _subColor),
+                  style: TextStyle(fontSize: 12, color: _subColor),
                 ),
                 const SizedBox(height: 18),
                 ElevatedButton(
                   onPressed: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const VehicleListScreen()),
+                      builder: (_) => const VehicleListScreen(),
+                    ),
                   ).then((_) => _loadData()),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryOrange,
                     foregroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 12),
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
                   ),
-                  child: const Text('Book a Ride',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 13)),
+                  child: const Text(
+                    'Book a Ride',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
                 ),
               ],
             ),
@@ -943,8 +875,16 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   Widget _buildActiveBookingDetails(BookingModel booking) {
     final dateFormat = DateFormat('dd MMM yyyy');
     Color statusColor = AppColors.primaryOrange;
-    if (['approved', 'confirmed', 'active', 'ongoing', 'Approved',
-         'Confirmed', 'Active', 'Ongoing'].contains(booking.status)) {
+    if ([
+      'approved',
+      'confirmed',
+      'active',
+      'ongoing',
+      'Approved',
+      'Confirmed',
+      'Active',
+      'Ongoing',
+    ].contains(booking.status)) {
       statusColor = const Color(0xFF10B981);
     }
 
@@ -954,7 +894,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         gradient: LinearGradient(
           colors: [
             AppColors.secondaryBlue,
-            AppColors.secondaryBlue.withValues(alpha: 0.85)
+            AppColors.secondaryBlue.withValues(alpha: 0.85),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -987,12 +927,15 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 4),
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                        color: statusColor.withValues(alpha: 0.4)),
+                      color: statusColor.withValues(alpha: 0.4),
+                    ),
                   ),
                   child: Text(
                     booking.status.toUpperCase(),
@@ -1017,8 +960,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             ),
             Text(
               '#${booking.id.substring(0, 8).toUpperCase()}',
-              style: const TextStyle(
-                  color: Colors.white38, fontSize: 11),
+              style: const TextStyle(color: Colors.white38, fontSize: 11),
             ),
             const SizedBox(height: 18),
             Row(
@@ -1033,11 +975,14 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('PICK UP',
-                            style: TextStyle(
-                                color: Colors.white38,
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold)),
+                        const Text(
+                          'PICK UP',
+                          style: TextStyle(
+                            color: Colors.white38,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                         const SizedBox(height: 4),
                         Text(
                           dateFormat.format(booking.pickUpDate),
@@ -1062,11 +1007,14 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('RETURN',
-                            style: TextStyle(
-                                color: Colors.white38,
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold)),
+                        const Text(
+                          'RETURN',
+                          style: TextStyle(
+                            color: Colors.white38,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                         const SizedBox(height: 4),
                         Text(
                           dateFormat.format(booking.returnDate),
@@ -1092,9 +1040,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     const Text(
                       'TOTAL COST',
                       style: TextStyle(
-                          color: Colors.white38,
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold),
+                        color: Colors.white38,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     Text(
                       'RM ${booking.totalPrice.toStringAsFixed(2)}',
@@ -1107,20 +1056,22 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   ],
                 ),
                 OutlinedButton(
-                  onPressed: () => CustomerResponsiveShell.of(context)?.setIndex(2),
+                  onPressed: () =>
+                      CustomerResponsiveShell.of(context)?.setIndex(2),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.white,
-                    side:
-                        const BorderSide(color: Colors.white30),
+                    side: const BorderSide(color: Colors.white30),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 10),
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
                   ),
                   child: const Text(
                     'View Details',
-                    style: TextStyle(
-                        fontSize: 12, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
@@ -1149,8 +1100,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             TextButton(
               onPressed: () => Navigator.push(
                 context,
-                MaterialPageRoute(
-                    builder: (_) => const VehicleListScreen()),
+                MaterialPageRoute(builder: (_) => const VehicleListScreen()),
               ).then((_) => _loadData()),
               child: const Text(
                 'See All',
@@ -1196,7 +1146,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         MaterialPageRoute(
           builder: (_) => CustomerResponsiveShell(
             initialIndex: 0,
-            customBody: VehicleDetailsScreen(vehicle: vehicle, hideAppBar: true),
+            customBody: VehicleDetailsScreen(
+              vehicle: vehicle,
+              hideAppBar: true,
+            ),
           ),
         ),
       ).then((_) => _loadData()),
@@ -1222,8 +1175,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ClipRRect(
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(18)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(18),
+              ),
               child: SizedBox(
                 height: 100,
                 width: double.infinity,
@@ -1231,23 +1185,26 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     ? Image(
                         image:
                             getAppImageProvider(vehicle.mainImage) ??
-                                const AssetImage(
-                                    'assets/images/car_placeholder.png'),
+                            const AssetImage(
+                              'assets/images/car_placeholder.png',
+                            ),
                         fit: BoxFit.cover,
                         errorBuilder: (_, _, _) => Container(
                           color: AppColors.lightGray,
                           child: const Icon(
-                              Icons.directions_car_filled_rounded,
-                              color: AppColors.borderGray,
-                              size: 40),
+                            Icons.directions_car_filled_rounded,
+                            color: AppColors.borderGray,
+                            size: 40,
+                          ),
                         ),
                       )
                     : Container(
                         color: AppColors.lightGray,
                         child: const Icon(
-                            Icons.directions_car_filled_rounded,
-                            color: AppColors.borderGray,
-                            size: 40),
+                          Icons.directions_car_filled_rounded,
+                          color: AppColors.borderGray,
+                          size: 40,
+                        ),
                       ),
               ),
             ),
@@ -1269,10 +1226,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   const SizedBox(height: 3),
                   Text(
                     vehicle.category,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: _subColor,
-                    ),
+                    style: TextStyle(fontSize: 10, color: _subColor),
                   ),
                   const SizedBox(height: 8),
                   Row(
@@ -1288,10 +1242,11 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF10B981)
-                              .withValues(alpha: 0.1),
+                          color: const Color(0xFF10B981).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: const Text(
@@ -1350,13 +1305,15 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
               padding: const EdgeInsets.all(24),
               child: Column(
                 children: [
-                  Icon(Icons.receipt_long_outlined,
-                      size: 40, color: Colors.grey[300]),
+                  Icon(
+                    Icons.receipt_long_outlined,
+                    size: 40,
+                    color: Colors.grey[300],
+                  ),
                   const SizedBox(height: 12),
                   Text(
                     'No payments yet.',
-                    style: TextStyle(
-                        color: Colors.grey[500], fontSize: 13),
+                    style: TextStyle(color: Colors.grey[500], fontSize: 13),
                   ),
                 ],
               ),
@@ -1412,8 +1369,11 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
               color: AppColors.primaryOrange.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.receipt_long_rounded,
-                color: AppColors.primaryOrange, size: 18),
+            child: const Icon(
+              Icons.receipt_long_rounded,
+              color: AppColors.primaryOrange,
+              size: 18,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1430,8 +1390,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 ),
                 Text(
                   DateFormat('dd MMM yyyy').format(payment.paymentDate),
-                  style: TextStyle(
-                      fontSize: 10, color: _subColor),
+                  style: TextStyle(fontSize: 10, color: _subColor),
                 ),
               ],
             ),
@@ -1448,8 +1407,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),

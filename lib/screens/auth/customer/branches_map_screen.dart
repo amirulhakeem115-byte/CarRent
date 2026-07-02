@@ -7,9 +7,12 @@ import '../../../models/branch_model.dart';
 import '../../../services/branch_service.dart';
 import '../../../widgets/loading_widget.dart';
 import '../../../constants/colors.dart';
-import '../../../services/file_download_helper.dart' if (dart.library.html) '../../../services/file_download_web.dart' as download_helper;
-import '../../../services/location_helper.dart' if (dart.library.html) '../../../services/location_web.dart' as location_helper;
-
+import '../../../services/file_download_helper.dart'
+    if (dart.library.html) '../../../services/file_download_web.dart'
+    as download_helper;
+import '../../../services/location_helper.dart'
+    if (dart.library.html) '../../../services/location_web.dart'
+    as location_helper;
 
 class BranchCluster {
   final double latitude;
@@ -32,9 +35,12 @@ class BranchesMapScreen extends StatefulWidget {
 
 class _BranchesMapScreenState extends State<BranchesMapScreen> {
   bool get _isDark => Theme.of(context).brightness == Brightness.dark;
-  Color get _textColor => _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
-  Color get _subColor => _isDark ? const Color(0xFFCBD5E1) : AppColors.lightText;
-  Color get _borderColor => _isDark ? const Color(0xFF334155) : AppColors.borderGray;
+  Color get _textColor =>
+      _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+  Color get _subColor =>
+      _isDark ? const Color(0xFFCBD5E1) : AppColors.lightText;
+  Color get _borderColor =>
+      _isDark ? const Color(0xFF334155) : AppColors.borderGray;
 
   final BranchService _branchService = BranchService();
   final MapController _mapController = MapController();
@@ -46,22 +52,28 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
   String? _error;
 
   double _currentZoom = 9.0;
-  LatLng _mapCenter = const LatLng(3.1390, 101.6869); // Default centered around Kuala Lumpur Sentral
+  LatLng _mapCenter = const LatLng(
+    3.1390,
+    101.6869,
+  ); // Default centered around Kuala Lumpur Sentral
 
   // Current user location (defaults to KL mock region)
   LatLng _currentUserLocation = const LatLng(3.1000, 101.7300);
 
   void _getUserGeolocation() {
-    location_helper.getUserLocation().then((location) {
-      if (location != null && mounted) {
-        setState(() {
-          _currentUserLocation = location;
+    location_helper
+        .getUserLocation()
+        .then((location) {
+          if (location != null && mounted) {
+            setState(() {
+              _currentUserLocation = location;
+            });
+            _mapController.move(_currentUserLocation, 12.0);
+          }
+        })
+        .catchError((e) {
+          debugPrint('Failed to get geolocation: $e');
         });
-        _mapController.move(_currentUserLocation, 12.0);
-      }
-    }).catchError((e) {
-      debugPrint('Failed to get geolocation: $e');
-    });
   }
 
   // Search & Selection State
@@ -70,6 +82,8 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
   BranchModel? _selectedBranch;
   bool _showRoute = false;
   bool _isSearchFocused = false;
+
+  PreferredSizeWidget? get branchesAppBar => null;
 
   @override
   void initState() {
@@ -91,7 +105,9 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
         if (mounted) {
           setState(() {
             // Only active branches shown to customers
-            _activeBranches = branchesList.where((b) => b.status == 'Active').toList();
+            _activeBranches = branchesList
+                .where((b) => b.status == 'Active')
+                .toList();
             _filterBranches();
             _loading = false;
           });
@@ -135,16 +151,24 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
   }
 
   // Haversine formula to compute distance in km
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  double _calculateDistance(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
     const double p = 0.017453292519943295; // Math.PI / 180
-    final double a = 0.5 -
+    final double a =
+        0.5 -
         cos((lat2 - lat1) * p) / 2 +
         cos(lat1 * p) * cos(lat2 * p) * (1 - cos((lon2 - lon1) * p)) / 2;
     return 12742 * asin(sqrt(a)); // 2 * R; R = 6371 km
   }
 
   void _findNearestBranch() {
-    final validActive = _activeBranches.where((b) => _isValidLatLng(b.latitude, b.longitude)).toList();
+    final validActive = _activeBranches
+        .where((b) => _isValidLatLng(b.latitude, b.longitude))
+        .toList();
 
     if (validActive.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -214,7 +238,9 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
 
   // Custom clustering implementation
   List<dynamic> _getClusters() {
-    final validActive = _filteredBranches.where((b) => _isValidLatLng(b.latitude, b.longitude)).toList();
+    final validActive = _filteredBranches
+        .where((b) => _isValidLatLng(b.latitude, b.longitude))
+        .toList();
 
     if (_currentZoom >= 11.0) {
       return validActive; // Return flat list at high zoom levels
@@ -241,7 +267,8 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
 
       for (int i = remaining.length - 1; i >= 0; i--) {
         final other = remaining[i];
-        final double dist = (first.latitude - other.latitude).abs() +
+        final double dist =
+            (first.latitude - other.latitude).abs() +
             (first.longitude - other.longitude).abs();
         if (dist < threshold) {
           clusterItems.add(other);
@@ -256,11 +283,13 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
           sumLat += item.latitude;
           sumLng += item.longitude;
         }
-        clustered.add(BranchCluster(
-          latitude: sumLat / clusterItems.length,
-          longitude: sumLng / clusterItems.length,
-          items: clusterItems,
-        ));
+        clustered.add(
+          BranchCluster(
+            latitude: sumLat / clusterItems.length,
+            longitude: sumLng / clusterItems.length,
+            items: clusterItems,
+          ),
+        );
       } else {
         clustered.add(first);
       }
@@ -281,23 +310,6 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
     final double width = MediaQuery.of(context).size.width;
     final bool isDesktop = width > 900;
 
-    final branchesAppBar = AppBar(
-      backgroundColor: _isDark ? const Color(0xFF1B2436) : Colors.white,
-      elevation: 0,
-      leading: IconButton(
-        icon: Icon(Icons.arrow_back_ios_rounded, color: _textColor, size: 20),
-        onPressed: () => Navigator.pop(context),
-      ),
-      title: Text(
-        'Rental Hubs',
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w900,
-          color: _textColor,
-        ),
-      ),
-    );
-
     if (_loading) {
       return Scaffold(
         appBar: branchesAppBar,
@@ -316,16 +328,30 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline, size: 64, color: Colors.redAccent),
+                const Icon(
+                  Icons.error_outline,
+                  size: 64,
+                  color: Colors.redAccent,
+                ),
                 const SizedBox(height: 16),
-                Text(_error!, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: _textColor)),
+                Text(
+                  _error!,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: _textColor,
+                  ),
+                ),
                 const SizedBox(height: 24),
                 ElevatedButton(
                   onPressed: _subscribeBranches,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryOrange,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
                   ),
                   child: const Text('Retry Connection'),
                 ),
@@ -354,9 +380,7 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
           child: Container(
             decoration: BoxDecoration(
               color: Theme.of(context).cardColor,
-              border: Border(
-                right: BorderSide(color: _borderColor, width: 1),
-              ),
+              border: Border(right: BorderSide(color: _borderColor, width: 1)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -372,10 +396,7 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
           ),
         ),
         // Map Panel
-        Expanded(
-          flex: 8,
-          child: _buildMapWidget(),
-        ),
+        Expanded(flex: 8, child: _buildMapWidget()),
       ],
     );
   }
@@ -385,9 +406,7 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
     return Stack(
       children: [
         // Map fills entire background
-        Positioned.fill(
-          child: _buildMapWidget(),
-        ),
+        Positioned.fill(child: _buildMapWidget()),
 
         // Floating Search & Overlay Card at Top
         Positioned(
@@ -498,32 +517,49 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
                         ),
                         IconButton(
                           icon: Icon(Icons.close, color: _subColor),
-                          onPressed: () => setState(() => _selectedBranch = null),
+                          onPressed: () =>
+                              setState(() => _selectedBranch = null),
                         ),
                       ],
                     ),
                     const SizedBox(height: 4),
                     Text(
                       _selectedBranch!.address,
-                      style: TextStyle(color: _subColor, fontSize: 13, height: 1.4),
+                      style: TextStyle(
+                        color: _subColor,
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        const Icon(Icons.phone, size: 14, color: AppColors.primaryOrange),
+                        const Icon(
+                          Icons.phone,
+                          size: 14,
+                          color: AppColors.primaryOrange,
+                        ),
                         const SizedBox(width: 6),
                         Text(
                           _selectedBranch!.phone,
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _textColor),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: _textColor,
+                          ),
                         ),
                         const Spacer(),
                         Icon(Icons.access_time, size: 14, color: _subColor),
                         const SizedBox(width: 6),
                         Text(
                           _selectedBranch!.operatingHours,
-                          style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: _subColor),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                            color: _subColor,
+                          ),
                         ),
                       ],
                     ),
@@ -545,14 +581,22 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
                                 _showRoute = true;
                               });
                             },
-                            icon: const Icon(Icons.directions_outlined, size: 18),
-                            label: const Text('Get Directions', style: TextStyle(fontWeight: FontWeight.bold)),
+                            icon: const Icon(
+                              Icons.directions_outlined,
+                              size: 18,
+                            ),
+                            label: const Text(
+                              'Get Directions',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 12),
                         IconButton(
                           style: IconButton.styleFrom(
-                            backgroundColor: _isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
+                            backgroundColor: _isDark
+                                ? const Color(0xFF0F172A)
+                                : AppColors.lightGray,
                             padding: const EdgeInsets.all(12),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
@@ -581,7 +625,10 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
   Widget _buildMapWidget() {
     final bool isDesktop = MediaQuery.of(context).size.width > 900;
     final elements = _getClusters();
-    final hasValidRoute = _showRoute && _selectedBranch != null && _isValidLatLng(_selectedBranch!.latitude, _selectedBranch!.longitude);
+    final hasValidRoute =
+        _showRoute &&
+        _selectedBranch != null &&
+        _isValidLatLng(_selectedBranch!.latitude, _selectedBranch!.longitude);
 
     // Calculate routing distance
     double routeDistance = 0;
@@ -625,7 +672,10 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
                   Polyline(
                     points: [
                       _currentUserLocation,
-                      LatLng(_selectedBranch!.latitude, _selectedBranch!.longitude),
+                      LatLng(
+                        _selectedBranch!.latitude,
+                        _selectedBranch!.longitude,
+                      ),
                     ],
                     color: AppColors.primaryOrange,
                     strokeWidth: 4.5,
@@ -674,15 +724,23 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
                       height: 44,
                       child: GestureDetector(
                         onTap: () {
-                          final nextZoom = (_currentZoom + 2.0).clamp(3.0, 18.0);
-                          _mapController.move(LatLng(el.latitude, el.longitude), nextZoom);
+                          final nextZoom = (_currentZoom + 2.0).clamp(
+                            3.0,
+                            18.0,
+                          );
+                          _mapController.move(
+                            LatLng(el.latitude, el.longitude),
+                            nextZoom,
+                          );
                           setState(() {
                             _currentZoom = nextZoom;
                           });
                         },
                         child: Container(
                           decoration: BoxDecoration(
-                            color: AppColors.secondaryBlue.withValues(alpha: 0.95),
+                            color: AppColors.secondaryBlue.withValues(
+                              alpha: 0.95,
+                            ),
                             shape: BoxShape.circle,
                             border: Border.all(color: Colors.white, width: 2),
                             boxShadow: [
@@ -718,7 +776,9 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
                           children: [
                             Icon(
                               Icons.location_on,
-                              color: isSelected ? Colors.redAccent : AppColors.primaryOrange,
+                              color: isSelected
+                                  ? Colors.redAccent
+                                  : AppColors.primaryOrange,
                               size: isSelected ? 42 : 34,
                             ),
                           ],
@@ -744,11 +804,17 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.directions_car, color: AppColors.primaryOrange),
+                    const Icon(
+                      Icons.directions_car,
+                      color: AppColors.primaryOrange,
+                    ),
                     const SizedBox(width: 12),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -756,17 +822,28 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
                       children: [
                         const Text(
                           'Live Map Routing Active',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
                         ),
                         Text(
                           'Estimated straight line distance: ${routeDistance.toStringAsFixed(1)} km',
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 11),
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: 11,
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(width: 16),
                     IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white, size: 16),
+                      icon: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 16,
+                      ),
                       onPressed: _clearRoute,
                       tooltip: 'Clear Route',
                     ),
@@ -783,9 +860,7 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
   Widget _buildFloatingSearchCard() {
     return Card(
       color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 6,
       shadowColor: Colors.black.withValues(alpha: 0.08),
       child: Padding(
@@ -840,7 +915,11 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
             children: [
               if (Navigator.canPop(context)) ...[
                 IconButton(
-                  icon: Icon(Icons.arrow_back_ios_new_rounded, color: _textColor, size: 18),
+                  icon: Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    color: _textColor,
+                    size: 18,
+                  ),
                   onPressed: () => Navigator.pop(context),
                 ),
                 const SizedBox(width: 4),
@@ -868,11 +947,19 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
             style: TextStyle(color: _textColor, fontSize: 13),
             decoration: InputDecoration(
               hintText: 'Search rental hubs by name...',
-              hintStyle: TextStyle(color: _isDark ? Colors.white30 : Colors.grey, fontSize: 13),
+              hintStyle: TextStyle(
+                color: _isDark ? Colors.white30 : Colors.grey,
+                fontSize: 13,
+              ),
               prefixIcon: Icon(Icons.search, color: _subColor),
               filled: true,
-              fillColor: _isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
-              contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+              fillColor: _isDark
+                  ? const Color(0xFF0F172A)
+                  : AppColors.lightGray,
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: 14,
+                horizontal: 16,
+              ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide(color: _borderColor),
@@ -883,7 +970,10 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.primaryOrange, width: 1.5),
+                borderSide: const BorderSide(
+                  color: AppColors.primaryOrange,
+                  width: 1.5,
+                ),
               ),
               suffixIcon: _searchQuery.isNotEmpty
                   ? IconButton(
@@ -915,7 +1005,10 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
                   ),
                   onPressed: _findNearestBranch,
                   icon: const Icon(Icons.my_location, size: 16),
-                  label: const Text('Find Nearest', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  label: const Text(
+                    'Find Nearest',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -928,7 +1021,10 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
                   ),
                 ),
                 onPressed: _zoomToUserLocation,
-                icon: const Icon(Icons.gps_fixed, color: AppColors.secondaryBlue),
+                icon: const Icon(
+                  Icons.gps_fixed,
+                  color: AppColors.secondaryBlue,
+                ),
                 tooltip: 'My Location',
               ),
             ],
@@ -951,7 +1047,10 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
               SizedBox(height: 12),
               Text(
                 'No active branches found.',
-                style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ],
           ),
@@ -960,7 +1059,10 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
     }
 
     return ListView.builder(
-      padding: EdgeInsets.symmetric(horizontal: isDesktop ? 24.0 : 12.0, vertical: 8),
+      padding: EdgeInsets.symmetric(
+        horizontal: isDesktop ? 24.0 : 12.0,
+        vertical: 8,
+      ),
       itemCount: _filteredBranches.length,
       itemBuilder: (context, index) {
         final branch = _filteredBranches[index];
@@ -985,9 +1087,7 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
             color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: isSelected
-                  ? AppColors.primaryOrange
-                  : _borderColor,
+              color: isSelected ? AppColors.primaryOrange : _borderColor,
               width: isSelected ? 1.5 : 1,
             ),
             boxShadow: [
@@ -1008,7 +1108,9 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Branch "${branch.branchName}" does not have valid GPS coordinates.'),
+                      content: Text(
+                        'Branch "${branch.branchName}" does not have valid GPS coordinates.',
+                      ),
                       backgroundColor: Colors.orange,
                     ),
                   );
@@ -1024,12 +1126,16 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
                       decoration: BoxDecoration(
                         color: isSelected
                             ? AppColors.primaryOrange.withValues(alpha: 0.1)
-                            : (_isDark ? const Color(0xFF0F172A) : AppColors.lightGray),
+                            : (_isDark
+                                  ? const Color(0xFF0F172A)
+                                  : AppColors.lightGray),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
                         Icons.location_on_rounded,
-                        color: isSelected ? AppColors.primaryOrange : _textColor,
+                        color: isSelected
+                            ? AppColors.primaryOrange
+                            : _textColor,
                         size: 20,
                       ),
                     ),
@@ -1054,9 +1160,14 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
                               if (isValid) ...[
                                 const SizedBox(width: 8),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
                                   decoration: BoxDecoration(
-                                    color: AppColors.primaryOrange.withValues(alpha: 0.1),
+                                    color: AppColors.primaryOrange.withValues(
+                                      alpha: 0.1,
+                                    ),
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
@@ -1085,7 +1196,11 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
                           const SizedBox(height: 10),
                           Row(
                             children: [
-                              Icon(Icons.phone_outlined, size: 13, color: _subColor),
+                              Icon(
+                                Icons.phone_outlined,
+                                size: 13,
+                                color: _subColor,
+                              ),
                               const SizedBox(width: 4),
                               Text(
                                 branch.phone,
@@ -1096,7 +1211,11 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
                                 ),
                               ),
                               const Spacer(),
-                              Icon(Icons.access_time_outlined, size: 13, color: _subColor),
+                              Icon(
+                                Icons.access_time_outlined,
+                                size: 13,
+                                color: _subColor,
+                              ),
                               const SizedBox(width: 4),
                               Text(
                                 branch.operatingHours,
@@ -1121,7 +1240,7 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
     );
   }
 
-  // --- DESKTOP SIDEBAR DETAIL VIEW ---
+  // --- DESKTOP SIDEBAR DETAIL VIEW (REMOVED BACK BUTTON) ---
   Widget _buildSelectedBranchDetailPanel() {
     if (_selectedBranch == null) return const SizedBox.shrink();
 
@@ -1143,21 +1262,15 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Back to listing row
-          TextButton.icon(
-            onPressed: () {
-              setState(() {
-                _selectedBranch = null;
-                _showRoute = false;
-              });
-            },
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 14, color: AppColors.primaryOrange),
-            label: const Text('Back to branch list', style: TextStyle(color: AppColors.primaryOrange, fontWeight: FontWeight.bold, fontSize: 13)),
-          ),
-          const SizedBox(height: 16),
+          // REMOVED THE BACK BUTTON - no more 2nd App Bar
+          const SizedBox(height: 8),
           Text(
             branch.branchName,
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: _textColor),
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              color: _textColor,
+            ),
           ),
           const SizedBox(height: 8),
           Container(
@@ -1168,62 +1281,108 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
             ),
             child: const Text(
               'ACTIVE SERVICE HUB',
-              style: TextStyle(color: Colors.green, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+              style: TextStyle(
+                color: Colors.green,
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
             ),
           ),
           const SizedBox(height: 24),
-          Text('ADDRESS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _subColor, letterSpacing: 0.5)),
+          Text(
+            'ADDRESS',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: _subColor,
+              letterSpacing: 0.5,
+            ),
+          ),
           const SizedBox(height: 6),
-          Text(branch.address, style: TextStyle(fontSize: 13, color: _textColor, height: 1.4, fontWeight: FontWeight.w600)),
+          Text(
+            branch.address,
+            style: TextStyle(
+              fontSize: 13,
+              color: _textColor,
+              height: 1.4,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(height: 20),
-          Text('CONTACT INFORMATION', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _subColor, letterSpacing: 0.5)),
+          Text(
+            'CONTACT INFORMATION',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: _subColor,
+              letterSpacing: 0.5,
+            ),
+          ),
           const SizedBox(height: 6),
           Row(
             children: [
               Icon(Icons.phone_outlined, size: 16, color: _subColor),
               const SizedBox(width: 8),
-              Text(branch.phone, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _textColor)),
+              Text(
+                branch.phone,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: _textColor,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 20),
-          Text('OPERATING HOURS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _subColor, letterSpacing: 0.5)),
+          Text(
+            'OPERATING HOURS',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: _subColor,
+              letterSpacing: 0.5,
+            ),
+          ),
           const SizedBox(height: 6),
           Row(
             children: [
               Icon(Icons.access_time_outlined, size: 16, color: _subColor),
               const SizedBox(width: 8),
-              Text(branch.operatingHours, style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: _textColor, fontWeight: FontWeight.w600)),
+              Text(
+                branch.operatingHours,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontStyle: FontStyle.italic,
+                  color: _textColor,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 20),
           if (isValid) ...[
-            Text('LOCATION ANALYSIS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _subColor, letterSpacing: 0.5)),
+            Text(
+              'LOCATION ANALYSIS',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: _subColor,
+                letterSpacing: 0.5,
+              ),
+            ),
             const SizedBox(height: 6),
             Text(
               'Approx. Straight-line distance: ${distance.toStringAsFixed(1)} km away',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _textColor),
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: _textColor,
+              ),
             ),
           ],
           Divider(height: 40, color: _borderColor),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryOrange,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              minimumSize: const Size.fromHeight(48),
-              elevation: 0,
-            ),
-            onPressed: () {
-              setState(() {
-                _showRoute = true;
-              });
-            },
-            icon: const Icon(Icons.directions_outlined, size: 18),
-            label: const Text('Show Directions on Map', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-          const SizedBox(height: 12),
+          // REMOVED "Show Directions on Map" button - only kept "Open in Google Maps"
           OutlinedButton.icon(
             style: OutlinedButton.styleFrom(
               foregroundColor: _textColor,
@@ -1239,7 +1398,10 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
               );
             },
             icon: const Icon(Icons.map_outlined, size: 18),
-            label: const Text('Open in Google Maps', style: TextStyle(fontWeight: FontWeight.bold)),
+            label: const Text(
+              'Open in Google Maps',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),

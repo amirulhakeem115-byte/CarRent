@@ -203,34 +203,6 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar:
-          ModalRoute.of(context)?.settings.name == null &&
-              Navigator.of(context).canPop()
-          ? AppBar(
-              backgroundColor: _isDark ? const Color(0xFF1B2436) : Colors.white,
-              elevation: 0,
-              leading: IconButton(
-                icon: Icon(
-                  Icons.arrow_back_ios_rounded,
-                  color: _textColor,
-                  size: 20,
-                ),
-                onPressed: () => Navigator.pop(context),
-              ),
-              title: Text(
-                'Search Cars',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                  color: _textColor,
-                ),
-              ),
-              bottom: PreferredSize(
-                preferredSize: const Size.fromHeight(1),
-                child: Container(height: 1, color: _borderColor),
-              ),
-            )
-          : null,
       body: _loading
           ? const Center(
               child: CircularProgressIndicator(
@@ -326,10 +298,6 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
   Widget _buildPageHeader(BuildContext context) {
     return Row(
       children: [
-        IconButton(
-          icon: Icon(Icons.arrow_back, color: _textColor, size: 24),
-          onPressed: () => Navigator.pop(context),
-        ),
         const SizedBox(width: 8),
         Expanded(
           child: Column(
@@ -366,56 +334,34 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
       ),
       child: Row(
         children: [
-          if (!isDesktop) ...[
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: _isDark
-                      ? const Color(0xFF0F172A)
-                      : AppColors.lightGray,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: TextField(
-                  controller: _searchController,
-                  style: TextStyle(color: _textColor, fontSize: 13),
-                  decoration: InputDecoration(
-                    hintText: 'Search brand / model...',
-                    hintStyle: TextStyle(
-                      color: _isDark ? Colors.white30 : Colors.grey,
-                      fontSize: 13,
-                    ),
-                    prefixIcon: Icon(Icons.search, size: 20, color: _subColor),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 12,
-                    ),
+          // Search field - now in toolbar for both desktop and mobile
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: _isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: TextField(
+                controller: _searchController,
+                style: TextStyle(color: _textColor, fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: 'Search brand / model...',
+                  hintStyle: TextStyle(
+                    color: _isDark ? Colors.white30 : Colors.grey,
+                    fontSize: 13,
+                  ),
+                  prefixIcon: Icon(Icons.search, size: 20, color: _subColor),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            IconButton(
-              onPressed: _showMobileFiltersBottomSheet,
-              icon: Badge(
-                label: Text('$_activeFiltersCount'),
-                isLabelVisible: _activeFiltersCount > 0,
-                child: Icon(Icons.tune, color: _textColor),
-              ),
-            ),
-          ] else ...[
-            Text(
-              'Select Your Ride',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: _textColor,
-              ),
-            ),
-            const Spacer(),
-          ],
+          ),
           const SizedBox(width: 12),
-          // Sort Dropdown
+          // Sort Dropdown (Recommended)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
@@ -486,6 +432,18 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
               ],
             ),
           ),
+          // Mobile filter button
+          if (!isDesktop) ...[
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: _showMobileFiltersBottomSheet,
+              icon: Badge(
+                label: Text('$_activeFiltersCount'),
+                isLabelVisible: _activeFiltersCount > 0,
+                child: Icon(Icons.tune, color: _textColor),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -513,6 +471,19 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // "Select Your Ride" - Now at the top of filters panel
+          Text(
+            'Select Your Ride',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: _textColor,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Divider(color: _borderColor),
+          const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -538,34 +509,13 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                 ),
             ],
           ),
-          const SizedBox(height: 16),
-          // Search Brand/Model
-          const Text(
-            'SEARCH',
-            style: TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey,
-            ),
-          ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 0),
+          // Search Brand/Model - Moved here from toolbar
+          const SizedBox(height: 2),
           Container(
             decoration: BoxDecoration(
               color: AppColors.lightGray,
               borderRadius: BorderRadius.circular(10),
-            ),
-            child: TextField(
-              controller: _searchController,
-              decoration: const InputDecoration(
-                hintText: 'Search brand or model...',
-                prefixIcon: Icon(Icons.search, size: 18),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 12,
-                ),
-              ),
-              style: const TextStyle(fontSize: 13),
             ),
           ),
           const SizedBox(height: 16),
@@ -688,9 +638,9 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
         return StatefulBuilder(
           builder: (context, setSheetState) {
             return DraggableScrollableSheet(
-              initialChildSize: 0.7,
+              initialChildSize: 0.85,
               minChildSize: 0.5,
-              maxChildSize: 0.9,
+              maxChildSize: 0.95,
               expand: false,
               builder: (context, scrollController) {
                 return SingleChildScrollView(
@@ -699,6 +649,23 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      // "Select Your Ride" at the top of mobile filters
+                      Text(
+                        'Select Your Ride',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: _textColor,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Choose from our premium registered cars and start your journey.',
+                        style: TextStyle(fontSize: 13, color: _subColor),
+                      ),
+                      const SizedBox(height: 20),
+                      Divider(color: _borderColor),
+                      const SizedBox(height: 16),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -724,6 +691,43 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 16),
+                      // Search bar in mobile filters
+                      Container(
+                        decoration: BoxDecoration(
+                          color: _isDark
+                              ? const Color(0xFF0F172A)
+                              : AppColors.lightGray,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: TextField(
+                          controller: _searchController,
+                          style: TextStyle(color: _textColor, fontSize: 13),
+                          decoration: InputDecoration(
+                            hintText: 'Search brand or model...',
+                            hintStyle: TextStyle(
+                              color: _isDark ? Colors.white30 : Colors.grey,
+                              fontSize: 13,
+                            ),
+                            prefixIcon: Icon(
+                              Icons.search,
+                              size: 18,
+                              color: _subColor,
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 12,
+                            ),
+                          ),
+                          onChanged: (val) {
+                            setState(() {
+                              _searchQuery = val.toLowerCase();
+                            });
+                            setSheetState(() {});
+                          },
+                        ),
                       ),
                       const SizedBox(height: 20),
                       _buildDropdownSectionTitle('Transmission'),
@@ -1025,8 +1029,11 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
         ? const Color(0xFFF59E0B)
         : const Color(0xFFEF4444);
     final bool isDesktop = MediaQuery.of(context).size.width > 950;
-    final double imageHeight = isDesktop ? 130 : 110;
-    final double contentPadding = isDesktop ? 12 : 10;
+    final bool isMobile = MediaQuery.of(context).size.width <= 600;
+
+    // Reduced image height for mobile
+    final double imageHeight = isDesktop ? 130 : 90;
+    final double contentPadding = isDesktop ? 12 : 8;
 
     return Container(
       decoration: BoxDecoration(
@@ -1043,6 +1050,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min, // Added to minimize vertical space
         children: [
           Stack(
             children: [
@@ -1089,12 +1097,12 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                   ),
                 ),
               Positioned(
-                top: 12,
-                left: 12,
+                top: 8,
+                left: 8,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
+                    horizontal: 6,
+                    vertical: 2,
                   ),
                   decoration: BoxDecoration(
                     color: statusColor,
@@ -1104,7 +1112,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                     vehicle.status.toUpperCase(),
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 8,
+                      fontSize: 7,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 0.5,
                     ),
@@ -1117,7 +1125,10 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
             padding: EdgeInsets.all(contentPadding),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize:
+                  MainAxisSize.min, // Added to minimize vertical space
               children: [
+                // Car name row
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1128,45 +1139,49 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 13,
+                          fontSize: isMobile ? 12 : 13,
                           color: _textColor,
                         ),
                       ),
                     ),
-                    if (!isDesktop)
+                    // Daily rate for mobile (moved to top)
+                    if (isMobile) ...[
+                      const SizedBox(width: 4),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           const Text(
                             'DAILY RATE',
                             style: TextStyle(
-                              fontSize: 8,
+                              fontSize: 6,
                               color: Colors.grey,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          const SizedBox(height: 2),
                           Text(
                             'RM ${vehicle.pricePerDay.toStringAsFixed(0)}',
                             style: const TextStyle(
-                              fontSize: 12,
+                              fontSize: 10,
                               fontWeight: FontWeight.bold,
                               color: AppColors.primaryOrange,
                             ),
                           ),
                         ],
                       ),
+                    ],
                   ],
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
+                // Location
                 Row(
                   children: [
                     const Icon(
                       Icons.location_on_outlined,
-                      size: 12,
+                      size: 10,
                       color: Colors.grey,
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 2),
                     Expanded(
                       child: Text(
                         vehicle.branchName.isNotEmpty
@@ -1174,15 +1189,13 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                             : 'General Hub',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: Colors.grey,
-                        ),
+                        style: const TextStyle(fontSize: 9, color: Colors.grey),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 6),
+                // Spec tags row
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -1196,15 +1209,14 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                Divider(height: 1, color: _borderColor),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: isDesktop
-                      ? MainAxisAlignment.spaceBetween
-                      : MainAxisAlignment.end,
-                  children: [
-                    if (isDesktop)
+                // Daily rate for desktop only
+                if (isDesktop) ...[
+                  const SizedBox(height: 8),
+                  Divider(height: 1, color: _borderColor),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -1226,54 +1238,113 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                           ),
                         ],
                       ),
-                    ElevatedButton(
-                      onPressed: isAvailable
-                          ? () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => CustomerResponsiveShell(
-                                    initialIndex: 1,
-                                    customBody: VehicleDetailsScreen(
-                                      vehicle: vehicle,
-                                      hideAppBar: true,
+                      SizedBox(
+                        height: 28,
+                        child: ElevatedButton(
+                          onPressed: isAvailable
+                              ? () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          CustomerResponsiveShell(
+                                            initialIndex: 1,
+                                            customBody: VehicleDetailsScreen(
+                                              vehicle: vehicle,
+                                              hideAppBar: true,
+                                            ),
+                                          ),
                                     ),
-                                  ),
-                                ),
-                              ).then((_) => _loadData());
-                            }
-                          : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: isAvailable
-                            ? AppColors.primaryOrange
-                            : (_isDark
-                                  ? const Color(0xFF0F172A)
-                                  : Colors.grey[200]),
-                        foregroundColor: isAvailable
-                            ? Colors.white
-                            : (_isDark ? Colors.white30 : Colors.grey[400]),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
+                                  ).then((_) => _loadData());
+                                }
+                              : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isAvailable
+                                ? AppColors.primaryOrange
+                                : (_isDark
+                                      ? const Color(0xFF0F172A)
+                                      : Colors.grey[200]),
+                            foregroundColor: isAvailable
+                                ? Colors.white
+                                : (_isDark ? Colors.white30 : Colors.grey[400]),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
+                          ),
+                          child: Text(
+                            isAvailable ? 'Book Now' : 'Booked',
+                            style: const TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ),
-                      child: Text(
-                        isAvailable ? 'Book Now' : 'Booked',
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
+          // Book Now button at bottom for mobile only
+          if (isMobile)
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                contentPadding,
+                0,
+                contentPadding,
+                contentPadding,
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                height: 32,
+                child: ElevatedButton(
+                  onPressed: isAvailable
+                      ? () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => CustomerResponsiveShell(
+                                initialIndex: 1,
+                                customBody: VehicleDetailsScreen(
+                                  vehicle: vehicle,
+                                  hideAppBar: true,
+                                ),
+                              ),
+                            ),
+                          ).then((_) => _loadData());
+                        }
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isAvailable
+                        ? AppColors.primaryOrange
+                        : (_isDark
+                              ? const Color(0xFF0F172A)
+                              : Colors.grey[200]),
+                    foregroundColor: isAvailable
+                        ? Colors.white
+                        : (_isDark ? Colors.white30 : Colors.grey[400]),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                  ),
+                  child: Text(
+                    isAvailable ? 'Book Now' : 'Booked',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

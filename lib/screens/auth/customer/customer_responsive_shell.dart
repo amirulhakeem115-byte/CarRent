@@ -861,7 +861,6 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
               ],
             ),
           ),
-          const Divider(color: Colors.white10, height: 1),
           const SizedBox(height: 12),
         ],
       ),
@@ -943,7 +942,6 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                   2,
                 ),
                 _buildDrawerTile(Icons.map_rounded, 'Branches', 3),
-                _buildDrawerTile(Icons.stars_rounded, 'Loyalty Rewards', 4),
                 _buildDrawerTile(Icons.history_rounded, 'History', 5),
                 _buildDrawerTile(
                   Icons.support_agent_rounded,
