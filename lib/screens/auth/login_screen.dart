@@ -13,7 +13,7 @@ import 'customer/customer_responsive_shell.dart';
 import 'admin/dashboard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, required Null Function() onLoggedIn});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -73,7 +73,8 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_recentEmails.isEmpty) return;
 
     final overlayState = Overlay.of(context);
-    final renderBox = _emailKey.currentContext?.findRenderObject() as RenderBox?;
+    final renderBox =
+        _emailKey.currentContext?.findRenderObject() as RenderBox?;
     if (renderBox == null) return;
     final size = renderBox.size;
 
@@ -101,12 +102,16 @@ class _LoginScreenState extends State<LoginScreen> {
                   padding: EdgeInsets.zero,
                   shrinkWrap: true,
                   itemCount: _recentEmails.length,
-                  separatorBuilder: (context, index) => const Divider(height: 1, color: AppColors.borderGray),
+                  separatorBuilder: (context, index) =>
+                      const Divider(height: 1, color: AppColors.borderGray),
                   itemBuilder: (context, index) {
                     final email = _recentEmails[index];
                     return ListTile(
                       dense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 4,
+                      ),
                       title: Text(
                         email,
                         style: const TextStyle(
@@ -116,7 +121,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          color: Colors.redAccent,
+                          size: 20,
+                        ),
                         onPressed: () => _deleteEmail(email),
                       ),
                       onTap: () {
@@ -149,12 +158,12 @@ class _LoginScreenState extends State<LoginScreen> {
       _recentEmails.remove(email);
     });
     await prefs.setStringList('recent_login_emails', _recentEmails);
-    
+
     final lastEmail = prefs.getString('last_login_email') ?? '';
     if (lastEmail == email) {
       await prefs.remove('last_login_email');
     }
-    
+
     if (_recentEmails.isEmpty) {
       _hideOverlay();
     } else {
@@ -191,7 +200,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!userModel.isActive) {
         setState(() {
-          _error = 'Your account has been disabled or suspended. Please contact support.';
+          _error =
+              'Your account has been disabled or suspended. Please contact support.';
           _loading = false;
         });
         await _authService.logout();
@@ -203,8 +213,9 @@ class _LoginScreenState extends State<LoginScreen> {
       if (enteredEmail.isNotEmpty) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('last_login_email', enteredEmail);
-        
-        final List<String> list = prefs.getStringList('recent_login_emails') ?? [];
+
+        final List<String> list =
+            prefs.getStringList('recent_login_emails') ?? [];
         list.remove(enteredEmail);
         list.insert(0, enteredEmail);
         if (list.length > 5) {
@@ -231,7 +242,9 @@ class _LoginScreenState extends State<LoginScreen> {
       } else {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const CustomerResponsiveShell()),
+          MaterialPageRoute(
+            builder: (context) => const CustomerResponsiveShell(),
+          ),
         );
       }
     } catch (e) {
@@ -272,7 +285,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!userModel.isActive) {
         setState(() {
-          _error = 'Your account has been disabled or suspended. Please contact support.';
+          _error =
+              'Your account has been disabled or suspended. Please contact support.';
           _googleLoading = false;
         });
         await _authService.logout();
@@ -295,7 +309,9 @@ class _LoginScreenState extends State<LoginScreen> {
       } else {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const CustomerResponsiveShell()),
+          MaterialPageRoute(
+            builder: (context) => const CustomerResponsiveShell(),
+          ),
         );
       }
     } catch (e) {
@@ -374,7 +390,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
           const SizedBox(height: 32),
-          
+
           // Email label and field
           Text(
             '   Email Address',
@@ -397,15 +413,17 @@ class _LoginScreenState extends State<LoginScreen> {
                 keyboardType: TextInputType.emailAddress,
                 focusNode: _emailFocusNode,
                 validator: (val) {
-                  if (val == null || val.trim().isEmpty) return 'Email is required';
-                  if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val)) return 'Enter a valid email';
+                  if (val == null || val.trim().isEmpty)
+                    return 'Email is required';
+                  if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val))
+                    return 'Enter a valid email';
                   return null;
                 },
               ),
             ),
           ),
           const SizedBox(height: 20),
-          
+
           // Password label and field
           Text(
             '   Password',
@@ -439,7 +457,7 @@ class _LoginScreenState extends State<LoginScreen> {
             },
           ),
           const SizedBox(height: 12),
-          
+
           // Forgot Password / Remember me Row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -455,7 +473,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     },
                     activeColor: AppColors.primaryOrange,
                     checkColor: Colors.white,
-                    side: BorderSide(color: isDark ? Colors.white54 : AppColors.secondaryBlue),
+                    side: BorderSide(
+                      color: isDark ? Colors.white54 : AppColors.secondaryBlue,
+                    ),
                   ),
                   Text(
                     'Remember Me',
@@ -488,7 +508,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          
+
           // Error Message
           if (_error != null) ...[
             Container(
@@ -496,17 +516,23 @@ class _LoginScreenState extends State<LoginScreen> {
               decoration: BoxDecoration(
                 color: Colors.redAccent.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
+                border: Border.all(
+                  color: Colors.redAccent.withValues(alpha: 0.3),
+                ),
               ),
               child: Text(
                 _error!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  color: Colors.redAccent,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             const SizedBox(height: 20),
           ],
-          
+
           // Login Button
           SizedBox(
             height: 54,
@@ -525,7 +551,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   ? const SizedBox(
                       width: 20,
                       height: 20,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
                     )
                   : const Text(
                       'Login',
@@ -538,11 +567,17 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          
+
           // Divider
           Row(
             children: [
-              Expanded(child: Divider(color: isDark ? const Color(0xFF334155) : AppColors.borderGray)),
+              Expanded(
+                child: Divider(
+                  color: isDark
+                      ? const Color(0xFF334155)
+                      : AppColors.borderGray,
+                ),
+              ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Text(
@@ -555,20 +590,32 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
-              Expanded(child: Divider(color: isDark ? const Color(0xFF334155) : AppColors.borderGray)),
+              Expanded(
+                child: Divider(
+                  color: isDark
+                      ? const Color(0xFF334155)
+                      : AppColors.borderGray,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 24),
-          
+
           // Google Sign In Button
           SizedBox(
             height: 54,
             child: OutlinedButton(
               style: OutlinedButton.styleFrom(
-                backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                foregroundColor: isDark ? Colors.white : AppColors.secondaryBlue,
+                backgroundColor: isDark
+                    ? const Color(0xFF1E293B)
+                    : Colors.white,
+                foregroundColor: isDark
+                    ? Colors.white
+                    : AppColors.secondaryBlue,
                 side: BorderSide(
-                  color: isDark ? const Color(0xFF334155) : AppColors.borderGray,
+                  color: isDark
+                      ? const Color(0xFF334155)
+                      : AppColors.borderGray,
                   width: 1.5,
                 ),
                 shape: RoundedRectangleBorder(
@@ -583,7 +630,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       height: 24,
                       child: CircularProgressIndicator(
                         strokeWidth: 2.5,
-                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryOrange),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppColors.primaryOrange,
+                        ),
                       ),
                     )
                   : Row(
@@ -593,11 +642,12 @@ class _LoginScreenState extends State<LoginScreen> {
                           'https://www.gstatic.com/mobilesdk/160503_mobilesdk/logo/2x/google_g_normal_id_48dp.png',
                           height: 24,
                           width: 24,
-                          errorBuilder: (context, error, stackTrace) => const Icon(
-                            Icons.g_mobiledata_rounded,
-                            color: AppColors.primaryOrange,
-                            size: 28,
-                          ),
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Icon(
+                                Icons.g_mobiledata_rounded,
+                                color: AppColors.primaryOrange,
+                                size: 28,
+                              ),
                         ),
                         const SizedBox(width: 12),
                         Text(
@@ -606,7 +656,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
                             letterSpacing: 0.5,
-                            color: isDark ? Colors.white : AppColors.secondaryBlue,
+                            color: isDark
+                                ? Colors.white
+                                : AppColors.secondaryBlue,
                           ),
                         ),
                       ],
@@ -614,7 +666,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
           const SizedBox(height: 32),
-          
+
           // Register Link
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -647,7 +699,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ],
           ),
           const SizedBox(height: 24),
-          
+
           // Copyright
           Text(
             '© 2026 ${context.watch<CompanySettingsProvider>().companyName}. All rights reserved.',
@@ -720,7 +772,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   flex: 6,
                   child: Center(
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 40),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 60,
+                        vertical: 40,
+                      ),
                       child: Container(
                         constraints: const BoxConstraints(maxWidth: 480),
                         child: formContent,
@@ -744,7 +799,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           height: 240,
                           decoration: const BoxDecoration(
                             gradient: LinearGradient(
-                              colors: [AppColors.secondaryBlue, Color(0xFF0F172A)],
+                              colors: [
+                                AppColors.secondaryBlue,
+                                Color(0xFF0F172A),
+                              ],
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                             ),
@@ -782,16 +840,23 @@ class _LoginScreenState extends State<LoginScreen> {
                             width: 76,
                             height: 76,
                             decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                              color: isDark
+                                  ? const Color(0xFF1E293B)
+                                  : Colors.white,
                               shape: BoxShape.circle,
                               boxShadow: const [
                                 BoxShadow(
                                   color: Colors.black12,
                                   blurRadius: 10,
                                   offset: Offset(0, 4),
-                                )
+                                ),
                               ],
-                              border: isDark ? Border.all(color: const Color(0xFF334155), width: 1) : null,
+                              border: isDark
+                                  ? Border.all(
+                                      color: const Color(0xFF334155),
+                                      width: 1,
+                                    )
+                                  : null,
                             ),
                             child: const Icon(
                               Icons.person,
@@ -805,7 +870,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 24),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 16,
+                    ),
                     child: formContent,
                   ),
                 ],
@@ -820,7 +888,12 @@ class HeaderCurveClipper extends CustomClipper<Path> {
   Path getClip(Size size) {
     final path = Path();
     path.lineTo(0, size.height - 40);
-    path.quadraticBezierTo(size.width / 2, size.height + 10, size.width, size.height - 40);
+    path.quadraticBezierTo(
+      size.width / 2,
+      size.height + 10,
+      size.width,
+      size.height - 40,
+    );
     path.lineTo(size.width, 0);
     path.close();
     return path;

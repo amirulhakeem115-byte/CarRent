@@ -993,17 +993,20 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
     }
 
     if (_isGridView) {
+      final int crossAxisCount = isDesktop
+          ? 3
+          : (MediaQuery.of(context).size.width > 600 ? 2 : 1);
       return GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         itemCount: vehicles.length,
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: isDesktop
-              ? 3
-              : (MediaQuery.of(context).size.width > 600 ? 2 : 1),
+          crossAxisCount: crossAxisCount,
           crossAxisSpacing: 18,
           mainAxisSpacing: 18,
-          childAspectRatio: isDesktop ? 0.68 : 0.72,
+          childAspectRatio: isDesktop
+              ? 0.68
+              : (crossAxisCount == 1 ? 1.35 : 0.72),
         ),
         itemBuilder: (context, index) {
           return _buildGridCard(vehicles[index]);
@@ -1030,7 +1033,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
         ? const Color(0xFFF59E0B)
         : const Color(0xFFEF4444);
     final bool isDesktop = MediaQuery.of(context).size.width > 950;
-    final double imageHeight = isDesktop ? 130 : 110;
+    final double imageHeight = isDesktop ? 130 : 100;
     final double contentPadding = isDesktop ? 12 : 10;
 
     return Container(
@@ -1047,6 +1050,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
         ],
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Stack(
@@ -1121,6 +1125,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
           Padding(
             padding: EdgeInsets.all(contentPadding),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
@@ -1231,49 +1236,95 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                           ),
                         ],
                       ),
-                    ElevatedButton(
-                      onPressed: isAvailable
-                          ? () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => CustomerResponsiveShell(
-                                    initialIndex: 1,
-                                    customBody: VehicleDetailsScreen(
-                                      vehicle: vehicle,
-                                      hideAppBar: true,
-                                    ),
+                    if (isDesktop)
+                      ElevatedButton(
+                        onPressed: isAvailable
+                            ? () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        CustomerResponsiveShell(
+                                          initialIndex: 1,
+                                          customBody: VehicleDetailsScreen(
+                                            vehicle: vehicle,
+                                            hideAppBar: true,
+                                          ),
+                                        ),
                                   ),
-                                ),
-                              ).then((_) => _loadData());
-                            }
-                          : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: isAvailable
-                            ? AppColors.primaryOrange
-                            : (_isDark
-                                  ? const Color(0xFF0F172A)
-                                  : Colors.grey[200]),
-                        foregroundColor: isAvailable
-                            ? Colors.white
-                            : (_isDark ? Colors.white30 : Colors.grey[400]),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                                ).then((_) => _loadData());
+                              }
+                            : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isAvailable
+                              ? AppColors.primaryOrange
+                              : (_isDark
+                                    ? const Color(0xFF0F172A)
+                                    : Colors.grey[200]),
+                          foregroundColor: isAvailable
+                              ? Colors.white
+                              : (_isDark ? Colors.white30 : Colors.grey[400]),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
                         ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
+                        child: Text(
+                          isAvailable ? 'Book Now' : 'Booked',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      )
+                    else
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: isAvailable
+                              ? () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          CustomerResponsiveShell(
+                                            initialIndex: 1,
+                                            customBody: VehicleDetailsScreen(
+                                              vehicle: vehicle,
+                                              hideAppBar: true,
+                                            ),
+                                          ),
+                                    ),
+                                  ).then((_) => _loadData());
+                                }
+                              : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isAvailable
+                                ? AppColors.primaryOrange
+                                : (_isDark
+                                      ? const Color(0xFF0F172A)
+                                      : Colors.grey[200]),
+                            foregroundColor: isAvailable
+                                ? Colors.white
+                                : (_isDark ? Colors.white30 : Colors.grey[400]),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          child: Text(
+                            isAvailable ? 'Book Now' : 'Booked',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ),
-                      child: Text(
-                        isAvailable ? 'Book Now' : 'Booked',
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ],

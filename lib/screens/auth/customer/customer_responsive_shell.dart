@@ -300,7 +300,7 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
     final nav = Navigator.of(context);
     await _authService.logout();
     nav.pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => const LoginScreen()),
+      MaterialPageRoute(builder: (context) => LoginScreen(onLoggedIn: () {})),
       (route) => false,
     );
   }

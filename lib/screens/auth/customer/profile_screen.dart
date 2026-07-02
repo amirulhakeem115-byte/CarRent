@@ -92,15 +92,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _loading = true;
       _error = null;
     });
-    
+
     try {
       final currentUser = _authService.currentUser;
       if (currentUser != null) {
-        _user = await _databaseService.getUser(currentUser.uid).timeout(const Duration(seconds: 5));
+        _user = await _databaseService
+            .getUser(currentUser.uid)
+            .timeout(const Duration(seconds: 5));
         if (_user == null) {
           throw Exception("User profile not found in database");
         }
-        
+
         if (mounted) {
           setState(() {
             _loading = false;
@@ -110,7 +112,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             if (_user?.idType.isNotEmpty == true) {
               _selectedIdType = _user!.idType;
             }
-            if (_licenseNumberController.text.isEmpty && _user?.licenseNumber != null) {
+            if (_licenseNumberController.text.isEmpty &&
+                _user?.licenseNumber != null) {
               _licenseNumberController.text = _user!.licenseNumber!;
             }
             if (_user?.licenseClass.isNotEmpty == true) {
@@ -118,7 +121,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             }
             if (_user?.licenseExpiry.isNotEmpty == true) {
               try {
-                _licenseExpiryDate = DateFormat('dd / MM / yyyy').parse(_user!.licenseExpiry);
+                _licenseExpiryDate = DateFormat(
+                  'dd / MM / yyyy',
+                ).parse(_user!.licenseExpiry);
               } catch (_) {}
             }
           });
@@ -126,36 +131,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         // Fetch bookings, payments, QR settings, and vehicles asynchronously in the background
         Future.wait([
-          _bookingService.getUserBookings(currentUser.uid),
-          _paymentService.getUserPayments(currentUser.uid),
-          _databaseService.getQrPaymentSettings(),
-          _vehicleService.getVehicles(),
-        ]).timeout(const Duration(seconds: 10)).then((results) {
-          if (mounted) {
-            setState(() {
-              _bookings = results[0] as List<BookingModel>;
-              _payments = results[1] as List<PaymentModel>;
-              final qrSettings = results[2] as Map<String, dynamic>?;
-              _vehicles = results[3] as List<VehicleModel>;
-              if (qrSettings != null) {
-                _qrCodeUrl = qrSettings['qrCodeBase64'] ?? qrSettings['qrCodeUrl'];
-                _bankName = qrSettings['bankName'];
-                _accountName = qrSettings['accountName'];
-                _accountNumber = qrSettings['accountNumber'];
-                _bankLogoUrl = qrSettings['bankLogoUrl'];
+              _bookingService.getUserBookings(currentUser.uid),
+              _paymentService.getUserPayments(currentUser.uid),
+              _databaseService.getQrPaymentSettings(),
+              _vehicleService.getVehicles(),
+            ])
+            .timeout(const Duration(seconds: 10))
+            .then((results) {
+              if (mounted) {
+                setState(() {
+                  _bookings = results[0] as List<BookingModel>;
+                  _payments = results[1] as List<PaymentModel>;
+                  final qrSettings = results[2] as Map<String, dynamic>?;
+                  _vehicles = results[3] as List<VehicleModel>;
+                  if (qrSettings != null) {
+                    _qrCodeUrl =
+                        qrSettings['qrCodeBase64'] ?? qrSettings['qrCodeUrl'];
+                    _bankName = qrSettings['bankName'];
+                    _accountName = qrSettings['accountName'];
+                    _accountNumber = qrSettings['accountNumber'];
+                    _bankLogoUrl = qrSettings['bankLogoUrl'];
+                  }
+                });
+              }
+            })
+            .catchError((err) {
+              debugPrint(
+                'Error loading background data for ProfileScreen: $err',
+              );
+              if (mounted) {
+                setState(() {
+                  if (_vehicles.isEmpty) {
+                    _vehicles = [];
+                  }
+                });
               }
             });
-          }
-        }).catchError((err) {
-          debugPrint('Error loading background data for ProfileScreen: $err');
-          if (mounted) {
-            setState(() {
-              if (_vehicles.isEmpty) {
-                _vehicles = [];
-              }
-            });
-          }
-        });
       }
     } catch (e) {
       debugPrint('Error loading profile: $e');
@@ -178,7 +189,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }) async {
     bool isSaving = false;
     String? errorMessage;
-    
+
     await showDialog(
       context: context,
       barrierDismissible: false,
@@ -186,8 +197,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.secondaryBlue,
+                ),
+              ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -207,15 +226,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 12),
                     Text(
                       errorMessage!,
-                      style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                      style: const TextStyle(
+                        color: Colors.redAccent,
+                        fontSize: 13,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                   ],
                   if (isSaving) ...[
                     const SizedBox(height: 16),
-                    const CircularProgressIndicator(color: AppColors.primaryOrange),
+                    const CircularProgressIndicator(
+                      color: AppColors.primaryOrange,
+                    ),
                     const SizedBox(height: 8),
-                    const Text('Saving...', style: TextStyle(color: Colors.grey)),
+                    const Text(
+                      'Saving...',
+                      style: TextStyle(color: Colors.grey),
+                    ),
                   ],
                 ],
               ),
@@ -274,10 +301,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
           title: 'Preview Profile Photo',
           onSave: () async {
             final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
-            await _databaseService.updateUser(_user!.id, {'profileImage': base64Image});
+            await _databaseService.updateUser(_user!.id, {
+              'profileImage': base64Image,
+            });
             if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Profile photo updated successfully'), backgroundColor: Colors.green),
+              const SnackBar(
+                content: Text('Profile photo updated successfully'),
+                backgroundColor: Colors.green,
+              ),
             );
             _loadProfileData();
           },
@@ -287,8 +319,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       debugPrint('Profile photo pick error: $e');
     }
   }
-
-
 
   void _showEditProfileDialog() {
     if (_user == null) return;
@@ -301,25 +331,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('Edit Profile Details', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Text(
+            'Edit Profile Details',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: AppColors.secondaryBlue,
+            ),
+          ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
                   controller: nameController,
-                  decoration: const InputDecoration(labelText: 'Full Name', prefixIcon: Icon(Icons.person_outline)),
+                  decoration: const InputDecoration(
+                    labelText: 'Full Name',
+                    prefixIcon: Icon(Icons.person_outline),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: phoneController,
-                  decoration: const InputDecoration(labelText: 'Phone Number', prefixIcon: Icon(Icons.phone_outlined)),
+                  decoration: const InputDecoration(
+                    labelText: 'Phone Number',
+                    prefixIcon: Icon(Icons.phone_outlined),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: addressController,
-                  decoration: const InputDecoration(labelText: 'Residential Address', prefixIcon: Icon(Icons.home_outlined)),
+                  decoration: const InputDecoration(
+                    labelText: 'Residential Address',
+                    prefixIcon: Icon(Icons.home_outlined),
+                  ),
                 ),
               ],
             ),
@@ -343,7 +390,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 if (!context.mounted) return;
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Profile updated successfully'), backgroundColor: Colors.green),
+                  const SnackBar(
+                    content: Text('Profile updated successfully'),
+                    backgroundColor: Colors.green,
+                  ),
                 );
                 _loadProfileData();
               },
@@ -365,7 +415,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
               title: Text('Rate ${booking.vehicleName}'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -378,7 +430,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       final starVal = index + 1.0;
                       return IconButton(
                         icon: Icon(
-                          starVal <= selectedRating ? Icons.star : Icons.star_border,
+                          starVal <= selectedRating
+                              ? Icons.star
+                              : Icons.star_border,
                           color: Colors.amber,
                           size: 32,
                         ),
@@ -396,7 +450,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     maxLines: 2,
                     decoration: InputDecoration(
                       hintText: 'Share your feedback...',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                 ],
@@ -428,7 +484,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     if (!context.mounted) return;
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Review submitted! Thank you.'), backgroundColor: Colors.green),
+                      const SnackBar(
+                        content: Text('Review submitted! Thank you.'),
+                        backgroundColor: Colors.green,
+                      ),
                     );
                   },
                   child: const Text('Submit'),
@@ -464,8 +523,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline_rounded,
-                  color: Colors.redAccent, size: 64),
+              const Icon(
+                Icons.error_outline_rounded,
+                color: Colors.redAccent,
+                size: 64,
+              ),
               const SizedBox(height: 16),
               Text(
                 _error!,
@@ -484,8 +546,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryOrange,
                   foregroundColor: Colors.white,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -498,117 +562,265 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     return SingleChildScrollView(
-              padding: EdgeInsets.symmetric(
-                horizontal: isDesktop ? 60.0 : 20.0,
-                vertical: 24.0,
+      padding: EdgeInsets.symmetric(
+        horizontal: isDesktop ? 60.0 : 20.0,
+        vertical: 24.0,
+      ),
+      child: Column(
+        children: [
+          // Profile Header Banner Card (Image Reference 2)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isDark ? const Color(0xFF334155) : Colors.grey[200]!,
               ),
-              child: Column(
-                children: [
-                  _buildVerificationReminderCard(isDark),
-                  // Profile Header Banner Card (Image Reference 2)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).cardColor,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.grey[200]!),
+            ),
+            child: Row(
+              children: [
+                // Avatar clickable to change profile photo
+                GestureDetector(
+                  onTap: _pickProfileImage,
+                  child: Stack(
+                    children: [
+                      CircleAvatar(
+                        radius: 36,
+                        backgroundColor: AppColors.secondaryBlue.withValues(
+                          alpha: 0.1,
+                        ),
+                        backgroundImage: getAppImageProvider(
+                          _user?.profileImage,
+                        ),
+                        child:
+                            _user?.profileImage.isNotEmpty != true ||
+                                getAppImageProvider(_user?.profileImage) == null
+                            ? const Icon(
+                                Icons.person,
+                                size: 36,
+                                color: AppColors.secondaryBlue,
+                              )
+                            : null,
+                      ),
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: AppColors.primaryOrange,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.camera_alt,
+                            size: 10,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 20),
+                // Username + Email details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _user?.fullName.isNotEmpty == true
+                            ? _user!.fullName
+                            : 'Username',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: isDark
+                              ? Colors.white
+                              : AppColors.secondaryBlue,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _user?.email ?? '',
+                        style: TextStyle(
+                          color: isDark
+                              ? const Color(0xFFCBD5E1)
+                              : Colors.grey[500],
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.stars_rounded,
+                            color: AppColors.primaryOrange,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${_user?.rewardPoints ?? 0} Points',
+                            style: const TextStyle(
+                              color: AppColors.primaryOrange,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                // Edit profile and logout buttons row
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.secondaryBlue,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                      ),
+                      icon: const Icon(Icons.edit, size: 16),
+                      label: const Text(
+                        'Edit Profile',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      onPressed: _showEditProfileDialog,
                     ),
-                    child: Row(
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                      ),
+                      icon: const Icon(Icons.logout, size: 16),
+                      label: const Text(
+                        'Logout',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      onPressed: () async {
+                        final nav = Navigator.of(context);
+                        await _authService.logout();
+                        nav.pushAndRemoveUntil(
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                LoginScreen(onLoggedIn: () {}),
+                          ),
+                          (route) => false,
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Dual Column layout (Grid layout in mockup)
+          Flex(
+            direction: isDesktop ? Axis.horizontal : Axis.vertical,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Left Column: Personal info & credentials
+              Expanded(
+                flex: isDesktop ? 4 : 0,
+                child: Column(
+                  children: [
+                    // 1. Personal Information Card
+                    _buildInfoCard(
+                      title: 'Personal Information',
+                      icon: Icons.person_outline,
                       children: [
-                        // Avatar clickable to change profile photo
-                        GestureDetector(
-                          onTap: _pickProfileImage,
-                          child: Stack(
-                            children: [
-                              CircleAvatar(
-                                radius: 36,
-                                backgroundColor: AppColors.secondaryBlue.withValues(alpha: 0.1),
-                                backgroundImage: getAppImageProvider(_user?.profileImage),
-                                child: _user?.profileImage.isNotEmpty != true || getAppImageProvider(_user?.profileImage) == null
-                                    ? const Icon(Icons.person, size: 36, color: AppColors.secondaryBlue)
-                                    : null,
-                              ),
-                              Positioned(
-                                right: 0,
-                                bottom: 0,
-                                child: Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: const BoxDecoration(color: AppColors.primaryOrange, shape: BoxShape.circle),
-                                  child: const Icon(Icons.camera_alt, size: 10, color: Colors.white),
-                                ),
-                              ),
-                            ],
-                          ),
+                        _buildDetailRow('EMAIL ADDRESS', _user?.email ?? 'N/A'),
+                        _buildDetailRow('PHONE NUMBER', _user?.phone ?? 'N/A'),
+                        _buildDetailRow(
+                          'RESIDENTIAL ADDRESS',
+                          _user?.address ?? 'N/A',
                         ),
-                        const SizedBox(width: 20),
-                        // Username + Email details
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _user?.fullName.isNotEmpty == true ? _user!.fullName : 'Username',
-                                style: TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                  color: isDark ? Colors.white : AppColors.secondaryBlue,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                _user?.email ?? '',
-                                style: TextStyle(color: isDark ? const Color(0xFFCBD5E1) : Colors.grey[500], fontSize: 13),
-                              ),
-                              const SizedBox(height: 6),
-                              Row(
-                                children: [
-                                  const Icon(Icons.stars_rounded, color: AppColors.primaryOrange, size: 16),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '${_user?.rewardPoints ?? 0} Points',
-                                    style: const TextStyle(
-                                      color: AppColors.primaryOrange,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        // Edit profile and logout buttons row
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 2. Loyalty Rewards
+                    _buildInfoCard(
+                      title: 'Loyalty Rewards',
+                      icon: Icons.stars_rounded,
+                      children: [
                         Row(
-                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'CURRENT BALANCE',
+                                  style: TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${_user?.rewardPoints ?? 0} Points',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.primaryOrange,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
+                            ),
                             ElevatedButton.icon(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.secondaryBlue,
                                 foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 10,
+                                ),
                               ),
-                              icon: const Icon(Icons.edit, size: 16),
-                              label: const Text('Edit Profile', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                              onPressed: _showEditProfileDialog,
-                            ),
-                            const SizedBox(width: 8),
-                            ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.redAccent,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              icon: const Icon(Icons.history, size: 14),
+                              label: const Text(
+                                'View Ledger',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                              icon: const Icon(Icons.logout, size: 16),
-                              label: const Text('Logout', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                              onPressed: () async {
-                                final nav = Navigator.of(context);
-                                await _authService.logout();
-                                nav.pushAndRemoveUntil(
-                                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                                  (route) => false,
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const RewardHistoryScreen(),
+                                  ),
                                 );
                               },
                             ),
@@ -616,403 +828,568 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 24),
+                    const SizedBox(height: 16),
 
-                  // Dual Column layout (Grid layout in mockup)
-                  Flex(
-                    direction: isDesktop ? Axis.horizontal : Axis.vertical,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Left Column: Personal info & credentials
-                      Expanded(
-                        flex: isDesktop ? 4 : 0,
-                        child: Column(
+                    // 3. Theme Settings
+                    _buildInfoCard(
+                      title: 'Theme Settings',
+                      icon: Icons.brightness_6_outlined,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            // 1. Personal Information Card
-                            _buildInfoCard(
-                              title: 'Personal Information',
-                              icon: Icons.person_outline,
-                              children: [
-                                _buildDetailRow('EMAIL ADDRESS', _user?.email ?? 'N/A'),
-                                _buildDetailRow('PHONE NUMBER', _user?.phone ?? 'N/A'),
-                                _buildDetailRow('RESIDENTIAL ADDRESS', _user?.address ?? 'N/A'),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            
-                            // 2. Loyalty Rewards
-                            _buildInfoCard(
-                              title: 'Loyalty Rewards',
-                              icon: Icons.stars_rounded,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Text('CURRENT BALANCE', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
-                                        const SizedBox(height: 4),
-                                        Text('${_user?.rewardPoints ?? 0} Points', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryOrange, fontSize: 16)),
-                                      ],
-                                    ),
-                                    ElevatedButton.icon(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: AppColors.secondaryBlue,
-                                        foregroundColor: Colors.white,
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                      ),
-                                      icon: const Icon(Icons.history, size: 14),
-                                      label: const Text('View Ledger', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                      onPressed: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(builder: (context) => const RewardHistoryScreen()),
-                                        );
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-
-                            // 3. Theme Settings
-                            _buildInfoCard(
-                              title: 'Theme Settings',
-                              icon: Icons.brightness_6_outlined,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          const Text('THEME MODE', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            themeProvider.themeMode == ThemeMode.system
-                                                ? 'System Default'
-                                                : themeProvider.themeMode == ThemeMode.light
-                                                    ? 'Light Mode'
-                                                    : 'Dark Mode',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              color: isDark ? Colors.white : AppColors.secondaryBlue,
-                                              fontSize: 14,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    DropdownButton<ThemeMode>(
-                                      value: themeProvider.themeMode,
-                                      onChanged: (mode) {
-                                        if (mode != null) {
-                                          themeProvider.setThemeMode(mode);
-                                        }
-                                      },
-                                      dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                                      style: TextStyle(
-                                        color: isDark ? Colors.white : AppColors.secondaryBlue,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      items: const [
-                                        DropdownMenuItem(value: ThemeMode.system, child: Text('System')),
-                                        DropdownMenuItem(value: ThemeMode.light, child: Text('Light')),
-                                        DropdownMenuItem(value: ThemeMode.dark, child: Text('Dark')),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-
-                            // 4. Identity Verification
-                            _buildIdentityVerificationCard(isDark),
-                          ],
-                        ),
-                      ),
-                      if (isDesktop) const SizedBox(width: 24),
-                      if (!isDesktop) const SizedBox(height: 24),
-
-                      // Right Column: Recent Bookings (Grid Right in mockup)
-                      Expanded(
-                        flex: isDesktop ? 5 : 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).cardColor,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.grey[200]!),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    'Recent Bookings',
-                                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : AppColors.secondaryBlue),
+                                  const Text(
+                                    'THEME MODE',
+                                    style: TextStyle(
+                                      color: Colors.grey,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
-                                  TextButton(
-                                    onPressed: _loadProfileData,
-                                    child: const Text('View All', style: TextStyle(color: AppColors.primaryOrange, fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    themeProvider.themeMode == ThemeMode.system
+                                        ? 'System Default'
+                                        : themeProvider.themeMode ==
+                                              ThemeMode.light
+                                        ? 'Light Mode'
+                                        : 'Dark Mode',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: isDark
+                                          ? Colors.white
+                                          : AppColors.secondaryBlue,
+                                      fontSize: 14,
+                                    ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 16),
-                              // Statistics Row
-                              Container(
-                                margin: const EdgeInsets.only(bottom: 20),
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8F9FA),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.grey[200]!),
-                                ),
-                                child: GridView.count(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  crossAxisCount: width > 600 ? 4 : 2,
-                                  childAspectRatio: width > 600 ? 2.5 : 2.0,
-                                  crossAxisSpacing: 12,
-                                  mainAxisSpacing: 12,
-                                  children: [
-                                    _buildStatMiniTile('Total Bookings', '${_bookings.length}', Icons.book_online, Colors.blue),
-                                    _buildStatMiniTile('Active Bookings', '${_bookings.where((b) => b.status == 'approved' || b.status == 'active' || b.status == 'ongoing').length}', Icons.directions_car, Colors.orange),
-                                    _buildStatMiniTile('Completed', '${_bookings.where((b) => b.status == 'completed').length}', Icons.check_circle_outline, Colors.green),
-                                    _buildStatMiniTile('Total Spent', 'RM ${_bookings.where((b) => b.status == 'completed' || b.status == 'active' || b.status == 'approved' || b.status == 'ongoing').fold(0.0, (sum, b) => sum + b.totalPrice).toStringAsFixed(0)}', Icons.monetization_on, Colors.indigo),
-                                  ],
-                                ),
+                            ),
+                            DropdownButton<ThemeMode>(
+                              value: themeProvider.themeMode,
+                              onChanged: (mode) {
+                                if (mode != null) {
+                                  themeProvider.setThemeMode(mode);
+                                }
+                              },
+                              dropdownColor: isDark
+                                  ? const Color(0xFF1E293B)
+                                  : Colors.white,
+                              style: TextStyle(
+                                color: isDark
+                                    ? Colors.white
+                                    : AppColors.secondaryBlue,
+                                fontWeight: FontWeight.bold,
                               ),
-                              _bookings.isEmpty
-                                  ? Center(
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(32.0),
-                                        child: Column(
-                                          children: [
-                                            Icon(Icons.history_toggle_off, size: 48, color: Colors.grey[300]),
-                                            const SizedBox(height: 12),
-                                            Text('No rental history found.', style: TextStyle(color: Colors.grey[500])),
-                                          ],
-                                        ),
-                                      ),
-                                    )
-                                  : ListView.builder(
-                                      shrinkWrap: true,
-                                      physics: const NeverScrollableScrollPhysics(),
-                                      itemCount: _bookings.length > 5 ? 5 : _bookings.length,
-                                      itemBuilder: (context, index) {
-                                        final booking = _bookings[index];
-                                        final dateFormat = DateFormat('dd MMM yyyy');
-                                        
-                                        Color statusColor = Colors.orange;
-                                        if (booking.status == 'approved' || booking.status == 'ongoing') {
-                                          statusColor = Colors.blue;
-                        } else if (booking.status == 'completed') {
-                                          statusColor = Colors.green;
-                                        } else if (booking.status == 'cancelled' || booking.status == 'rejected') {
-                                          statusColor = Colors.red;
-                                        }
-                                        final paymentList = _payments.where((p) => p.bookingId == booking.id).toList();
-                                        final payment = paymentList.isNotEmpty ? paymentList.first : null;
+                              items: const [
+                                DropdownMenuItem(
+                                  value: ThemeMode.system,
+                                  child: Text('System'),
+                                ),
+                                DropdownMenuItem(
+                                  value: ThemeMode.light,
+                                  child: Text('Light'),
+                                ),
+                                DropdownMenuItem(
+                                  value: ThemeMode.dark,
+                                  child: Text('Dark'),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
 
-                                        return Card(
-                                          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8F9FA),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: isDark ? const Color(0xFF334155) : Colors.grey[200]!)),
-                                          elevation: 0,
-                                          margin: const EdgeInsets.only(bottom: 12),
-                                          child: Padding(
-                                            padding: const EdgeInsets.all(12.0),
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Row(
-                                                  children: [
-                                                    // Left rounded vehicle image
-                                                    Container(
-                                                      width: 80,
-                                                      height: 60,
-                                                      decoration: BoxDecoration(
-                                                        color: Colors.grey[200],
-                                                        borderRadius: BorderRadius.circular(8),
-                                                      ),
-                                                      child: const Icon(Icons.directions_car, color: Colors.grey),
-                                                    ),
-                                                    const SizedBox(width: 12),
-                                                    // Center detail text block
-                                                    Expanded(
-                                                      child: Column(
-                                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                                        children: [
-                                                          Text(
-                                                            booking.vehicleName,
-                                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.secondaryBlue),
-                                                          ),
-                                                          const SizedBox(height: 2),
-                                                          Text(
-                                                            'Booking ID: #${booking.id.substring(0, booking.id.length > 8 ? 8 : booking.id.length).toUpperCase()}',
-                                                            style: TextStyle(color: Colors.grey[500], fontSize: 10, fontWeight: FontWeight.bold),
-                                                          ),
-                                                          const SizedBox(height: 4),
-                                                          Row(
-                                                            children: [
-                                                              const Icon(Icons.calendar_today, size: 10, color: Colors.grey),
-                                                              const SizedBox(width: 4),
-                                                              Text(
-                                                                '${dateFormat.format(booking.pickUpDate)} - ${dateFormat.format(booking.returnDate)}',
-                                                                style: TextStyle(color: Colors.grey[600], fontSize: 10),
-                                                              ),
-                                                            ],
-                                                          ),
-                                                          const SizedBox(height: 2),
-                                                          Row(
-                                                            children: [
-                                                              const Icon(Icons.payments_outlined, size: 10, color: Colors.grey),
-                                                              const SizedBox(width: 4),
-                                                              Text(
-                                                                'RM ${booking.totalPrice.toStringAsFixed(2)}',
-                                                                style: TextStyle(color: Colors.grey[600], fontSize: 10, fontWeight: FontWeight.bold),
-                                                              ),
-                                                            ],
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                    // Right status badge
-                                                    Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                      decoration: BoxDecoration(
-                                                        color: statusColor.withValues(alpha: 0.1),
-                                                        borderRadius: BorderRadius.circular(6),
-                                                      ),
-                                                      child: Text(
-                                                        booking.status.toUpperCase(),
-                                                        style: TextStyle(color: statusColor, fontSize: 9, fontWeight: FontWeight.bold),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                                 if (payment != null) ...[
-                                                   const Divider(height: 16),
-                                                   Row(
-                                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                     children: [
-                                                       Row(
-                                                         children: [
-                                                           const Text(
-                                                             'Payment Status: ',
-                                                             style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w600),
-                                                           ),
-                                                           _buildPaymentBadge(payment),
-                                                         ],
-                                                       ),
-                                                       Row(
-                                                         mainAxisSize: MainAxisSize.min,
-                                                         children: [
-                                                           if (payment.receiptImage != null && payment.receiptImage!.isNotEmpty) ...[
-                                                             TextButton.icon(
-                                                               onPressed: () => _openReceiptLightbox(payment),
-                                                               icon: const Icon(Icons.visibility_outlined, size: 14, color: AppColors.secondaryBlue),
-                                                               label: const Text(
-                                                                 'View Receipt',
-                                                                 style: TextStyle(color: AppColors.secondaryBlue, fontSize: 11, fontWeight: FontWeight.bold),
-                                                               ),
-                                                               style: TextButton.styleFrom(
-                                                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                                               ),
-                                                             ),
-                                                             const SizedBox(width: 8),
-                                                           ],
-                                                           if (payment.paymentStatus == 'Rejected')
-                                                             TextButton.icon(
-                                                               onPressed: _vehicles.any((v) => v.id == booking.vehicleId && v.status.toLowerCase() == 'maintenance')
-                                                                   ? null
-                                                                   : () => _showReUploadReceiptDialog(payment),
-                                                               icon: Icon(
-                                                                 Icons.replay_outlined,
-                                                                 size: 14,
-                                                                 color: _vehicles.any((v) => v.id == booking.vehicleId && v.status.toLowerCase() == 'maintenance')
-                                                                     ? Colors.grey
-                                                                     : AppColors.primaryOrange,
-                                                               ),
-                                                               label: Text(
-                                                                 _vehicles.any((v) => v.id == booking.vehicleId && v.status.toLowerCase() == 'maintenance')
-                                                                     ? 'Under Maintenance'
-                                                                     : 'Re-upload Receipt',
-                                                                 style: TextStyle(
-                                                                   color: _vehicles.any((v) => v.id == booking.vehicleId && v.status.toLowerCase() == 'maintenance')
-                                                                       ? Colors.grey
-                                                                       : AppColors.primaryOrange,
-                                                                   fontSize: 11,
-                                                                   fontWeight: FontWeight.bold,
-                                                                 ),
-                                                               ),
-                                                               style: TextButton.styleFrom(
-                                                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                                               ),
-                                                             ),
-                                                         ],
-                                                       ),
-                                                     ],
-                                                   ),
-                                                  if (payment.paymentStatus == 'Rejected' && payment.rejectionReason != null && payment.rejectionReason!.isNotEmpty) ...[
-                                                    const SizedBox(height: 6),
-                                                    Align(
-                                                      alignment: Alignment.centerLeft,
-                                                      child: Text(
-                                                        'Rejection Reason: ${payment.rejectionReason}',
-                                                        style: const TextStyle(color: Colors.redAccent, fontSize: 11, fontWeight: FontWeight.w600),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ],
-                                                if (booking.status == 'completed') ...[
-                                                  const Divider(height: 16),
-                                                  SizedBox(
-                                                    width: double.infinity,
-                                                    height: 32,
-                                                    child: ElevatedButton.icon(
-                                                      style: ElevatedButton.styleFrom(
-                                                        backgroundColor: AppColors.secondaryBlue,
-                                                        foregroundColor: Colors.white,
-                                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                                                      ),
-                                                      icon: const Icon(Icons.rate_review, size: 14),
-                                                      label: const Text('SUBMIT REVIEW', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                                                      onPressed: () => _submitReview(booking),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ],
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    ),
+                    // 4. Identity Verification
+                    _buildIdentityVerificationCard(isDark),
+                  ],
+                ),
+              ),
+              if (isDesktop) const SizedBox(width: 24),
+              if (!isDesktop) const SizedBox(height: 24),
+
+              // Right Column: Recent Bookings (Grid Right in mockup)
+              Expanded(
+                flex: isDesktop ? 5 : 0,
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isDark
+                          ? const Color(0xFF334155)
+                          : Colors.grey[200]!,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Recent Bookings',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: isDark
+                                  ? Colors.white
+                                  : AppColors.secondaryBlue,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      // Statistics Row
+                      SizedBox(
+                        height: isDesktop ? 240 : null,
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 20),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? const Color(0xFF0F172A)
+                                : const Color(0xFFF8F9FA),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isDark
+                                  ? const Color(0xFF334155)
+                                  : Colors.grey[200]!,
+                            ),
+                          ),
+                          child: GridView.count(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            crossAxisCount: isDesktop ? 2 : 2,
+                            childAspectRatio: isDesktop ? 2.2 : 2.0,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                            children: [
+                              _buildStatMiniTile(
+                                'Total Bookings',
+                                '${_bookings.length}',
+                                Icons.book_online,
+                                Colors.blue,
+                              ),
+                              _buildStatMiniTile(
+                                'Active Bookings',
+                                '${_bookings.where((b) => b.status == 'approved' || b.status == 'active' || b.status == 'ongoing').length}',
+                                Icons.directions_car,
+                                Colors.orange,
+                              ),
+                              _buildStatMiniTile(
+                                'Completed',
+                                '${_bookings.where((b) => b.status == 'completed').length}',
+                                Icons.check_circle_outline,
+                                Colors.green,
+                              ),
+                              _buildStatMiniTile(
+                                'Total Spent',
+                                'RM ${_bookings.where((b) => b.status == 'completed' || b.status == 'active' || b.status == 'approved' || b.status == 'ongoing').fold(0.0, (sum, b) => sum + b.totalPrice).toStringAsFixed(0)}',
+                                Icons.monetization_on,
+                                Colors.indigo,
+                              ),
                             ],
                           ),
                         ),
                       ),
+                      _bookings.isEmpty
+                          ? Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(32.0),
+                                child: Column(
+                                  children: [
+                                    Icon(
+                                      Icons.history_toggle_off,
+                                      size: 48,
+                                      color: Colors.grey[300],
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      'No rental history found.',
+                                      style: TextStyle(color: Colors.grey[500]),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: _bookings.length > 5
+                                  ? 5
+                                  : _bookings.length,
+                              itemBuilder: (context, index) {
+                                final booking = _bookings[index];
+                                final dateFormat = DateFormat('dd MMM yyyy');
+
+                                Color statusColor = Colors.orange;
+                                if (booking.status == 'approved' ||
+                                    booking.status == 'ongoing') {
+                                  statusColor = Colors.blue;
+                                } else if (booking.status == 'completed') {
+                                  statusColor = Colors.green;
+                                } else if (booking.status == 'cancelled' ||
+                                    booking.status == 'rejected') {
+                                  statusColor = Colors.red;
+                                }
+                                final paymentList = _payments
+                                    .where((p) => p.bookingId == booking.id)
+                                    .toList();
+                                final payment = paymentList.isNotEmpty
+                                    ? paymentList.first
+                                    : null;
+
+                                return Card(
+                                  color: isDark
+                                      ? const Color(0xFF1E293B)
+                                      : const Color(0xFFF8F9FA),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    side: BorderSide(
+                                      color: isDark
+                                          ? const Color(0xFF334155)
+                                          : Colors.grey[200]!,
+                                    ),
+                                  ),
+                                  elevation: 0,
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12.0),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            // Left rounded vehicle image
+                                            Container(
+                                              width: 80,
+                                              height: 60,
+                                              decoration: BoxDecoration(
+                                                color: Colors.grey[200],
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                              child: const Icon(
+                                                Icons.directions_car,
+                                                color: Colors.grey,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            // Center detail text block
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    booking.vehicleName,
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 14,
+                                                      color: AppColors
+                                                          .secondaryBlue,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    'Booking ID: #${booking.id.substring(0, booking.id.length > 8 ? 8 : booking.id.length).toUpperCase()}',
+                                                    style: TextStyle(
+                                                      color: Colors.grey[500],
+                                                      fontSize: 10,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Row(
+                                                    children: [
+                                                      const Icon(
+                                                        Icons.calendar_today,
+                                                        size: 10,
+                                                        color: Colors.grey,
+                                                      ),
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        '${dateFormat.format(booking.pickUpDate)} - ${dateFormat.format(booking.returnDate)}',
+                                                        style: TextStyle(
+                                                          color:
+                                                              Colors.grey[600],
+                                                          fontSize: 10,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 2),
+                                                  Row(
+                                                    children: [
+                                                      const Icon(
+                                                        Icons.payments_outlined,
+                                                        size: 10,
+                                                        color: Colors.grey,
+                                                      ),
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        'RM ${booking.totalPrice.toStringAsFixed(2)}',
+                                                        style: TextStyle(
+                                                          color:
+                                                              Colors.grey[600],
+                                                          fontSize: 10,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            // Right status badge
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 4,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: statusColor.withValues(
+                                                  alpha: 0.1,
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                booking.status.toUpperCase(),
+                                                style: TextStyle(
+                                                  color: statusColor,
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        if (payment != null) ...[
+                                          const Divider(height: 16),
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  const Text(
+                                                    'Payment Status: ',
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      color: Colors.grey,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                  _buildPaymentBadge(payment),
+                                                ],
+                                              ),
+                                              Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  if (payment.receiptImage !=
+                                                          null &&
+                                                      payment
+                                                          .receiptImage!
+                                                          .isNotEmpty) ...[
+                                                    TextButton.icon(
+                                                      onPressed: () =>
+                                                          _openReceiptLightbox(
+                                                            payment,
+                                                          ),
+                                                      icon: const Icon(
+                                                        Icons
+                                                            .visibility_outlined,
+                                                        size: 14,
+                                                        color: AppColors
+                                                            .secondaryBlue,
+                                                      ),
+                                                      label: const Text(
+                                                        'View Receipt',
+                                                        style: TextStyle(
+                                                          color: AppColors
+                                                              .secondaryBlue,
+                                                          fontSize: 11,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                      style: TextButton.styleFrom(
+                                                        padding:
+                                                            const EdgeInsets.symmetric(
+                                                              horizontal: 8,
+                                                              vertical: 4,
+                                                            ),
+                                                        tapTargetSize:
+                                                            MaterialTapTargetSize
+                                                                .shrinkWrap,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                  ],
+                                                  if (payment.paymentStatus ==
+                                                      'Rejected')
+                                                    TextButton.icon(
+                                                      onPressed:
+                                                          _vehicles.any(
+                                                            (v) =>
+                                                                v.id ==
+                                                                    booking
+                                                                        .vehicleId &&
+                                                                v.status.toLowerCase() ==
+                                                                    'maintenance',
+                                                          )
+                                                          ? null
+                                                          : () =>
+                                                                _showReUploadReceiptDialog(
+                                                                  payment,
+                                                                ),
+                                                      icon: Icon(
+                                                        Icons.replay_outlined,
+                                                        size: 14,
+                                                        color:
+                                                            _vehicles.any(
+                                                              (v) =>
+                                                                  v.id ==
+                                                                      booking
+                                                                          .vehicleId &&
+                                                                  v.status.toLowerCase() ==
+                                                                      'maintenance',
+                                                            )
+                                                            ? Colors.grey
+                                                            : AppColors
+                                                                  .primaryOrange,
+                                                      ),
+                                                      label: Text(
+                                                        _vehicles.any(
+                                                              (v) =>
+                                                                  v.id ==
+                                                                      booking
+                                                                          .vehicleId &&
+                                                                  v.status.toLowerCase() ==
+                                                                      'maintenance',
+                                                            )
+                                                            ? 'Under Maintenance'
+                                                            : 'Re-upload Receipt',
+                                                        style: TextStyle(
+                                                          color:
+                                                              _vehicles.any(
+                                                                (v) =>
+                                                                    v.id ==
+                                                                        booking
+                                                                            .vehicleId &&
+                                                                    v.status.toLowerCase() ==
+                                                                        'maintenance',
+                                                              )
+                                                              ? Colors.grey
+                                                              : AppColors
+                                                                    .primaryOrange,
+                                                          fontSize: 11,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                      style: TextButton.styleFrom(
+                                                        padding:
+                                                            const EdgeInsets.symmetric(
+                                                              horizontal: 8,
+                                                              vertical: 4,
+                                                            ),
+                                                        tapTargetSize:
+                                                            MaterialTapTargetSize
+                                                                .shrinkWrap,
+                                                      ),
+                                                    ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                          if (payment.paymentStatus ==
+                                                  'Rejected' &&
+                                              payment.rejectionReason != null &&
+                                              payment
+                                                  .rejectionReason!
+                                                  .isNotEmpty) ...[
+                                            const SizedBox(height: 6),
+                                            Align(
+                                              alignment: Alignment.centerLeft,
+                                              child: Text(
+                                                'Rejection Reason: ${payment.rejectionReason}',
+                                                style: const TextStyle(
+                                                  color: Colors.redAccent,
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                        if (booking.status == 'completed') ...[
+                                          const Divider(height: 16),
+                                          SizedBox(
+                                            width: double.infinity,
+                                            height: 32,
+                                            child: ElevatedButton.icon(
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor:
+                                                    AppColors.secondaryBlue,
+                                                foregroundColor: Colors.white,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
+                                                ),
+                                              ),
+                                              icon: const Icon(
+                                                Icons.rate_review,
+                                                size: 14,
+                                              ),
+                                              label: const Text(
+                                                'SUBMIT REVIEW',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              onPressed: () =>
+                                                  _submitReview(booking),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
                     ],
                   ),
-                ],
+                ),
               ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildPaymentBadge(PaymentModel payment) {
     Color badgeColor = Colors.orange;
     String badgeText = 'Pending Verification';
-    
+
     if (payment.paymentStatus == 'Approved') {
       badgeColor = Colors.green;
       badgeText = 'Approved';
@@ -1060,37 +1437,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
         String? errorMsg;
         bool isSubmitting = false;
 
-        final amountController = TextEditingController(text: payment.amount.toStringAsFixed(2));
-        final referenceController = TextEditingController(text: payment.transactionId ?? '');
+        final amountController = TextEditingController(
+          text: payment.amount.toStringAsFixed(2),
+        );
+        final referenceController = TextEditingController(
+          text: payment.transactionId ?? '',
+        );
         DateTime selectedPaymentDate = payment.paymentDate;
 
         return StatefulBuilder(
           builder: (context, setDialogState) {
             // Register callback to update dialog state
-            receipt_upload.onReceiptUploadedCallback = (String base64, String name, int size) {
-              setDialogState(() {
-                if (base64 == 'error:size' || size > 10 * 1024 * 1024) {
-                  errorMsg = 'File size exceeds 10MB limit.';
-                  receiptBase64 = null;
-                  receiptName = null;
-                  receiptSize = null;
-                } else if (base64 == 'error:format') {
-                  errorMsg = 'Invalid file format. Only JPG, JPEG, PNG, and PDF are accepted.';
-                  receiptBase64 = null;
-                  receiptName = null;
-                  receiptSize = null;
-                } else {
-                  errorMsg = null;
-                  receiptBase64 = base64;
-                  receiptName = name;
-                  receiptSize = size;
-                }
-              });
-            };
+            receipt_upload.onReceiptUploadedCallback =
+                (String base64, String name, int size) {
+                  setDialogState(() {
+                    if (base64 == 'error:size' || size > 10 * 1024 * 1024) {
+                      errorMsg = 'File size exceeds 10MB limit.';
+                      receiptBase64 = null;
+                      receiptName = null;
+                      receiptSize = null;
+                    } else if (base64 == 'error:format') {
+                      errorMsg =
+                          'Invalid file format. Only JPG, JPEG, PNG, and PDF are accepted.';
+                      receiptBase64 = null;
+                      receiptName = null;
+                      receiptSize = null;
+                    } else {
+                      errorMsg = null;
+                      receiptBase64 = base64;
+                      receiptName = name;
+                      receiptSize = size;
+                    }
+                  });
+                };
 
             return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: const Text('Re-upload Payment Receipt', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: const Text(
+                'Re-upload Payment Receipt',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.secondaryBlue,
+                ),
+              ),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -1109,30 +1500,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           children: [
                             const Text(
                               'BOOKING SUMMARY',
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey,
+                              ),
                             ),
                             const SizedBox(height: 6),
                             Text(
                               'Vehicle: ${booking.vehicleName}',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.secondaryBlue),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: AppColors.secondaryBlue,
+                              ),
                             ),
                             Text(
                               'Dates: ${dialogDateFormat.format(booking.pickUpDate)} to ${dialogDateFormat.format(booking.returnDate)}',
-                              style: const TextStyle(fontSize: 12, color: AppColors.secondaryBlue),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.secondaryBlue,
+                              ),
                             ),
                             const Divider(height: 16),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text('Total Price:', style: TextStyle(fontSize: 12)),
-                                Text('RM ${booking.totalPrice.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                const Text(
+                                  'Total Price:',
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                                Text(
+                                  'RM ${booking.totalPrice.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ],
                             ),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text('Deposit Amount:', style: TextStyle(fontSize: 12)),
-                                Text('RM ${booking.depositAmount.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                const Text(
+                                  'Deposit Amount:',
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                                Text(
+                                  'RM ${booking.depositAmount.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ],
                             ),
                           ],
@@ -1145,11 +1565,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Bank Name:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                          const Text(
+                            'Bank Name:',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey,
+                            ),
+                          ),
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              if (_bankLogoUrl != null && _bankLogoUrl!.isNotEmpty) ...[
+                              if (_bankLogoUrl != null &&
+                                  _bankLogoUrl!.isNotEmpty) ...[
                                 AppImage(
                                   imageSrc: _bankLogoUrl!,
                                   height: 18,
@@ -1157,7 +1585,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ),
                                 const SizedBox(width: 6),
                               ],
-                              Text(_bankName!, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+                              Text(
+                                _bankName!,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.secondaryBlue,
+                                ),
+                              ),
                             ],
                           ),
                         ],
@@ -1166,16 +1601,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Account Number:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
-                          Text(_accountNumber ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+                          const Text(
+                            'Account Number:',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          Text(
+                            _accountNumber ?? '',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.secondaryBlue,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 4),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Account Name:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
-                          Text(_accountName ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+                          const Text(
+                            'Account Name:',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          Text(
+                            _accountName ?? '',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.secondaryBlue,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -1192,14 +1655,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             child: AppImage(
                               imageSrc: _qrCodeUrl,
                               fit: BoxFit.contain,
-                              placeholder: const Icon(Icons.qr_code_2, size: 80),
+                              placeholder: const Icon(
+                                Icons.qr_code_2,
+                                size: 80,
+                              ),
                             ),
                           ),
                         ),
                       ],
                       const Divider(),
                     ],
-                    const Text('Upload a new, valid transaction receipt proof to clear verification.', textAlign: TextAlign.center),
+                    const Text(
+                      'Upload a new, valid transaction receipt proof to clear verification.',
+                      textAlign: TextAlign.center,
+                    ),
                     const SizedBox(height: 16),
                     if (kIsWeb) ...[
                       Container(
@@ -1209,7 +1678,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           border: Border.all(color: Colors.grey[300]!),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const HtmlElementView(viewType: 'receipt-dropzone'),
+                        child: const HtmlElementView(
+                          viewType: 'receipt-dropzone',
+                        ),
                       ),
                       const SizedBox(height: 12),
                       OutlinedButton.icon(
@@ -1217,7 +1688,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           final file = await receipt_upload.pickReceiptFile();
                           if (file != null) {
                             setDialogState(() {
-                              if (file.base64Data == 'error:size' || file.size > 10 * 1024 * 1024) {
+                              if (file.base64Data == 'error:size' ||
+                                  file.size > 10 * 1024 * 1024) {
                                 errorMsg = 'File size exceeds 10MB limit.';
                                 receiptBase64 = null;
                               } else {
@@ -1237,14 +1709,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.secondaryBlue,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
                         onPressed: () async {
                           final file = await receipt_upload.pickReceiptFile();
                           if (file != null) {
                             setDialogState(() {
-                              if (file.base64Data == 'error:size' || file.size > 10 * 1024 * 1024) {
+                              if (file.base64Data == 'error:size' ||
+                                  file.size > 10 * 1024 * 1024) {
                                 errorMsg = 'File size exceeds 10MB limit.';
                                 receiptBase64 = null;
                               } else {
@@ -1264,7 +1742,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     if (errorMsg != null)
                       Text(
                         errorMsg!,
-                        style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          color: Colors.redAccent,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                     if (receiptBase64 != null) ...[
@@ -1279,22 +1761,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(12),
-                          child: receiptName!.toLowerCase().endsWith('.pdf') || receiptBase64!.startsWith('data:application/pdf')
+                          child:
+                              receiptName!.toLowerCase().endsWith('.pdf') ||
+                                  receiptBase64!.startsWith(
+                                    'data:application/pdf',
+                                  )
                               ? Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    const Icon(Icons.picture_as_pdf, color: Colors.redAccent, size: 54),
+                                    const Icon(
+                                      Icons.picture_as_pdf,
+                                      color: Colors.redAccent,
+                                      size: 54,
+                                    ),
                                     const SizedBox(height: 6),
                                     Text(
                                       receiptName ?? 'Receipt.pdf',
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     if (receiptSize != null)
                                       Text(
                                         '${(receiptSize! / 1024 / 1024).toStringAsFixed(2)} MB',
-                                        style: const TextStyle(fontSize: 10, color: Colors.grey),
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.grey,
+                                        ),
                                       ),
                                   ],
                                 )
@@ -1314,8 +1810,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             errorMsg = null;
                           });
                         },
-                        icon: const Icon(Icons.delete, color: Colors.redAccent, size: 16),
-                        label: const Text('Remove File', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
+                        icon: const Icon(
+                          Icons.delete,
+                          color: Colors.redAccent,
+                          size: 16,
+                        ),
+                        label: const Text(
+                          'Remove File',
+                          style: TextStyle(
+                            color: Colors.redAccent,
+                            fontSize: 12,
+                          ),
+                        ),
                       ),
                     ],
                     const SizedBox(height: 16),
@@ -1330,7 +1836,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: amountController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       decoration: const InputDecoration(
                         labelText: 'Payment Amount (RM)',
                         hintText: 'e.g., 150.00',
@@ -1343,7 +1851,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         final picked = await showDatePicker(
                           context: context,
                           initialDate: selectedPaymentDate,
-                          firstDate: DateTime.now().subtract(const Duration(days: 30)),
+                          firstDate: DateTime.now().subtract(
+                            const Duration(days: 30),
+                          ),
                           lastDate: DateTime.now().add(const Duration(days: 7)),
                         );
                         if (picked != null) {
@@ -1358,14 +1868,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           border: OutlineInputBorder(),
                           suffixIcon: Icon(Icons.calendar_today),
                         ),
-                        child: Text(dialogDateFormat.format(selectedPaymentDate)),
+                        child: Text(
+                          dialogDateFormat.format(selectedPaymentDate),
+                        ),
                       ),
                     ),
                     if (isSubmitting) ...[
                       const SizedBox(height: 16),
-                      const CircularProgressIndicator(color: AppColors.primaryOrange),
+                      const CircularProgressIndicator(
+                        color: AppColors.primaryOrange,
+                      ),
                       const SizedBox(height: 8),
-                      const Text('Uploading proof...', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                      const Text(
+                        'Uploading proof...',
+                        style: TextStyle(color: Colors.grey, fontSize: 12),
+                      ),
                     ],
                   ],
                 ),
@@ -1376,18 +1893,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: const Text('CANCEL'),
                 ),
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryOrange),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryOrange,
+                  ),
                   onPressed: receiptBase64 == null || isSubmitting
                       ? null
                       : () async {
                           final txId = referenceController.text.trim();
                           if (txId.isEmpty) {
                             setDialogState(() {
-                              errorMsg = 'Please enter Transaction Reference ID.';
+                              errorMsg =
+                                  'Please enter Transaction Reference ID.';
                             });
                             return;
                           }
-                          final parsedAmount = double.tryParse(amountController.text.trim());
+                          final parsedAmount = double.tryParse(
+                            amountController.text.trim(),
+                          );
                           if (parsedAmount == null || parsedAmount <= 0) {
                             setDialogState(() {
                               errorMsg = 'Please enter a valid payment amount.';
@@ -1400,26 +1922,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           });
                           try {
                             // Update payments record
-                            await FirebaseDatabase.instance.ref().child('payments').child(payment.id).update({
-                              'receiptImage': receiptBase64,
-                              'receiptFile': receiptBase64,
-                              'paymentStatus': 'Pending Verification',
-                              'status': 'pending',
-                              'uploadedAt': DateTime.now().toIso8601String(),
-                              'rejectionReason': '',
-                              'transactionId': txId,
-                              'amount': parsedAmount,
-                              'paymentDate': selectedPaymentDate.toIso8601String(),
-                            });
+                            await FirebaseDatabase.instance
+                                .ref()
+                                .child('payments')
+                                .child(payment.id)
+                                .update({
+                                  'receiptImage': receiptBase64,
+                                  'receiptFile': receiptBase64,
+                                  'paymentStatus': 'Pending Verification',
+                                  'status': 'pending',
+                                  'uploadedAt': DateTime.now()
+                                      .toIso8601String(),
+                                  'rejectionReason': '',
+                                  'transactionId': txId,
+                                  'amount': parsedAmount,
+                                  'paymentDate': selectedPaymentDate
+                                      .toIso8601String(),
+                                });
                             // Set booking back to pending
-                            await FirebaseDatabase.instance.ref().child('bookings').child(payment.bookingId).update({
-                              'status': 'pending',
-                              'updatedAt': DateTime.now().toIso8601String(),
-                            });
+                            await FirebaseDatabase.instance
+                                .ref()
+                                .child('bookings')
+                                .child(payment.bookingId)
+                                .update({
+                                  'status': 'pending',
+                                  'updatedAt': DateTime.now().toIso8601String(),
+                                });
                             if (context.mounted) {
                               Navigator.pop(context);
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('New receipt uploaded successfully! Waiting for verification.'), backgroundColor: Colors.green),
+                                const SnackBar(
+                                  content: Text(
+                                    'New receipt uploaded successfully! Waiting for verification.',
+                                  ),
+                                  backgroundColor: Colors.green,
+                                ),
                               );
                             }
                             _loadProfileData();
@@ -1430,7 +1967,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             });
                           }
                         },
-                  child: const Text('SUBMIT PROOF', style: TextStyle(color: Colors.white)),
+                  child: const Text(
+                    'SUBMIT PROOF',
+                    style: TextStyle(color: Colors.white),
+                  ),
                 ),
               ],
             );
@@ -1443,12 +1983,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _openReceiptLightbox(PaymentModel payment) {
     if (payment.receiptImage == null || payment.receiptImage!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No receipt file uploaded for this transaction.')),
+        const SnackBar(
+          content: Text('No receipt file uploaded for this transaction.'),
+        ),
       );
       return;
     }
 
-    final isPdf = payment.receiptImage!.toLowerCase().contains('.pdf') ||
+    final isPdf =
+        payment.receiptImage!.toLowerCase().contains('.pdf') ||
         payment.receiptImage!.startsWith('data:application/pdf');
 
     showDialog(
@@ -1462,7 +2005,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               AppBar(
                 backgroundColor: Colors.black54,
                 elevation: 0,
-                title: Text(isPdf ? 'PDF Receipt document' : 'Receipt Image Lightbox', style: const TextStyle(color: Colors.white)),
+                title: Text(
+                  isPdf ? 'PDF Receipt document' : 'Receipt Image Lightbox',
+                  style: const TextStyle(color: Colors.white),
+                ),
                 leading: IconButton(
                   icon: const Icon(Icons.close, color: Colors.white),
                   onPressed: () => Navigator.pop(context),
@@ -1475,13 +2021,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         final rawBase64 = payment.receiptImage!.split(',').last;
                         final bytes = base64Decode(rawBase64);
                         final ext = isPdf ? 'pdf' : 'png';
-                        download_helper.downloadFile(bytes, 'receipt_${payment.id}.$ext');
+                        download_helper.downloadFile(
+                          bytes,
+                          'receipt_${payment.id}.$ext',
+                        );
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('File download initiated successfully.'), backgroundColor: Colors.green),
+                          const SnackBar(
+                            content: Text(
+                              'File download initiated successfully.',
+                            ),
+                            backgroundColor: Colors.green,
+                          ),
                         );
                       } catch (e) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Download failed: $e'), backgroundColor: Colors.redAccent),
+                          SnackBar(
+                            content: Text('Download failed: $e'),
+                            backgroundColor: Colors.redAccent,
+                          ),
                         );
                       }
                     },
@@ -1496,19 +2053,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ? Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.picture_as_pdf, color: Colors.redAccent, size: 100),
+                            const Icon(
+                              Icons.picture_as_pdf,
+                              color: Colors.redAccent,
+                              size: 100,
+                            ),
                             const SizedBox(height: 16),
-                            const Text('PDF Receipt Document Uploaded', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                            const Text(
+                              'PDF Receipt Document Uploaded',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                             const SizedBox(height: 12),
                             ElevatedButton.icon(
                               onPressed: () {
                                 try {
-                                  final rawBase64 = payment.receiptImage!.split(',').last;
+                                  final rawBase64 = payment.receiptImage!
+                                      .split(',')
+                                      .last;
                                   final bytes = base64Decode(rawBase64);
-                                  download_helper.downloadFile(bytes, 'receipt_${payment.id}.pdf');
+                                  download_helper.downloadFile(
+                                    bytes,
+                                    'receipt_${payment.id}.pdf',
+                                  );
                                 } catch (e) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Download failed: $e')),
+                                    SnackBar(
+                                      content: Text('Download failed: $e'),
+                                    ),
                                   );
                                 }
                               },
@@ -1548,7 +2123,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.grey[200]!),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : Colors.grey[200]!,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1576,16 +2153,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildStatMiniTile(String label, String value, IconData icon, Color color) {
+  Widget _buildStatMiniTile(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF0F172A) : Colors.white,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.grey[200]!),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : Colors.grey[200]!,
+        ),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.01), blurRadius: 4, offset: const Offset(0, 2)),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.01),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Row(
@@ -1601,9 +2189,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(label, style: const TextStyle(fontSize: 9, color: Colors.grey, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 9,
+                    color: Colors.grey,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 const SizedBox(height: 2),
-                Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.white : AppColors.secondaryBlue), maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : AppColors.secondaryBlue,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ),
@@ -1621,12 +2227,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           Text(
             label,
-            style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              color: Colors.grey,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             value,
-            style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white : AppColors.secondaryBlue, fontSize: 14),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : AppColors.secondaryBlue,
+              fontSize: 14,
+            ),
           ),
         ],
       ),
@@ -1674,13 +2288,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (_user == null) return;
     if (_idNumberController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter your National ID or Passport number.'), backgroundColor: Colors.redAccent),
+        const SnackBar(
+          content: Text('Please enter your National ID or Passport number.'),
+          backgroundColor: Colors.redAccent,
+        ),
       );
       return;
     }
     if (_idImageFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select/upload your ID card or Passport photo.'), backgroundColor: Colors.redAccent),
+        const SnackBar(
+          content: Text('Please select/upload your ID card or Passport photo.'),
+          backgroundColor: Colors.redAccent,
+        ),
       );
       return;
     }
@@ -1689,7 +2309,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final bytes = await _idImageFile!.readAsBytes();
       final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
-      
+
       await _databaseService.updateUser(_user!.id, {
         'idNumber': _idNumberController.text.trim().toUpperCase(),
         'idType': _selectedIdType,
@@ -1701,14 +2321,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('ID/Passport uploaded for verification successfully!'), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Text(
+              'ID/Passport uploaded for verification successfully!',
+            ),
+            backgroundColor: Colors.green,
+          ),
         );
       }
       _loadProfileData();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to upload ID/Passport: $e'), backgroundColor: Colors.redAccent),
+          SnackBar(
+            content: Text('Failed to upload ID/Passport: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
         );
       }
     } finally {
@@ -1722,19 +2350,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (_user == null) return;
     if (_licenseNumberController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter your Driving License number.'), backgroundColor: Colors.redAccent),
+        const SnackBar(
+          content: Text('Please enter your Driving License number.'),
+          backgroundColor: Colors.redAccent,
+        ),
       );
       return;
     }
     if (_licenseExpiryDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select your license expiry date.'), backgroundColor: Colors.redAccent),
+        const SnackBar(
+          content: Text('Please select your license expiry date.'),
+          backgroundColor: Colors.redAccent,
+        ),
       );
       return;
     }
     if (_licenseImageFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select/upload your driving license card photo.'), backgroundColor: Colors.redAccent),
+        const SnackBar(
+          content: Text(
+            'Please select/upload your driving license card photo.',
+          ),
+          backgroundColor: Colors.redAccent,
+        ),
       );
       return;
     }
@@ -1743,27 +2382,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final bytes = await _licenseImageFile!.readAsBytes();
       final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
-      
+
       await _databaseService.updateUser(_user!.id, {
         'licenseNumber': _licenseNumberController.text.trim().toUpperCase(),
         'licenseClass': _selectedLicenseClass,
-        'licenseExpiry': DateFormat('dd / MM / yyyy').format(_licenseExpiryDate!),
+        'licenseExpiry': DateFormat(
+          'dd / MM / yyyy',
+        ).format(_licenseExpiryDate!),
         'licenseImage': base64Image,
         'licenseStatus': 'pending',
-        'licenseUploadDate': DateFormat('dd / MM / yyyy').format(DateTime.now()),
+        'licenseUploadDate': DateFormat(
+          'dd / MM / yyyy',
+        ).format(DateTime.now()),
         'licenseRejectionReason': '',
       });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Driving License uploaded for verification successfully!'), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Text(
+              'Driving License uploaded for verification successfully!',
+            ),
+            backgroundColor: Colors.green,
+          ),
         );
       }
       _loadProfileData();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to upload driving license: $e'), backgroundColor: Colors.redAccent),
+          SnackBar(
+            content: Text('Failed to upload driving license: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
         );
       }
     } finally {
@@ -1805,92 +2456,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Widget _buildVerificationReminderCard(bool isDark) {
-    if (_user == null) return const SizedBox.shrink();
-    
-    final bool hasLicenseApproved = _user!.licenseStatus == 'approved';
-    final bool hasIdApproved = _user!.idStatus == 'approved';
-    
-    if (hasLicenseApproved && hasIdApproved) {
-      return const SizedBox.shrink();
-    }
-    
-    List<String> missing = [];
-    if (!hasIdApproved) missing.add('Passport or National ID');
-    if (!hasLicenseApproved) missing.add('Driving License');
-    
-    final missingText = missing.join(' and ');
-    
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 20),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFFFF8E1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? const Color(0xFF334155) : Colors.orangeAccent.withValues(alpha: 0.3),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            Icons.info_outline_rounded,
-            color: isDark ? AppColors.primaryOrange : Colors.orange[800],
-            size: 24,
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Identity Verification Recommended',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                    color: isDark ? Colors.white : Colors.orange[900],
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Verify your identity by uploading your $missingText to help us keep your account secure.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: isDark ? const Color(0xFFCBD5E1) : Colors.orange[800],
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryOrange,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  ),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Scroll down to Identity Verification section below to upload documents.'),
-                        backgroundColor: AppColors.primaryOrange,
-                      ),
-                    );
-                  },
-                  child: const Text(
-                    'Upload Documents',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildIdentityVerificationCard(bool isDark) {
     if (_user == null) return const SizedBox.shrink();
 
@@ -1910,18 +2475,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
           uploadWidget: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('ID Type', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
+              const Text(
+                'ID Type',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
               const SizedBox(height: 4),
               DropdownButtonFormField<String>(
                 initialValue: _selectedIdType,
                 decoration: InputDecoration(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
                 dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
                 items: const [
-                  DropdownMenuItem(value: 'National ID', child: Text('National ID / IC')),
-                  DropdownMenuItem(value: 'Passport', child: Text('International Passport')),
+                  DropdownMenuItem(
+                    value: 'National ID',
+                    child: Text('National ID / IC'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'Passport',
+                    child: Text('International Passport'),
+                  ),
                 ],
                 onChanged: (val) {
                   if (val != null) {
@@ -1930,7 +2513,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 },
               ),
               const SizedBox(height: 12),
-              const Text('Document Number', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
+              const Text(
+                'Document Number',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
               const SizedBox(height: 4),
               CustomTextField(
                 controller: _idNumberController,
@@ -1939,14 +2529,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 prefixIcon: Icons.badge_outlined,
               ),
               const SizedBox(height: 12),
-              const Text('Document Photo Card', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
+              const Text(
+                'Document Photo Card',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
               const SizedBox(height: 4),
               InkWell(
                 onTap: _pickIdImage,
                 child: Container(
                   height: 110,
                   decoration: BoxDecoration(
-                    border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
+                    border: Border.all(
+                      color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                    ),
                     borderRadius: BorderRadius.circular(12),
                     color: isDark ? const Color(0xFF1E293B) : Colors.grey[50],
                   ),
@@ -1955,17 +2554,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ? const Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.add_photo_alternate_outlined, size: 24, color: AppColors.primaryOrange),
+                            Icon(
+                              Icons.add_photo_alternate_outlined,
+                              size: 24,
+                              color: AppColors.primaryOrange,
+                            ),
                             SizedBox(height: 4),
-                            Text('Upload document photo', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                            Text(
+                              'Upload document photo',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey,
+                              ),
+                            ),
                           ],
                         )
                       : const Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.check_circle_outline, size: 28, color: Colors.green),
+                            Icon(
+                              Icons.check_circle_outline,
+                              size: 28,
+                              color: Colors.green,
+                            ),
                             SizedBox(height: 4),
-                            Text('Document Selected', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green)),
+                            Text(
+                              'Document Selected',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
+                              ),
+                            ),
                           ],
                         ),
                 ),
@@ -1975,17 +2595,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryOrange,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
                 onPressed: _uploadingId ? null : _submitIdVerification,
                 child: _uploadingId
-                    ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Text('Submit ID / Passport', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    ? const SizedBox(
+                        height: 16,
+                        width: 16,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Text(
+                        'Submit ID / Passport',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
               ),
             ],
           ),
         ),
-        
+
         const SizedBox(height: 24),
         const Divider(),
         const SizedBox(height: 16),
@@ -1999,7 +2634,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
           uploadWidget: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('License Number', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
+              const Text(
+                'License Number',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
               const SizedBox(height: 4),
               CustomTextField(
                 controller: _licenseNumberController,
@@ -2008,35 +2650,73 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 prefixIcon: Icons.card_membership_outlined,
               ),
               const SizedBox(height: 12),
-              const Text('License Classification Class', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
+              const Text(
+                'License Classification Class',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
               const SizedBox(height: 4),
               DropdownButtonFormField<String>(
-                initialValue: _selectedLicenseClass.contains('DA') ? 'Class DA (Automatic Car)' : 'Class D (Car)',
+                initialValue: _selectedLicenseClass.contains('DA')
+                    ? 'Class DA (Automatic Car)'
+                    : 'Class D (Car)',
                 decoration: InputDecoration(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
                 dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
                 items: const [
-                  DropdownMenuItem(value: 'Class D (Car)', child: Text('Class D (Car)')),
-                  DropdownMenuItem(value: 'Class DA (Automatic Car)', child: Text('Class DA (Automatic Car)')),
-                  DropdownMenuItem(value: 'Class B2 (Motorcycle)', child: Text('Class B2 (Motorcycle)')),
+                  DropdownMenuItem(
+                    value: 'Class D (Car)',
+                    child: Text('Class D (Car)'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'Class DA (Automatic Car)',
+                    child: Text('Class DA (Automatic Car)'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'Class B2 (Motorcycle)',
+                    child: Text('Class B2 (Motorcycle)'),
+                  ),
                 ],
                 onChanged: (val) {
                   if (val != null) {
-                    setState(() => _selectedLicenseClass = '${val.split(' ')[0]} ${val.split(' ')[1]}');
+                    setState(
+                      () => _selectedLicenseClass =
+                          '${val.split(' ')[0]} ${val.split(' ')[1]}',
+                    );
                   }
                 },
               ),
               const SizedBox(height: 12),
-              const Text('Expiry Date', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
+              const Text(
+                'Expiry Date',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
               const SizedBox(height: 4),
               InkWell(
                 onTap: _selectLicenseExpiryDate,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
-                    border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
+                    border: Border.all(
+                      color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                    ),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -2045,26 +2725,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Text(
                         _licenseExpiryDate == null
                             ? 'Select Expiry Date'
-                            : DateFormat('dd / MM / yyyy').format(_licenseExpiryDate!),
+                            : DateFormat(
+                                'dd / MM / yyyy',
+                              ).format(_licenseExpiryDate!),
                         style: TextStyle(
                           fontSize: 13,
-                          color: _licenseExpiryDate == null ? Colors.grey : (isDark ? Colors.white : Colors.black),
+                          color: _licenseExpiryDate == null
+                              ? Colors.grey
+                              : (isDark ? Colors.white : Colors.black),
                         ),
                       ),
-                      const Icon(Icons.calendar_today, size: 14, color: AppColors.primaryOrange),
+                      const Icon(
+                        Icons.calendar_today,
+                        size: 14,
+                        color: AppColors.primaryOrange,
+                      ),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 12),
-              const Text('License Card Photo', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
+              const Text(
+                'License Card Photo',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
               const SizedBox(height: 4),
               InkWell(
                 onTap: _pickLicenseImage,
                 child: Container(
                   height: 110,
                   decoration: BoxDecoration(
-                    border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
+                    border: Border.all(
+                      color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                    ),
                     borderRadius: BorderRadius.circular(12),
                     color: isDark ? const Color(0xFF1E293B) : Colors.grey[50],
                   ),
@@ -2073,17 +2770,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ? const Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.add_photo_alternate_outlined, size: 24, color: AppColors.primaryOrange),
+                            Icon(
+                              Icons.add_photo_alternate_outlined,
+                              size: 24,
+                              color: AppColors.primaryOrange,
+                            ),
                             SizedBox(height: 4),
-                            Text('Upload license photo', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                            Text(
+                              'Upload license photo',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey,
+                              ),
+                            ),
                           ],
                         )
                       : const Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.check_circle_outline, size: 28, color: Colors.green),
+                            Icon(
+                              Icons.check_circle_outline,
+                              size: 28,
+                              color: Colors.green,
+                            ),
                             SizedBox(height: 4),
-                            Text('Card Photo Selected', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green)),
+                            Text(
+                              'Card Photo Selected',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
+                              ),
+                            ),
                           ],
                         ),
                 ),
@@ -2093,12 +2811,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryOrange,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
-                onPressed: _uploadingLicense ? null : _submitLicenseVerification,
+                onPressed: _uploadingLicense
+                    ? null
+                    : _submitLicenseVerification,
                 child: _uploadingLicense
-                    ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Text('Submit Driving License', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    ? const SizedBox(
+                        height: 16,
+                        width: 16,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Text(
+                        'Submit Driving License',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
               ),
             ],
           ),
@@ -2150,7 +2885,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               child: Text(
                 statusText,
-                style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: statusColor,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],

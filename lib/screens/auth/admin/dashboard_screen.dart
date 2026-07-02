@@ -115,23 +115,28 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
-  void _playTone(web.AudioContext ctx, double frequency, double duration, double delay) {
+  void _playTone(
+    web.AudioContext ctx,
+    double frequency,
+    double duration,
+    double delay,
+  ) {
     try {
       final osc = ctx.createOscillator();
       final gainNode = ctx.createGain();
-      
+
       osc.connect(gainNode);
       gainNode.connect(ctx.destination);
-      
+
       osc.frequency.value = frequency;
       osc.type = 'sine';
-      
+
       final startTime = ctx.currentTime + delay;
       final endTime = startTime + duration;
-      
+
       gainNode.gain.setValueAtTime(0.1, startTime);
       gainNode.gain.exponentialRampToValueAtTime(0.001, endTime);
-      
+
       osc.start(startTime);
       osc.stop(endTime);
     } catch (e) {
@@ -144,52 +149,63 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (currentUser != null) {
       _adminNotificationsSubscription?.cancel();
       _adminNotificationsSubscription = _notificationService
-          .getNotificationsStream(currentUser.uid, limit: _adminNotificationsLimit)
+          .getNotificationsStream(
+            currentUser.uid,
+            limit: _adminNotificationsLimit,
+          )
           .listen((notifs) {
-        if (mounted) {
-          if (!_notificationsInitialized) {
-            // First load: populate already played IDs so we do not alarm for old notifications
-            for (var notif in notifs) {
-              _playedNotificationIds.add(notif.id);
-            }
-            _notificationsInitialized = true;
-          } else {
-            // Subsequent loads: play sound for newly arrived unread notifications
-            for (var notif in notifs) {
-              if (!notif.isRead && !_playedNotificationIds.contains(notif.id)) {
-                _playedNotificationIds.add(notif.id);
-                _playNotificationSound();
+            if (mounted) {
+              if (!_notificationsInitialized) {
+                // First load: populate already played IDs so we do not alarm for old notifications
+                for (var notif in notifs) {
+                  _playedNotificationIds.add(notif.id);
+                }
+                _notificationsInitialized = true;
+              } else {
+                // Subsequent loads: play sound for newly arrived unread notifications
+                for (var notif in notifs) {
+                  if (!notif.isRead &&
+                      !_playedNotificationIds.contains(notif.id)) {
+                    _playedNotificationIds.add(notif.id);
+                    _playNotificationSound();
+                  }
+                }
               }
+              setState(() {
+                _adminNotifications = notifs;
+              });
             }
-          }
-          setState(() {
-            _adminNotifications = notifs;
           });
-        }
-      });
     }
   }
 
   void _subscribeTracking() {
     _trackingSubscription?.cancel();
-    _trackingSubscription = FirebaseDatabase.instance.ref().child('tracking').onValue.listen((event) {
-      if (mounted && event.snapshot.exists && event.snapshot.value != null) {
-        try {
-          final Map<dynamic, dynamic> data = event.snapshot.value as Map<dynamic, dynamic>;
-          final Map<String, Map<String, dynamic>> parsed = {};
-          data.forEach((key, value) {
-            if (value is Map) {
-              parsed[key.toString()] = Map<String, dynamic>.from(value);
+    _trackingSubscription = FirebaseDatabase.instance
+        .ref()
+        .child('tracking')
+        .onValue
+        .listen((event) {
+          if (mounted &&
+              event.snapshot.exists &&
+              event.snapshot.value != null) {
+            try {
+              final Map<dynamic, dynamic> data =
+                  event.snapshot.value as Map<dynamic, dynamic>;
+              final Map<String, Map<String, dynamic>> parsed = {};
+              data.forEach((key, value) {
+                if (value is Map) {
+                  parsed[key.toString()] = Map<String, dynamic>.from(value);
+                }
+              });
+              setState(() {
+                _liveLocations = parsed;
+              });
+            } catch (e) {
+              debugPrint('Error parsing real-time tracking node: $e');
             }
-          });
-          setState(() {
-            _liveLocations = parsed;
-          });
-        } catch (e) {
-          debugPrint('Error parsing real-time tracking node: $e');
-        }
-      }
-    });
+          }
+        });
   }
 
   StreamSubscription<List<BookingModel>>? _bookingsSubscription;
@@ -208,18 +224,33 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   void _subscribeToLiveData() {
     _bookingsSubscription?.cancel();
-    _bookingsSubscription = _bookingService.getBookingsStream().listen((bookingsList) {
+    _bookingsSubscription = _bookingService.getBookingsStream().listen((
+      bookingsList,
+    ) {
       if (mounted) {
         setState(() {
           _bookings = bookingsList;
           _bookings.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          _activeBookingsCount = _bookings.where((b) => b.status == 'pending' || b.status == 'approved' || b.status == 'ongoing' || b.status == 'Confirmed' || b.status == 'active').length;
-          
+          _activeBookingsCount = _bookings
+              .where(
+                (b) =>
+                    b.status == 'pending' ||
+                    b.status == 'approved' ||
+                    b.status == 'ongoing' ||
+                    b.status == 'Confirmed' ||
+                    b.status == 'active',
+              )
+              .length;
+
           for (var booking in _bookings) {
             final bStat = booking.status.toLowerCase();
-            if (bStat == 'ongoing' || bStat == 'approved' || bStat == 'confirmed' || bStat == 'active') {
+            if (bStat == 'ongoing' ||
+                bStat == 'approved' ||
+                bStat == 'confirmed' ||
+                bStat == 'active') {
               if (!_simulators.containsKey(booking.vehicleId)) {
-                _simulators[booking.vehicleId] = _trackingService.startRouteSimulation(booking.vehicleId);
+                _simulators[booking.vehicleId] = _trackingService
+                    .startRouteSimulation(booking.vehicleId);
               }
             }
           }
@@ -228,29 +259,42 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     });
 
     _vehiclesSubscription?.cancel();
-    _vehiclesSubscription = _vehicleService.getVehiclesStream().listen((vehiclesList) {
+    _vehiclesSubscription = _vehicleService.getVehiclesStream().listen((
+      vehiclesList,
+    ) {
       if (mounted) {
         setState(() {
           _vehicles = vehiclesList;
           _totalCars = _vehicles.length;
-          _availableCars = _vehicles.where((v) => v.status.toLowerCase() == 'available').length;
+          _availableCars = _vehicles
+              .where((v) => v.status.toLowerCase() == 'available')
+              .length;
         });
       }
     });
 
     _paymentsSubscription?.cancel();
-    _paymentsSubscription = _paymentService.getPaymentsStream().listen((paymentsList) {
+    _paymentsSubscription = _paymentService.getPaymentsStream().listen((
+      paymentsList,
+    ) {
       if (mounted) {
         setState(() {
           _payments = paymentsList;
-          _pendingPaymentsCount = _payments.where((p) => p.status == 'pending' || p.status == 'Pending Verification').length;
+          _pendingPaymentsCount = _payments
+              .where(
+                (p) =>
+                    p.status == 'pending' || p.status == 'Pending Verification',
+              )
+              .length;
 
           double monthlyRev = 0.0;
           final now = DateTime.now();
           for (var payment in _payments) {
             final status = payment.status.toLowerCase();
             final pStatus = (payment.paymentStatus ?? '').toLowerCase();
-            if (status == 'approved' || status == 'paid' || pStatus == 'approved') {
+            if (status == 'approved' ||
+                status == 'paid' ||
+                pStatus == 'approved') {
               final pDate = payment.paymentDate;
               if (pDate.year == now.year && pDate.month == now.month) {
                 monthlyRev += payment.amount;
@@ -285,7 +329,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     super.dispose();
   }
 
-
   Future<void> _loadDashboardData() async {
     if (!mounted) return;
     setState(() {
@@ -315,15 +358,25 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
       _totalCustomers = _users.where((u) => u.role == 'customer').length;
       _totalCars = _vehicles.length;
-      _availableCars = _vehicles.where((v) => v.status.toLowerCase() == 'available').length;
+      _availableCars = _vehicles
+          .where((v) => v.status.toLowerCase() == 'available')
+          .length;
 
-      _activeBookingsCount = _bookings.where((b) => b.status == 'pending' || b.status == 'approved' || b.status == 'ongoing').length;
+      _activeBookingsCount = _bookings
+          .where(
+            (b) =>
+                b.status == 'pending' ||
+                b.status == 'approved' ||
+                b.status == 'ongoing',
+          )
+          .length;
 
       // Automatically trigger mock hardware simulator for active bookings
       for (var booking in _bookings) {
         if (booking.status == 'ongoing' || booking.status == 'approved') {
           if (!_simulators.containsKey(booking.vehicleId)) {
-            _simulators[booking.vehicleId] = _trackingService.startRouteSimulation(booking.vehicleId);
+            _simulators[booking.vehicleId] = _trackingService
+                .startRouteSimulation(booking.vehicleId);
           }
         }
       }
@@ -343,7 +396,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       }
       _monthlyRevenue = monthlyRev;
 
-      _pendingPaymentsCount = _payments.where((p) => p.status == 'pending' || p.status == 'Pending Verification').length;
+      _pendingPaymentsCount = _payments
+          .where(
+            (p) => p.status == 'pending' || p.status == 'Pending Verification',
+          )
+          .length;
     } catch (e) {
       debugPrint('Dashboard loading error: $e');
       setState(() {
@@ -365,22 +422,34 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       if (job.status == 'Scheduled') {
         try {
           final startDate = DateTime.parse(job.startDate);
-          final parsedStart = DateTime(startDate.year, startDate.month, startDate.day);
+          final parsedStart = DateTime(
+            startDate.year,
+            startDate.month,
+            startDate.day,
+          );
 
-          if (parsedStart.isBefore(parsedToday) || parsedStart.isAtSameMomentAs(parsedToday)) {
+          if (parsedStart.isBefore(parsedToday) ||
+              parsedStart.isAtSameMomentAs(parsedToday)) {
             // Check if alert already exists in database (to prevent duplication)
             final ref = FirebaseDatabase.instance.ref().child('notifications');
-            final snapshot = await ref.orderByChild('relatedId').equalTo(job.id).get().timeout(const Duration(seconds: 5));
+            final snapshot = await ref
+                .orderByChild('relatedId')
+                .equalTo(job.id)
+                .get()
+                .timeout(const Duration(seconds: 5));
             bool alreadyAlerted = false;
             if (snapshot.exists && snapshot.value != null) {
               final data = snapshot.value as Map;
-              alreadyAlerted = data.values.any((n) => (n as Map)['type'] == 'maintenance');
+              alreadyAlerted = data.values.any(
+                (n) => (n as Map)['type'] == 'maintenance',
+              );
             }
 
             if (!alreadyAlerted) {
               await _notificationService.notifyAllAdmins(
                 title: 'Vehicle Maintenance Due',
-                message: 'Maintenance is due today for ${job.vehicleName}.\nJob: ${job.title}',
+                message:
+                    'Maintenance is due today for ${job.vehicleName}.\nJob: ${job.title}',
                 type: 'maintenance',
                 icon: '🔧',
                 color: '0xFFEF4444',
@@ -396,7 +465,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     final double width = MediaQuery.of(context).size.width;
@@ -411,21 +479,38 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           if (isDesktop) _buildSidebar(context),
           Expanded(
             child: _loading
-                ? const Center(child: LoadingWidget(message: 'Syncing dashboard with Firebase...'))
+                ? const Center(
+                    child: LoadingWidget(
+                      message: 'Syncing dashboard with Firebase...',
+                    ),
+                  )
                 : _error != null
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.error_outline, size: 64, color: Colors.redAccent),
-                            const SizedBox(height: 16),
-                            Text(_error!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                            const SizedBox(height: 16),
-                            ElevatedButton(onPressed: _loadDashboardData, child: const Text('Retry')),
-                          ],
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.error_outline,
+                          size: 64,
+                          color: Colors.redAccent,
                         ),
-                      )
-                    : _buildActiveBody(isDesktop),
+                        const SizedBox(height: 16),
+                        Text(
+                          _error!,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _loadDashboardData,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  )
+                : _buildActiveBody(isDesktop),
           ),
         ],
       ),
@@ -514,12 +599,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               if (relatedId != null && relatedId.isNotEmpty) {
                 if (route == 'Bookings') {
                   try {
-                    final booking = _bookings.firstWhere((b) => b.id == relatedId);
+                    final booking = _bookings.firstWhere(
+                      (b) => b.id == relatedId,
+                    );
                     _showBookingDetailsDialog(booking);
                   } catch (_) {}
                 } else if (route == 'Payments') {
                   try {
-                    final payment = _payments.firstWhere((p) => p.id == relatedId);
+                    final payment = _payments.firstWhere(
+                      (p) => p.id == relatedId,
+                    );
                     _showPaymentDetailsDialog(payment);
                   } catch (_) {}
                 }
@@ -529,26 +618,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         );
         break;
       default:
-        tabContent = const Expanded(
-          child: Center(
-            child: Text('Unknown Tab'),
-          ),
-        );
+        tabContent = const Expanded(child: Center(child: Text('Unknown Tab')));
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _buildHeader(isDesktop),
-        tabContent,
-      ],
+      children: [_buildHeader(isDesktop), tabContent],
     );
   }
 
   Widget _buildSidebar(BuildContext context) {
     return Container(
       width: 250,
-      color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF172033) : AppColors.secondaryBlue,
+      color: Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFF172033)
+          : AppColors.secondaryBlue,
       child: Column(
         children: [
           Container(
@@ -560,7 +644,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 const SizedBox(width: 8),
                 Text(
                   context.watch<CompanySettingsProvider>().companyName,
-                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 1.5),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.5,
+                  ),
                 ),
               ],
             ),
@@ -570,21 +659,81 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             child: ListView(
               padding: const EdgeInsets.symmetric(vertical: 12),
               children: [
-                _buildSidebarTile(Icons.dashboard_outlined, 'Dashboard', () => setState(() => _activeTab = 'Dashboard')),
-                _buildSidebarTile(Icons.directions_car_filled_outlined, 'Cars', () => setState(() => _activeTab = 'Cars')),
-                _buildSidebarTile(Icons.calendar_today_outlined, 'Bookings', () => setState(() => _activeTab = 'Bookings')),
-                _buildSidebarTile(Icons.people_outline_rounded, 'Customers', () => setState(() => _activeTab = 'Customers')),
-                _buildSidebarTile(Icons.payment_outlined, 'Payments', () => setState(() => _activeTab = 'Payments')),
-                _buildSidebarTile(Icons.stars_rounded, 'Reward Points', () => setState(() => _activeTab = 'Reward Points')),
-                _buildSidebarTile(Icons.map_outlined, 'Vehicle Tracking', () => setState(() => _activeTab = 'Vehicle Tracking')),
-                _buildSidebarTile(Icons.build_outlined, 'Vehicle Maintenance', () => setState(() => _activeTab = 'Vehicle Maintenance')),
-                _buildSidebarTile(Icons.storefront_outlined, 'Locations', () => setState(() => _activeTab = 'Locations')),
-                _buildSidebarTile(Icons.assessment_outlined, 'Reports', () => setState(() => _activeTab = 'Reports')),
-                _buildSidebarTile(Icons.notifications_none_outlined, 'Notifications', () => setState(() => _activeTab = 'Notifications')),
-                _buildSidebarTile(Icons.mail_outline_rounded, 'Support Inbox', () => setState(() => _activeTab = 'Support Inbox')),
-                _buildSidebarTile(Icons.qr_code_2, 'QR Payment Settings', () => setState(() => _activeTab = 'QR Payment Settings')),
-                _buildSidebarTile(Icons.settings_outlined, 'Company Settings', () => setState(() => _activeTab = 'Company Settings')),
-                _buildSidebarTile(Icons.person_outline, 'Admin Profile', () => setState(() => _activeTab = 'Admin Profile')),
+                _buildSidebarTile(
+                  Icons.dashboard_outlined,
+                  'Dashboard',
+                  () => setState(() => _activeTab = 'Dashboard'),
+                ),
+                _buildSidebarTile(
+                  Icons.directions_car_filled_outlined,
+                  'Cars',
+                  () => setState(() => _activeTab = 'Cars'),
+                ),
+                _buildSidebarTile(
+                  Icons.calendar_today_outlined,
+                  'Bookings',
+                  () => setState(() => _activeTab = 'Bookings'),
+                ),
+                _buildSidebarTile(
+                  Icons.people_outline_rounded,
+                  'Customers',
+                  () => setState(() => _activeTab = 'Customers'),
+                ),
+                _buildSidebarTile(
+                  Icons.payment_outlined,
+                  'Payments',
+                  () => setState(() => _activeTab = 'Payments'),
+                ),
+                _buildSidebarTile(
+                  Icons.stars_rounded,
+                  'Reward Points',
+                  () => setState(() => _activeTab = 'Reward Points'),
+                ),
+                _buildSidebarTile(
+                  Icons.map_outlined,
+                  'Vehicle Tracking',
+                  () => setState(() => _activeTab = 'Vehicle Tracking'),
+                ),
+                _buildSidebarTile(
+                  Icons.build_outlined,
+                  'Vehicle Maintenance',
+                  () => setState(() => _activeTab = 'Vehicle Maintenance'),
+                ),
+                _buildSidebarTile(
+                  Icons.storefront_outlined,
+                  'Locations',
+                  () => setState(() => _activeTab = 'Locations'),
+                ),
+                _buildSidebarTile(
+                  Icons.assessment_outlined,
+                  'Reports',
+                  () => setState(() => _activeTab = 'Reports'),
+                ),
+                _buildSidebarTile(
+                  Icons.notifications_none_outlined,
+                  'Notifications',
+                  () => setState(() => _activeTab = 'Notifications'),
+                ),
+                _buildSidebarTile(
+                  Icons.mail_outline_rounded,
+                  'Support Inbox',
+                  () => setState(() => _activeTab = 'Support Inbox'),
+                ),
+                _buildSidebarTile(
+                  Icons.qr_code_2,
+                  'QR Payment Settings',
+                  () => setState(() => _activeTab = 'QR Payment Settings'),
+                ),
+                _buildSidebarTile(
+                  Icons.settings_outlined,
+                  'Company Settings',
+                  () => setState(() => _activeTab = 'Company Settings'),
+                ),
+                _buildSidebarTile(
+                  Icons.person_outline,
+                  'Admin Profile',
+                  () => setState(() => _activeTab = 'Admin Profile'),
+                ),
               ],
             ),
           ),
@@ -593,7 +742,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             final nav = Navigator.of(context);
             await _authService.logout();
             nav.pushAndRemoveUntil(
-              MaterialPageRoute(builder: (context) => const LoginScreen()),
+              MaterialPageRoute(
+                builder: (context) => LoginScreen(onLoggedIn: () {}),
+              ),
               (route) => false,
             );
           }),
@@ -621,7 +772,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         ),
         child: Row(
           children: [
-            Icon(icon, color: isActive ? Colors.white : Colors.white70, size: 20),
+            Icon(
+              icon,
+              color: isActive ? Colors.white : Colors.white70,
+              size: 20,
+            ),
             const SizedBox(width: 16),
             Text(
               title,
@@ -636,8 +791,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
     );
   }
-
-
 
   String _getRelativeTimeString(DateTime dateTime) {
     final now = DateTime.now();
@@ -661,7 +814,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   Widget _buildHeader(bool isDesktop) {
     final unreadCount = _adminNotifications.where((n) => !n.isRead).length;
-    final String formattedDate = DateFormat('dd MMM yyyy').format(DateTime.now());
+    final String formattedDate = DateFormat(
+      'dd MMM yyyy',
+    ).format(DateTime.now());
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
@@ -675,7 +830,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               children: [
                 if (!isDesktop) ...[
                   IconButton(
-                    icon: Icon(Icons.menu, color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue),
+                    icon: Icon(
+                      Icons.menu,
+                      color: isDark
+                          ? const Color(0xFFF8FAFC)
+                          : AppColors.secondaryBlue,
+                    ),
                     onPressed: () => _scaffoldKey.currentState?.openDrawer(),
                   ),
                   const SizedBox(width: 8),
@@ -686,11 +846,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        _activeTab == 'Dashboard' ? 'Dashboard Overview' : _activeTab,
+                        _activeTab == 'Dashboard'
+                            ? 'Dashboard Overview'
+                            : _activeTab,
                         style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.w900,
-                          color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
+                          color: isDark
+                              ? const Color(0xFFF8FAFC)
+                              : AppColors.secondaryBlue,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -719,24 +883,37 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               // Date Indicator
               if (isDesktop) ...[
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: isDark ? const Color(0xFF1E293B) : Colors.grey[100],
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: isDark ? const Color(0xFF334155) : Colors.grey[200]!,
+                      color: isDark
+                          ? const Color(0xFF334155)
+                          : Colors.grey[200]!,
                     ),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.calendar_today, size: 14, color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue),
+                      Icon(
+                        Icons.calendar_today,
+                        size: 14,
+                        color: isDark
+                            ? const Color(0xFFF8FAFC)
+                            : AppColors.secondaryBlue,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         formattedDate,
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
+                          color: isDark
+                              ? const Color(0xFFF8FAFC)
+                              : AppColors.secondaryBlue,
                         ),
                       ),
                     ],
@@ -744,10 +921,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 ),
                 const SizedBox(width: 16),
               ],
- 
+
               // Refresh Button
               IconButton(
-                icon: Icon(Icons.refresh, color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue),
+                icon: Icon(
+                  Icons.refresh,
+                  color: isDark
+                      ? const Color(0xFFF8FAFC)
+                      : AppColors.secondaryBlue,
+                ),
                 onPressed: _loadDashboardData,
                 tooltip: 'Refresh Data',
               ),
@@ -756,13 +938,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               // Notifications Bell
               PopupMenuButton<void>(
                 offset: const Offset(0, 48),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 tooltip: 'Notifications Dropdown',
                 padding: EdgeInsets.zero,
                 itemBuilder: (context) {
                   final currentUser = _authService.currentUser;
                   final recentNotifs = _adminNotifications.take(10).toList();
-                  final dropdownUnread = _adminNotifications.where((n) => !n.isRead).length;
+                  final dropdownUnread = _adminNotifications
+                      .where((n) => !n.isRead)
+                      .length;
 
                   return [
                     PopupMenuItem<void>(
@@ -779,26 +965,32 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             Padding(
                               padding: const EdgeInsets.all(16),
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     'Notifications ($dropdownUnread)',
                                     style: TextStyle(
                                       fontWeight: FontWeight.w900,
                                       fontSize: 15,
-                                      color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
+                                      color: isDark
+                                          ? const Color(0xFFF8FAFC)
+                                          : AppColors.secondaryBlue,
                                     ),
                                   ),
-                                  if (currentUser != null && _adminNotifications.any((n) => !n.isRead))
+                                  if (currentUser != null &&
+                                      _adminNotifications.any((n) => !n.isRead))
                                     TextButton(
                                       onPressed: () async {
                                         Navigator.pop(context);
-                                        await _notificationService.markAllAsRead(currentUser.uid);
+                                        await _notificationService
+                                            .markAllAsRead(currentUser.uid);
                                       },
                                       style: TextButton.styleFrom(
                                         padding: EdgeInsets.zero,
                                         minimumSize: Size.zero,
-                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
                                       ),
                                       child: const Text(
                                         'Mark All Read',
@@ -812,40 +1004,73 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 ],
                               ),
                             ),
-                            Divider(height: 1, color: isDark ? const Color(0xFF334155) : Colors.grey[200]!),
+                            Divider(
+                              height: 1,
+                              color: isDark
+                                  ? const Color(0xFF334155)
+                                  : Colors.grey[200]!,
+                            ),
                             // List of 10 items
                             if (recentNotifs.isEmpty)
                               Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 32),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 32,
+                                ),
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.notifications_none_rounded, size: 40, color: isDark ? const Color(0xFF334155) : Colors.grey[300]),
+                                    Icon(
+                                      Icons.notifications_none_rounded,
+                                      size: 40,
+                                      color: isDark
+                                          ? const Color(0xFF334155)
+                                          : Colors.grey[300],
+                                    ),
                                     const SizedBox(height: 12),
                                     Text(
                                       'No notifications yet',
-                                      style: TextStyle(color: isDark ? const Color(0xFFCBD5E1) : Colors.grey[500], fontSize: 12, fontWeight: FontWeight.bold),
+                                      style: TextStyle(
+                                        color: isDark
+                                            ? const Color(0xFFCBD5E1)
+                                            : Colors.grey[500],
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ],
                                 ),
                               )
                             else
                               ConstrainedBox(
-                                constraints: const BoxConstraints(maxHeight: 350),
+                                constraints: const BoxConstraints(
+                                  maxHeight: 350,
+                                ),
                                 child: ListView.separated(
                                   shrinkWrap: true,
                                   physics: const ClampingScrollPhysics(),
                                   itemCount: recentNotifs.length,
-                                  separatorBuilder: (context, index) => Divider(height: 1, color: isDark ? const Color(0xFF334155) : Colors.grey[200]!),
+                                  separatorBuilder: (context, index) => Divider(
+                                    height: 1,
+                                    color: isDark
+                                        ? const Color(0xFF334155)
+                                        : Colors.grey[200]!,
+                                  ),
                                   itemBuilder: (context, index) {
                                     final notif = recentNotifs[index];
-                                    final parsedColor = Color(int.parse(notif.color));
+                                    final parsedColor = Color(
+                                      int.parse(notif.color),
+                                    );
 
                                     return InkWell(
                                       onTap: () async {
-                                        Navigator.pop(context); // Close dropdown
+                                        Navigator.pop(
+                                          context,
+                                        ); // Close dropdown
                                         if (!notif.isRead) {
-                                          await _notificationService.markAsRead(notif.userId, notif.id);
+                                          await _notificationService.markAsRead(
+                                            notif.userId,
+                                            notif.id,
+                                          );
                                         }
                                         if (notif.actionRoute.isNotEmpty) {
                                           setState(() {
@@ -853,59 +1078,123 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                           });
                                           // Open direct details if applicable
                                           if (notif.relatedId.isNotEmpty) {
-                                            if (notif.actionRoute == 'Bookings') {
+                                            if (notif.actionRoute ==
+                                                'Bookings') {
                                               try {
-                                                final booking = _bookings.firstWhere((b) => b.id == notif.relatedId);
-                                                _showBookingDetailsDialog(booking);
+                                                final booking = _bookings
+                                                    .firstWhere(
+                                                      (b) =>
+                                                          b.id ==
+                                                          notif.relatedId,
+                                                    );
+                                                _showBookingDetailsDialog(
+                                                  booking,
+                                                );
                                               } catch (_) {}
-                                            } else if (notif.actionRoute == 'Payments') {
+                                            } else if (notif.actionRoute ==
+                                                'Payments') {
                                               try {
-                                                final payment = _payments.firstWhere((p) => p.id == notif.relatedId);
-                                                _showPaymentDetailsDialog(payment);
+                                                final payment = _payments
+                                                    .firstWhere(
+                                                      (p) =>
+                                                          p.id ==
+                                                          notif.relatedId,
+                                                    );
+                                                _showPaymentDetailsDialog(
+                                                  payment,
+                                                );
                                               } catch (_) {}
                                             }
                                           }
                                         }
                                       },
                                       child: Container(
-                                        color: notif.isRead ? Colors.transparent : (isDark ? const Color(0xFF2D251E) : const Color(0xFFFFF7ED)),
-                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                        color: notif.isRead
+                                            ? Colors.transparent
+                                            : (isDark
+                                                  ? const Color(0xFF2D251E)
+                                                  : const Color(0xFFFFF7ED)),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 12,
+                                        ),
                                         child: Row(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             CircleAvatar(
                                               radius: 16,
-                                              backgroundColor: parsedColor.withValues(alpha: isDark ? 0.2 : 0.1),
-                                              child: Text(notif.icon, style: const TextStyle(fontSize: 14)),
+                                              backgroundColor: parsedColor
+                                                  .withValues(
+                                                    alpha: isDark ? 0.2 : 0.1,
+                                                  ),
+                                              child: Text(
+                                                notif.icon,
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                ),
+                                              ),
                                             ),
                                             const SizedBox(width: 12),
                                             Expanded(
                                               child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
                                                 children: [
                                                   Text(
                                                     notif.title,
                                                     style: TextStyle(
-                                                      fontWeight: notif.isRead ? FontWeight.bold : FontWeight.w900,
+                                                      fontWeight: notif.isRead
+                                                          ? FontWeight.bold
+                                                          : FontWeight.w900,
                                                       fontSize: 12,
-                                                      color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
+                                                      color: isDark
+                                                          ? const Color(
+                                                              0xFFF8FAFC,
+                                                            )
+                                                          : AppColors
+                                                                .secondaryBlue,
                                                     ),
                                                   ),
                                                   const SizedBox(height: 4),
                                                   Text(
                                                     notif.message,
                                                     maxLines: 2,
-                                                    overflow: TextOverflow.ellipsis,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
                                                     style: TextStyle(
                                                       fontSize: 10,
                                                       height: 1.3,
-                                                      color: notif.isRead ? (isDark ? const Color(0xFFCBD5E1) : Colors.grey[600]) : (isDark ? const Color(0xFFF8FAFC) : Colors.grey[800]),
+                                                      color: notif.isRead
+                                                          ? (isDark
+                                                                ? const Color(
+                                                                    0xFFCBD5E1,
+                                                                  )
+                                                                : Colors
+                                                                      .grey[600])
+                                                          : (isDark
+                                                                ? const Color(
+                                                                    0xFFF8FAFC,
+                                                                  )
+                                                                : Colors
+                                                                      .grey[800]),
                                                     ),
                                                   ),
                                                   const SizedBox(height: 6),
                                                   Text(
-                                                    _getRelativeTimeString(notif.createdAt),
-                                                    style: TextStyle(fontSize: 8, color: isDark ? const Color(0xFFCBD5E1) : Colors.grey, fontWeight: FontWeight.w500),
+                                                    _getRelativeTimeString(
+                                                      notif.createdAt,
+                                                    ),
+                                                    style: TextStyle(
+                                                      fontSize: 8,
+                                                      color: isDark
+                                                          ? const Color(
+                                                              0xFFCBD5E1,
+                                                            )
+                                                          : Colors.grey,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                    ),
                                                   ),
                                                 ],
                                               ),
@@ -914,9 +1203,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                               Container(
                                                 width: 6,
                                                 height: 6,
-                                                margin: const EdgeInsets.only(top: 4, left: 4),
+                                                margin: const EdgeInsets.only(
+                                                  top: 4,
+                                                  left: 4,
+                                                ),
                                                 decoration: const BoxDecoration(
-                                                  color: AppColors.primaryOrange,
+                                                  color:
+                                                      AppColors.primaryOrange,
                                                   shape: BoxShape.circle,
                                                 ),
                                               ),
@@ -927,7 +1220,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   },
                                 ),
                               ),
-                            Divider(height: 1, color: isDark ? const Color(0xFF334155) : Colors.grey[200]!),
+                            Divider(
+                              height: 1,
+                              color: isDark
+                                  ? const Color(0xFF334155)
+                                  : Colors.grey[200]!,
+                            ),
                             // Footer Button
                             InkWell(
                               onTap: () {
@@ -937,13 +1235,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 });
                               },
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
                                 alignment: Alignment.center,
-                                color: isDark ? const Color(0xFF0F172A) : Colors.grey[50],
+                                color: isDark
+                                    ? const Color(0xFF0F172A)
+                                    : Colors.grey[50],
                                 child: Text(
                                   'View All Notifications',
                                   style: TextStyle(
-                                    color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
+                                    color: isDark
+                                        ? const Color(0xFFF8FAFC)
+                                        : AppColors.secondaryBlue,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 12,
                                   ),
@@ -965,7 +1269,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      Icon(Icons.notifications_outlined, color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue, size: 24),
+                      Icon(
+                        Icons.notifications_outlined,
+                        color: isDark
+                            ? const Color(0xFFF8FAFC)
+                            : AppColors.secondaryBlue,
+                        size: 24,
+                      ),
                       if (unreadCount > 0)
                         Positioned(
                           right: -2,
@@ -1000,7 +1310,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               // Admin Dropdown menu profile trigger
               PopupMenuButton<String>(
                 offset: const Offset(0, 48),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 tooltip: 'Admin Settings',
                 onSelected: (val) {
                   if (val == 'profile') {
@@ -1022,11 +1334,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           children: [
                             Text(
                               _adminUser?.fullName ?? 'Admin User',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
                             ),
                             Text(
                               _adminUser?.email ?? 'admin@gmail.com',
-                              style: const TextStyle(fontSize: 10, color: Colors.grey),
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey,
+                              ),
                             ),
                           ],
                         ),
@@ -1050,7 +1368,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       children: [
                         Icon(Icons.logout, size: 18, color: Colors.redAccent),
                         SizedBox(width: 12),
-                        Text('Logout', style: TextStyle(color: Colors.redAccent, fontSize: 13)),
+                        Text(
+                          'Logout',
+                          style: TextStyle(
+                            color: Colors.redAccent,
+                            fontSize: 13,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -1059,10 +1383,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   children: [
                     CircleAvatar(
                       radius: 18,
-                      backgroundColor: AppColors.secondaryBlue.withValues(alpha: 0.1),
-                      backgroundImage: getAppImageProvider(_adminUser?.profileImage),
+                      backgroundColor: AppColors.secondaryBlue.withValues(
+                        alpha: 0.1,
+                      ),
+                      backgroundImage: getAppImageProvider(
+                        _adminUser?.profileImage,
+                      ),
                       child: _adminUser?.profileImage.isNotEmpty != true
-                          ? const Icon(Icons.person, size: 18, color: AppColors.secondaryBlue)
+                          ? const Icon(
+                              Icons.person,
+                              size: 18,
+                              color: AppColors.secondaryBlue,
+                            )
                           : null,
                     ),
                     const SizedBox(width: 8),
@@ -1073,7 +1405,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         children: [
                           Text(
                             _adminUser?.fullName ?? 'Admin',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.secondaryBlue),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: AppColors.secondaryBlue,
+                            ),
                           ),
                           const Text(
                             'Super Administrator',
@@ -1081,7 +1417,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           ),
                         ],
                       ),
-                      const Icon(Icons.arrow_drop_down, size: 16, color: AppColors.secondaryBlue),
+                      const Icon(
+                        Icons.arrow_drop_down,
+                        size: 16,
+                        color: AppColors.secondaryBlue,
+                      ),
                     ],
                   ],
                 ),
@@ -1097,7 +1437,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final nav = Navigator.of(context);
     await _authService.logout();
     nav.pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => const LoginScreen()),
+      MaterialPageRoute(builder: (context) => LoginScreen(onLoggedIn: () {})),
       (route) => false,
     );
   }
@@ -1114,10 +1454,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         return false;
       }
     }).length;
-    String vehiclesTrend = vehiclesAddedThisMonth > 0 ? '+$vehiclesAddedThisMonth this month' : 'Stable fleet';
+    String vehiclesTrend = vehiclesAddedThisMonth > 0
+        ? '+$vehiclesAddedThisMonth this month'
+        : 'Stable fleet';
 
     // 2. Available vehicles percentage
-    double availablePct = _totalCars > 0 ? (_availableCars / _totalCars) * 100 : 0.0;
+    double availablePct = _totalCars > 0
+        ? (_availableCars / _totalCars) * 100
+        : 0.0;
     String availableTrend = '${availablePct.toStringAsFixed(0)}% ready to rent';
 
     // 3. Active Bookings
@@ -1155,13 +1499,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         return false;
       }
     }).length;
-    String customersTrend = customersThisMonth > 0 ? '+$customersThisMonth this month' : 'Stable userbase';
+    String customersTrend = customersThisMonth > 0
+        ? '+$customersThisMonth this month'
+        : 'Stable userbase';
 
     // 6. Pending Payments action required
-    String paymentsTrend = _pendingPaymentsCount > 0 ? 'Requires approval' : 'All cleared';
+    String paymentsTrend = _pendingPaymentsCount > 0
+        ? 'Requires approval'
+        : 'All cleared';
 
     return GridView.count(
-      crossAxisCount: isDesktop ? 6 : (MediaQuery.of(context).size.width > 600 ? 3 : 2),
+      crossAxisCount: isDesktop
+          ? 6
+          : (MediaQuery.of(context).size.width > 600 ? 3 : 2),
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisSpacing: 16,
@@ -1263,7 +1613,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 Container(
                   width: 8,
                   height: 8,
-                  decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
                 ),
             ],
           ),
@@ -1275,7 +1628,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    color: Colors.grey,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1284,7 +1641,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   fit: BoxFit.scaleDown,
                   child: Text(
                     value,
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue),
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: _isDark
+                          ? const Color(0xFFF8FAFC)
+                          : AppColors.secondaryBlue,
+                    ),
                   ),
                 ),
               ],
@@ -1295,11 +1658,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             children: [
               Icon(
                 label.contains('Revenue')
-                    ? (isPositiveAction ? Icons.arrow_upward : Icons.arrow_downward)
-                    : (label.contains('Pending') && _pendingPaymentsCount > 0 ? Icons.error_outline : Icons.trending_up),
+                    ? (isPositiveAction
+                          ? Icons.arrow_upward
+                          : Icons.arrow_downward)
+                    : (label.contains('Pending') && _pendingPaymentsCount > 0
+                          ? Icons.error_outline
+                          : Icons.trending_up),
                 color: label.contains('Revenue')
                     ? (isPositiveAction ? Colors.green : Colors.red)
-                    : (label.contains('Pending') && _pendingPaymentsCount > 0 ? Colors.orange : Colors.grey),
+                    : (label.contains('Pending') && _pendingPaymentsCount > 0
+                          ? Colors.orange
+                          : Colors.grey),
                 size: 12,
               ),
               const SizedBox(width: 4),
@@ -1311,7 +1680,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     fontWeight: FontWeight.bold,
                     color: label.contains('Revenue')
                         ? (isPositiveAction ? Colors.green : Colors.red)
-                        : (label.contains('Pending') && _pendingPaymentsCount > 0 ? Colors.orange : Colors.grey),
+                        : (label.contains('Pending') &&
+                                  _pendingPaymentsCount > 0
+                              ? Colors.orange
+                              : Colors.grey),
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -1338,12 +1710,26 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       }
     }
 
-    int pendingCount = _bookings.where((b) => b.status.toLowerCase() == 'pending').length;
-    int approvedCount = _bookings.where((b) => b.status.toLowerCase() == 'approved').length;
-    int ongoingCount = _bookings.where((b) => b.status.toLowerCase() == 'ongoing').length;
-    int completedCount = _bookings.where((b) => b.status.toLowerCase() == 'completed').length;
-    int cancelledCount = _bookings.where((b) => b.status.toLowerCase() == 'cancelled' || b.status.toLowerCase() == 'rejected').length;
-    
+    int pendingCount = _bookings
+        .where((b) => b.status.toLowerCase() == 'pending')
+        .length;
+    int approvedCount = _bookings
+        .where((b) => b.status.toLowerCase() == 'approved')
+        .length;
+    int ongoingCount = _bookings
+        .where((b) => b.status.toLowerCase() == 'ongoing')
+        .length;
+    int completedCount = _bookings
+        .where((b) => b.status.toLowerCase() == 'completed')
+        .length;
+    int cancelledCount = _bookings
+        .where(
+          (b) =>
+              b.status.toLowerCase() == 'cancelled' ||
+              b.status.toLowerCase() == 'rejected',
+        )
+        .length;
+
     Map<String, int> statusCounts = {
       'Pending': pendingCount,
       'Approved': approvedCount,
@@ -1352,7 +1738,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       'Cancelled': cancelledCount,
     };
 
-    final totalBookingsCount = statusCounts.values.fold(0, (sum, val) => sum + val);
+    final totalBookingsCount = statusCounts.values.fold(
+      0,
+      (sum, val) => sum + val,
+    );
 
     final chartCard = Container(
       padding: const EdgeInsets.all(24),
@@ -1374,17 +1763,29 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 style: TextStyle(
                   fontWeight: FontWeight.w900,
                   fontSize: 16,
-                  color: _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
+                  color: _isDark
+                      ? const Color(0xFFF8FAFC)
+                      : AppColors.secondaryBlue,
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.grey[100],
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(color: Colors.grey[200]!),
                 ),
-                child: const Text('Monthly', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
+                child: const Text(
+                  'Monthly',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey,
+                  ),
+                ),
               ),
             ],
           ),
@@ -1394,7 +1795,20 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             child: CustomPaint(
               painter: RevenueOverviewLineChartPainter(
                 values: monthlyRevenue,
-                labels: const ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                labels: const [
+                  'Jan',
+                  'Feb',
+                  'Mar',
+                  'Apr',
+                  'May',
+                  'Jun',
+                  'Jul',
+                  'Aug',
+                  'Sep',
+                  'Oct',
+                  'Nov',
+                  'Dec',
+                ],
                 isDark: _isDark,
               ),
               child: Container(),
@@ -1424,17 +1838,29 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 style: TextStyle(
                   fontWeight: FontWeight.w900,
                   fontSize: 16,
-                  color: _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
+                  color: _isDark
+                      ? const Color(0xFFF8FAFC)
+                      : AppColors.secondaryBlue,
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.grey[100],
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(color: Colors.grey[200]!),
                 ),
-                child: const Text('This Year', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
+                child: const Text(
+                  'This Year',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey,
+                  ),
+                ),
               ),
             ],
           ),
@@ -1450,17 +1876,39 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     children: [
                       CustomPaint(
                         size: const Size(140, 140),
-                        painter: BookingStatusDoughnutPainter(statusCounts: statusCounts),
+                        painter: BookingStatusDoughnutPainter(
+                          statusCounts: statusCounts,
+                        ),
                       ),
                       Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text('Total', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+                          const Text(
+                            'Total',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                           Text(
                             '$totalBookingsCount',
-                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue),
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              color: _isDark
+                                  ? const Color(0xFFF8FAFC)
+                                  : AppColors.secondaryBlue,
+                            ),
                           ),
-                          const Text('Bookings', style: TextStyle(fontSize: 8, color: Colors.grey, fontWeight: FontWeight.bold)),
+                          const Text(
+                            'Bookings',
+                            style: TextStyle(
+                              fontSize: 8,
+                              color: Colors.grey,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ],
                       ),
                     ],
@@ -1473,11 +1921,36 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildLegendRow('Pending', pendingCount, totalBookingsCount, Colors.orange),
-                    _buildLegendRow('Approved', approvedCount, totalBookingsCount, Colors.blue),
-                    _buildLegendRow('Ongoing', ongoingCount, totalBookingsCount, Colors.teal),
-                    _buildLegendRow('Completed', completedCount, totalBookingsCount, Colors.green),
-                    _buildLegendRow('Cancelled', cancelledCount, totalBookingsCount, Colors.redAccent),
+                    _buildLegendRow(
+                      'Pending',
+                      pendingCount,
+                      totalBookingsCount,
+                      Colors.orange,
+                    ),
+                    _buildLegendRow(
+                      'Approved',
+                      approvedCount,
+                      totalBookingsCount,
+                      Colors.blue,
+                    ),
+                    _buildLegendRow(
+                      'Ongoing',
+                      ongoingCount,
+                      totalBookingsCount,
+                      Colors.teal,
+                    ),
+                    _buildLegendRow(
+                      'Completed',
+                      completedCount,
+                      totalBookingsCount,
+                      Colors.green,
+                    ),
+                    _buildLegendRow(
+                      'Cancelled',
+                      cancelledCount,
+                      totalBookingsCount,
+                      Colors.redAccent,
+                    ),
                   ],
                 ),
               ),
@@ -1498,11 +1971,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           )
         : Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              chartCard,
-              const SizedBox(height: 24),
-              statusCard,
-            ],
+            children: [chartCard, const SizedBox(height: 24), statusCard],
           );
   }
 
@@ -1512,7 +1981,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -1520,7 +1993,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               children: [
                 Text(
                   label,
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: _isDark
+                        ? const Color(0xFFF8FAFC)
+                        : AppColors.secondaryBlue,
+                  ),
                 ),
                 Text(
                   '$count (${pct.toStringAsFixed(0)}%)',
@@ -1546,7 +2025,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   List<Map<String, dynamic>> _getActiveTrackedVehicles() {
     final Map<String, Map<String, dynamic>> tracked = {};
-    final activeBookings = _bookings.where((b) => b.status == 'ongoing' || b.status == 'approved').toList();
+    final activeBookings = _bookings
+        .where((b) => b.status == 'ongoing' || b.status == 'approved')
+        .toList();
 
     for (var booking in activeBookings) {
       if (tracked.containsKey(booking.vehicleId)) continue;
@@ -1556,8 +2037,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       final vehicle = vehicleList.first;
 
       final loc = _liveLocations[vehicle.id];
-      final double lat = loc != null ? (loc['latitude'] as num).toDouble() : 3.1344;
-      final double lng = loc != null ? (loc['longitude'] as num).toDouble() : 101.6861;
+      final double lat = loc != null
+          ? (loc['latitude'] as num).toDouble()
+          : 3.1344;
+      final double lng = loc != null
+          ? (loc['longitude'] as num).toDouble()
+          : 101.6861;
       final double speed = loc != null ? (loc['speed'] as num).toDouble() : 0.0;
 
       tracked[booking.vehicleId] = {
@@ -1578,7 +2063,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   List<MaintenanceJobModel> _getActiveMaintenanceJobs() {
-    return _maintenanceJobs.where((j) => j.status == 'Scheduled' || j.status == 'In Progress').toList();
+    return _maintenanceJobs
+        .where((j) => j.status == 'Scheduled' || j.status == 'In Progress')
+        .toList();
   }
 
   List<PaymentModel> _getRecentPayments() {
@@ -1627,30 +2114,53 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.gps_fixed, color: AppColors.primaryOrange, size: 18),
+                    const Icon(
+                      Icons.gps_fixed,
+                      color: AppColors.primaryOrange,
+                      size: 18,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       'Live Vehicle Tracking',
                       style: TextStyle(
                         fontWeight: FontWeight.w900,
                         fontSize: 15,
-                        color: _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
+                        color: _isDark
+                            ? const Color(0xFFF8FAFC)
+                            : AppColors.secondaryBlue,
                       ),
                     ),
                   ],
                 ),
                 if (trackedVehicles.isNotEmpty)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.green.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Row(
                       children: [
-                        Container(width: 6, height: 6, decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle)),
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: Colors.green,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
                         const SizedBox(width: 4),
-                        Text('${trackedVehicles.length} Active', style: const TextStyle(color: Colors.green, fontSize: 9, fontWeight: FontWeight.bold)),
+                        Text(
+                          '${trackedVehicles.length} Active',
+                          style: const TextStyle(
+                            color: Colors.green,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -1663,10 +2173,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.map_outlined, size: 48, color: Colors.grey[300]),
+                        Icon(
+                          Icons.map_outlined,
+                          size: 48,
+                          color: Colors.grey[300],
+                        ),
                         const SizedBox(height: 8),
-                        const Text('No active tracked vehicles', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-                        const Text('Active bookings will drive automated simulated routes.', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                        const Text(
+                          'No active tracked vehicles',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        const Text(
+                          'Active bookings will drive automated simulated routes.',
+                          style: TextStyle(fontSize: 10, color: Colors.grey),
+                        ),
                       ],
                     ),
                   )
@@ -1675,12 +2198,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       FlutterMap(
                         mapController: _dashboardMapController,
                         options: MapOptions(
-                          initialCenter: LatLng(trackedVehicles.first['latitude'], trackedVehicles.first['longitude']),
+                          initialCenter: LatLng(
+                            trackedVehicles.first['latitude'],
+                            trackedVehicles.first['longitude'],
+                          ),
                           initialZoom: 11,
                         ),
                         children: [
                           TileLayer(
-                            urlTemplate: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+                            urlTemplate:
+                                'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
                             userAgentPackageName: 'com.carrent.app',
                           ),
                           MarkerLayer(
@@ -1702,7 +2229,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                         width: 38,
                                         height: 38,
                                         decoration: BoxDecoration(
-                                          color: AppColors.primaryOrange.withValues(alpha: 0.2),
+                                          color: AppColors.primaryOrange
+                                              .withValues(alpha: 0.2),
                                           shape: BoxShape.circle,
                                         ),
                                       ),
@@ -1712,7 +2240,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                         decoration: const BoxDecoration(
                                           color: Colors.white,
                                           shape: BoxShape.circle,
-                                          boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 1))],
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black26,
+                                              blurRadius: 4,
+                                              offset: Offset(0, 1),
+                                            ),
+                                          ],
                                         ),
                                         child: Padding(
                                           padding: const EdgeInsets.all(2.0),
@@ -1721,7 +2255,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                               color: AppColors.primaryOrange,
                                               shape: BoxShape.circle,
                                             ),
-                                            child: const Icon(Icons.directions_car, color: Colors.white, size: 12),
+                                            child: const Icon(
+                                              Icons.directions_car,
+                                              color: Colors.white,
+                                              size: 12,
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -1741,22 +2279,46 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             width: 260,
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: _isDark ? const Color(0xFF1E293B) : Colors.white,
+                              color: _isDark
+                                  ? const Color(0xFF1E293B)
+                                  : Colors.white,
                               borderRadius: BorderRadius.circular(12),
-                              boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 2))],
-                              border: Border.all(color: _isDark ? const Color(0xFF334155) : Colors.grey[100]!),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Colors.black12,
+                                  blurRadius: 8,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                              border: Border.all(
+                                color: _isDark
+                                    ? const Color(0xFF334155)
+                                    : Colors.grey[100]!,
+                              ),
                             ),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text('Live Vehicle Telematics', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue)),
+                                    Text(
+                                      'Live Vehicle Telematics',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 11,
+                                        color: _isDark
+                                            ? const Color(0xFFF8FAFC)
+                                            : AppColors.secondaryBlue,
+                                      ),
+                                    ),
                                     IconButton(
                                       icon: const Icon(Icons.close, size: 14),
-                                      onPressed: () => setState(() => _selectedTrackedVehicle = null),
+                                      onPressed: () => setState(
+                                        () => _selectedTrackedVehicle = null,
+                                      ),
                                       padding: EdgeInsets.zero,
                                       constraints: const BoxConstraints(),
                                     ),
@@ -1770,25 +2332,46 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                       child: Container(
                                         width: 50,
                                         height: 38,
-                                        color: _isDark ? const Color(0xFF111827) : Colors.grey[100],
+                                        color: _isDark
+                                            ? const Color(0xFF111827)
+                                            : Colors.grey[100],
                                         child: AppImage(
-                                          imageSrc: (_selectedTrackedVehicle!['vehicle'] as VehicleModel).mainImage,
-                                          placeholder: const Icon(Icons.directions_car, size: 14),
+                                          imageSrc:
+                                              (_selectedTrackedVehicle!['vehicle']
+                                                      as VehicleModel)
+                                                  .mainImage,
+                                          placeholder: const Icon(
+                                            Icons.directions_car,
+                                            size: 14,
+                                          ),
                                         ),
                                       ),
                                     ),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             '${(_selectedTrackedVehicle!['vehicle'] as VehicleModel).brand} ${(_selectedTrackedVehicle!['vehicle'] as VehicleModel).model}',
-                                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue),
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
+                                              color: _isDark
+                                                  ? const Color(0xFFF8FAFC)
+                                                  : AppColors.secondaryBlue,
+                                            ),
                                           ),
                                           Text(
-                                            (_selectedTrackedVehicle!['vehicle'] as VehicleModel).plateNumber,
-                                            style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold),
+                                            (_selectedTrackedVehicle!['vehicle']
+                                                    as VehicleModel)
+                                                .plateNumber,
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.grey,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
                                         ],
                                       ),
@@ -1798,22 +2381,50 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 const SizedBox(height: 8),
                                 const Divider(height: 1),
                                 const SizedBox(height: 8),
-                                _buildOverlayRow('Customer', (_selectedTrackedVehicle!['booking'] as BookingModel).userName),
-                                _buildOverlayRow('Booking Status', (_selectedTrackedVehicle!['booking'] as BookingModel).status.toUpperCase()),
-                                _buildOverlayRow('Speed', '${_selectedTrackedVehicle!['speed'].toStringAsFixed(0)} km/h'),
+                                _buildOverlayRow(
+                                  'Customer',
+                                  (_selectedTrackedVehicle!['booking']
+                                          as BookingModel)
+                                      .userName,
+                                ),
+                                _buildOverlayRow(
+                                  'Booking Status',
+                                  (_selectedTrackedVehicle!['booking']
+                                          as BookingModel)
+                                      .status
+                                      .toUpperCase(),
+                                ),
+                                _buildOverlayRow(
+                                  'Speed',
+                                  '${_selectedTrackedVehicle!['speed'].toStringAsFixed(0)} km/h',
+                                ),
                                 const SizedBox(height: 8),
                                 SizedBox(
                                   width: double.infinity,
                                   child: ElevatedButton(
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: _isDark ? AppColors.primaryOrange : AppColors.secondaryBlue,
+                                      backgroundColor: _isDark
+                                          ? AppColors.primaryOrange
+                                          : AppColors.secondaryBlue,
                                       foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 8,
+                                      ),
                                       elevation: 0,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
                                     ),
-                                    onPressed: () => _showVehicleDetailsDialog(_selectedTrackedVehicle!['vehicle']),
-                                    child: const Text('View Specifications', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                    onPressed: () => _showVehicleDetailsDialog(
+                                      _selectedTrackedVehicle!['vehicle'],
+                                    ),
+                                    child: const Text(
+                                      'View Specifications',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -1848,12 +2459,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 style: TextStyle(
                   fontWeight: FontWeight.w900,
                   fontSize: 16,
-                  color: _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
+                  color: _isDark
+                      ? const Color(0xFFF8FAFC)
+                      : AppColors.secondaryBlue,
                 ),
               ),
               TextButton(
                 onPressed: () => setState(() => _activeTab = 'Bookings'),
-                child: const Text('View All', style: TextStyle(color: AppColors.primaryOrange, fontWeight: FontWeight.bold, fontSize: 12)),
+                child: const Text(
+                  'View All',
+                  style: TextStyle(
+                    color: AppColors.primaryOrange,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
               ),
             ],
           ),
@@ -1866,19 +2486,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     separatorBuilder: (_, index) => const Divider(height: 1),
                     itemBuilder: (context, index) {
                       final booking = recentBookings[index];
-                      
+
                       // Find vehicle image
                       String vehicleImg = '';
                       try {
-                        vehicleImg = _vehicles.firstWhere((v) => v.id == booking.vehicleId).mainImage;
+                        vehicleImg = _vehicles
+                            .firstWhere((v) => v.id == booking.vehicleId)
+                            .mainImage;
                       } catch (_) {}
 
                       Color statusColor = Colors.orange;
-                      if (booking.status == 'approved' || booking.status == 'ongoing') {
+                      if (booking.status == 'approved' ||
+                          booking.status == 'ongoing') {
                         statusColor = Colors.blue;
                       } else if (booking.status == 'completed') {
                         statusColor = Colors.green;
-                      } else if (booking.status == 'cancelled' || booking.status == 'rejected') {
+                      } else if (booking.status == 'cancelled' ||
+                          booking.status == 'rejected') {
                         statusColor = Colors.red;
                       }
 
@@ -1889,32 +2513,66 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           child: Container(
                             width: 48,
                             height: 36,
-                            color: _isDark ? const Color(0xFF111827) : Colors.grey[100],
+                            color: _isDark
+                                ? const Color(0xFF111827)
+                                : Colors.grey[100],
                             child: AppImage(
                               imageSrc: vehicleImg,
-                              placeholder: const Icon(Icons.directions_car, color: Colors.grey, size: 20),
+                              placeholder: const Icon(
+                                Icons.directions_car,
+                                color: Colors.grey,
+                                size: 20,
+                              ),
                             ),
                           ),
                         ),
                         title: Text(
                           booking.vehicleName,
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: _isDark
+                                ? const Color(0xFFF8FAFC)
+                                : AppColors.secondaryBlue,
+                          ),
                         ),
                         subtitle: Text(
                           '${booking.userName} • ${DateFormat('dd MMM').format(booking.pickUpDate)}',
-                          style: const TextStyle(fontSize: 10, color: Colors.grey),
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey,
+                          ),
                         ),
                         trailing: Column(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text('RM ${booking.totalPrice.toStringAsFixed(0)}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue)),
+                            Text(
+                              'RM ${booking.totalPrice.toStringAsFixed(0)}',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                                color: _isDark
+                                    ? const Color(0xFFF8FAFC)
+                                    : AppColors.secondaryBlue,
+                              ),
+                            ),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: statusColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
                               child: Text(
                                 booking.status.toUpperCase(),
-                                style: TextStyle(color: statusColor, fontSize: 8, fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                  color: statusColor,
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ],
@@ -1939,11 +2597,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           )
         : Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              mapCard,
-              const SizedBox(height: 24),
-              bookingsCard,
-            ],
+            children: [mapCard, const SizedBox(height: 24), bookingsCard],
           );
   }
 
@@ -1954,7 +2608,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
-          Text(value, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue)),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: _isDark
+                  ? const Color(0xFFF8FAFC)
+                  : AppColors.secondaryBlue,
+            ),
+          ),
         ],
       ),
     );
@@ -1982,7 +2645,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             style: TextStyle(
               fontWeight: FontWeight.w900,
               fontSize: 16,
-              color: _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
+              color: _isDark
+                  ? const Color(0xFFF8FAFC)
+                  : AppColors.secondaryBlue,
             ),
           ),
           const SizedBox(height: 16),
@@ -2000,7 +2665,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   () {
                     setState(() => _activeTab = 'Cars');
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Click "Add Vehicle" at the top right of the fleet screen.'), backgroundColor: Colors.indigo),
+                      const SnackBar(
+                        content: Text(
+                          'Click "Add Vehicle" at the top right of the fleet screen.',
+                        ),
+                        backgroundColor: Colors.indigo,
+                      ),
                     );
                   },
                 ),
@@ -2039,12 +2709,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 backgroundColor: AppColors.primaryOrange,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
                 elevation: 0,
               ),
               onPressed: _showSendNotificationDialog,
               icon: const Icon(Icons.campaign, size: 18),
-              label: const Text('Send Broadcast Notification', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              label: const Text(
+                'Send Broadcast Notification',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
             ),
           ),
         ],
@@ -2068,39 +2743,75 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Maintenance Alerts', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppColors.secondaryBlue)),
+                    const Text(
+                      'Maintenance Alerts',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                        color: AppColors.secondaryBlue,
+                      ),
+                    ),
                     TextButton(
-                      onPressed: () => setState(() => _activeTab = 'Vehicle Maintenance'),
-                      child: const Text('View All', style: TextStyle(color: AppColors.primaryOrange, fontWeight: FontWeight.bold, fontSize: 12)),
+                      onPressed: () =>
+                          setState(() => _activeTab = 'Vehicle Maintenance'),
+                      child: const Text(
+                        'View All',
+                        style: TextStyle(
+                          color: AppColors.primaryOrange,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
                 Expanded(
                   child: ListView.separated(
-                    itemCount: activeMaintenance.length > 4 ? 4 : activeMaintenance.length,
+                    itemCount: activeMaintenance.length > 4
+                        ? 4
+                        : activeMaintenance.length,
                     separatorBuilder: (_, index) => const Divider(height: 1),
                     itemBuilder: (context, index) {
                       final job = activeMaintenance[index];
-                      final Color statusColor = job.status == 'In Progress' ? Colors.orange : Colors.blue;
+                      final Color statusColor = job.status == 'In Progress'
+                          ? Colors.orange
+                          : Colors.blue;
 
                       return ListTile(
                         contentPadding: EdgeInsets.zero,
                         dense: true,
                         title: Text(
                           job.vehicleName,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.secondaryBlue),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: AppColors.secondaryBlue,
+                          ),
                         ),
                         subtitle: Text(
                           '${job.title} • Due: ${job.endDate}',
-                          style: const TextStyle(fontSize: 10, color: Colors.grey),
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey,
+                          ),
                         ),
                         trailing: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
                           child: Text(
                             job.status.toUpperCase(),
-                            style: TextStyle(color: statusColor, fontSize: 8, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              color: statusColor,
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       );
@@ -2133,12 +2844,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 style: TextStyle(
                   fontWeight: FontWeight.w900,
                   fontSize: 16,
-                  color: _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
+                  color: _isDark
+                      ? const Color(0xFFF8FAFC)
+                      : AppColors.secondaryBlue,
                 ),
               ),
               TextButton(
                 onPressed: () => setState(() => _activeTab = 'Payments'),
-                child: const Text('View All', style: TextStyle(color: AppColors.primaryOrange, fontWeight: FontWeight.bold, fontSize: 12)),
+                child: const Text(
+                  'View All',
+                  style: TextStyle(
+                    color: AppColors.primaryOrange,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
               ),
             ],
           ),
@@ -2152,19 +2872,32 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     itemBuilder: (context, index) {
                       final payment = recentPayments[index];
                       final custName = _getCustomerName(payment.userId);
-                      final vName = _getVehicleNameForPayment(payment.bookingId);
-                      final bool isPending = payment.status.toLowerCase() == 'pending' || payment.status == 'Pending Verification';
-                      final Color statusColor = isPending ? Colors.orange : Colors.green;
+                      final vName = _getVehicleNameForPayment(
+                        payment.bookingId,
+                      );
+                      final bool isPending =
+                          payment.status.toLowerCase() == 'pending' ||
+                          payment.status == 'Pending Verification';
+                      final Color statusColor = isPending
+                          ? Colors.orange
+                          : Colors.green;
 
                       return ListTile(
                         contentPadding: EdgeInsets.zero,
                         title: Text(
                           vName,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.secondaryBlue),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: AppColors.secondaryBlue,
+                          ),
                         ),
                         subtitle: Text(
                           '$custName • ${DateFormat('dd MMM').format(payment.paymentDate)}',
-                          style: const TextStyle(fontSize: 10, color: Colors.grey),
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey,
+                          ),
                         ),
                         trailing: Column(
                           crossAxisAlignment: CrossAxisAlignment.end,
@@ -2172,14 +2905,28 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           children: [
                             Text(
                               'RM ${payment.amount.toStringAsFixed(0)}',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.secondaryBlue),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                                color: AppColors.secondaryBlue,
+                              ),
                             ),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: statusColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
                               child: Text(
                                 isPending ? 'PENDING' : 'PAID',
-                                style: TextStyle(color: statusColor, fontSize: 8, fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                  color: statusColor,
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ],
@@ -2220,7 +2967,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           );
   }
 
-  Widget _buildQuickActionButton(String label, IconData icon, Color color, VoidCallback onTap) {
+  Widget _buildQuickActionButton(
+    String label,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+  ) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -2242,7 +2994,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             Expanded(
               child: Text(
                 label,
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: color),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
+                  color: color,
+                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -2255,17 +3011,26 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   void _showVehicleDetailsDialog(VehicleModel vehicle) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final textPrimary = isDark
+        ? const Color(0xFFF8FAFC)
+        : AppColors.secondaryBlue;
     final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final surfaceColor = isDark ? const Color(0xFF111827) : const Color(0xFFF1F5F9);
+    final surfaceColor = isDark
+        ? const Color(0xFF111827)
+        : const Color(0xFFF1F5F9);
 
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
           backgroundColor: cardColor,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('${vehicle.brand} ${vehicle.model}', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            '${vehicle.brand} ${vehicle.model}',
+            style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
+          ),
           content: Container(
             width: MediaQuery.of(context).size.width * 0.9,
             constraints: const BoxConstraints(maxWidth: 450),
@@ -2289,7 +3054,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   const SizedBox(height: 16),
                   _buildDetailDialogRow('Plate Number', vehicle.plateNumber),
                   _buildDetailDialogRow('Category', vehicle.category),
-                  _buildDetailDialogRow('Daily Rental Rate', 'RM ${vehicle.pricePerDay.toStringAsFixed(0)}'),
+                  _buildDetailDialogRow(
+                    'Daily Rental Rate',
+                    'RM ${vehicle.pricePerDay.toStringAsFixed(0)}',
+                  ),
                   _buildDetailDialogRow('Seats', '${vehicle.seats} Seats'),
                   _buildDetailDialogRow('Transmission', vehicle.transmission),
                   _buildDetailDialogRow('Fuel Type', vehicle.fuelType),
@@ -2313,7 +3081,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   void _showBookingDetailsDialog(BookingModel booking) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final textPrimary = isDark
+        ? const Color(0xFFF8FAFC)
+        : AppColors.secondaryBlue;
     final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
 
     showDialog(
@@ -2321,8 +3091,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       builder: (context) {
         return AlertDialog(
           backgroundColor: cardColor,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Booking Details', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            'Booking Details',
+            style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
+          ),
           content: Container(
             width: MediaQuery.of(context).size.width * 0.9,
             constraints: const BoxConstraints(maxWidth: 450),
@@ -2335,11 +3110,30 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   _buildDetailDialogRow('Vehicle Model', booking.vehicleName),
                   _buildDetailDialogRow('Customer Name', booking.userName),
                   _buildDetailDialogRow('Customer Phone', booking.userPhone),
-                  _buildDetailDialogRow('Pickup Date', DateFormat('dd MMM yyyy, hh:mm a').format(booking.pickUpDate)),
-                  _buildDetailDialogRow('Return Date', DateFormat('dd MMM yyyy, hh:mm a').format(booking.returnDate)),
-                  _buildDetailDialogRow('Total Paid Price', 'RM ${booking.totalPrice.toStringAsFixed(2)}'),
-                  _buildDetailDialogRow('Deposit Amount', 'RM ${booking.depositAmount.toStringAsFixed(2)}'),
-                  _buildDetailDialogRow('Booking Status', booking.status.toUpperCase()),
+                  _buildDetailDialogRow(
+                    'Pickup Date',
+                    DateFormat(
+                      'dd MMM yyyy, hh:mm a',
+                    ).format(booking.pickUpDate),
+                  ),
+                  _buildDetailDialogRow(
+                    'Return Date',
+                    DateFormat(
+                      'dd MMM yyyy, hh:mm a',
+                    ).format(booking.returnDate),
+                  ),
+                  _buildDetailDialogRow(
+                    'Total Paid Price',
+                    'RM ${booking.totalPrice.toStringAsFixed(2)}',
+                  ),
+                  _buildDetailDialogRow(
+                    'Deposit Amount',
+                    'RM ${booking.depositAmount.toStringAsFixed(2)}',
+                  ),
+                  _buildDetailDialogRow(
+                    'Booking Status',
+                    booking.status.toUpperCase(),
+                  ),
                   if (booking.notes?.isNotEmpty == true)
                     _buildDetailDialogRow('Reservation Notes', booking.notes!),
                 ],
@@ -2359,7 +3153,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   void _showPaymentDetailsDialog(PaymentModel payment) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final textPrimary = isDark
+        ? const Color(0xFFF8FAFC)
+        : AppColors.secondaryBlue;
     final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
 
     showDialog(
@@ -2367,8 +3163,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       builder: (context) {
         return AlertDialog(
           backgroundColor: cardColor,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Transaction Details', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            'Transaction Details',
+            style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
+          ),
           content: Container(
             width: MediaQuery.of(context).size.width * 0.9,
             constraints: const BoxConstraints(maxWidth: 450),
@@ -2379,11 +3180,28 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 children: [
                   _buildDetailDialogRow('Payment Receipt ID', payment.id),
                   _buildDetailDialogRow('Booking Reference', payment.bookingId),
-                  _buildDetailDialogRow('Transaction Amount', 'RM ${payment.amount.toStringAsFixed(2)}'),
-                  _buildDetailDialogRow('Payment Method', payment.paymentMethod),
-                  _buildDetailDialogRow('Transaction Ref', payment.transactionId ?? 'N/A'),
-                  _buildDetailDialogRow('Payment Date', DateFormat('dd MMM yyyy, hh:mm a').format(payment.paymentDate)),
-                  _buildDetailDialogRow('Verification Status', payment.status.toUpperCase()),
+                  _buildDetailDialogRow(
+                    'Transaction Amount',
+                    'RM ${payment.amount.toStringAsFixed(2)}',
+                  ),
+                  _buildDetailDialogRow(
+                    'Payment Method',
+                    payment.paymentMethod,
+                  ),
+                  _buildDetailDialogRow(
+                    'Transaction Ref',
+                    payment.transactionId ?? 'N/A',
+                  ),
+                  _buildDetailDialogRow(
+                    'Payment Date',
+                    DateFormat(
+                      'dd MMM yyyy, hh:mm a',
+                    ).format(payment.paymentDate),
+                  ),
+                  _buildDetailDialogRow(
+                    'Verification Status',
+                    payment.status.toUpperCase(),
+                  ),
                 ],
               ),
             ),
@@ -2401,7 +3219,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   Widget _buildDetailDialogRow(String label, String value) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final textPrimary = isDark
+        ? const Color(0xFFF8FAFC)
+        : AppColors.secondaryBlue;
     final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
 
     return Padding(
@@ -2409,9 +3229,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('$label: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: textSecondary)),
+          Text(
+            '$label: ',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+              color: textSecondary,
+            ),
+          ),
           Expanded(
-            child: Text(value, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: textPrimary)),
+            child: Text(
+              value,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+                color: textPrimary,
+              ),
+            ),
           ),
         ],
       ),
@@ -2424,9 +3258,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     String target = 'all_customers';
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final textPrimary = isDark
+        ? const Color(0xFFF8FAFC)
+        : AppColors.secondaryBlue;
     final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
-    
+
     showDialog(
       context: context,
       builder: (context) {
@@ -2434,8 +3270,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           builder: (context, setDialogState) {
             return AlertDialog(
               backgroundColor: cardColor,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: Text('Send Broadcast Notification', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Text(
+                'Send Broadcast Notification',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: textPrimary,
+                ),
+              ),
               content: Container(
                 width: MediaQuery.of(context).size.width * 0.9,
                 constraints: const BoxConstraints(maxWidth: 450),
@@ -2446,24 +3290,39 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       TextField(
                         controller: titleController,
                         style: TextStyle(color: textPrimary),
-                        decoration: const InputDecoration(labelText: 'Notification Title', border: OutlineInputBorder()),
+                        decoration: const InputDecoration(
+                          labelText: 'Notification Title',
+                          border: OutlineInputBorder(),
+                        ),
                       ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: messageController,
                         style: TextStyle(color: textPrimary),
                         maxLines: 3,
-                        decoration: const InputDecoration(labelText: 'Notification Message', border: OutlineInputBorder()),
+                        decoration: const InputDecoration(
+                          labelText: 'Notification Message',
+                          border: OutlineInputBorder(),
+                        ),
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
                         initialValue: target,
                         dropdownColor: cardColor,
                         style: TextStyle(color: textPrimary),
-                        decoration: const InputDecoration(labelText: 'Recipient Target', border: OutlineInputBorder()),
+                        decoration: const InputDecoration(
+                          labelText: 'Recipient Target',
+                          border: OutlineInputBorder(),
+                        ),
                         items: const [
-                          DropdownMenuItem(value: 'all_customers', child: Text('All Customers')),
-                          DropdownMenuItem(value: 'all_admins', child: Text('All Admin Staff')),
+                          DropdownMenuItem(
+                            value: 'all_customers',
+                            child: Text('All Customers'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'all_admins',
+                            child: Text('All Admin Staff'),
+                          ),
                         ],
                         onChanged: (val) {
                           if (val != null) {
@@ -2478,36 +3337,59 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 ),
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryOrange,
                     foregroundColor: Colors.white,
                   ),
                   onPressed: () async {
-                    if (titleController.text.trim().isEmpty || messageController.text.trim().isEmpty) {
+                    if (titleController.text.trim().isEmpty ||
+                        messageController.text.trim().isEmpty) {
                       return;
                     }
                     final title = titleController.text.trim();
                     final msg = messageController.text.trim();
                     Navigator.pop(context);
-                    
+
                     try {
                       if (target == 'all_customers') {
-                        await _notificationService.notifyAllCustomers(title: title, message: msg, type: 'system');
+                        await _notificationService.notifyAllCustomers(
+                          title: title,
+                          message: msg,
+                          type: 'system',
+                        );
                       } else if (target == 'all_admins') {
-                        await _notificationService.notifyAllAdmins(title: title, message: msg, type: 'system');
+                        await _notificationService.notifyAllAdmins(
+                          title: title,
+                          message: msg,
+                          type: 'system',
+                        );
                       }
                       scaffoldMessenger.showSnackBar(
-                        const SnackBar(content: Text('Broadcast notification sent successfully!'), backgroundColor: Colors.green),
+                        const SnackBar(
+                          content: Text(
+                            'Broadcast notification sent successfully!',
+                          ),
+                          backgroundColor: Colors.green,
+                        ),
                       );
                     } catch (e) {
                       scaffoldMessenger.showSnackBar(
-                        SnackBar(content: Text('Failed to broadcast: $e'), backgroundColor: Colors.redAccent),
+                        SnackBar(
+                          content: Text('Failed to broadcast: $e'),
+                          backgroundColor: Colors.redAccent,
+                        ),
                       );
                     }
                   },
-                  child: const Text('Send Broadcast', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    'Send Broadcast',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             );
@@ -2516,8 +3398,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       },
     );
   }
-
-
 }
 
 class BookingSelectionDialogContent extends StatelessWidget {
@@ -2538,17 +3418,31 @@ class BookingSelectionDialogContent extends StatelessWidget {
       itemBuilder: (context, index) {
         final booking = bookings[index];
         return ListTile(
-          title: Text(booking.vehicleName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-          subtitle: Text('Customer: ${booking.userName} | RM ${booking.totalPrice.toStringAsFixed(0)}', style: const TextStyle(fontSize: 11)),
+          title: Text(
+            booking.vehicleName,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          ),
+          subtitle: Text(
+            'Customer: ${booking.userName} | RM ${booking.totalPrice.toStringAsFixed(0)}',
+            style: const TextStyle(fontSize: 11),
+          ),
           trailing: Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: booking.status == 'pending' ? Colors.orange.withValues(alpha: 0.1) : Colors.green.withValues(alpha: 0.1),
+              color: booking.status == 'pending'
+                  ? Colors.orange.withValues(alpha: 0.1)
+                  : Colors.green.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
               booking.status.toUpperCase(),
-              style: TextStyle(color: booking.status == 'pending' ? Colors.orange : Colors.green, fontSize: 8, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: booking.status == 'pending'
+                    ? Colors.orange
+                    : Colors.green,
+                fontSize: 8,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
           onTap: () => onSelected(booking),
@@ -2563,7 +3457,11 @@ class RevenueOverviewLineChartPainter extends CustomPainter {
   final List<String> labels;
   final bool isDark;
 
-  RevenueOverviewLineChartPainter({required this.values, required this.labels, required this.isDark});
+  RevenueOverviewLineChartPainter({
+    required this.values,
+    required this.labels,
+    required this.isDark,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -2585,7 +3483,7 @@ class RevenueOverviewLineChartPainter extends CustomPainter {
     final paintGrid = Paint()
       ..color = isDark ? const Color(0xFF334155) : Colors.grey[200]!
       ..strokeWidth = 1.0;
-    
+
     for (int i = 0; i <= 4; i++) {
       final double y = 20.0 + (size.height - 50.0) * i / 4;
       canvas.drawLine(Offset(0, y), Offset(size.width, y), paintGrid);
@@ -2594,7 +3492,11 @@ class RevenueOverviewLineChartPainter extends CustomPainter {
       final textPainter = TextPainter(
         text: TextSpan(
           text: 'RM ${(gridVal / 1000).toStringAsFixed(1)}K',
-          style: const TextStyle(color: Colors.grey, fontSize: 8, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            color: Colors.grey,
+            fontSize: 8,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         textDirection: ui.TextDirection.ltr,
       )..layout();
@@ -2606,7 +3508,8 @@ class RevenueOverviewLineChartPainter extends CustomPainter {
 
     for (int i = 0; i < values.length; i++) {
       final double x = i * stepX;
-      final double y = 20.0 + (size.height - 50.0) * (1.0 - (values[i] / maxVal));
+      final double y =
+          20.0 + (size.height - 50.0) * (1.0 - (values[i] / maxVal));
 
       if (i == 0) {
         path.moveTo(x, y);
@@ -2627,21 +3530,33 @@ class RevenueOverviewLineChartPainter extends CustomPainter {
         final textPainter = TextPainter(
           text: TextSpan(
             text: labels[i],
-            style: const TextStyle(color: Colors.grey, fontSize: 9, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              color: Colors.grey,
+              fontSize: 9,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           textDirection: ui.TextDirection.ltr,
         )..layout();
-        textPainter.paint(canvas, Offset(x - (textPainter.width / 2), size.height - 15));
+        textPainter.paint(
+          canvas,
+          Offset(x - (textPainter.width / 2), size.height - 15),
+        );
       }
     }
 
     final gradient = LinearGradient(
-      colors: [AppColors.primaryOrange.withValues(alpha: 0.3), AppColors.primaryOrange.withValues(alpha: 0.0)],
+      colors: [
+        AppColors.primaryOrange.withValues(alpha: 0.3),
+        AppColors.primaryOrange.withValues(alpha: 0.0),
+      ],
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
     );
 
-    paintFill.shader = gradient.createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+    paintFill.shader = gradient.createShader(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+    );
     canvas.drawPath(fillPath, paintFill);
     canvas.drawPath(path, paintLine);
 
@@ -2650,7 +3565,8 @@ class RevenueOverviewLineChartPainter extends CustomPainter {
     final paintDotOuter = Paint()..color = Colors.white;
     for (int i = 0; i < values.length; i++) {
       final double x = i * stepX;
-      final double y = 20.0 + (size.height - 50.0) * (1.0 - (values[i] / maxVal));
+      final double y =
+          20.0 + (size.height - 50.0) * (1.0 - (values[i] / maxVal));
       canvas.drawCircle(Offset(x, y), 5.0, paintDotOuter);
       canvas.drawCircle(Offset(x, y), 3.0, paintDot);
     }
@@ -2667,7 +3583,9 @@ class BookingStatusDoughnutPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final double total = statusCounts.values.fold(0, (sum, val) => sum + val).toDouble();
+    final double total = statusCounts.values
+        .fold(0, (sum, val) => sum + val)
+        .toDouble();
     if (total == 0) return;
 
     final double centerPadding = size.width / 2;

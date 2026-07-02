@@ -79,36 +79,48 @@ class _HomeScreenState extends State<HomeScreen> {
       final currentUser = _authService.currentUser;
       if (currentUser != null) {
         try {
-          _user = await _databaseService.getUser(currentUser.uid).timeout(const Duration(seconds: 4));
+          _user = await _databaseService
+              .getUser(currentUser.uid)
+              .timeout(const Duration(seconds: 4));
           if (_user != null && mounted) {
             if (_user!.role == 'admin') {
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (context) => const AdminDashboardScreen()),
+                MaterialPageRoute(
+                  builder: (context) => const AdminDashboardScreen(),
+                ),
               );
               return;
             } else {
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (context) => const CustomerResponsiveShell()),
+                MaterialPageRoute(
+                  builder: (context) => const CustomerResponsiveShell(),
+                ),
               );
               return;
             }
           }
         } catch (userErr) {
-          debugPrint('Error getting current user: $userErr. Continuing as guest/offline profile.');
+          debugPrint(
+            'Error getting current user: $userErr. Continuing as guest/offline profile.',
+          );
         }
       }
-      
+
       try {
-        _branches = await _branchService.getBranches().timeout(const Duration(seconds: 8));
+        _branches = await _branchService.getBranches().timeout(
+          const Duration(seconds: 8),
+        );
       } catch (branchErr) {
         debugPrint('Error getting branches: $branchErr.');
         _branches = [];
       }
 
       try {
-        _vehicles = await _vehicleService.getVehicles().timeout(const Duration(seconds: 8));
+        _vehicles = await _vehicleService.getVehicles().timeout(
+          const Duration(seconds: 8),
+        );
       } catch (vehicleErr) {
         debugPrint('Error getting vehicles: $vehicleErr.');
         _vehicles = [];
@@ -162,15 +174,15 @@ class _HomeScreenState extends State<HomeScreen> {
   void _searchCars() {
     if (_selectedPickupBranch == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a pickup branch location.')),
+        const SnackBar(
+          content: Text('Please select a pickup branch location.'),
+        ),
       );
       return;
     }
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => const VehicleListScreen(),
-      ),
+      MaterialPageRoute(builder: (context) => const VehicleListScreen()),
     );
   }
 
@@ -187,7 +199,9 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Thank you! Your message has been sent successfully. Our team will contact you shortly.'),
+            content: Text(
+              'Thank you! Your message has been sent successfully. Our team will contact you shortly.',
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -238,10 +252,7 @@ class _HomeScreenState extends State<HomeScreen> {
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.85),
                 border: Border(
-                  bottom: BorderSide(
-                    color: Colors.grey[200]!,
-                    width: 1,
-                  ),
+                  bottom: BorderSide(color: Colors.grey[200]!, width: 1),
                 ),
                 boxShadow: [
                   BoxShadow(
@@ -253,7 +264,10 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               child: SafeArea(
                 child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: isDesktop ? 80 : 20, vertical: 10),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isDesktop ? 80 : 20,
+                    vertical: 10,
+                  ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -264,7 +278,10 @@ class _HomeScreenState extends State<HomeScreen> {
                           cursor: SystemMouseCursors.click,
                           child: Row(
                             children: [
-                              const AppLogo(size: 28, fallbackColor: AppColors.primaryOrange),
+                              const AppLogo(
+                                size: 28,
+                                fallbackColor: AppColors.primaryOrange,
+                              ),
                               const SizedBox(width: 12),
                               Text(
                                 companyName,
@@ -283,15 +300,30 @@ class _HomeScreenState extends State<HomeScreen> {
                       if (isDesktop)
                         Row(
                           children: [
-                            NavHoverLink(text: 'Home', onTap: () => _scrollToSection(_homeKey)),
-                            NavHoverLink(text: 'Fleet', onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (context) => const VehicleListScreen()),
-                              );
-                            }),
-                            NavHoverLink(text: 'About Us', onTap: () => _scrollToSection(_aboutKey)),
-                            NavHoverLink(text: 'Contact', onTap: () => _scrollToSection(_contactKey)),
+                            NavHoverLink(
+                              text: 'Home',
+                              onTap: () => _scrollToSection(_homeKey),
+                            ),
+                            NavHoverLink(
+                              text: 'Fleet',
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const VehicleListScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                            NavHoverLink(
+                              text: 'About Us',
+                              onTap: () => _scrollToSection(_aboutKey),
+                            ),
+                            NavHoverLink(
+                              text: 'Contact',
+                              onTap: () => _scrollToSection(_contactKey),
+                            ),
                           ],
                         ),
                       // Login/Register or Dashboard Button
@@ -301,31 +333,43 @@ class _HomeScreenState extends State<HomeScreen> {
                             if (_user!.role == 'admin') {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (context) => const AdminDashboardScreen()),
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const AdminDashboardScreen(),
+                                ),
                               );
                             } else {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (context) => const CustomerResponsiveShell()),
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const CustomerResponsiveShell(),
+                                ),
                               );
                             }
                           } else {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (context) => const LoginScreen()),
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    LoginScreen(onLoggedIn: () {}),
+                              ),
                             ).then((_) => _loadData());
                           }
                         },
                         style: ButtonStyle(
-                          backgroundColor: WidgetStateProperty.resolveWith<Color?>(
-                            (Set<WidgetState> states) {
-                              if (states.contains(WidgetState.hovered)) {
-                                return AppColors.primaryOrange;
-                              }
-                              return AppColors.secondaryBlue;
-                            },
+                          backgroundColor:
+                              WidgetStateProperty.resolveWith<Color?>((
+                                Set<WidgetState> states,
+                              ) {
+                                if (states.contains(WidgetState.hovered)) {
+                                  return AppColors.primaryOrange;
+                                }
+                                return AppColors.secondaryBlue;
+                              }),
+                          foregroundColor: WidgetStateProperty.all<Color>(
+                            Colors.white,
                           ),
-                          foregroundColor: WidgetStateProperty.all<Color>(Colors.white),
                           padding: WidgetStateProperty.all<EdgeInsetsGeometry>(
                             EdgeInsets.symmetric(
                               horizontal: isDesktop ? 24 : 16,
@@ -357,44 +401,53 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       body: _loading
-          ? const Center(child: LoadingWidget(message: 'Loading Car Rental system...'))
+          ? const Center(
+              child: LoadingWidget(message: 'Loading Car Rental system...'),
+            )
           : _error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 64),
-                        const SizedBox(height: 16),
-                        Text(
-                          _error!,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            color: AppColors.secondaryBlue,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        ElevatedButton.icon(
-                          onPressed: _loadData,
-                          icon: const Icon(Icons.refresh_rounded),
-                          label: const Text('Retry Loading'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primaryOrange,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ],
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.error_outline_rounded,
+                      color: Colors.redAccent,
+                      size: 64,
                     ),
-                  ),
-                )
-              : SingleChildScrollView(
+                    const SizedBox(height: 16),
+                    Text(
+                      _error!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: AppColors.secondaryBlue,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: _loadData,
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('Retry Loading'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryOrange,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -430,8 +483,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-
-
   Widget _buildHeroSection(bool isDesktop) {
     return Container(
       key: _homeKey,
@@ -442,7 +493,9 @@ class _HomeScreenState extends State<HomeScreen> {
       decoration: const BoxDecoration(
         color: AppColors.secondaryBlue,
         image: DecorationImage(
-          image: NetworkImage('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=1200'),
+          image: NetworkImage(
+            'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=1200',
+          ),
           fit: BoxFit.cover,
           opacity: 0.12,
         ),
@@ -458,16 +511,25 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.primaryOrange.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppColors.primaryOrange.withValues(alpha: 0.4)),
+                    border: Border.all(
+                      color: AppColors.primaryOrange.withValues(alpha: 0.4),
+                    ),
                   ),
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.star, color: AppColors.primaryOrange, size: 14),
+                      Icon(
+                        Icons.star,
+                        color: AppColors.primaryOrange,
+                        size: 14,
+                      ),
                       SizedBox(width: 6),
                       Text(
                         'MALAYSIA\'S #1 PREMIUM FLEET',
@@ -517,30 +579,59 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryOrange,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 18),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 28,
+                          vertical: 18,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                         elevation: 4,
-                        shadowColor: AppColors.primaryOrange.withValues(alpha: 0.4),
+                        shadowColor: AppColors.primaryOrange.withValues(
+                          alpha: 0.4,
+                        ),
                       ),
-                      child: const Text('Explore Benefits', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      child: const Text(
+                        'Explore Benefits',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 16),
                     OutlinedButton(
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const VehicleListScreen()),
+                          MaterialPageRoute(
+                            builder: (context) => const VehicleListScreen(),
+                          ),
                         );
                       },
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.white,
-                        side: BorderSide(color: Colors.white.withValues(alpha: 0.3), width: 1.5),
-                        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 18),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        side: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.3),
+                          width: 1.5,
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 28,
+                          vertical: 18,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
                       child: const Row(
                         children: [
-                          Text('Browse Fleet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          Text(
+                            'Browse Fleet',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
                           SizedBox(width: 8),
                           Icon(Icons.arrow_forward_rounded, size: 16),
                         ],
@@ -565,7 +656,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.92),
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1.5),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      width: 1.5,
+                    ),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.1),
@@ -588,34 +682,64 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 4),
                       Text(
                         'Premium cars. Instant confirmation.',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600], fontWeight: FontWeight.w500),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                       const SizedBox(height: 24),
                       // Pickup Branch
-                      const Text('PICKUP LOCATION', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue, letterSpacing: 0.5)),
+                      const Text(
+                        'PICKUP LOCATION',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.secondaryBlue,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
                       const SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: Colors.grey[200]!),
                           boxShadow: [
-                            BoxShadow(color: Colors.black.withValues(alpha: 0.01), blurRadius: 5, offset: const Offset(0, 2)),
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.01),
+                              blurRadius: 5,
+                              offset: const Offset(0, 2),
+                            ),
                           ],
                         ),
                         child: DropdownButtonHideUnderline(
                           child: DropdownButton<BranchModel>(
                             value: _selectedPickupBranch,
                             isExpanded: true,
-                            icon: const Icon(Icons.location_on_outlined, color: AppColors.primaryOrange),
+                            icon: const Icon(
+                              Icons.location_on_outlined,
+                              color: AppColors.primaryOrange,
+                            ),
                             items: _branches.map((b) {
                               return DropdownMenuItem(
                                 value: b,
-                                child: Text(b.name, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue, fontSize: 13)),
+                                child: Text(
+                                  b.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.secondaryBlue,
+                                    fontSize: 13,
+                                  ),
+                                ),
                               );
                             }).toList(),
-                            onChanged: (val) => setState(() => _selectedPickupBranch = val),
+                            onChanged: (val) =>
+                                setState(() => _selectedPickupBranch = val),
                           ),
                         ),
                       ),
@@ -627,30 +751,57 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('PICKUP DATE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue, letterSpacing: 0.5)),
+                                const Text(
+                                  'PICKUP DATE',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.secondaryBlue,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
                                 const SizedBox(height: 8),
                                 InkWell(
                                   onTap: () => _selectDate(context, true),
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 14,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: Colors.white,
                                       borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: Colors.grey[200]!),
+                                      border: Border.all(
+                                        color: Colors.grey[200]!,
+                                      ),
                                       boxShadow: [
-                                        BoxShadow(color: Colors.black.withValues(alpha: 0.01), blurRadius: 5, offset: const Offset(0, 2)),
+                                        BoxShadow(
+                                          color: Colors.black.withValues(
+                                            alpha: 0.01,
+                                          ),
+                                          blurRadius: 5,
+                                          offset: const Offset(0, 2),
+                                        ),
                                       ],
                                     ),
                                     child: Row(
                                       children: [
-                                        const Icon(Icons.calendar_today, size: 14, color: AppColors.primaryOrange),
+                                        const Icon(
+                                          Icons.calendar_today,
+                                          size: 14,
+                                          color: AppColors.primaryOrange,
+                                        ),
                                         const SizedBox(width: 10),
                                         Expanded(
                                           child: Text(
                                             _pickupDate == null
                                                 ? 'Select Date'
                                                 : '${_pickupDate!.day}/${_pickupDate!.month}/${_pickupDate!.year}',
-                                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue),
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppColors.secondaryBlue,
+                                            ),
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
@@ -666,30 +817,57 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('RETURN DATE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue, letterSpacing: 0.5)),
+                                const Text(
+                                  'RETURN DATE',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.secondaryBlue,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
                                 const SizedBox(height: 8),
                                 InkWell(
                                   onTap: () => _selectDate(context, false),
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 14,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: Colors.white,
                                       borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: Colors.grey[200]!),
+                                      border: Border.all(
+                                        color: Colors.grey[200]!,
+                                      ),
                                       boxShadow: [
-                                        BoxShadow(color: Colors.black.withValues(alpha: 0.01), blurRadius: 5, offset: const Offset(0, 2)),
+                                        BoxShadow(
+                                          color: Colors.black.withValues(
+                                            alpha: 0.01,
+                                          ),
+                                          blurRadius: 5,
+                                          offset: const Offset(0, 2),
+                                        ),
                                       ],
                                     ),
                                     child: Row(
                                       children: [
-                                        const Icon(Icons.calendar_today, size: 14, color: AppColors.primaryOrange),
+                                        const Icon(
+                                          Icons.calendar_today,
+                                          size: 14,
+                                          color: AppColors.primaryOrange,
+                                        ),
                                         const SizedBox(width: 10),
                                         Expanded(
                                           child: Text(
                                             _returnDate == null
                                                 ? 'Select Date'
                                                 : '${_returnDate!.day}/${_returnDate!.month}/${_returnDate!.year}',
-                                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue),
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppColors.secondaryBlue,
+                                            ),
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
@@ -709,9 +887,13 @@ class _HomeScreenState extends State<HomeScreen> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primaryOrange,
                             foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
                             elevation: 2,
-                            shadowColor: AppColors.primaryOrange.withValues(alpha: 0.4),
+                            shadowColor: AppColors.primaryOrange.withValues(
+                              alpha: 0.4,
+                            ),
                           ),
                           onPressed: _searchCars,
                           child: const Row(
@@ -719,7 +901,14 @@ class _HomeScreenState extends State<HomeScreen> {
                             children: [
                               Icon(Icons.search, size: 18),
                               SizedBox(width: 8),
-                              Text('SEARCH CARS', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 1.0)),
+                              Text(
+                                'SEARCH CARS',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 13,
+                                  letterSpacing: 1.0,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -762,23 +951,51 @@ class _HomeScreenState extends State<HomeScreen> {
             direction: isDesktop ? Axis.horizontal : Axis.vertical,
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildStatCard(Icons.people_outline, '15,000+', 'Active Customers'),
+              _buildStatCard(
+                Icons.people_outline,
+                '15,000+',
+                'Active Customers',
+              ),
               if (!isDesktop)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Divider(color: Colors.grey[200], thickness: 1, indent: 40, endIndent: 40),
+                  child: Divider(
+                    color: Colors.grey[200],
+                    thickness: 1,
+                    indent: 40,
+                    endIndent: 40,
+                  ),
                 )
               else
-                SizedBox(height: 50, child: VerticalDivider(color: Colors.grey[200], thickness: 1)),
-              _buildStatCard(Icons.directions_car_filled_rounded, '500+', 'Premium Fleet'),
+                SizedBox(
+                  height: 50,
+                  child: VerticalDivider(color: Colors.grey[200], thickness: 1),
+                ),
+              _buildStatCard(
+                Icons.directions_car_filled_rounded,
+                '500+',
+                'Premium Fleet',
+              ),
               if (!isDesktop)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Divider(color: Colors.grey[200], thickness: 1, indent: 40, endIndent: 40),
+                  child: Divider(
+                    color: Colors.grey[200],
+                    thickness: 1,
+                    indent: 40,
+                    endIndent: 40,
+                  ),
                 )
               else
-                SizedBox(height: 50, child: VerticalDivider(color: Colors.grey[200], thickness: 1)),
-              _buildStatCard(Icons.verified_user_outlined, '99.8%', 'Rental Satisfaction'),
+                SizedBox(
+                  height: 50,
+                  child: VerticalDivider(color: Colors.grey[200], thickness: 1),
+                ),
+              _buildStatCard(
+                Icons.verified_user_outlined,
+                '99.8%',
+                'Rental Satisfaction',
+              ),
             ],
           ),
         ),
@@ -804,11 +1021,20 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Text(
               value,
-              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue, letterSpacing: -0.5),
+              style: const TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w900,
+                color: AppColors.secondaryBlue,
+                letterSpacing: -0.5,
+              ),
             ),
             Text(
               label,
-              style: const TextStyle(fontSize: 13, color: AppColors.lightText, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.lightText,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ],
         ),
@@ -817,7 +1043,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildFeaturedSection(bool isDesktop) {
-    final availableFleet = _vehicles.where((v) => v.isAvailable).take(3).toList();
+    final availableFleet = _vehicles
+        .where((v) => v.isAvailable)
+        .take(3)
+        .toList();
 
     return Container(
       color: AppColors.lightGray,
@@ -856,7 +1085,11 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Text(
                 'Browse through our meticulously curated collection of high-performance vehicles, perfect for business trips or personal journeys across Malaysia.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey[500], fontSize: 14, height: 1.5),
+                style: TextStyle(
+                  color: Colors.grey[500],
+                  fontSize: 14,
+                  height: 1.5,
+                ),
               ),
             ),
           ),
@@ -872,11 +1105,18 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.directions_car_filled_outlined, size: 48, color: Colors.grey[300]),
+                        Icon(
+                          Icons.directions_car_filled_outlined,
+                          size: 48,
+                          color: Colors.grey[300],
+                        ),
                         const SizedBox(height: 16),
                         Text(
                           'No featured vehicles listed currently.',
-                          style: TextStyle(color: Colors.grey[500], fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            color: Colors.grey[500],
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ],
                     ),
@@ -932,10 +1172,26 @@ class _HomeScreenState extends State<HomeScreen> {
             runSpacing: 32,
             alignment: WrapAlignment.center,
             children: [
-              _buildServiceCard(Icons.car_rental, 'Short-Term Rental', 'Flexible daily and weekly rentals for personal use, road trips, or business excursions.'),
-              _buildServiceCard(Icons.calendar_today, 'Long-Term Lease', 'Highly economical monthly leasing programs with maintenance and insurance coverage.'),
-              _buildServiceCard(Icons.flight_takeoff, 'Airport Transfer', 'Convenient vehicle pickup and dropoff options directly at KLIA1, KLIA2, and Subang airports.'),
-              _buildServiceCard(Icons.business_center, 'Corporate Fleet', 'Tailored corporate logistics management plans for businesses requiring dedicated fleet logistics.'),
+              _buildServiceCard(
+                Icons.car_rental,
+                'Short-Term Rental',
+                'Flexible daily and weekly rentals for personal use, road trips, or business excursions.',
+              ),
+              _buildServiceCard(
+                Icons.calendar_today,
+                'Long-Term Lease',
+                'Highly economical monthly leasing programs with maintenance and insurance coverage.',
+              ),
+              _buildServiceCard(
+                Icons.flight_takeoff,
+                'Airport Transfer',
+                'Convenient vehicle pickup and dropoff options directly at KLIA1, KLIA2, and Subang airports.',
+              ),
+              _buildServiceCard(
+                Icons.business_center,
+                'Corporate Fleet',
+                'Tailored corporate logistics management plans for businesses requiring dedicated fleet logistics.',
+              ),
             ],
           ),
         ],
@@ -983,7 +1239,12 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 10),
           Text(
             body,
-            style: const TextStyle(fontSize: 13, color: AppColors.lightText, height: 1.5, fontWeight: FontWeight.w500),
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.lightText,
+              height: 1.5,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
@@ -1028,18 +1289,34 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 20),
                 Text(
                   'At ${CompanySettingsProvider().companyName}, we build a seamless platform designed to redefine vehicle mobility. Whether it is an airport transfer, long-term business leasing, or weekend getaway fleets, we supply top-tier vehicles under clean, transparent terms.',
-                  style: const TextStyle(fontSize: 15, color: AppColors.lightText, height: 1.6),
+                  style: const TextStyle(
+                    fontSize: 15,
+                    color: AppColors.lightText,
+                    height: 1.6,
+                  ),
                 ),
                 const SizedBox(height: 32),
-                _buildAboutBullet('Our Mission', 'To empower clients with reliable, well-maintained fleets through frictionless bookings.'),
+                _buildAboutBullet(
+                  'Our Mission',
+                  'To empower clients with reliable, well-maintained fleets through frictionless bookings.',
+                ),
                 const SizedBox(height: 16),
-                _buildAboutBullet('Our Vision', 'To establish Malaysia\'s safest, most reliable telematics-driven vehicle network.'),
+                _buildAboutBullet(
+                  'Our Vision',
+                  'To establish Malaysia\'s safest, most reliable telematics-driven vehicle network.',
+                ),
                 const SizedBox(height: 16),
-                _buildAboutBullet('Why Choose Us', 'Dynamic DuitNow/FPX deposits, instant identity verification, and live telematics-backed security.'),
+                _buildAboutBullet(
+                  'Why Choose Us',
+                  'Dynamic DuitNow/FPX deposits, instant identity verification, and live telematics-backed security.',
+                ),
               ],
             ),
           ),
-          if (isDesktop) const SizedBox(width: 80) else const SizedBox(height: 48),
+          if (isDesktop)
+            const SizedBox(width: 80)
+          else
+            const SizedBox(height: 48),
           Expanded(
             flex: isDesktop ? 1 : 0,
             child: Container(
@@ -1062,7 +1339,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   errorBuilder: (context, error, stackTrace) => Container(
                     height: 400,
                     color: Colors.grey[200],
-                    child: const Icon(Icons.image, size: 64, color: Colors.grey),
+                    child: const Icon(
+                      Icons.image,
+                      size: 64,
+                      color: Colors.grey,
+                    ),
                   ),
                 ),
               ),
@@ -1077,15 +1358,32 @@ class _HomeScreenState extends State<HomeScreen> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(Icons.check_circle_outline, color: AppColors.primaryOrange, size: 20),
+        const Icon(
+          Icons.check_circle_outline,
+          color: AppColors.primaryOrange,
+          size: 20,
+        ),
         const SizedBox(width: 12),
         Expanded(
           child: RichText(
             text: TextSpan(
-              style: const TextStyle(fontSize: 13, color: AppColors.darkText, height: 1.5),
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.darkText,
+                height: 1.5,
+              ),
               children: [
-                TextSpan(text: '$title: ', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
-                TextSpan(text: body, style: const TextStyle(color: AppColors.lightText)),
+                TextSpan(
+                  text: '$title: ',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.secondaryBlue,
+                  ),
+                ),
+                TextSpan(
+                  text: body,
+                  style: const TextStyle(color: AppColors.lightText),
+                ),
               ],
             ),
           ),
@@ -1156,7 +1454,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildReviewCard(String name, String location, String text, String avatarUrl) {
+  Widget _buildReviewCard(
+    String name,
+    String location,
+    String text,
+    String avatarUrl,
+  ) {
     return Container(
       width: 320,
       padding: const EdgeInsets.all(32),
@@ -1176,12 +1479,25 @@ class _HomeScreenState extends State<HomeScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            children: List.generate(5, (_) => const Icon(Icons.star_rounded, color: AppColors.primaryOrange, size: 18)),
+            children: List.generate(
+              5,
+              (_) => const Icon(
+                Icons.star_rounded,
+                color: AppColors.primaryOrange,
+                size: 18,
+              ),
+            ),
           ),
           const SizedBox(height: 20),
           Text(
             '"$text"',
-            style: const TextStyle(fontSize: 14, fontStyle: FontStyle.italic, color: AppColors.lightText, height: 1.6, fontWeight: FontWeight.w500),
+            style: const TextStyle(
+              fontSize: 14,
+              fontStyle: FontStyle.italic,
+              color: AppColors.lightText,
+              height: 1.6,
+              fontWeight: FontWeight.w500,
+            ),
           ),
           const SizedBox(height: 24),
           Row(
@@ -1195,8 +1511,22 @@ class _HomeScreenState extends State<HomeScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
-                  Text(location, style: const TextStyle(fontSize: 11, color: AppColors.lightText, fontWeight: FontWeight.bold)),
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.secondaryBlue,
+                    ),
+                  ),
+                  Text(
+                    location,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.lightText,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -1238,10 +1568,22 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(height: 56),
-          _buildFAQItem('What documents are required to rent a vehicle?', 'You need a valid ID/Passport and a verified driving license upload in your profile to checkout a car reservation.'),
-          _buildFAQItem('Is there a security deposit?', 'Yes. Deposits can be paid securely via DuitNow QR or FPX Online Banking, which are fully refunded upon safe return.'),
-          _buildFAQItem('How does GPS tracking work?', 'Rented vehicles transmit latitude/longitude coordinates to Firebase Realtime Database. You can track your car location directly in your dashboard.'),
-          _buildFAQItem('Can I return the vehicle to a different branch?', 'Yes. Select your preferred pickup and dropoff branches on the checkout page before making a payment.'),
+          _buildFAQItem(
+            'What documents are required to rent a vehicle?',
+            'You need a valid ID/Passport and a verified driving license upload in your profile to checkout a car reservation.',
+          ),
+          _buildFAQItem(
+            'Is there a security deposit?',
+            'Yes. Deposits can be paid securely via DuitNow QR or FPX Online Banking, which are fully refunded upon safe return.',
+          ),
+          _buildFAQItem(
+            'How does GPS tracking work?',
+            'Rented vehicles transmit latitude/longitude coordinates to Firebase Realtime Database. You can track your car location directly in your dashboard.',
+          ),
+          _buildFAQItem(
+            'Can I return the vehicle to a different branch?',
+            'Yes. Select your preferred pickup and dropoff branches on the checkout page before making a payment.',
+          ),
         ],
       ),
     );
@@ -1260,19 +1602,32 @@ class _HomeScreenState extends State<HomeScreen> {
         child: ExpansionTile(
           title: Text(
             question,
-            style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue, fontSize: 14),
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: AppColors.secondaryBlue,
+              fontSize: 14,
+            ),
           ),
           iconColor: AppColors.primaryOrange,
           collapsedIconColor: AppColors.secondaryBlue,
           shape: Border.all(color: Colors.transparent),
           collapsedShape: Border.all(color: Colors.transparent),
-          childrenPadding: const EdgeInsets.only(left: 16, right: 16, bottom: 20),
+          childrenPadding: const EdgeInsets.only(
+            left: 16,
+            right: 16,
+            bottom: 20,
+          ),
           children: [
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
                 answer,
-                style: const TextStyle(color: AppColors.lightText, fontSize: 13, height: 1.6, fontWeight: FontWeight.w500),
+                style: const TextStyle(
+                  color: AppColors.lightText,
+                  fontSize: 13,
+                  height: 1.6,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
           ],
@@ -1325,20 +1680,41 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 20),
                     const Text(
                       'Have queries about corporate leases, custom drop-off branches, or DuitNow deposit approvals? Contact our support staff or subscribe to receive our weekly seasonal updates and promotional codes.',
-                      style: TextStyle(color: AppColors.lightText, fontSize: 15, height: 1.6),
+                      style: TextStyle(
+                        color: AppColors.lightText,
+                        fontSize: 15,
+                        height: 1.6,
+                      ),
                     ),
                     const SizedBox(height: 36),
                     // Contact Info Cards
-                    _buildContactInfoItem(Icons.location_on_outlined, 'Headquarters', 'Presint 1 Terminal Hub, 62000 Putrajaya'),
+                    _buildContactInfoItem(
+                      Icons.location_on_outlined,
+                      'Headquarters',
+                      'Presint 1 Terminal Hub, 62000 Putrajaya',
+                    ),
                     const SizedBox(height: 16),
-                    _buildContactInfoItem(Icons.phone_outlined, 'Direct Phone Support', '+603-8888 1234 (HQ)'),
+                    _buildContactInfoItem(
+                      Icons.phone_outlined,
+                      'Direct Phone Support',
+                      '+603-8888 1234 (HQ)',
+                    ),
                     const SizedBox(height: 16),
-                    _buildContactInfoItem(Icons.mail_outline_rounded, 'Corporate Email Desk', CompanySettingsProvider().companyEmail),
+                    _buildContactInfoItem(
+                      Icons.mail_outline_rounded,
+                      'Corporate Email Desk',
+                      CompanySettingsProvider().companyEmail,
+                    ),
                     const SizedBox(height: 48),
                     // Newsletter Block
                     const Text(
                       'SUBSCRIBE TO NEWSLETTER',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue, letterSpacing: 1.0),
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.secondaryBlue,
+                        letterSpacing: 1.0,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Row(
@@ -1351,8 +1727,14 @@ class _HomeScreenState extends State<HomeScreen> {
                               hintText: 'Enter your email',
                               filled: true,
                               fillColor: AppColors.lightGray,
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 16,
+                              ),
                             ),
                           ),
                         ),
@@ -1361,7 +1743,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           onPressed: () {
                             if (newsletterController.text.trim().isNotEmpty) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Thank you for subscribing to ${CompanySettingsProvider().companyName}!'), backgroundColor: Colors.green),
+                                SnackBar(
+                                  content: Text(
+                                    'Thank you for subscribing to ${CompanySettingsProvider().companyName}!',
+                                  ),
+                                  backgroundColor: Colors.green,
+                                ),
                               );
                               newsletterController.clear();
                             }
@@ -1369,17 +1756,28 @@ class _HomeScreenState extends State<HomeScreen> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.secondaryBlue,
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 18,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
-                          child: const Text('Subscribe', style: TextStyle(fontWeight: FontWeight.bold)),
+                          child: const Text(
+                            'Subscribe',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
                         ),
                       ],
                     ),
                   ],
                 ),
               ),
-              if (isDesktop) const SizedBox(width: 80) else const SizedBox(height: 48),
+              if (isDesktop)
+                const SizedBox(width: 80)
+              else
+                const SizedBox(height: 48),
               // Right side: Support Contact Form Card
               Expanded(
                 flex: isDesktop ? 5 : 0,
@@ -1404,7 +1802,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         const Text(
                           'Send Us a Message',
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.secondaryBlue),
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.secondaryBlue,
+                          ),
                         ),
                         const SizedBox(height: 20),
                         TextFormField(
@@ -1414,7 +1816,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             hintText: 'Enter your name',
                             prefixIcon: Icon(Icons.person_outline),
                           ),
-                          validator: (val) => val == null || val.trim().isEmpty ? 'Name is required' : null,
+                          validator: (val) => val == null || val.trim().isEmpty
+                              ? 'Name is required'
+                              : null,
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
@@ -1425,8 +1829,10 @@ class _HomeScreenState extends State<HomeScreen> {
                             prefixIcon: Icon(Icons.email_outlined),
                           ),
                           validator: (val) {
-                            if (val == null || val.trim().isEmpty) return 'Email is required';
-                            if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val)) return 'Enter a valid email';
+                            if (val == null || val.trim().isEmpty)
+                              return 'Email is required';
+                            if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val))
+                              return 'Enter a valid email';
                             return null;
                           },
                         ),
@@ -1438,7 +1844,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             hintText: 'What is this regarding?',
                             prefixIcon: Icon(Icons.subject_outlined),
                           ),
-                          validator: (val) => val == null || val.trim().isEmpty ? 'Subject is required' : null,
+                          validator: (val) => val == null || val.trim().isEmpty
+                              ? 'Subject is required'
+                              : null,
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
@@ -1449,7 +1857,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             hintText: 'How can we help you?',
                             prefixIcon: Icon(Icons.message_outlined),
                           ),
-                          validator: (val) => val == null || val.trim().isEmpty ? 'Message cannot be empty' : null,
+                          validator: (val) => val == null || val.trim().isEmpty
+                              ? 'Message cannot be empty'
+                              : null,
                         ),
                         const SizedBox(height: 24),
                         SizedBox(
@@ -1458,18 +1868,34 @@ class _HomeScreenState extends State<HomeScreen> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primaryOrange,
                               foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
                               elevation: 2,
-                              shadowColor: AppColors.primaryOrange.withValues(alpha: 0.4),
+                              shadowColor: AppColors.primaryOrange.withValues(
+                                alpha: 0.4,
+                              ),
                             ),
-                            onPressed: _loadingSupport ? null : _submitContactForm,
+                            onPressed: _loadingSupport
+                                ? null
+                                : _submitContactForm,
                             child: _loadingSupport
                                 ? const SizedBox(
                                     width: 20,
                                     height: 20,
-                                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
                                   )
-                                : const Text('SEND MESSAGE', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5)),
+                                : const Text(
+                                    'SEND MESSAGE',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 13,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
                           ),
                         ),
                       ],
@@ -1501,9 +1927,24 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
               const SizedBox(height: 2),
-              Text(detail, style: const TextStyle(fontSize: 14, color: AppColors.secondaryBlue, fontWeight: FontWeight.bold)),
+              Text(
+                detail,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppColors.secondaryBlue,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
         ),
@@ -1543,19 +1984,31 @@ class _HomeScreenState extends State<HomeScreen> {
                                 color: Colors.white.withValues(alpha: 0.08),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: const AppLogo(size: 24, fallbackColor: AppColors.primaryOrange),
+                              child: const AppLogo(
+                                size: 24,
+                                fallbackColor: AppColors.primaryOrange,
+                              ),
                             ),
                             const SizedBox(width: 8),
                             Text(
                               CompanySettingsProvider().companyName,
-                              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 1.5),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.5,
+                              ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 20),
                         Text(
                           CompanySettingsProvider().companyDescription,
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13, height: 1.6),
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.6),
+                            fontSize: 13,
+                            height: 1.6,
+                          ),
                         ),
                         const SizedBox(height: 24),
                         Row(
@@ -1575,7 +2028,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('SERVICES', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.0)),
+                      const Text(
+                        'SERVICES',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
                       const SizedBox(height: 20),
                       _buildFooterLink('Short-Term Rental'),
                       _buildFooterLink('Long-Term Lease'),
@@ -1588,7 +2049,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('QUICK LINKS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.0)),
+                      const Text(
+                        'QUICK LINKS',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
                       const SizedBox(height: 20),
                       _buildFooterLink('Search Vehicles'),
                       _buildFooterLink('Customer Login'),
@@ -1601,12 +2070,38 @@ class _HomeScreenState extends State<HomeScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('${CompanySettingsProvider().companyName} HQ', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.0)),
+                      Text(
+                        '${CompanySettingsProvider().companyName} HQ',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
                       const SizedBox(height: 20),
-                      Text(CompanySettingsProvider().companyAddress, style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
+                      Text(
+                        CompanySettingsProvider().companyAddress,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.6),
+                          fontSize: 13,
+                        ),
+                      ),
                       const SizedBox(height: 12),
-                      Text('Phone: ${CompanySettingsProvider().companyPhone}', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
-                      Text('Email: ${CompanySettingsProvider().companyEmail}', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
+                      Text(
+                        'Phone: ${CompanySettingsProvider().companyPhone}',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.6),
+                          fontSize: 13,
+                        ),
+                      ),
+                      Text(
+                        'Email: ${CompanySettingsProvider().companyEmail}',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.6),
+                          fontSize: 13,
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -1619,11 +2114,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text(
                     '© 2026 ${CompanySettingsProvider().companyName}. All rights reserved.',
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.4),
+                      fontSize: 12,
+                    ),
                   ),
                   Text(
                     'SaaS Web Platform v2.0',
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.4),
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),
@@ -1650,7 +2151,10 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.only(bottom: 12),
       child: Text(
         label,
-        style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: 0.6),
+          fontSize: 13,
+        ),
       ),
     );
   }
@@ -1660,11 +2164,7 @@ class NavHoverLink extends StatefulWidget {
   final String text;
   final VoidCallback onTap;
 
-  const NavHoverLink({
-    super.key,
-    required this.text,
-    required this.onTap,
-  });
+  const NavHoverLink({super.key, required this.text, required this.onTap});
 
   @override
   State<NavHoverLink> createState() => _NavHoverLinkState();
@@ -1691,7 +2191,9 @@ class _NavHoverLinkState extends State<NavHoverLink> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: _isHovered ? FontWeight.bold : FontWeight.w600,
-                  color: _isHovered ? AppColors.primaryOrange : AppColors.secondaryBlue,
+                  color: _isHovered
+                      ? AppColors.primaryOrange
+                      : AppColors.secondaryBlue,
                 ),
               ),
               const SizedBox(height: 4),
@@ -1726,25 +2228,44 @@ class _VehicleHoverCardState extends State<VehicleHoverCard> {
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
-      cursor: v.status.toLowerCase() == 'available' ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      cursor: v.status.toLowerCase() == 'available'
+          ? SystemMouseCursors.click
+          : SystemMouseCursors.basic,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
         curve: Curves.easeOut,
         width: 320,
-        transform: Matrix4.translationValues(0.0, (_isHovered && v.status.toLowerCase() == 'available') ? -8.0 : 0.0, 0.0),
+        transform: Matrix4.translationValues(
+          0.0,
+          (_isHovered && v.status.toLowerCase() == 'available') ? -8.0 : 0.0,
+          0.0,
+        ),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: (_isHovered && v.status.toLowerCase() == 'available') ? 0.08 : 0.03),
-              blurRadius: (_isHovered && v.status.toLowerCase() == 'available') ? 20 : 10,
-              offset: Offset(0, (_isHovered && v.status.toLowerCase() == 'available') ? 10 : 4),
+              color: Colors.black.withValues(
+                alpha: (_isHovered && v.status.toLowerCase() == 'available')
+                    ? 0.08
+                    : 0.03,
+              ),
+              blurRadius: (_isHovered && v.status.toLowerCase() == 'available')
+                  ? 20
+                  : 10,
+              offset: Offset(
+                0,
+                (_isHovered && v.status.toLowerCase() == 'available') ? 10 : 4,
+              ),
             ),
           ],
           border: Border.all(
-            color: (_isHovered && v.status.toLowerCase() == 'available') ? AppColors.primaryOrange.withValues(alpha: 0.5) : Colors.grey[200]!,
-            width: (_isHovered && v.status.toLowerCase() == 'available') ? 1.5 : 1.0,
+            color: (_isHovered && v.status.toLowerCase() == 'available')
+                ? AppColors.primaryOrange.withValues(alpha: 0.5)
+                : Colors.grey[200]!,
+            width: (_isHovered && v.status.toLowerCase() == 'available')
+                ? 1.5
+                : 1.0,
           ),
         ),
         child: Column(
@@ -1753,7 +2274,9 @@ class _VehicleHoverCardState extends State<VehicleHoverCard> {
             Stack(
               children: [
                 ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(23)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(23),
+                  ),
                   child: AppImage(
                     imageSrc: v.mainImage,
                     height: 180,
@@ -1762,7 +2285,11 @@ class _VehicleHoverCardState extends State<VehicleHoverCard> {
                     placeholder: Container(
                       height: 180,
                       color: Colors.grey[100],
-                      child: const Icon(Icons.car_rental, size: 48, color: Colors.grey),
+                      child: const Icon(
+                        Icons.car_rental,
+                        size: 48,
+                        color: Colors.grey,
+                      ),
                     ),
                   ),
                 ),
@@ -1770,25 +2297,36 @@ class _VehicleHoverCardState extends State<VehicleHoverCard> {
                   top: 16,
                   left: 16,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.secondaryBlue.withValues(alpha: 0.85),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
                       v.category.toUpperCase(),
-                      style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.5,
+                      ),
                     ),
                   ),
                 ),
-                
+
                 // Status Overlay Over Vehicle Image
                 if (v.status.toLowerCase() == 'available')
                   Positioned(
                     top: 16,
                     right: 16,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFF2ECC71), // Green Badge
                         borderRadius: BorderRadius.circular(20),
@@ -1822,7 +2360,9 @@ class _VehicleHoverCardState extends State<VehicleHoverCard> {
                   // Dark overlay
                   Positioned.fill(
                     child: ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(23)),
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(23),
+                      ),
                       child: Container(
                         color: Colors.black.withValues(alpha: 0.4),
                       ),
@@ -1834,9 +2374,15 @@ class _VehicleHoverCardState extends State<VehicleHoverCard> {
                       child: Transform.rotate(
                         angle: -0.2, // diagonal angle
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
-                            border: Border.all(color: const Color(0xFFE74C3C), width: 3),
+                            border: Border.all(
+                              color: const Color(0xFFE74C3C),
+                              width: 3,
+                            ),
                             borderRadius: BorderRadius.circular(8),
                             color: Colors.black.withValues(alpha: 0.5),
                           ),
@@ -1857,7 +2403,9 @@ class _VehicleHoverCardState extends State<VehicleHoverCard> {
                   // Dark overlay
                   Positioned.fill(
                     child: ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(23)),
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(23),
+                      ),
                       child: Container(
                         color: Colors.black.withValues(alpha: 0.4),
                       ),
@@ -1869,16 +2417,26 @@ class _VehicleHoverCardState extends State<VehicleHoverCard> {
                       child: Transform.rotate(
                         angle: -0.2,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
-                            border: Border.all(color: const Color(0xFFE67E22), width: 3),
+                            border: Border.all(
+                              color: const Color(0xFFE67E22),
+                              width: 3,
+                            ),
                             borderRadius: BorderRadius.circular(8),
                             color: Colors.black.withValues(alpha: 0.5),
                           ),
                           child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.build, color: Color(0xFFE67E22), size: 14),
+                              Icon(
+                                Icons.build,
+                                color: Color(0xFFE67E22),
+                                size: 14,
+                              ),
                               SizedBox(width: 6),
                               Text(
                                 'MAINTENANCE',
@@ -1914,11 +2472,19 @@ class _VehicleHoverCardState extends State<VehicleHoverCard> {
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      const Icon(Icons.location_on_outlined, size: 14, color: AppColors.primaryOrange),
+                      const Icon(
+                        Icons.location_on_outlined,
+                        size: 14,
+                        color: AppColors.primaryOrange,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         v.branchName.isNotEmpty ? v.branchName : 'General Hub',
-                        style: const TextStyle(fontSize: 12, color: AppColors.lightText, fontWeight: FontWeight.w500),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.lightText,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ],
                   ),
@@ -1927,9 +2493,18 @@ class _VehicleHoverCardState extends State<VehicleHoverCard> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildSpecBadge(Icons.airline_seat_recline_normal, '${v.seats} Seats'),
-                      _buildSpecBadge(Icons.settings_input_component, v.transmission),
-                      _buildSpecBadge(Icons.local_gas_station_outlined, v.fuelType),
+                      _buildSpecBadge(
+                        Icons.airline_seat_recline_normal,
+                        '${v.seats} Seats',
+                      ),
+                      _buildSpecBadge(
+                        Icons.settings_input_component,
+                        v.transmission,
+                      ),
+                      _buildSpecBadge(
+                        Icons.local_gas_station_outlined,
+                        v.fuelType,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -1941,7 +2516,15 @@ class _VehicleHoverCardState extends State<VehicleHoverCard> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('DAILY RATE', style: TextStyle(fontSize: 9, color: Colors.grey, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                          const Text(
+                            'DAILY RATE',
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: Colors.grey,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
                           Text(
                             'RM ${v.pricePerDay.toStringAsFixed(0)}',
                             style: const TextStyle(
@@ -1953,25 +2536,43 @@ class _VehicleHoverCardState extends State<VehicleHoverCard> {
                         ],
                       ),
                       ElevatedButton(
-                        onPressed: v.status.toLowerCase() == 'available' ? () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => VehicleDetailsScreen(vehicle: v),
-                            ),
-                          );
-                        } : null,
+                        onPressed: v.status.toLowerCase() == 'available'
+                            ? () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        VehicleDetailsScreen(vehicle: v),
+                                  ),
+                                );
+                              }
+                            : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primaryOrange,
                           foregroundColor: Colors.white,
-                          elevation: (_isHovered && v.status.toLowerCase() == 'available') ? 2 : 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          elevation:
+                              (_isHovered &&
+                                  v.status.toLowerCase() == 'available')
+                              ? 2
+                              : 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
                         ),
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text('Book Now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                            Text(
+                              'Book Now',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
                             SizedBox(width: 4),
                             Icon(Icons.arrow_forward_rounded, size: 14),
                           ],
@@ -2000,7 +2601,14 @@ class _VehicleHoverCardState extends State<VehicleHoverCard> {
         children: [
           Icon(icon, size: 12, color: AppColors.lightText),
           const SizedBox(width: 4),
-          Text(text, style: const TextStyle(fontSize: 10, color: AppColors.lightText, fontWeight: FontWeight.bold)),
+          Text(
+            text,
+            style: const TextStyle(
+              fontSize: 10,
+              color: AppColors.lightText,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ],
       ),
     );
