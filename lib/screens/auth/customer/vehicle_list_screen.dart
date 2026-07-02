@@ -510,6 +510,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
             ],
           ),
           const SizedBox(height: 0),
+
           // Search Brand/Model - Moved here from toolbar
           const SizedBox(height: 2),
           Container(
@@ -1029,11 +1030,8 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
         ? const Color(0xFFF59E0B)
         : const Color(0xFFEF4444);
     final bool isDesktop = MediaQuery.of(context).size.width > 950;
-    final bool isMobile = MediaQuery.of(context).size.width <= 600;
-
-    // Reduced image height for mobile
-    final double imageHeight = isDesktop ? 130 : 90;
-    final double contentPadding = isDesktop ? 12 : 8;
+    final double imageHeight = isDesktop ? 130 : 110;
+    final double contentPadding = isDesktop ? 12 : 10;
 
     return Container(
       decoration: BoxDecoration(
@@ -1050,7 +1048,6 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min, // Added to minimize vertical space
         children: [
           Stack(
             children: [
@@ -1097,12 +1094,12 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                   ),
                 ),
               Positioned(
-                top: 8,
-                left: 8,
+                top: 12,
+                left: 12,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
+                    horizontal: 8,
+                    vertical: 4,
                   ),
                   decoration: BoxDecoration(
                     color: statusColor,
@@ -1112,7 +1109,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                     vehicle.status.toUpperCase(),
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 7,
+                      fontSize: 8,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 0.5,
                     ),
@@ -1125,10 +1122,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
             padding: EdgeInsets.all(contentPadding),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize:
-                  MainAxisSize.min, // Added to minimize vertical space
               children: [
-                // Car name row
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1139,49 +1133,45 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: isMobile ? 12 : 13,
+                          fontSize: 13,
                           color: _textColor,
                         ),
                       ),
                     ),
-                    // Daily rate for mobile (moved to top)
-                    if (isMobile) ...[
-                      const SizedBox(width: 4),
+                    if (!isDesktop)
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
-                        mainAxisSize: MainAxisSize.min,
                         children: [
                           const Text(
                             'DAILY RATE',
                             style: TextStyle(
-                              fontSize: 6,
+                              fontSize: 8,
                               color: Colors.grey,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
+                          const SizedBox(height: 2),
                           Text(
                             'RM ${vehicle.pricePerDay.toStringAsFixed(0)}',
                             style: const TextStyle(
-                              fontSize: 10,
+                              fontSize: 12,
                               fontWeight: FontWeight.bold,
                               color: AppColors.primaryOrange,
                             ),
                           ),
                         ],
                       ),
-                    ],
                   ],
                 ),
-                const SizedBox(height: 2),
-                // Location
+                const SizedBox(height: 4),
                 Row(
                   children: [
                     const Icon(
                       Icons.location_on_outlined,
-                      size: 10,
+                      size: 12,
                       color: Colors.grey,
                     ),
-                    const SizedBox(width: 2),
+                    const SizedBox(width: 4),
                     Expanded(
                       child: Text(
                         vehicle.branchName.isNotEmpty
@@ -1189,13 +1179,15 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                             : 'General Hub',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 9, color: Colors.grey),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Colors.grey,
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                // Spec tags row
+                const SizedBox(height: 10),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -1209,14 +1201,15 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                     ),
                   ],
                 ),
-                // Daily rate for desktop only
-                if (isDesktop) ...[
-                  const SizedBox(height: 8),
-                  Divider(height: 1, color: _borderColor),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
+                const SizedBox(height: 12),
+                Divider(height: 1, color: _borderColor),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: isDesktop
+                      ? MainAxisAlignment.spaceBetween
+                      : MainAxisAlignment.end,
+                  children: [
+                    if (isDesktop)
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -1238,113 +1231,54 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                           ),
                         ],
                       ),
-                      SizedBox(
-                        height: 28,
-                        child: ElevatedButton(
-                          onPressed: isAvailable
-                              ? () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          CustomerResponsiveShell(
-                                            initialIndex: 1,
-                                            customBody: VehicleDetailsScreen(
-                                              vehicle: vehicle,
-                                              hideAppBar: true,
-                                            ),
-                                          ),
+                    ElevatedButton(
+                      onPressed: isAvailable
+                          ? () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => CustomerResponsiveShell(
+                                    initialIndex: 1,
+                                    customBody: VehicleDetailsScreen(
+                                      vehicle: vehicle,
+                                      hideAppBar: true,
                                     ),
-                                  ).then((_) => _loadData());
-                                }
-                              : null,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: isAvailable
-                                ? AppColors.primaryOrange
-                                : (_isDark
-                                      ? const Color(0xFF0F172A)
-                                      : Colors.grey[200]),
-                            foregroundColor: isAvailable
-                                ? Colors.white
-                                : (_isDark ? Colors.white30 : Colors.grey[400]),
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 4,
-                            ),
-                          ),
-                          child: Text(
-                            isAvailable ? 'Book Now' : 'Booked',
-                            style: const TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                                  ),
+                                ),
+                              ).then((_) => _loadData());
+                            }
+                          : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isAvailable
+                            ? AppColors.primaryOrange
+                            : (_isDark
+                                  ? const Color(0xFF0F172A)
+                                  : Colors.grey[200]),
+                        foregroundColor: isAvailable
+                            ? Colors.white
+                            : (_isDark ? Colors.white30 : Colors.grey[400]),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
                         ),
                       ),
-                    ],
-                  ),
-                ],
+                      child: Text(
+                        isAvailable ? 'Book Now' : 'Booked',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
-          // Book Now button at bottom for mobile only
-          if (isMobile)
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                contentPadding,
-                0,
-                contentPadding,
-                contentPadding,
-              ),
-              child: SizedBox(
-                width: double.infinity,
-                height: 32,
-                child: ElevatedButton(
-                  onPressed: isAvailable
-                      ? () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => CustomerResponsiveShell(
-                                initialIndex: 1,
-                                customBody: VehicleDetailsScreen(
-                                  vehicle: vehicle,
-                                  hideAppBar: true,
-                                ),
-                              ),
-                            ),
-                          ).then((_) => _loadData());
-                        }
-                      : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isAvailable
-                        ? AppColors.primaryOrange
-                        : (_isDark
-                              ? const Color(0xFF0F172A)
-                              : Colors.grey[200]),
-                    foregroundColor: isAvailable
-                        ? Colors.white
-                        : (_isDark ? Colors.white30 : Colors.grey[400]),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                  ),
-                  child: Text(
-                    isAvailable ? 'Book Now' : 'Booked',
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
     );
