@@ -468,7 +468,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     foregroundColor: Colors.white,
                   ),
                   onPressed: () async {
-                    if (commentController.text.trim().isEmpty) return;
+                    final comment = commentController.text.trim();
 
                     final review = ReviewModel(
                       id: '',
@@ -476,7 +476,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       userId: booking.userId,
                       userName: booking.userName,
                       rating: selectedRating,
-                      comment: commentController.text.trim(),
+                      comment: comment,
                       createdAt: DateTime.now(),
                     );
 

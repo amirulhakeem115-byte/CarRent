@@ -292,7 +292,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                     ),
                   ),
                   onPressed: () async {
-                    if (commentController.text.trim().isEmpty) return;
+                    final comment = commentController.text.trim();
 
                     final review = ReviewModel(
                       id: '',
@@ -300,7 +300,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                       userId: booking.userId,
                       userName: booking.userName,
                       rating: selectedRating,
-                      comment: commentController.text.trim(),
+                      comment: comment,
                       createdAt: DateTime.now(),
                     );
 
