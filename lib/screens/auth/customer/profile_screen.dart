@@ -590,9 +590,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 color: isDark ? const Color(0xFF334155) : Colors.grey[200]!,
               ),
             ),
-            child: Row(
+            child: Flex(
+              direction: isDesktop ? Axis.horizontal : Axis.vertical,
+              crossAxisAlignment: isDesktop
+                  ? CrossAxisAlignment.center
+                  : CrossAxisAlignment.center,
               children: [
-                // Avatar clickable to change profile photo
                 GestureDetector(
                   onTap: _pickProfileImage,
                   child: Stack(
@@ -634,16 +637,66 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(width: 20),
-                // Username + Email details
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                SizedBox(width: isDesktop ? 20 : 0, height: isDesktop ? 0 : 16),
+                if (isDesktop)
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _user?.fullName.isNotEmpty == true
+                              ? _user!.fullName
+                              : 'Username',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: isDark
+                                ? Colors.white
+                                : AppColors.secondaryBlue,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _user?.email ?? '',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: isDark
+                                ? const Color(0xFFCBD5E1)
+                                : Colors.grey[500],
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.stars_rounded,
+                              color: AppColors.primaryOrange,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${_user?.rewardPoints ?? 0} Points',
+                              style: const TextStyle(
+                                color: AppColors.primaryOrange,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  Column(
                     children: [
                       Text(
                         _user?.fullName.isNotEmpty == true
                             ? _user!.fullName
                             : 'Username',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
@@ -653,17 +706,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        _user?.email ?? '',
-                        style: TextStyle(
-                          color: isDark
-                              ? const Color(0xFFCBD5E1)
-                              : Colors.grey[500],
-                          fontSize: 13,
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 240),
+                        child: Text(
+                          _user?.email ?? '',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: isDark
+                                ? const Color(0xFFCBD5E1)
+                                : Colors.grey[500],
+                            fontSize: 13,
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 8),
                       Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           const Icon(
                             Icons.stars_rounded,
@@ -683,10 +743,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ],
                   ),
-                ),
-                // Edit profile and logout buttons row
-                Row(
-                  mainAxisSize: MainAxisSize.min,
+                SizedBox(width: isDesktop ? 20 : 0, height: isDesktop ? 0 : 16),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
@@ -710,7 +771,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       onPressed: _showEditProfileDialog,
                     ),
-                    const SizedBox(width: 8),
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.redAccent,

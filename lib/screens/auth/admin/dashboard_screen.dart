@@ -710,11 +710,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   () => setState(() => _activeTab = 'Reports'),
                 ),
                 _buildSidebarTile(
-                  Icons.notifications_none_outlined,
-                  'Notifications',
-                  () => setState(() => _activeTab = 'Notifications'),
-                ),
-                _buildSidebarTile(
                   Icons.mail_outline_rounded,
                   'Support Inbox',
                   () => setState(() => _activeTab = 'Support Inbox'),
@@ -729,25 +724,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   'Company Settings',
                   () => setState(() => _activeTab = 'Company Settings'),
                 ),
-                _buildSidebarTile(
-                  Icons.person_outline,
-                  'Admin Profile',
-                  () => setState(() => _activeTab = 'Admin Profile'),
-                ),
               ],
             ),
           ),
-          const Divider(color: Colors.white12, height: 1),
-          _buildSidebarTile(Icons.logout, 'Logout', () async {
-            final nav = Navigator.of(context);
-            await _authService.logout();
-            nav.pushAndRemoveUntil(
-              MaterialPageRoute(
-                builder: (context) => LoginScreen(onLoggedIn: () {}),
-              ),
-              (route) => false,
-            );
-          }),
           const SizedBox(height: 16),
         ],
       ),
@@ -1390,10 +1369,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         _adminUser?.profileImage,
                       ),
                       child: _adminUser?.profileImage.isNotEmpty != true
-                          ? const Icon(
+                          ? Icon(
                               Icons.person,
                               size: 18,
-                              color: AppColors.secondaryBlue,
+                              color: _isDark
+                                  ? const Color(0xFFF8FAFC)
+                                  : AppColors.secondaryBlue,
                             )
                           : null,
                     ),
@@ -1405,22 +1386,31 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         children: [
                           Text(
                             _adminUser?.fullName ?? 'Admin',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 13,
-                              color: AppColors.secondaryBlue,
+                              color: _isDark
+                                  ? const Color(0xFFF8FAFC)
+                                  : AppColors.secondaryBlue,
                             ),
                           ),
-                          const Text(
+                          Text(
                             'Super Administrator',
-                            style: TextStyle(fontSize: 9, color: Colors.grey),
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: _isDark
+                                  ? const Color(0xFFE2E8F0)
+                                  : Colors.grey,
+                            ),
                           ),
                         ],
                       ),
-                      const Icon(
+                      Icon(
                         Icons.arrow_drop_down,
                         size: 16,
-                        color: AppColors.secondaryBlue,
+                        color: _isDark
+                            ? const Color(0xFFF8FAFC)
+                            : AppColors.secondaryBlue,
                       ),
                     ],
                   ],
@@ -1516,7 +1506,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       physics: const NeverScrollableScrollPhysics(),
       crossAxisSpacing: 16,
       mainAxisSpacing: 16,
-      childAspectRatio: isDesktop ? 1.05 : 1.25,
+      childAspectRatio: isDesktop ? 1.05 : 0.94,
       children: [
         _buildStatsCard(
           'Total Vehicles',
@@ -1578,8 +1568,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     String trendText,
     bool isPositiveAction,
   ) {
+    final bool isCompactMobile = MediaQuery.of(context).size.width <= 600;
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isCompactMobile ? 14 : 16),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
@@ -1611,8 +1603,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ),
               if (label.contains('Pending') && _pendingPaymentsCount > 0)
                 Container(
-                  width: 8,
-                  height: 8,
+                  width: isCompactMobile ? 7 : 8,
+                  height: isCompactMobile ? 7 : 8,
                   decoration: const BoxDecoration(
                     color: Colors.red,
                     shape: BoxShape.circle,
@@ -1620,7 +1612,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 ),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: isCompactMobile ? 6 : 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1628,21 +1620,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Colors.grey,
-                    fontSize: 11,
+                    fontSize: isCompactMobile ? 10 : 11,
                     fontWeight: FontWeight.bold,
                   ),
-                  maxLines: 1,
+                  maxLines: isCompactMobile ? 2 : 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: isCompactMobile ? 2 : 4),
                 FittedBox(
                   fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
                   child: Text(
                     value,
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: isCompactMobile ? 16 : 18,
                       fontWeight: FontWeight.w900,
                       color: _isDark
                           ? const Color(0xFFF8FAFC)
@@ -1653,8 +1646,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: isCompactMobile ? 2 : 4),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Icon(
                 label.contains('Revenue')
@@ -1669,14 +1663,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     : (label.contains('Pending') && _pendingPaymentsCount > 0
                           ? Colors.orange
                           : Colors.grey),
-                size: 12,
+                size: isCompactMobile ? 11 : 12,
               ),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
                   trendText,
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: isCompactMobile ? 9 : 10,
                     fontWeight: FontWeight.bold,
                     color: label.contains('Revenue')
                         ? (isPositiveAction ? Colors.green : Colors.red)
@@ -1685,7 +1679,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               ? Colors.orange
                               : Colors.grey),
                   ),
-                  maxLines: 1,
+                  maxLines: isCompactMobile ? 2 : 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
