@@ -445,11 +445,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     }),
                   ),
                   const SizedBox(height: 16),
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Feedback (optional)',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   TextField(
                     controller: commentController,
                     maxLines: 2,
                     decoration: InputDecoration(
-                      hintText: 'Share your feedback...',
+                      hintText: 'Share your feedback (optional)...',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),

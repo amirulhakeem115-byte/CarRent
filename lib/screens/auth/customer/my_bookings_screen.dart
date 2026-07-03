@@ -256,12 +256,24 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                     }),
                   ),
                   const SizedBox(height: 16),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Feedback (optional)',
+                      style: TextStyle(
+                        color: _textColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   TextField(
                     controller: commentController,
                     maxLines: 3,
                     style: TextStyle(color: _textColor, fontSize: 13),
                     decoration: InputDecoration(
-                      hintText: 'Share your feedback...',
+                      hintText: 'Share your feedback (optional)...',
                       hintStyle: TextStyle(
                         fontSize: 12,
                         color: _isDark ? Colors.white30 : Colors.grey,
