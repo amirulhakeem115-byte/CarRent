@@ -15,6 +15,13 @@ import '../../../models/notification_model.dart';
 import '../../../widgets/app_image.dart';
 import '../../../widgets/app_logo.dart';
 import '../login_screen.dart';
+import '../../../ai/services/ai_service.dart';
+import '../../../ai/models/ai_intent.dart';
+import '../../../ai/widgets/ai_floating_button.dart';
+import '../../../ai/widgets/ai_chat_panel.dart';
+import '../../../models/booking_model.dart';
+import 'booking_screen.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 // Import all screens to load them inside the shell
 import 'home_screen.dart';
@@ -64,6 +71,11 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
     _currentIndex = widget.initialIndex;
     _customBody = widget.customBody;
     _loadUserData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<AIService>().addListener(_handleAIAction);
+      }
+    });
   }
 
   void showCustomBody(Widget body) {
@@ -88,7 +100,56 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
   @override
   void dispose() {
     _notificationsSubscription?.cancel();
+    try {
+      context.read<AIService>().removeListener(_handleAIAction);
+    } catch (_) {}
     super.dispose();
+  }
+
+  void _handleAIAction() {
+    if (!mounted) return;
+    final aiService = context.read<AIService>();
+    final intent = aiService.lastIntent;
+    if (intent == null) return;
+
+    if (intent is BookingIntent) {
+      final action = intent.parameters['action']?.toString() ?? '';
+      if (action == 'book_vehicle' || action == 'search_vehicles') {
+        setIndex(1);
+      } else {
+        setIndex(2);
+      }
+      aiService.clearLastIntent();
+    } else if (intent is RewardIntent) {
+      setIndex(4);
+      aiService.clearLastIntent();
+    } else if (intent is SupportIntent) {
+      setIndex(7);
+      aiService.clearLastIntent();
+    } else if (intent is ProfileIntent) {
+      setIndex(6);
+      aiService.clearLastIntent();
+    } else if (intent is BranchIntent) {
+      setIndex(3);
+      aiService.clearLastIntent();
+    } else if (intent is HistoryIntent) {
+      setIndex(5);
+      aiService.clearLastIntent();
+    } else if (intent is DashboardIntent) {
+      setIndex(0);
+      aiService.clearLastIntent();
+    } else if (intent is VehicleSearchIntent) {
+      setIndex(1);
+      aiService.clearLastIntent();
+    } else if (intent is NotificationIntent) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const CustomerNotificationsScreen(),
+        ),
+      );
+      aiService.clearLastIntent();
+    }
   }
 
   Future<void> _loadUserData() async {
@@ -458,6 +519,108 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
             ),
           ],
         ),
+        bottomNavigationBar: !isDesktop && _customBody == null
+            ? Container(
+                decoration: BoxDecoration(
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, -2),
+                    ),
+                  ],
+                ),
+                child: BottomNavigationBar(
+                  currentIndex: bottomNavIndex,
+                  selectedItemColor: AppColors.primaryOrange,
+                  unselectedItemColor: Colors.blueGrey[400],
+                  showUnselectedLabels: true,
+                  type: BottomNavigationBarType.fixed,
+                  backgroundColor:
+                      Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFF1B2436)
+                      : Theme.of(context).cardColor,
+                  elevation: 0,
+                  selectedLabelStyle: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 11,
+                  ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontWeight: FontWeight.normal,
+                    fontSize: 11,
+                  ),
+                  onTap: (index) {
+                    setState(() {
+                      if (index == 0) _currentIndex = 0;
+                      if (index == 1) _currentIndex = 1;
+                      if (index == 2) _currentIndex = 2;
+                      if (index == 3) _currentIndex = 6;
+                    });
+                  },
+                  items: const [
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.dashboard_outlined),
+                      activeIcon: Icon(Icons.dashboard_rounded),
+                      label: 'Dashboard',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.search_rounded),
+                      label: 'Search',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.calendar_today_outlined),
+                      activeIcon: Icon(Icons.calendar_today_rounded),
+                      label: 'Bookings',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.person_outline),
+                      activeIcon: Icon(Icons.person_rounded),
+                      label: 'Profile',
+                    ),
+                  ],
+                ),
+              )
+            : null,
+        floatingActionButton: AIFloatingButton(
+          onTap: () async {
+            final result = await showAIChatModal(context);
+            if (result == 'open_pending_bookings') {
+              if (mounted) setIndex(2);
+              return;
+            }
+            if (result != null &&
+                result is Map &&
+                result['action'] == 'pay' &&
+                context.mounted) {
+              final bId = result['bookingId'];
+              final method = result['method'];
+              try {
+                final bSnap = await FirebaseDatabase.instance
+                    .ref()
+                    .child('bookings')
+                    .child(bId)
+                    .get();
+                if (bSnap.exists) {
+                  final bData = Map<dynamic, dynamic>.from(bSnap.value as Map);
+                  final booking = BookingModel.fromMap(bId, bData);
+                  if (context.mounted) {
+                    await BookingScreen.navigateToPayment(
+                      context,
+                      booking,
+                      method,
+                    );
+                  }
+                }
+              } catch (e) {
+                debugPrint(
+                  'Error routing to checkout from floating button: $e',
+                );
+              }
+            }
+          },
+          isOpen: false,
+        ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       ),
     );
   }

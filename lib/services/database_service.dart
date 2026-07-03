@@ -4,6 +4,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_model.dart';
 import 'notification_service.dart';
+import 'user_role_cache.dart';
 
 class DatabaseService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref();
@@ -35,11 +36,7 @@ class DatabaseService {
 
   Future<String> _getCurrentUserRole(String? uid) async {
     if (uid == null) return 'unauthenticated';
-    try {
-      final snap = await _db.child('users').child(uid).child('role').get().timeout(const Duration(seconds: 3));
-      if (snap.exists) return snap.value.toString();
-    } catch (_) {}
-    return 'unknown';
+    return UserRoleCache.getRole(uid);
   }
 
   Future<List<Map<String, dynamic>>> getSupportMessages() async {
@@ -341,8 +338,10 @@ class DatabaseService {
       if (snapshot.exists) {
         final data = snapshot.value as Map<dynamic, dynamic>;
         final user = UserModel.fromMap(uid, data);
+        UserRoleCache.set(uid, user.role);
         if (user.email.trim().toLowerCase() == 'admin@gmail.com' && user.role != 'admin') {
           await updateUser(uid, {'role': 'admin'});
+          UserRoleCache.set(uid, 'admin');
           return UserModel(
             id: user.id,
             fullName: user.fullName,

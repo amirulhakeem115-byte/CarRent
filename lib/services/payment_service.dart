@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -6,6 +7,7 @@ import 'notification_service.dart';
 import 'booking_service.dart';
 import 'reward_service.dart';
 import 'receipt_service.dart';
+import 'user_role_cache.dart';
 
 class PaymentService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref().child('payments');
@@ -58,28 +60,53 @@ class PaymentService {
         debugPrint('Error getting booking info for payment notification: $e');
       }
 
-      // Notify user of transaction approval
-      await _notificationService.createNotification(
-        userId: payment.userId,
-        title: 'Payment Approved',
-        message: 'Your payment of RM ${payment.amount.toStringAsFixed(2)} has been approved successfully.',
-        type: 'payment',
-        icon: '💳',
-        color: '0xFF10B981',
-        relatedId: newRef.key!,
-        actionRoute: 'Dashboard',
-      );
+      if (isApproved) {
+        // Notify user of transaction approval
+        await _notificationService.createNotification(
+          userId: payment.userId,
+          title: 'Payment Approved',
+          message: 'Your payment of RM ${payment.amount.toStringAsFixed(2)} has been approved successfully.',
+          type: 'payment',
+          icon: '💳',
+          color: '0xFF10B981',
+          relatedId: newRef.key!,
+          actionRoute: 'Dashboard',
+        );
 
-      // Notify admins of auto-approved payment
-      await _notificationService.notifyAllAdmins(
-        title: 'Payment Approved Automatically',
-        message: 'Customer: $customerName\nVehicle: $vehicleName\nAmount: RM ${payment.amount.toStringAsFixed(2)}',
-        type: 'payment',
-        icon: '💳',
-        color: '0xFF10B981',
-        relatedId: newRef.key!,
-        actionRoute: 'Payments',
-      );
+        // Notify admins of auto-approved payment
+        await _notificationService.notifyAllAdmins(
+          title: 'Payment Approved Automatically',
+          message: 'Customer: $customerName\nVehicle: $vehicleName\nAmount: RM ${payment.amount.toStringAsFixed(2)}',
+          type: 'payment',
+          icon: '💳',
+          color: '0xFF10B981',
+          relatedId: newRef.key!,
+          actionRoute: 'Payments',
+        );
+      } else {
+        // Notify user their payment is pending review
+        await _notificationService.createNotification(
+          userId: payment.userId,
+          title: 'Payment Pending Review',
+          message: 'Your payment of RM ${payment.amount.toStringAsFixed(2)} has been submitted and is awaiting admin verification.',
+          type: 'payment',
+          icon: '🕐',
+          color: '0xFFF59E0B',
+          relatedId: newRef.key!,
+          actionRoute: 'Dashboard',
+        );
+
+        // Notify admins of new payment requiring verification
+        await _notificationService.notifyAllAdmins(
+          title: 'New Payment — Action Required',
+          message: 'Customer: $customerName\nVehicle: $vehicleName\nAmount: RM ${payment.amount.toStringAsFixed(2)}\nPlease verify and approve.',
+          type: 'payment',
+          icon: '💳',
+          color: '0xFFF59E0B',
+          relatedId: newRef.key!,
+          actionRoute: 'Payments',
+        );
+      }
     } catch (e) {
       debugPrint('Error creating payment: $e');
       rethrow;
@@ -91,13 +118,7 @@ class PaymentService {
     final currentUid = FirebaseAuth.instance.currentUser?.uid;
     if (currentUid == null) return payments;
 
-    String currentRole = 'customer';
-    try {
-      final roleSnap = await FirebaseDatabase.instance.ref().child('users').child(currentUid).child('role').get().timeout(const Duration(seconds: 3));
-      if (roleSnap.exists) {
-        currentRole = roleSnap.value.toString();
-      }
-    } catch (_) {}
+    final currentRole = await UserRoleCache.getRole(currentUid);
     debugPrint('[PaymentService] [getPayments] Accessing path: payments');
     debugPrint('[PaymentService] [getPayments] Current UID: $currentUid, Current Role: $currentRole');
 
@@ -125,36 +146,46 @@ class PaymentService {
     return payments;
   }
 
-  Stream<List<PaymentModel>> getPaymentsStream() async* {
+  Stream<List<PaymentModel>> getPaymentsStream() {
     final currentUid = FirebaseAuth.instance.currentUser?.uid;
     if (currentUid == null) {
-      yield [];
-      return;
+      return Stream.value([]);
     }
 
-    String currentRole = 'customer';
-    try {
-      final roleSnap = await FirebaseDatabase.instance.ref().child('users').child(currentUid).child('role').get().timeout(const Duration(seconds: 3));
-      if (roleSnap.exists) {
-        currentRole = roleSnap.value.toString();
-      }
-    } catch (_) {}
+    final controller = StreamController<List<PaymentModel>>.broadcast();
+    StreamSubscription? sub;
 
-    final Query query = currentRole == 'admin' 
-        ? _db 
-        : _db.orderByChild('userId').equalTo(currentUid);
+    UserRoleCache.getRole(currentUid).then((currentRole) {
+      if (controller.isClosed) return;
+      debugPrint('[PaymentService] getPaymentsStream — uid: $currentUid, role: $currentRole');
 
-    yield* query.onValue.map((event) {
-      List<PaymentModel> payments = [];
-      if (event.snapshot.exists) {
-        final Map<dynamic, dynamic> data = event.snapshot.value as Map<dynamic, dynamic>;
-        data.forEach((key, value) {
-          payments.add(PaymentModel.fromMap(key.toString(), value as Map<dynamic, dynamic>));
-        });
-      }
-      payments.sort((a, b) => b.paymentDate.compareTo(a.paymentDate));
-      return payments;
+      final Query query =
+          currentRole == 'admin' ? _db : _db.orderByChild('userId').equalTo(currentUid);
+
+      sub = query.onValue.listen((event) {
+        if (controller.isClosed) return;
+        List<PaymentModel> payments = [];
+        if (event.snapshot.exists) {
+          final Map<dynamic, dynamic> data =
+              event.snapshot.value as Map<dynamic, dynamic>;
+          data.forEach((key, value) {
+            payments.add(
+                PaymentModel.fromMap(key.toString(), value as Map<dynamic, dynamic>));
+          });
+        }
+        payments.sort((a, b) => b.paymentDate.compareTo(a.paymentDate));
+        controller.add(payments);
+      }, onError: (e) {
+        debugPrint('[PaymentService] getPaymentsStream error: $e');
+        if (!controller.isClosed) controller.add([]);
+      });
+    }).catchError((e) {
+      debugPrint('[PaymentService] getPaymentsStream role fetch error: $e');
+      if (!controller.isClosed) controller.add([]);
     });
+
+    controller.onCancel = () => sub?.cancel();
+    return controller.stream;
   }
 
   Future<List<PaymentModel>> getUserPayments(String userId) async {

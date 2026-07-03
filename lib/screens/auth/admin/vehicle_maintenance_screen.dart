@@ -450,9 +450,15 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                         ),
                       ),
                       const SizedBox(width: 16),
-                      _buildStatusDropdown(isDark: isDark, cardColor: surfaceColor, textPrimary: textPrimary, borderColor: borderColor),
+                      SizedBox(
+                        width: 200,
+                        child: _buildStatusDropdown(isDark: isDark, cardColor: surfaceColor, textPrimary: textPrimary, borderColor: borderColor),
+                      ),
                       const SizedBox(width: 16),
-                      _buildVehicleDropdown(isDark: isDark, cardColor: surfaceColor, textPrimary: textPrimary, borderColor: borderColor),
+                      SizedBox(
+                        width: 200,
+                        child: _buildVehicleDropdown(isDark: isDark, cardColor: surfaceColor, textPrimary: textPrimary, borderColor: borderColor),
+                      ),
                     ],
                   )
                 : Column(

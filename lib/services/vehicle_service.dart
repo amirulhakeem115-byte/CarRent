@@ -4,21 +4,25 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/vehicle_model.dart';
 import 'notification_service.dart';
+import 'booking_lifecycle_manager.dart';
+import 'user_role_cache.dart';
 
 class VehicleService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref().child('vehicles');
 
   Future<List<VehicleModel>> getVehicles() async {
+    // Run lifecycle manager check first
+    try {
+      await BookingLifecycleManager().checkAndProcessLifecycle();
+    } catch (lifecycleErr) {
+      debugPrint('[VehicleService] Warning: lifecycle check failed: $lifecycleErr');
+    }
+
     List<VehicleModel> vehicles = [];
     final currentUid = FirebaseAuth.instance.currentUser?.uid;
     String currentRole = 'unknown';
     if (currentUid != null) {
-      try {
-        final roleSnap = await FirebaseDatabase.instance.ref().child('users').child(currentUid).child('role').get().timeout(const Duration(seconds: 3));
-        if (roleSnap.exists) {
-          currentRole = roleSnap.value.toString();
-        }
-      } catch (_) {}
+      currentRole = await UserRoleCache.getRole(currentUid);
     }
     debugPrint('[VehicleService] [getVehicles] Accessing path: vehicles');
     debugPrint('[VehicleService] [getVehicles] Current UID: $currentUid, Current Role: $currentRole');

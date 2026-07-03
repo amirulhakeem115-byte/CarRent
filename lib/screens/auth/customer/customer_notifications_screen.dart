@@ -40,10 +40,21 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
   Color get _subColor => _isDark ? const Color(0xFFCBD5E1) : AppColors.lightText;
   Color get _borderColor => _isDark ? const Color(0xFF334155) : AppColors.borderGray;
 
+  Stream<List<NotificationModel>>? _notificationsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    final currentUser = _auth.currentUser;
+    if (currentUser != null) {
+      _notificationsStream = _notificationService.getNotificationsStream(currentUser.uid);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUser = _auth.currentUser;
-    if (currentUser == null) {
+    if (currentUser == null || _notificationsStream == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Notifications')),
         body: const Center(child: Text('Please log in first.')),
@@ -71,7 +82,7 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
         ],
       ),
       body: StreamBuilder<List<NotificationModel>>(
-        stream: _notificationService.getNotificationsStream(currentUser.uid),
+        stream: _notificationsStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: LoadingWidget(message: 'Syncing notifications...'));
@@ -353,13 +364,74 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
           ),
           subtitle: Padding(
             padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              notif.message,
-              style: TextStyle(
-                fontSize: 11,
-                height: 1.3,
-                color: notif.isRead ? _subColor : _textColor,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  notif.message,
+                  style: TextStyle(
+                    fontSize: 11,
+                    height: 1.3,
+                    color: notif.isRead ? _subColor : _textColor,
+                  ),
+                ),
+                if (notif.type == 'pickup_reminder_customer') ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryOrange,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                        ),
+                        onPressed: () => _showBookingDetails(context, notif.relatedId),
+                        child: const Text('View Booking', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.teal,
+                          side: const BorderSide(color: Colors.teal),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                        ),
+                        onPressed: () => _sendOnMyWayStatus(notif.relatedId),
+                        child: const Text("I'm On My Way", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ],
+                if (notif.type == 'return_reminder_customer') ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.teal,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                        ),
+                        onPressed: () => _sendOnMyWayStatus(notif.relatedId),
+                        child: const Text("I'm On My Way", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primaryOrange,
+                          side: const BorderSide(color: AppColors.primaryOrange),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                        ),
+                        onPressed: () => _showExtendRentalGuidance(),
+                        child: const Text("Extend Rental", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
             ),
           ),
           trailing: Row(
@@ -694,6 +766,48 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _sendOnMyWayStatus(String bookingId) async {
+    try {
+      await FirebaseDatabase.instance.ref().child('bookings').child(bookingId).update({'customerStatus': 'on_my_way'});
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Status sent to admin: You are on your way!")),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Failed to send status: $e")),
+        );
+      }
+    }
+  }
+
+  void _showExtendRentalGuidance() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text("Extend Active Rental", style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white : AppColors.secondaryBlue)),
+          content: Text(
+            "To request a rental contract extension, please contact CARENT Corporate Support directly at +60 3-2274 1234 or visit the nearest branch center.",
+            style: TextStyle(color: isDark ? const Color(0xFFCBD5E1) : Colors.black87),
+          ),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryOrange),
+              onPressed: () => Navigator.pop(context),
+              child: const Text("OK", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
     );
   }
 }

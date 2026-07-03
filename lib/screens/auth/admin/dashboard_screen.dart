@@ -45,7 +45,10 @@ import '../../../widgets/app_image.dart';
 import '../../../widgets/app_logo.dart';
 import '../../../services/company_settings_provider.dart';
 import 'package:provider/provider.dart';
-
+import '../../../ai/services/ai_service.dart';
+import '../../../ai/models/ai_intent.dart';
+import '../../../ai/widgets/ai_floating_button.dart';
+import '../../../ai/widgets/ai_chat_panel.dart';
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
 
@@ -220,6 +223,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     _subscribeNotifications();
     _subscribeTracking();
     _subscribeToLiveData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<AIService>().addListener(_handleAIAction);
+      }
+    });
   }
 
   void _subscribeToLiveData() {
@@ -231,26 +239,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         setState(() {
           _bookings = bookingsList;
           _bookings.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          _activeBookingsCount = _bookings
-              .where(
-                (b) =>
-                    b.status == 'pending' ||
-                    b.status == 'approved' ||
-                    b.status == 'ongoing' ||
-                    b.status == 'Confirmed' ||
-                    b.status == 'active',
-              )
-              .length;
-
+          _activeBookingsCount = _bookings.where((b) => b.status == 'pending' || b.status == 'approved' || b.status == 'ongoing' || b.status == 'Confirmed' || b.status == 'active').length;
+          
           for (var booking in _bookings) {
             final bStat = booking.status.toLowerCase();
-            if (bStat == 'ongoing' ||
-                bStat == 'approved' ||
-                bStat == 'confirmed' ||
-                bStat == 'active') {
+            if (bStat == 'ongoing' || bStat == 'approved' || bStat == 'confirmed' || bStat == 'active') {
               if (!_simulators.containsKey(booking.vehicleId)) {
-                _simulators[booking.vehicleId] = _trackingService
-                    .startRouteSimulation(booking.vehicleId);
+                _simulators[booking.vehicleId] = _trackingService.startRouteSimulation(booking.vehicleId);
               }
             }
           }
@@ -326,8 +321,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     _paymentsSubscription?.cancel();
     _usersSubscription?.cancel();
     _simulators.forEach((_, sim) => sim?.cancel());
+    try {
+      context.read<AIService>().removeListener(_handleAIAction);
+    } catch (_) {}
     super.dispose();
   }
+
 
   Future<void> _loadDashboardData() async {
     if (!mounted) return;
@@ -362,21 +361,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           .where((v) => v.status.toLowerCase() == 'available')
           .length;
 
-      _activeBookingsCount = _bookings
-          .where(
-            (b) =>
-                b.status == 'pending' ||
-                b.status == 'approved' ||
-                b.status == 'ongoing',
-          )
-          .length;
+      _activeBookingsCount = _bookings.where((b) => b.status == 'pending' || b.status == 'approved' || b.status == 'ongoing').length;
 
       // Automatically trigger mock hardware simulator for active bookings
       for (var booking in _bookings) {
         if (booking.status == 'ongoing' || booking.status == 'approved') {
           if (!_simulators.containsKey(booking.vehicleId)) {
-            _simulators[booking.vehicleId] = _trackingService
-                .startRouteSimulation(booking.vehicleId);
+            _simulators[booking.vehicleId] = _trackingService.startRouteSimulation(booking.vehicleId);
           }
         }
       }
@@ -403,9 +394,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           .length;
     } catch (e) {
       debugPrint('Dashboard loading error: $e');
-      setState(() {
-        _error = 'Failed to load dashboard statistics. Please try again.';
-      });
+      if (mounted) {
+        setState(() {
+          _error = 'Failed to load dashboard statistics. Please try again.';
+        });
+      }
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -514,6 +507,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         ],
       ),
+      floatingActionButton: AIFloatingButton(
+        onTap: () => showAIChatModal(context),
+        isOpen: false,
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
@@ -589,6 +587,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       case 'Admin Profile':
         tabContent = const Expanded(child: AdminProfileView());
         break;
+      case 'AI Assistant':
+        tabContent = const Expanded(child: AIChatPanel(onClose: null));
+        break;
       case 'Notifications':
         tabContent = Expanded(
           child: AdminNotificationsView(
@@ -659,81 +660,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             child: ListView(
               padding: const EdgeInsets.symmetric(vertical: 12),
               children: [
-                _buildSidebarTile(
-                  Icons.dashboard_outlined,
-                  'Dashboard',
-                  () => setState(() => _activeTab = 'Dashboard'),
-                ),
-                _buildSidebarTile(
-                  Icons.directions_car_filled_outlined,
-                  'Cars',
-                  () => setState(() => _activeTab = 'Cars'),
-                ),
-                _buildSidebarTile(
-                  Icons.calendar_today_outlined,
-                  'Bookings',
-                  () => setState(() => _activeTab = 'Bookings'),
-                ),
-                _buildSidebarTile(
-                  Icons.people_outline_rounded,
-                  'Customers',
-                  () => setState(() => _activeTab = 'Customers'),
-                ),
-                _buildSidebarTile(
-                  Icons.payment_outlined,
-                  'Payments',
-                  () => setState(() => _activeTab = 'Payments'),
-                ),
-                _buildSidebarTile(
-                  Icons.stars_rounded,
-                  'Reward Points',
-                  () => setState(() => _activeTab = 'Reward Points'),
-                ),
-                _buildSidebarTile(
-                  Icons.map_outlined,
-                  'Vehicle Tracking',
-                  () => setState(() => _activeTab = 'Vehicle Tracking'),
-                ),
-                _buildSidebarTile(
-                  Icons.build_outlined,
-                  'Vehicle Maintenance',
-                  () => setState(() => _activeTab = 'Vehicle Maintenance'),
-                ),
-                _buildSidebarTile(
-                  Icons.storefront_outlined,
-                  'Locations',
-                  () => setState(() => _activeTab = 'Locations'),
-                ),
-                _buildSidebarTile(
-                  Icons.assessment_outlined,
-                  'Reports',
-                  () => setState(() => _activeTab = 'Reports'),
-                ),
-                _buildSidebarTile(
-                  Icons.notifications_none_outlined,
-                  'Notifications',
-                  () => setState(() => _activeTab = 'Notifications'),
-                ),
-                _buildSidebarTile(
-                  Icons.mail_outline_rounded,
-                  'Support Inbox',
-                  () => setState(() => _activeTab = 'Support Inbox'),
-                ),
-                _buildSidebarTile(
-                  Icons.qr_code_2,
-                  'QR Payment Settings',
-                  () => setState(() => _activeTab = 'QR Payment Settings'),
-                ),
-                _buildSidebarTile(
-                  Icons.settings_outlined,
-                  'Company Settings',
-                  () => setState(() => _activeTab = 'Company Settings'),
-                ),
-                _buildSidebarTile(
-                  Icons.person_outline,
-                  'Admin Profile',
-                  () => setState(() => _activeTab = 'Admin Profile'),
-                ),
+                _buildSidebarTile(Icons.dashboard_outlined, 'Dashboard', () => setState(() => _activeTab = 'Dashboard')),
+                _buildSidebarTile(Icons.directions_car_filled_outlined, 'Cars', () => setState(() => _activeTab = 'Cars')),
+                _buildSidebarTile(Icons.calendar_today_outlined, 'Bookings', () => setState(() => _activeTab = 'Bookings')),
+                _buildSidebarTile(Icons.people_outline_rounded, 'Customers', () => setState(() => _activeTab = 'Customers')),
+                _buildSidebarTile(Icons.payment_outlined, 'Payments', () => setState(() => _activeTab = 'Payments')),
+                _buildSidebarTile(Icons.stars_rounded, 'Reward Points', () => setState(() => _activeTab = 'Reward Points')),
+                _buildSidebarTile(Icons.map_outlined, 'Vehicle Tracking', () => setState(() => _activeTab = 'Vehicle Tracking')),
+                _buildSidebarTile(Icons.build_outlined, 'Vehicle Maintenance', () => setState(() => _activeTab = 'Vehicle Maintenance')),
+                _buildSidebarTile(Icons.storefront_outlined, 'Locations', () => setState(() => _activeTab = 'Locations')),
+                _buildSidebarTile(Icons.assessment_outlined, 'Reports', () => setState(() => _activeTab = 'Reports')),
+                _buildSidebarTile(Icons.notifications_none_outlined, 'Notifications', () => setState(() => _activeTab = 'Notifications')),
+                _buildSidebarTile(Icons.mail_outline_rounded, 'Support Inbox', () => setState(() => _activeTab = 'Support Inbox')),
+                _buildSidebarTile(Icons.qr_code_2, 'QR Payment Settings', () => setState(() => _activeTab = 'QR Payment Settings')),
+                _buildSidebarTile(Icons.settings_outlined, 'Company Settings', () => setState(() => _activeTab = 'Company Settings')),
+                _buildSidebarTile(Icons.person_outline, 'Admin Profile', () => setState(() => _activeTab = 'Admin Profile')),
               ],
             ),
           ),
@@ -1710,32 +1651,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       }
     }
 
-    int pendingCount = _bookings
-        .where((b) => b.status.toLowerCase() == 'pending')
-        .length;
-    int approvedCount = _bookings
-        .where((b) => b.status.toLowerCase() == 'approved')
-        .length;
-    int ongoingCount = _bookings
-        .where((b) => b.status.toLowerCase() == 'ongoing')
-        .length;
-    int completedCount = _bookings
-        .where((b) => b.status.toLowerCase() == 'completed')
-        .length;
-    int cancelledCount = _bookings
-        .where(
-          (b) =>
-              b.status.toLowerCase() == 'cancelled' ||
-              b.status.toLowerCase() == 'rejected',
-        )
-        .length;
-
+    int pendingCount = _bookings.where((b) => b.status.toLowerCase() == 'pending').length;
+    int approvedCount = _bookings.where((b) => b.status.toLowerCase() == 'approved').length;
+    int ongoingCount = _bookings.where((b) => b.status.toLowerCase() == 'ongoing').length;
+    int completedCount = _bookings.where((b) => b.status.toLowerCase() == 'completed').length;
+    int cancelledCount = _bookings.where((b) => b.status.toLowerCase() == 'cancelled' || b.status.toLowerCase() == 'rejected').length;
+    
     Map<String, int> statusCounts = {
       'Pending': pendingCount,
       'Approved': approvedCount,
       'Ongoing': ongoingCount,
       'Completed': completedCount,
       'Cancelled': cancelledCount,
+      'Overdue': overdueCount,
     };
 
     final totalBookingsCount = statusCounts.values.fold(
@@ -1921,36 +1849,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildLegendRow(
-                      'Pending',
-                      pendingCount,
-                      totalBookingsCount,
-                      Colors.orange,
-                    ),
-                    _buildLegendRow(
-                      'Approved',
-                      approvedCount,
-                      totalBookingsCount,
-                      Colors.blue,
-                    ),
-                    _buildLegendRow(
-                      'Ongoing',
-                      ongoingCount,
-                      totalBookingsCount,
-                      Colors.teal,
-                    ),
-                    _buildLegendRow(
-                      'Completed',
-                      completedCount,
-                      totalBookingsCount,
-                      Colors.green,
-                    ),
-                    _buildLegendRow(
-                      'Cancelled',
-                      cancelledCount,
-                      totalBookingsCount,
-                      Colors.redAccent,
-                    ),
+                    _buildLegendRow('Pending', pendingCount, totalBookingsCount, Colors.orange),
+                    _buildLegendRow('Approved', approvedCount, totalBookingsCount, Colors.blue),
+                    _buildLegendRow('Ongoing', ongoingCount, totalBookingsCount, Colors.teal),
+                    _buildLegendRow('Completed', completedCount, totalBookingsCount, Colors.green),
+                    _buildLegendRow('Cancelled', cancelledCount, totalBookingsCount, Colors.redAccent),
                   ],
                 ),
               ),
@@ -3593,12 +3496,21 @@ class BookingStatusDoughnutPainter extends CustomPainter {
     final center = Offset(centerPadding, centerPadding);
 
     final List<MapEntry<String, int>> entries = statusCounts.entries.toList();
+    final Map<String, Color> colorMap = {
+      'Pending': Colors.orange,
+      'Approved': Colors.blue,
+      'Ongoing': Colors.teal,
+      'Completed': Colors.green,
+      'Cancelled': Colors.redAccent,
+      'Overdue': Colors.red,
+    };
     final List<Color> colors = [
       Colors.orange,
       Colors.blue,
       Colors.teal,
       Colors.green,
       Colors.redAccent,
+      Colors.red,
     ];
 
     double startAngle = -3.14159 / 2;
@@ -3613,7 +3525,7 @@ class BookingStatusDoughnutPainter extends CustomPainter {
       if (count == 0) continue;
 
       final double sweepAngle = (count / total) * 2 * 3.14159;
-      paintStroke.color = colors[i % colors.length];
+      paintStroke.color = colorMap[entries[i].key] ?? colors[i % colors.length];
 
       canvas.drawArc(
         Rect.fromCircle(center: center, radius: radius),

@@ -7,11 +7,28 @@ class ReviewService {
 
   Future<void> submitReview(ReviewModel review) async {
     try {
+      if (review.bookingId.isNotEmpty) {
+        final duplicate = await hasSubmittedReview(review.bookingId);
+        if (duplicate) {
+          throw Exception('A review has already been submitted for this booking.');
+        }
+      }
       final newRef = _db.push();
       await newRef.set(review.toMap()).timeout(const Duration(seconds: 5));
     } catch (e) {
       debugPrint('Error submitting review: $e');
       rethrow;
+    }
+  }
+
+  Future<bool> hasSubmittedReview(String bookingId) async {
+    if (bookingId.isEmpty) return false;
+    try {
+      final snapshot = await _db.orderByChild('bookingId').equalTo(bookingId).get().timeout(const Duration(seconds: 5));
+      return snapshot.exists && snapshot.value != null;
+    } catch (e) {
+      debugPrint('Error checking duplicate review: $e');
+      return false;
     }
   }
 
@@ -57,6 +74,7 @@ class ReviewService {
       return [
         ReviewModel(
           id: '',
+          bookingId: 'seed_booking_1',
           vehicleId: vehicleId,
           userId: 'seed_u1',
           userName: 'Muhammad Firdaus',
@@ -66,6 +84,7 @@ class ReviewService {
         ),
         ReviewModel(
           id: '',
+          bookingId: 'seed_booking_2',
           vehicleId: vehicleId,
           userId: 'seed_u2',
           userName: 'Siti Aminah',
@@ -78,6 +97,7 @@ class ReviewService {
       return [
         ReviewModel(
           id: '',
+          bookingId: 'seed_booking_3',
           vehicleId: vehicleId,
           userId: 'seed_u3',
           userName: 'Chong Wei Ming',
@@ -87,6 +107,7 @@ class ReviewService {
         ),
         ReviewModel(
           id: '',
+          bookingId: 'seed_booking_4',
           vehicleId: vehicleId,
           userId: 'seed_u4',
           userName: 'Kavitha Rajan',
@@ -99,6 +120,7 @@ class ReviewService {
       return [
         ReviewModel(
           id: '',
+          bookingId: 'seed_booking_5',
           vehicleId: vehicleId,
           userId: 'seed_u5',
           userName: 'Ahmad Faiz',
@@ -108,6 +130,7 @@ class ReviewService {
         ),
         ReviewModel(
           id: '',
+          bookingId: 'seed_booking_6',
           vehicleId: vehicleId,
           userId: 'seed_u6',
           userName: 'Wong Siew Ling',
@@ -120,6 +143,7 @@ class ReviewService {
       return [
         ReviewModel(
           id: '',
+          bookingId: 'seed_booking_7',
           vehicleId: vehicleId,
           userId: 'seed_u7',
           userName: 'Ridhuan Yusof',
@@ -129,6 +153,7 @@ class ReviewService {
         ),
         ReviewModel(
           id: '',
+          bookingId: 'seed_booking_8',
           vehicleId: vehicleId,
           userId: 'seed_u8',
           userName: 'Grace Choong',
@@ -141,6 +166,7 @@ class ReviewService {
       return [
         ReviewModel(
           id: '',
+          bookingId: 'seed_booking_9',
           vehicleId: vehicleId,
           userId: 'seed_u9',
           userName: 'Azlan Shah',

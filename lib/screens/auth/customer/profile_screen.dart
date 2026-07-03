@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -57,6 +58,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? _accountNumber;
   String? _bankLogoUrl;
 
+  StreamSubscription<DatabaseEvent>? _reviewsSubscription;
+  Set<String> _reviewedBookingIds = {};
+
   // Image Picker
   final _picker = ImagePicker();
 
@@ -76,6 +80,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _loadProfileData();
+    _subscribeToReviews();
     receipt_upload.registerPlatformDropzone();
   }
 
@@ -83,6 +88,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void dispose() {
     _idNumberController.dispose();
     _licenseNumberController.dispose();
+    _reviewsSubscription?.cancel();
     super.dispose();
   }
 
@@ -180,6 +186,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
         setState(() => _loading = false);
       }
     }
+  }
+
+  void _subscribeToReviews() {
+    final currentUser = _authService.currentUser;
+    if (currentUser == null) return;
+
+    _reviewsSubscription?.cancel();
+    _reviewsSubscription = FirebaseDatabase.instance
+        .ref()
+        .child('reviews')
+        .orderByChild('userId')
+        .equalTo(currentUser.uid)
+        .onValue
+        .listen((event) {
+      if (mounted) {
+        final Set<String> ids = {};
+        if (event.snapshot.exists && event.snapshot.value != null) {
+          final Map<dynamic, dynamic> data = event.snapshot.value as Map<dynamic, dynamic>;
+          data.forEach((key, value) {
+            if (value is Map && value['bookingId'] != null) {
+              ids.add(value['bookingId'].toString());
+            }
+          });
+        }
+        setState(() {
+          _reviewedBookingIds = ids;
+        });
+      }
+    });
   }
 
   Future<void> _showImagePreviewDialog({
@@ -472,6 +507,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                     final review = ReviewModel(
                       id: '',
+                      bookingId: booking.id,
                       vehicleId: booking.vehicleId,
                       userId: booking.userId,
                       userName: booking.userName,
@@ -829,6 +865,57 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ],
                     ),
                     const SizedBox(height: 16),
+    final Widget leftColumn = Column(
+      children: [
+        // 1. Personal Information Card
+        _buildInfoCard(
+          title: 'Personal Information',
+          icon: Icons.person_outline,
+          children: [
+            _buildDetailRow('EMAIL ADDRESS', _user?.email ?? 'N/A'),
+            _buildDetailRow('PHONE NUMBER', _user?.phone ?? 'N/A'),
+            _buildDetailRow('RESIDENTIAL ADDRESS', _user?.address ?? 'N/A'),
+          ],
+        ),
+        const SizedBox(height: 16),
+        
+        // 2. Loyalty Rewards
+        _buildInfoCard(
+          title: 'Loyalty Rewards',
+          icon: Icons.stars_rounded,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('CURRENT BALANCE', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    Text('${_user?.rewardPoints ?? 0} Points', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryOrange, fontSize: 16)),
+                  ],
+                ),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.secondaryBlue,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                  icon: const Icon(Icons.history, size: 14),
+                  label: const Text('View Ledger', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const RewardHistoryScreen()),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
 
                     // 3. Theme Settings
                     _buildInfoCard(
@@ -1383,6 +1470,332 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
+                    return Card(
+                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8F9FA),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: isDark ? const Color(0xFF334155) : Colors.grey[200]!)),
+                      elevation: 0,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                // Left rounded vehicle image
+                                Container(
+                                  width: 80,
+                                  height: 60,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[200],
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(Icons.directions_car, color: Colors.grey),
+                                ),
+                                const SizedBox(width: 12),
+                                // Center detail text block
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        booking.vehicleName,
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.secondaryBlue),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Booking ID: #${booking.id.substring(0, booking.id.length > 8 ? 8 : booking.id.length).toUpperCase()}',
+                                        style: TextStyle(color: Colors.grey[500], fontSize: 10, fontWeight: FontWeight.bold),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.calendar_today, size: 10, color: Colors.grey),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            '${dateFormat.format(booking.pickUpDate)} - ${dateFormat.format(booking.returnDate)}',
+                                            style: TextStyle(color: Colors.grey[600], fontSize: 10),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.payments_outlined, size: 10, color: Colors.grey),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'RM ${booking.totalPrice.toStringAsFixed(2)}',
+                                            style: TextStyle(color: Colors.grey[600], fontSize: 10, fontWeight: FontWeight.bold),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                // Right status badge
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: statusColor.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    booking.status.toUpperCase(),
+                                    style: TextStyle(color: statusColor, fontSize: 9, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (payment != null) ...[
+                              const Divider(height: 16),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Text(
+                                        'Payment Status: ',
+                                        style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w600),
+                                      ),
+                                      _buildPaymentBadge(payment),
+                                    ],
+                                  ),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (payment.receiptImage != null && payment.receiptImage!.isNotEmpty) ...[
+                                        TextButton.icon(
+                                          onPressed: () => _openReceiptLightbox(payment),
+                                          icon: const Icon(Icons.visibility_outlined, size: 14, color: AppColors.secondaryBlue),
+                                          label: const Text(
+                                            'View Receipt',
+                                            style: TextStyle(color: AppColors.secondaryBlue, fontSize: 11, fontWeight: FontWeight.bold),
+                                          ),
+                                          style: TextButton.styleFrom(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                      ],
+                                      if (payment.paymentStatus == 'Rejected')
+                                        TextButton.icon(
+                                          onPressed: _vehicles.any((v) => v.id == booking.vehicleId && v.status.toLowerCase() == 'maintenance')
+                                              ? null
+                                              : () => _showReUploadReceiptDialog(payment),
+                                          icon: Icon(
+                                            Icons.replay_outlined,
+                                            size: 14,
+                                            color: _vehicles.any((v) => v.id == booking.vehicleId && v.status.toLowerCase() == 'maintenance')
+                                                ? Colors.grey
+                                                : AppColors.primaryOrange,
+                                          ),
+                                          label: Text(
+                                            _vehicles.any((v) => v.id == booking.vehicleId && v.status.toLowerCase() == 'maintenance')
+                                                ? 'Under Maintenance'
+                                                : 'Re-upload Receipt',
+                                            style: TextStyle(
+                                              color: _vehicles.any((v) => v.id == booking.vehicleId && v.status.toLowerCase() == 'maintenance')
+                                                  ? Colors.grey
+                                                  : AppColors.primaryOrange,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          style: TextButton.styleFrom(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              if (payment.paymentStatus == 'Rejected' && payment.rejectionReason != null && payment.rejectionReason!.isNotEmpty) ...[
+                                const SizedBox(height: 6),
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    'Rejection Reason: ${payment.rejectionReason}',
+                                    style: const TextStyle(color: Colors.redAccent, fontSize: 11, fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ],
+                            ],
+                            if (booking.status == 'completed' && !_reviewedBookingIds.contains(booking.id)) ...[
+                              const Divider(height: 16),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 32,
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.secondaryBlue,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                  ),
+                                  icon: const Icon(Icons.rate_review, size: 14),
+                                  label: const Text('SUBMIT REVIEW', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                  onPressed: () => _submitReview(booking),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ],
+      ),
+    );
+
+    return SingleChildScrollView(
+              padding: EdgeInsets.symmetric(
+                horizontal: isDesktop ? 60.0 : 20.0,
+                vertical: 24.0,
+              ),
+              child: Column(
+                children: [
+                  _buildVerificationReminderCard(isDark),
+                  // Profile Header Banner Card (Image Reference 2)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).cardColor,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.grey[200]!),
+                    ),
+                    child: Row(
+                      children: [
+                        // Avatar clickable to change profile photo
+                        GestureDetector(
+                          onTap: _pickProfileImage,
+                          child: Stack(
+                            children: [
+                              CircleAvatar(
+                                radius: 36,
+                                backgroundColor: AppColors.secondaryBlue.withValues(alpha: 0.1),
+                                backgroundImage: getAppImageProvider(_user?.profileImage),
+                                child: _user?.profileImage.isNotEmpty != true || getAppImageProvider(_user?.profileImage) == null
+                                    ? const Icon(Icons.person, size: 36, color: AppColors.secondaryBlue)
+                                    : null,
+                              ),
+                              Positioned(
+                                right: 0,
+                                bottom: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(color: AppColors.primaryOrange, shape: BoxShape.circle),
+                                  child: const Icon(Icons.camera_alt, size: 10, color: Colors.white),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 20),
+                        // Username + Email details
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _user?.fullName.isNotEmpty == true ? _user!.fullName : 'Username',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? Colors.white : AppColors.secondaryBlue,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _user?.email ?? '',
+                                style: TextStyle(color: isDark ? const Color(0xFFCBD5E1) : Colors.grey[500], fontSize: 13),
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  const Icon(Icons.stars_rounded, color: AppColors.primaryOrange, size: 16),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${_user?.rewardPoints ?? 0} Points',
+                                    style: const TextStyle(
+                                      color: AppColors.primaryOrange,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Edit profile and logout buttons row
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.secondaryBlue,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              ),
+                              icon: const Icon(Icons.edit, size: 16),
+                              label: const Text('Edit Profile', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              onPressed: _showEditProfileDialog,
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.redAccent,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              ),
+                              icon: const Icon(Icons.logout, size: 16),
+                              label: const Text('Logout', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              onPressed: () async {
+                                final nav = Navigator.of(context);
+                                await _authService.logout();
+                                nav.pushAndRemoveUntil(
+                                  MaterialPageRoute(builder: (context) => const LoginScreen()),
+                                  (route) => false,
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  isDesktop
+                      ? Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 4,
+                              child: leftColumn,
+                            ),
+                            const SizedBox(width: 24),
+                            Expanded(
+                              flex: 5,
+                              child: rightColumn,
+                            ),
+                          ],
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            leftColumn,
+                            const SizedBox(height: 24),
+                            rightColumn,
+                          ],
+                        ),
+                ],
+              ),
     );
   }
 

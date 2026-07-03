@@ -11,6 +11,8 @@ import 'register_screen.dart';
 import 'forgot_password_screen.dart';
 import 'customer/customer_responsive_shell.dart';
 import 'admin/dashboard_screen.dart';
+import '../../services/booking_lifecycle_manager.dart';
+import '../../services/user_session.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, required Null Function() onLoggedIn});
@@ -187,7 +189,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final uid = userCreds.user!.uid;
       final userModel = await _databaseService.getUser(uid);
-
+      if (userModel != null) {
+        UserSession().forceSetRole(userModel.role);
+      }
       if (!mounted) return;
 
       if (userModel == null) {
@@ -223,6 +227,11 @@ class _LoginScreenState extends State<LoginScreen> {
         }
         await prefs.setStringList('recent_login_emails', list);
       }
+
+      if (!mounted) return;
+
+      // Trigger booking lifecycle check on login
+      await BookingLifecycleManager().checkAndProcessLifecycle();
 
       if (!mounted) return;
 
@@ -272,7 +281,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final uid = userCreds.user!.uid;
       final userModel = await _databaseService.getUser(uid);
-
+      if (userModel != null) {
+        UserSession().forceSetRole(userModel.role);
+      }
       if (!mounted) return;
 
       if (userModel == null) {
@@ -292,6 +303,11 @@ class _LoginScreenState extends State<LoginScreen> {
         await _authService.logout();
         return;
       }
+
+      // Trigger booking lifecycle check on login
+      await BookingLifecycleManager().checkAndProcessLifecycle();
+
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

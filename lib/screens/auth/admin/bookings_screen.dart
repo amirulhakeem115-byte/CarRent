@@ -18,7 +18,7 @@ class _BookingsViewState extends State<BookingsView> {
 
   List<BookingModel> _bookings = [];
   bool _loading = true;
-  String _selectedFilter = 'All'; // 'All', 'Pending', 'Approved', 'Ongoing', 'Completed', 'Cancelled'
+  String _selectedFilter = 'All'; // 'All', 'Pending', 'Approved', 'Ongoing', 'Completed', 'Cancelled', 'Overdue'
   String? _error;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -101,10 +101,12 @@ class _BookingsViewState extends State<BookingsView> {
       backgroundColor: sheetBg,
       builder: (context) {
         Color statusColor = Colors.orange;
-        if (booking.status == 'approved') statusColor = Colors.green;
-        if (booking.status == 'ongoing') statusColor = Colors.blue;
-        if (booking.status == 'completed') statusColor = Colors.indigo;
-        if (booking.status == 'cancelled' || booking.status == 'rejected') statusColor = Colors.redAccent;
+        final bStat = booking.status.toLowerCase();
+        if (bStat == 'approved') statusColor = Colors.green;
+        if (bStat == 'ongoing' || bStat == 'active') statusColor = Colors.blue;
+        if (bStat == 'completed') statusColor = Colors.indigo;
+        if (bStat == 'cancelled' || bStat == 'rejected') statusColor = Colors.redAccent;
+        if (bStat == 'overdue') statusColor = Colors.red;
 
         return Padding(
           padding: EdgeInsets.only(
@@ -165,17 +167,17 @@ class _BookingsViewState extends State<BookingsView> {
                         child: const Text('Reject & Deny'),
                       ),
                     ],
-                    if (booking.status == 'approved') ...[
+                    if (booking.status == 'approved' || booking.status == 'Confirmed' || booking.status == 'confirmed') ...[
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
                         onPressed: () {
                           Navigator.pop(context);
-                          _updateStatus(booking, 'ongoing');
+                          _updateStatus(booking, 'active');
                         },
-                        child: const Text('Handover Keys (Ongoing)'),
+                        child: const Text('Handover Keys (Active)'),
                       ),
                     ],
-                    if (booking.status == 'ongoing') ...[
+                    if (booking.status == 'ongoing' || booking.status.toLowerCase() == 'active' || booking.status.toLowerCase() == 'overdue') ...[
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo, foregroundColor: Colors.white),
                         onPressed: () {
@@ -258,9 +260,15 @@ class _BookingsViewState extends State<BookingsView> {
 
     // Calculations
     final totalBookings = _bookings.length;
-    final activeBookings = _bookings.where((b) => b.status == 'approved' || b.status == 'ongoing').length;
-    final completedBookings = _bookings.where((b) => b.status == 'completed').length;
-    final cancelledBookings = _bookings.where((b) => b.status == 'cancelled' || b.status == 'rejected').length;
+    final activeBookings = _bookings.where((b) {
+      final s = b.status.toLowerCase();
+      return s == 'approved' || s == 'ongoing' || s == 'active' || s == 'overdue' || s == 'confirmed';
+    }).length;
+    final completedBookings = _bookings.where((b) => b.status.toLowerCase() == 'completed').length;
+    final cancelledBookings = _bookings.where((b) {
+      final s = b.status.toLowerCase();
+      return s == 'cancelled' || s == 'rejected';
+    }).length;
 
     // Filtering
     final filteredBookings = _bookings.where((b) {
@@ -443,14 +451,16 @@ class _BookingsViewState extends State<BookingsView> {
           DataColumn(label: Text('Return Date', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
           DataColumn(label: Text('Amount (RM)', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
           DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
-          DataColumn(label: Text('Detail', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
+          DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
         ],
         rows: bookings.map((b) {
           Color statusColor = Colors.orange;
-          if (b.status == 'approved') statusColor = Colors.green;
-          if (b.status == 'ongoing') statusColor = Colors.blue;
-          if (b.status == 'completed') statusColor = Colors.indigo;
-          if (b.status == 'cancelled' || b.status == 'rejected') statusColor = Colors.redAccent;
+          final bStat = b.status.toLowerCase();
+          if (bStat == 'approved') statusColor = Colors.green;
+          if (bStat == 'ongoing' || bStat == 'active') statusColor = Colors.blue;
+          if (bStat == 'completed') statusColor = Colors.indigo;
+          if (bStat == 'cancelled' || bStat == 'rejected') statusColor = Colors.redAccent;
+          if (bStat == 'overdue') statusColor = Colors.red;
           final dateFormat = DateFormat('yyyy-MM-dd');
           return DataRow(cells: [
             DataCell(Text(b.id.substring(0, b.id.length > 8 ? 8 : b.id.length), style: TextStyle(fontWeight: FontWeight.w600, color: textPrimary))),
@@ -466,9 +476,28 @@ class _BookingsViewState extends State<BookingsView> {
                 child: Text(b.status.toUpperCase(), style: TextStyle(color: statusColor, fontSize: 9, fontWeight: FontWeight.bold)),
               ),
             ),
-            DataCell(IconButton(
-              icon: Icon(Icons.visibility_outlined, color: textPrimary, size: 18),
-              onPressed: () => _showBookingDetails(b),
+            DataCell(Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: Icon(Icons.visibility_outlined, color: textPrimary, size: 18),
+                  onPressed: () => _showBookingDetails(b),
+                ),
+                if (bStat == 'active' || bStat == 'ongoing' || bStat == 'overdue') ...[
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.teal,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                    ),
+                    onPressed: () => _confirmCompleteBooking(b),
+                    icon: const Icon(Icons.check_circle_outline, size: 12),
+                    label: const Text('Complete Booking', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ],
             )),
           ]);
         }).toList(),
@@ -484,28 +513,58 @@ class _BookingsViewState extends State<BookingsView> {
       itemBuilder: (context, index) {
         final b = bookings[index];
         Color statusColor = Colors.orange;
-        if (b.status == 'approved') statusColor = Colors.green;
-        if (b.status == 'ongoing') statusColor = Colors.blue;
-        if (b.status == 'completed') statusColor = Colors.indigo;
-        if (b.status == 'cancelled' || b.status == 'rejected') statusColor = Colors.redAccent;
+        final bStat = b.status.toLowerCase();
+        if (bStat == 'approved') statusColor = Colors.green;
+        if (bStat == 'ongoing' || bStat == 'active') statusColor = Colors.blue;
+        if (bStat == 'completed') statusColor = Colors.indigo;
+        if (bStat == 'cancelled' || bStat == 'rejected') statusColor = Colors.redAccent;
+        if (bStat == 'overdue') statusColor = Colors.red;
         final dateFormat = DateFormat('yyyy-MM-dd');
-        return ListTile(
-          title: Text(b.vehicleName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textPrimary)),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        return Card(
+          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8F9FA),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: borderColor)),
+          elevation: 0,
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Column(
             children: [
-              const SizedBox(height: 4),
-              Text('Customer: ${b.userName}', style: TextStyle(fontSize: 12, color: textSecondary)),
-              Text('${dateFormat.format(b.pickUpDate)} → ${dateFormat.format(b.returnDate)}', style: TextStyle(fontSize: 12, color: textSecondary)),
-              Text('RM ${b.totalPrice.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primaryOrange)),
+              ListTile(
+                title: Text(b.vehicleName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textPrimary)),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 4),
+                    Text('Customer: ${b.userName}', style: TextStyle(fontSize: 12, color: textSecondary)),
+                    Text('${dateFormat.format(b.pickUpDate)} → ${dateFormat.format(b.returnDate)}', style: TextStyle(fontSize: 12, color: textSecondary)),
+                    Text('RM ${b.totalPrice.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primaryOrange)),
+                  ],
+                ),
+                trailing: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
+                  child: Text(b.status.toUpperCase(), style: TextStyle(color: statusColor, fontSize: 9, fontWeight: FontWeight.bold)),
+                ),
+                onTap: () => _showBookingDetails(b),
+              ),
+              if (bStat == 'active' || bStat == 'ongoing' || bStat == 'overdue')
+                Padding(
+                  padding: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 36,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.teal,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: () => _confirmCompleteBooking(b),
+                      icon: const Icon(Icons.check_circle_outline, size: 14),
+                      label: const Text('Complete Booking', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ),
             ],
           ),
-          trailing: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
-            child: Text(b.status.toUpperCase(), style: TextStyle(color: statusColor, fontSize: 9, fontWeight: FontWeight.bold)),
-          ),
-          onTap: () => _showBookingDetails(b),
         );
       },
     );
@@ -524,7 +583,7 @@ class _BookingsViewState extends State<BookingsView> {
         underline: const SizedBox(),
         dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         style: TextStyle(color: textPrimary, fontSize: 13, fontWeight: FontWeight.bold),
-        items: ['All', 'Pending', 'Approved', 'Ongoing', 'Completed', 'Cancelled'].map((s) {
+        items: ['All', 'Pending', 'Approved', 'Ongoing', 'Completed', 'Cancelled', 'Overdue'].map((s) {
           return DropdownMenuItem(value: s, child: Text(s, style: TextStyle(color: textPrimary, fontSize: 13)));
         }).toList(),
         onChanged: (val) {
@@ -532,5 +591,52 @@ class _BookingsViewState extends State<BookingsView> {
         },
       ),
     );
+  }
+
+  Future<void> _confirmCompleteBooking(BookingModel booking) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            'Complete Booking',
+            style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white : AppColors.secondaryBlue),
+          ),
+          content: Text(
+            'Are you sure the customer has returned the vehicle?',
+            style: TextStyle(color: isDark ? const Color(0xFFCBD5E1) : Colors.black87),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text('Cancel', style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : Colors.grey)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.teal,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Complete Booking', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm == true) {
+      await _bookingService.updateBookingStatus(
+        booking.id,
+        'completed',
+        booking.userId,
+        booking.vehicleId,
+        booking.vehicleName,
+      );
+      _loadBookings();
+    }
   }
 }

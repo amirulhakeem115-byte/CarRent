@@ -103,7 +103,10 @@ class _AdminProfileViewState extends State<AdminProfileView> {
 
         _totalVehicles = vehiclesList.length;
         _totalBookingsApproved = bookingsList
-            .where((b) => b.status == 'approved' || b.status == 'ongoing' || b.status == 'completed')
+            .where((b) {
+              final s = b.status.toLowerCase();
+              return s == 'approved' || s == 'confirmed' || s == 'ongoing' || s == 'active' || s == 'overdue' || s == 'completed';
+            })
             .length;
         
         _totalPaymentsApproved = paymentsList

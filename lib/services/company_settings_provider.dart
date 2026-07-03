@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 
-class CompanySettingsProvider extends ChangeNotifier {
+class CompanySettingsProvider with ChangeNotifier {
   static final CompanySettingsProvider _instance = CompanySettingsProvider._internal();
   factory CompanySettingsProvider() => _instance;
 
@@ -23,6 +23,8 @@ class CompanySettingsProvider extends ChangeNotifier {
   String get companyRegistrationNumber => _settings['companyRegistrationNumber'] ?? '202301012345 (123456-X)';
   String get businessHours => _settings['businessHours'] ?? 'Mon - Fri: 9:00 AM - 6:00 PM MYT';
   String get companyDescription => _settings['companyDescription'] ?? 'Leading car rental system providing premium vehicles.';
+  String get openingTime => _settings['openingTime'] ?? '08:00 AM';
+  String get closingTime => _settings['closingTime'] ?? '08:00 PM';
   
   // Social media handles as a Map
   Map<String, dynamic> get socialMediaLinks {
@@ -118,6 +120,8 @@ class CompanySettingsProvider extends ChangeNotifier {
       'companyRegistrationNumber': '202301012345 (123456-X)',
       'businessHours': 'Mon - Fri: 9:00 AM - 6:00 PM MYT',
       'companyDescription': 'Leading car rental system providing premium vehicles.',
+      'openingTime': '08:00 AM',
+      'closingTime': '08:00 PM',
       'socialMediaLinks': {
         'whatsapp': '+60 12-345 6789',
         'facebook': 'https://facebook.com/carrent',

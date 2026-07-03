@@ -18,11 +18,55 @@ import '../../../widgets/app_image.dart';
 import '../../../services/receipt_upload_helper.dart'
     if (dart.library.html) '../../../services/receipt_upload_web.dart'
     as receipt_upload;
+import '../../../services/company_settings_provider.dart';
 
 class BookingScreen extends StatefulWidget {
   final VehicleModel vehicle;
+  final DateTime? prefilledPickupDate;
+  final DateTime? prefilledReturnDate;
+  final BookingModel? existingBooking;
+  final String? initialPaymentMethod;
 
-  const BookingScreen({super.key, required this.vehicle});
+  const BookingScreen({
+    super.key,
+    required this.vehicle,
+    this.prefilledPickupDate,
+    this.prefilledReturnDate,
+    this.existingBooking,
+    this.initialPaymentMethod,
+  });
+
+  static Future<void> navigateToPayment(
+    BuildContext context,
+    BookingModel booking,
+    String? method,
+  ) async {
+    try {
+      final vehicleSnap = await FirebaseDatabase.instance
+          .ref()
+          .child('vehicles')
+          .child(booking.vehicleId)
+          .get();
+      if (vehicleSnap.exists) {
+        final vData = Map<dynamic, dynamic>.from(vehicleSnap.value as Map);
+        final vehicle = VehicleModel.fromMap(booking.vehicleId, vData);
+        if (context.mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => BookingScreen(
+                vehicle: vehicle,
+                existingBooking: booking,
+                initialPaymentMethod: method,
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error navigating to payment: $e');
+    }
+  }
 
   @override
   State<BookingScreen> createState() => _BookingScreenState();
@@ -38,6 +82,7 @@ class _BookingScreenState extends State<BookingScreen> {
   final _txnIdController = TextEditingController();
   DateTime? _pickupDate;
   DateTime? _returnDate;
+  String? _pickupTime;
 
   int _availablePoints = 0;
   int _pointsToRedeem = 0;
@@ -72,9 +117,37 @@ class _BookingScreenState extends State<BookingScreen> {
     'Hong Leong Connect',
   ];
 
+  String? _activeBookingId;
+  DateTime? _activeBookingCreatedAt;
+
   @override
   void initState() {
     super.initState();
+    _pickupDate =
+        widget.existingBooking?.pickUpDate ?? widget.prefilledPickupDate;
+    _returnDate =
+        widget.existingBooking?.returnDate ?? widget.prefilledReturnDate;
+    _activeBookingId = widget.existingBooking?.id;
+    _activeBookingCreatedAt = widget.existingBooking?.createdAt;
+
+    if (widget.existingBooking != null) {
+      _currentStep = 3;
+      _pointsToRedeem = widget.existingBooking!.pointsRedeemed;
+      _pointsController.text = _pointsToRedeem.toString();
+      _pickupTime = DateFormat(
+        'hh:mm a',
+      ).format(widget.existingBooking!.pickUpDate);
+      if (widget.initialPaymentMethod != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _handleSelectedPaymentMethod(
+              widget.initialPaymentMethod!,
+              widget.existingBooking!,
+            );
+          }
+        });
+      }
+    }
     _loadUserProfile();
     _loadQrSettings();
     receipt_upload.registerPlatformDropzone();
@@ -154,6 +227,69 @@ class _BookingScreenState extends State<BookingScreen> {
     return val < 0.0 ? 0.0 : val;
   }
 
+  List<String> _generateTimeSlots() {
+    final provider = CompanySettingsProvider();
+    final openStr = provider.openingTime;
+    final closeStr = provider.closingTime;
+
+    final List<String> slots = [];
+    try {
+      final format = DateFormat('hh:mm a');
+      final open = format.parse(openStr);
+      final close = format.parse(closeStr);
+
+      var current = open;
+      while (current.isBefore(close) || current.isAtSameMomentAs(close)) {
+        slots.add(DateFormat('hh:mm a').format(current));
+        current = current.add(const Duration(minutes: 30));
+      }
+    } catch (e) {
+      debugPrint('Error generating slots: $e');
+      slots.addAll([
+        '08:00 AM',
+        '09:00 AM',
+        '10:00 AM',
+        '11:00 AM',
+        '12:00 PM',
+        '01:00 PM',
+        '02:00 PM',
+        '03:00 PM',
+        '04:00 PM',
+        '05:00 PM',
+        '06:00 PM',
+        '07:00 PM',
+        '08:00 PM',
+      ]);
+    }
+    return slots;
+  }
+
+  void _updateDateTimes() {
+    if (_pickupDate != null && _pickupTime != null) {
+      try {
+        final parsedTime = DateFormat('hh:mm a').parse(_pickupTime!);
+        _pickupDate = DateTime(
+          _pickupDate!.year,
+          _pickupDate!.month,
+          _pickupDate!.day,
+          parsedTime.hour,
+          parsedTime.minute,
+        );
+        if (_returnDate != null) {
+          _returnDate = DateTime(
+            _returnDate!.year,
+            _returnDate!.month,
+            _returnDate!.day,
+            parsedTime.hour,
+            parsedTime.minute,
+          );
+        }
+      } catch (e) {
+        debugPrint('Error parsing time: $e');
+      }
+    }
+  }
+
   Future<void> _selectPickupDate() async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final picked = await showDatePicker(
@@ -184,6 +320,7 @@ class _BookingScreenState extends State<BookingScreen> {
     if (picked != null) {
       setState(() {
         _pickupDate = picked;
+        _updateDateTimes();
         if (_returnDate != null && _returnDate!.isBefore(_pickupDate!)) {
           _returnDate = null;
         }
@@ -227,14 +364,17 @@ class _BookingScreenState extends State<BookingScreen> {
     if (picked != null) {
       setState(() {
         _returnDate = picked;
+        _updateDateTimes();
       });
     }
   }
 
   void _triggerPaymentFlow() {
-    if (_pickupDate == null || _returnDate == null) {
+    if (_pickupDate == null || _pickupTime == null || _returnDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select pick-up and return dates')),
+        const SnackBar(
+          content: Text('Please select pick-up date, time and return date'),
+        ),
       );
       return;
     }
@@ -1248,6 +1388,33 @@ class _BookingScreenState extends State<BookingScreen> {
     );
   }
 
+  void _handleSelectedPaymentMethod(String method, BookingModel booking) {
+    setState(() {
+      _currentStep = 3;
+      _paymentOption = 'Deposit'; // default
+      _activeBookingId = booking.id;
+      _activeBookingCreatedAt = booking.createdAt;
+
+      if (method.toLowerCase().contains('fpx')) {
+        _paymentMethod = 'FPX Online Banking';
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _showFPXDialog();
+        });
+      } else if (method.toLowerCase().contains('qr') ||
+          method.toLowerCase().contains('duitnow')) {
+        _paymentMethod = 'DuitNow QR';
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _showPaymentDialog(isQr: true);
+        });
+      } else {
+        _paymentMethod = 'Cash';
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _showCashConfirmationDialog();
+        });
+      }
+    });
+  }
+
   // Core Booking processor
   Future<void> _processBooking({
     required String status,
@@ -1274,6 +1441,9 @@ class _BookingScreenState extends State<BookingScreen> {
       final todayStart = DateTime(nowToday.year, nowToday.month, nowToday.day);
       if (_pickupDate == null) {
         throw 'Please select a pickup date.';
+      }
+      if (_pickupTime == null) {
+        throw 'Please select a pickup time.';
       }
       if (_pickupDate!.isBefore(todayStart)) {
         throw 'Pickup date cannot be in the past.';
@@ -1309,7 +1479,7 @@ class _BookingScreenState extends State<BookingScreen> {
           .key!;
 
       final booking = BookingModel(
-        id: bookingId,
+        id: _activeBookingId ?? bookingId,
         vehicleId: widget.vehicle.id,
         vehicleName: '${widget.vehicle.brand} ${widget.vehicle.model}',
         userId: currentUser.uid,
@@ -1322,8 +1492,8 @@ class _BookingScreenState extends State<BookingScreen> {
         status: 'Confirmed', // Confirmed automatically
         notes: _notesController.text.trim().isNotEmpty
             ? _notesController.text.trim()
-            : null,
-        createdAt: DateTime.now(),
+            : (widget.existingBooking?.notes ?? 'AI Operator Guided Booking'),
+        createdAt: _activeBookingCreatedAt ?? DateTime.now(),
         pointsRedeemed: _pointsToRedeem,
         discountAmount: _discountAmount,
         pointsRedeemedProcessed: _pointsToRedeem > 0,
@@ -1336,7 +1506,7 @@ class _BookingScreenState extends State<BookingScreen> {
       // Save Payment record
       final payment = PaymentModel(
         id: '',
-        bookingId: bookingId,
+        bookingId: booking.id,
         userId: currentUser.uid,
         amount: amount,
         depositAmount: _depositAmount,
@@ -1360,7 +1530,7 @@ class _BookingScreenState extends State<BookingScreen> {
       // Deduct reward points immediately if any were redeemed
       if (_pointsToRedeem > 0) {
         try {
-          await RewardPointsService().deductPointsForBooking(bookingId);
+          await RewardPointsService().deductPointsForBooking(booking.id);
         } catch (rewardErr) {
           debugPrint('Error auto-deducting reward points: $rewardErr');
         }
@@ -1660,7 +1830,7 @@ class _BookingScreenState extends State<BookingScreen> {
         const SizedBox(height: 20),
 
         // 2. Date select
-        Text('Select Rental Dates', style: headingStyle),
+        Text('Select Rental Dates & Time', style: headingStyle),
         const SizedBox(height: 10),
         Row(
           children: [
@@ -1712,6 +1882,63 @@ class _BookingScreenState extends State<BookingScreen> {
             ),
             const SizedBox(width: 12),
             Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: cardColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: borderColor),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _pickupTime,
+                    hint: Text(
+                      'Select Time',
+                      style: TextStyle(
+                        color: isDark ? Colors.white60 : Colors.black54,
+                        fontSize: 13,
+                      ),
+                    ),
+                    dropdownColor: cardColor,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      labelText: 'Pick-up Time',
+                      labelStyle: TextStyle(
+                        color: isDark
+                            ? const Color(0xFF94A3B8)
+                            : AppColors.lightText,
+                        fontSize: 10,
+                      ),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    style: TextStyle(
+                      color: isDark ? Colors.white : AppColors.secondaryBlue,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                    items: _generateTimeSlots().map((time) {
+                      return DropdownMenuItem(value: time, child: Text(time));
+                    }).toList(),
+                    onChanged: (val) {
+                      setState(() {
+                        _pickupTime = val;
+                        _updateDateTimes();
+                      });
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
               child: MouseRegion(
                 cursor: SystemMouseCursors.click,
                 child: GestureDetector(
@@ -1757,7 +1984,77 @@ class _BookingScreenState extends State<BookingScreen> {
                 ),
               ),
             ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: borderColor),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Return Time (Auto-matched)',
+                      style: TextStyle(
+                        color: isDark
+                            ? const Color(0xFF94A3B8)
+                            : AppColors.lightText,
+                        fontSize: 10,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _pickupTime ?? 'Select Pickup Time',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: _pickupTime != null
+                            ? (isDark ? Colors.white : AppColors.secondaryBlue)
+                            : Colors.grey,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.primaryOrange.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: AppColors.primaryOrange.withValues(alpha: 0.3),
+            ),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.info_outline,
+                color: AppColors.primaryOrange,
+                size: 16,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Company Working Hours: ${CompanySettingsProvider().openingTime} - ${CompanySettingsProvider().closingTime}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primaryOrange,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 20),
 
@@ -2048,7 +2345,7 @@ class _BookingScreenState extends State<BookingScreen> {
                           ),
                         ),
                         Text(
-                          '$pickupDateStr • 10:00 AM',
+                          '$pickupDateStr • ${_pickupTime ?? "10:00 AM"}',
                           style: TextStyle(fontSize: 10, color: textMuted),
                         ),
                         const SizedBox(height: 8),
@@ -2078,7 +2375,7 @@ class _BookingScreenState extends State<BookingScreen> {
                           ),
                         ),
                         Text(
-                          '$returnDateStr • 10:00 AM',
+                          '$returnDateStr • ${_pickupTime ?? "10:00 AM"}',
                           style: TextStyle(fontSize: 10, color: textMuted),
                         ),
                       ],

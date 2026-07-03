@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:firebase_database/firebase_database.dart';
+import '../../../models/review_model.dart';
 import '../../../services/vehicle_service.dart';
 import '../../../services/branch_service.dart';
 import '../../../models/vehicle_model.dart';
@@ -45,12 +47,15 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
   bool _isGridView = true;
 
   StreamSubscription<List<VehicleModel>>? _vehiclesSubscription;
+  StreamSubscription<DatabaseEvent>? _allReviewsSubscription;
+  Map<String, List<ReviewModel>> _vehicleReviewsCache = {};
 
   @override
   void initState() {
     super.initState();
     _loadData();
     _subscribeToVehicles();
+    _subscribeToReviews();
     _searchController.addListener(() {
       if (mounted) {
         setState(() {
@@ -103,6 +108,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
   void dispose() {
     _searchController.dispose();
     _vehiclesSubscription?.cancel();
+    _allReviewsSubscription?.cancel();
     super.dispose();
   }
 
@@ -115,6 +121,37 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
     if (_selectedAvailability != null) count++;
     if (_priceBudget < 1000.0) count++;
     return count;
+  }
+
+  void _subscribeToReviews() {
+    _allReviewsSubscription?.cancel();
+    _allReviewsSubscription = FirebaseDatabase.instance
+        .ref()
+        .child('reviews')
+        .onValue
+        .listen((event) {
+          if (mounted) {
+            final Map<String, List<ReviewModel>> cache = {};
+            if (event.snapshot.exists && event.snapshot.value != null) {
+              final Map<dynamic, dynamic> data =
+                  event.snapshot.value as Map<dynamic, dynamic>;
+              data.forEach((key, value) {
+                try {
+                  final r = ReviewModel.fromMap(
+                    key.toString(),
+                    value as Map<dynamic, dynamic>,
+                  );
+                  cache.putIfAbsent(r.vehicleId, () => []).add(r);
+                } catch (e) {
+                  debugPrint('Error parsing review in search cache: $e');
+                }
+              });
+            }
+            setState(() {
+              _vehicleReviewsCache = cache;
+            });
+          }
+        });
   }
 
   void _resetFilters() {
@@ -1026,6 +1063,14 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
   }
 
   Widget _buildGridCard(VehicleModel vehicle) {
+    final vehicleReviews = _vehicleReviewsCache[vehicle.id] ?? [];
+    final reviewsCount = vehicleReviews.length;
+    double avgRating = 0.0;
+    if (vehicleReviews.isNotEmpty) {
+      avgRating =
+          vehicleReviews.map((r) => r.rating).reduce((a, b) => a + b) /
+          vehicleReviews.length;
+    }
     final bool isAvailable = vehicle.status.toLowerCase() == 'available';
     final Color statusColor = isAvailable
         ? const Color(0xFF10B981)
@@ -1166,6 +1211,30 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                           ),
                         ],
                       ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.star_rounded,
+                      color: Colors.amber,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 2),
+                    Text(
+                      avgRating > 0 ? avgRating.toStringAsFixed(1) : '4.8',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                        color: _textColor,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '($reviewsCount)',
+                      style: TextStyle(fontSize: 10, color: _subColor),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 4),
@@ -1336,6 +1405,14 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
   }
 
   Widget _buildListCard(VehicleModel vehicle) {
+    final vehicleReviews = _vehicleReviewsCache[vehicle.id] ?? [];
+    final reviewsCount = vehicleReviews.length;
+    double avgRating = 0.0;
+    if (vehicleReviews.isNotEmpty) {
+      avgRating =
+          vehicleReviews.map((r) => r.rating).reduce((a, b) => a + b) /
+          vehicleReviews.length;
+    }
     final bool isAvailable = vehicle.status.toLowerCase() == 'available';
     final Color statusColor = isAvailable
         ? const Color(0xFF10B981)
@@ -1453,6 +1530,35 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                                 fontSize: 15,
                                 color: _textColor,
                               ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.star_rounded,
+                                  color: Colors.amber,
+                                  size: 14,
+                                ),
+                                const SizedBox(width: 2),
+                                Text(
+                                  avgRating > 0
+                                      ? avgRating.toStringAsFixed(1)
+                                      : '4.8',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11,
+                                    color: _textColor,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '($reviewsCount)',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: _subColor,
+                                  ),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 4),
                             Row(

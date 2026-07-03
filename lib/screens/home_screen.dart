@@ -1,12 +1,16 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'dart:ui' show ImageFilter;
 import 'package:provider/provider.dart';
+import 'package:firebase_database/firebase_database.dart';
+import '../models/review_model.dart';
 import '../constants/colors.dart';
 import '../services/auth_service.dart';
 import '../services/database_service.dart';
 import '../services/branch_service.dart';
 import '../services/vehicle_service.dart';
 import '../services/company_settings_provider.dart';
+import '../services/user_session.dart';
 import '../models/user_model.dart';
 import '../models/vehicle_model.dart';
 import '../models/branch_model.dart';
@@ -83,6 +87,7 @@ class _HomeScreenState extends State<HomeScreen> {
               .getUser(currentUser.uid)
               .timeout(const Duration(seconds: 4));
           if (_user != null && mounted) {
+            UserSession().forceSetRole(_user!.role);
             if (_user!.role == 'admin') {
               Navigator.pushReplacement(
                 context,
@@ -2222,6 +2227,58 @@ class VehicleHoverCard extends StatefulWidget {
 class _VehicleHoverCardState extends State<VehicleHoverCard> {
   bool _isHovered = false;
 
+  StreamSubscription<DatabaseEvent>? _reviewsSubscription;
+  List<ReviewModel> _reviews = [];
+  double _avgRating = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _subscribeToReviews();
+  }
+
+  @override
+  void dispose() {
+    _reviewsSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _subscribeToReviews() {
+    _reviewsSubscription?.cancel();
+    _reviewsSubscription = FirebaseDatabase.instance
+        .ref()
+        .child('reviews')
+        .orderByChild('vehicleId')
+        .equalTo(widget.vehicle.id)
+        .onValue
+        .listen((event) {
+          if (mounted) {
+            final List<ReviewModel> reviews = [];
+            double sum = 0.0;
+            if (event.snapshot.exists && event.snapshot.value != null) {
+              final Map<dynamic, dynamic> data =
+                  event.snapshot.value as Map<dynamic, dynamic>;
+              data.forEach((key, value) {
+                try {
+                  final r = ReviewModel.fromMap(
+                    key.toString(),
+                    value as Map<dynamic, dynamic>,
+                  );
+                  reviews.add(r);
+                  sum += r.rating;
+                } catch (e) {
+                  debugPrint('Error parsing review on landing: $e');
+                }
+              });
+            }
+            setState(() {
+              _reviews = reviews;
+              _avgRating = reviews.isEmpty ? 0.0 : sum / reviews.length;
+            });
+          }
+        });
+  }
+
   @override
   Widget build(BuildContext context) {
     final v = widget.vehicle;
@@ -2468,6 +2525,33 @@ class _VehicleHoverCardState extends State<VehicleHoverCard> {
                       fontSize: 18,
                       color: AppColors.secondaryBlue,
                     ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.star_rounded,
+                        color: Colors.amber,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _avgRating > 0 ? _avgRating.toStringAsFixed(1) : '4.8',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: AppColors.secondaryBlue,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '(${_reviews.length} reviews)',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 6),
                   Row(

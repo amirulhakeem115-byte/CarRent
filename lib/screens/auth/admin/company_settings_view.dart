@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'dart:convert';
+import 'package:intl/intl.dart';
 import '../../../constants/colors.dart';
 import '../../../services/company_settings_provider.dart';
 import '../../../widgets/app_image.dart';
@@ -28,6 +29,8 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
   final _companyAddressController = TextEditingController();
   final _businessHoursController = TextEditingController();
   final _companyDescriptionController = TextEditingController();
+  final _openingTimeController = TextEditingController();
+  final _closingTimeController = TextEditingController();
 
   // Socials
   final _socialWhatsappController = TextEditingController();
@@ -67,6 +70,8 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
     _companyAddressController.dispose();
     _businessHoursController.dispose();
     _companyDescriptionController.dispose();
+    _openingTimeController.dispose();
+    _closingTimeController.dispose();
     _socialWhatsappController.dispose();
     _socialFacebookController.dispose();
     _socialInstagramController.dispose();
@@ -89,6 +94,8 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
     _companyAddressController.text = provider.companyAddress;
     _businessHoursController.text = provider.businessHours;
     _companyDescriptionController.text = provider.companyDescription;
+    _openingTimeController.text = provider.openingTime;
+    _closingTimeController.text = provider.closingTime;
 
     final social = provider.socialMediaLinks;
     _socialWhatsappController.text = social['whatsapp']?.toString() ?? '';
@@ -146,6 +153,22 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
     }
   }
 
+  Future<void> _selectTime(TextEditingController controller) async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: const TimeOfDay(hour: 8, minute: 0),
+    );
+    if (picked != null) {
+      if (!mounted) return;
+      final now = DateTime.now();
+      final dt = DateTime(now.year, now.month, now.day, picked.hour, picked.minute);
+      final formatted = DateFormat('hh:mm a').format(dt);
+      setState(() {
+        controller.text = formatted;
+      });
+    }
+  }
+
   Future<void> _saveSettings() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
@@ -160,6 +183,8 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
         'companyAddress': _companyAddressController.text.trim(),
         'businessHours': _businessHoursController.text.trim(),
         'companyDescription': _companyDescriptionController.text.trim(),
+        'openingTime': _openingTimeController.text.trim(),
+        'closingTime': _closingTimeController.text.trim(),
         'companyLogo': _logoUrl ?? '',
         'socialMediaLinks': {
           'whatsapp': _socialWhatsappController.text.trim(),
@@ -440,12 +465,42 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
         TextFormField(
           controller: _businessHoursController,
           decoration: const InputDecoration(
-            labelText: 'Business Hours',
+            labelText: 'Business Hours Description',
             hintText: 'e.g. Mon - Fri: 9:00 AM - 6:00 PM MYT',
             prefixIcon: Icon(Icons.access_time_outlined),
           ),
           validator: (val) =>
               val == null || val.trim().isEmpty ? 'Business hours details required' : null,
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _openingTimeController,
+                readOnly: true,
+                onTap: () => _selectTime(_openingTimeController),
+                decoration: const InputDecoration(
+                  labelText: 'Opening Time',
+                  prefixIcon: Icon(Icons.alarm_on_outlined),
+                ),
+                validator: (val) => val == null || val.trim().isEmpty ? 'Required' : null,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: TextFormField(
+                controller: _closingTimeController,
+                readOnly: true,
+                onTap: () => _selectTime(_closingTimeController),
+                decoration: const InputDecoration(
+                  labelText: 'Closing Time',
+                  prefixIcon: Icon(Icons.alarm_off_outlined),
+                ),
+                validator: (val) => val == null || val.trim().isEmpty ? 'Required' : null,
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 16),
         TextFormField(

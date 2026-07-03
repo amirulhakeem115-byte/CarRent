@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/notification_model.dart';
+import 'user_role_cache.dart';
 
 class NotificationService {
   final DatabaseReference _baseDb = FirebaseDatabase.instance.ref().child('notifications');
@@ -78,13 +79,7 @@ class NotificationService {
 
     String targetUserId = userId;
     if (userId != currentUser.uid) {
-      String currentRole = 'customer';
-      try {
-        final roleSnap = await FirebaseDatabase.instance.ref().child('users').child(currentUser.uid).child('role').get().timeout(const Duration(seconds: 3));
-        if (roleSnap.exists) {
-          currentRole = roleSnap.value.toString();
-        }
-      } catch (_) {}
+      final currentRole = await UserRoleCache.getRole(currentUser.uid);
 
       if (currentRole != 'admin') {
         targetUserId = currentUser.uid;
@@ -162,16 +157,8 @@ class NotificationService {
       emitMerged();
     });
 
-    // 2. Fetch role asynchronously and optionally subscribe to 'admin' topic
-    FirebaseDatabase.instance
-        .ref()
-        .child('users')
-        .child(currentUser.uid)
-        .child('role')
-        .get()
-        .then((roleSnap) {
+    UserRoleCache.getRole(currentUser.uid).then((role) {
       if (controller.isClosed) return;
-      final role = roleSnap.exists ? roleSnap.value.toString() : 'customer';
 
       if (role == 'admin') {
         Query adminQuery = _baseDb.orderByChild('userId').equalTo('admin');
@@ -308,13 +295,7 @@ class NotificationService {
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser == null) return;
 
-      String currentRole = 'customer';
-      try {
-        final roleSnap = await FirebaseDatabase.instance.ref().child('users').child(currentUser.uid).child('role').get().timeout(const Duration(seconds: 3));
-        if (roleSnap.exists) {
-          currentRole = roleSnap.value.toString();
-        }
-      } catch (_) {}
+      final currentRole = await UserRoleCache.getRole(currentUser.uid);
 
       if (currentRole != 'admin') {
         debugPrint('[NotificationService] [notifyAllCustomers] Customer user cannot read user list to notify customers. Skipping.');
@@ -359,13 +340,7 @@ class NotificationService {
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser == null) return;
 
-      String currentRole = 'customer';
-      try {
-        final roleSnap = await FirebaseDatabase.instance.ref().child('users').child(currentUser.uid).child('role').get().timeout(const Duration(seconds: 3));
-        if (roleSnap.exists) {
-          currentRole = roleSnap.value.toString();
-        }
-      } catch (_) {}
+      final currentRole = await UserRoleCache.getRole(currentUser.uid);
 
       if (currentRole != 'admin') {
         // Fallback for customer actions: write directly to 'admin' topic

@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../../models/vehicle_model.dart';
 import '../../../models/review_model.dart';
 import '../../../models/maintenance_job_model.dart';
-import '../../../services/review_service.dart';
 import '../../../services/maintenance_service.dart';
 import '../../../constants/colors.dart';
 import '../../../widgets/custom_app_bar.dart';
@@ -27,7 +27,6 @@ class VehicleDetailsScreen extends StatefulWidget {
 }
 
 class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
-  final ReviewService _reviewService = ReviewService();
   bool get _isDark => Theme.of(context).brightness == Brightness.dark;
   Color get _textColor => _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
   Color get _subColor => _isDark ? const Color(0xFFCBD5E1) : AppColors.lightText;
@@ -41,6 +40,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
 
   late VehicleModel _vehicle;
   StreamSubscription<DatabaseEvent>? _vehicleSubscription;
+  StreamSubscription<DatabaseEvent>? _reviewsSubscription;
 
   @override
   void initState() {
@@ -48,6 +48,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
     _vehicle = widget.vehicle;
     _loadDetails();
     _subscribeToVehicle();
+    _subscribeToReviews();
   }
 
   void _subscribeToVehicle() {
@@ -74,22 +75,20 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
   @override
   void dispose() {
     _vehicleSubscription?.cancel();
+    _reviewsSubscription?.cancel();
     super.dispose();
   }
 
   Future<void> _loadDetails() async {
     if (!mounted) return;
     try {
-      _reviews = await _reviewService.getVehicleReviews(widget.vehicle.id).timeout(const Duration(seconds: 10));
-      _avgRating = await _reviewService.getAverageRating(widget.vehicle.id).timeout(const Duration(seconds: 10));
-      
       final jobs = await MaintenanceService().getMaintenanceJobs().timeout(const Duration(seconds: 10));
       _maintenanceJobs = jobs.where((job) => job.vehicleId == widget.vehicle.id && job.showToCustomer && job.status == 'Completed').toList();
       if (mounted) {
         setState(() {});
       }
     } catch (e) {
-      debugPrint('Error loading vehicle details/reviews/maintenance: $e');
+      debugPrint('Error loading vehicle details/maintenance: $e');
     }
   }
 
@@ -169,6 +168,8 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                           _buildFeaturesSection(),
                           const SizedBox(height: 24),
                           _buildMaintenanceSection(),
+                          const SizedBox(height: 24),
+                          _buildReviewsSection(),
                         ],
                       ),
                     ),
@@ -198,6 +199,8 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                               _buildFeaturesSection(),
                               const SizedBox(height: 24),
                               _buildMaintenanceSection(),
+                              const SizedBox(height: 24),
+                              _buildReviewsSection(),
                             ],
                           ),
                         ),
@@ -225,6 +228,8 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                     _buildFeaturesSection(),
                     const SizedBox(height: 16),
                     _buildMaintenanceSection(),
+                    const SizedBox(height: 16),
+                    _buildReviewsSection(),
                   ],
                 ),
               const SizedBox(height: 40),
@@ -804,6 +809,141 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
           fontSize: 11,
           fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
         ),
+      ),
+    );
+  }
+
+  void _subscribeToReviews() {
+    _reviewsSubscription?.cancel();
+    _reviewsSubscription = FirebaseDatabase.instance
+        .ref()
+        .child('reviews')
+        .orderByChild('vehicleId')
+        .equalTo(widget.vehicle.id)
+        .onValue
+        .listen((event) {
+      if (mounted) {
+        final List<ReviewModel> reviews = [];
+        double sum = 0.0;
+        if (event.snapshot.exists && event.snapshot.value != null) {
+          final Map<dynamic, dynamic> data = event.snapshot.value as Map<dynamic, dynamic>;
+          data.forEach((key, value) {
+            try {
+              final r = ReviewModel.fromMap(key.toString(), value as Map<dynamic, dynamic>);
+              reviews.add(r);
+              sum += r.rating;
+            } catch (e) {
+              debugPrint('Error parsing review in details: $e');
+            }
+          });
+        }
+        reviews.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        setState(() {
+          _reviews = reviews;
+          _avgRating = reviews.isEmpty ? 0.0 : sum / reviews.length;
+        });
+      }
+    });
+  }
+
+  Widget _buildReviewsSection() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: _isDark ? const Color(0xFF334155) : AppColors.borderGray,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.cardShadow,
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Customer Reviews',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: _textColor),
+              ),
+              Row(
+                children: [
+                  const Icon(Icons.star_rounded, color: Colors.amber, size: 20),
+                  const SizedBox(width: 4),
+                  Text(
+                    _avgRating > 0 ? _avgRating.toStringAsFixed(1) : "0.0",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _textColor),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '(${_reviews.length})',
+                    style: TextStyle(fontSize: 12, color: _subColor),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _reviews.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                      'No reviews yet for this vehicle.',
+                      style: TextStyle(color: _subColor, fontSize: 12),
+                    ),
+                  ),
+                )
+              : ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _reviews.length,
+                  separatorBuilder: (_, _) => const Divider(height: 24),
+                  itemBuilder: (context, index) {
+                    final review = _reviews[index];
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              review.userName,
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: _textColor),
+                            ),
+                            Text(
+                              DateFormat('dd MMM yyyy').format(review.createdAt),
+                              style: TextStyle(fontSize: 11, color: _subColor),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: List.generate(5, (starIdx) {
+                            return Icon(
+                              starIdx < review.rating ? Icons.star_rounded : Icons.star_border_rounded,
+                              color: Colors.amber,
+                              size: 16,
+                            );
+                          }),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          review.comment,
+                          style: TextStyle(fontSize: 12, height: 1.4, color: _textColor),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+        ],
       ),
     );
   }

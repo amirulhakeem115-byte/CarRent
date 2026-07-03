@@ -3,6 +3,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/booking_model.dart';
 import 'notification_service.dart';
+import 'user_role_cache.dart';
 
 class RewardPointsService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref();
@@ -92,13 +93,7 @@ class RewardPointsService {
       return;
     }
 
-    String currentRole = 'customer';
-    try {
-      final roleSnap = await _db.child('users').child(currentUser.uid).child('role').get().timeout(const Duration(seconds: 3));
-      if (roleSnap.exists) {
-        currentRole = roleSnap.value.toString();
-      }
-    } catch (_) {}
+    final String currentRole = await UserRoleCache.getRole(currentUser.uid);
 
     if (currentRole == 'admin') {
       yield* _db.child('reward_transactions').onValue.map((event) {

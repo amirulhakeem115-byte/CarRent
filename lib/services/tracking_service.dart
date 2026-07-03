@@ -6,8 +6,20 @@ import '../models/tracking_model.dart';
 class TrackingService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref().child('tracking');
 
+  // Guard: returns true if vehicleId is safe to use as a Firebase path segment
+  bool _isValidVehicleId(String vehicleId) {
+    if (vehicleId.trim().isEmpty) return false;
+    // Firebase path segments cannot contain '.', '#', '$', '[', or ']'
+    final invalidChars = RegExp(r'[.#\$\[\]]');
+    return !invalidChars.hasMatch(vehicleId);
+  }
+
   // Stream location updates for a specific vehicle
   Stream<TrackingModel?> getVehicleLocationStream(String vehicleId) {
+    if (!_isValidVehicleId(vehicleId)) {
+      debugPrint('[TrackingService] Invalid vehicleId for stream: "$vehicleId" — returning empty stream.');
+      return const Stream.empty();
+    }
     return _db.child(vehicleId).onValue.map((event) {
       if (event.snapshot.exists) {
         final data = event.snapshot.value as Map<dynamic, dynamic>;
@@ -19,6 +31,16 @@ class TrackingService {
 
   // Retrieve current static coordinates
   Future<TrackingModel?> getVehicleLocation(String vehicleId) async {
+    if (!_isValidVehicleId(vehicleId)) {
+      debugPrint('[TrackingService] Invalid vehicleId for getLocation: "$vehicleId" — returning default location.');
+      return TrackingModel(
+        vehicleId: vehicleId,
+        latitude: 3.1344,
+        longitude: 101.6861,
+        speed: 0.0,
+        timestamp: DateTime.now().toIso8601String(),
+      );
+    }
     try {
       final snapshot = await _db.child(vehicleId).get().timeout(const Duration(seconds: 5));
       if (snapshot.exists) {
@@ -40,6 +62,10 @@ class TrackingService {
 
   // Update telemetry details (used by GPS hardware trackers or simulator)
   Future<void> updateLocation(String vehicleId, double latitude, double longitude, double speed) async {
+    if (!_isValidVehicleId(vehicleId)) {
+      debugPrint('[TrackingService] Skipping updateLocation — invalid vehicleId: "$vehicleId"');
+      return;
+    }
     try {
       await _db.child(vehicleId).set({
         'latitude': latitude,
@@ -49,12 +75,18 @@ class TrackingService {
       });
     } catch (e) {
       debugPrint('Error writing telematics updates: $e');
-      rethrow;
+      // Do NOT rethrow — telematics failures should not crash the app
     }
   }
 
   // Simulates a car route driving from Kuala Lumpur Sentral to Shah Alam Seksyen 7
   Timer startRouteSimulation(String vehicleId) {
+    if (!_isValidVehicleId(vehicleId)) {
+      debugPrint('[TrackingService] startRouteSimulation called with invalid vehicleId: "$vehicleId" — simulation not started.');
+      // Return a dummy timer that fires once and immediately cancels itself
+      return Timer(Duration.zero, () {});
+    }
+
     final List<List<double>> klToShahAlamRoute = [
       [3.1344, 101.6861], // KL Sentral
       [3.1284, 101.6701], // Mid Valley

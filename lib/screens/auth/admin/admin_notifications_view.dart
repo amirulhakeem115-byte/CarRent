@@ -5,6 +5,8 @@ import '../../../constants/colors.dart';
 import '../../../services/notification_service.dart';
 import '../../../models/notification_model.dart';
 import '../../../widgets/loading_widget.dart';
+import '../../../services/booking_service.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 class AdminNotificationsView extends StatefulWidget {
   final Function(String, String?) onNavigateTab;
@@ -32,10 +34,21 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
     'maintenance', 'vehicle', 'location', 'security', 'system'
   ];
 
+  Stream<List<NotificationModel>>? _notificationsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    final currentUser = _auth.currentUser;
+    if (currentUser != null) {
+      _notificationsStream = _notificationService.getNotificationsStream(currentUser.uid);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUser = _auth.currentUser;
-    if (currentUser == null) {
+    if (currentUser == null || _notificationsStream == null) {
       return const Center(child: Text('User not authenticated'));
     }
 
@@ -49,7 +62,7 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
     final bool isDesktop = width > 900;
 
     return StreamBuilder<List<NotificationModel>>(
-      stream: _notificationService.getNotificationsStream(currentUser.uid),
+      stream: _notificationsStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: LoadingWidget(message: 'Loading notification logs...'));
@@ -253,9 +266,78 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
                             ),
                             subtitle: Padding(
                               padding: const EdgeInsets.only(top: 6),
-                              child: Text(
-                                notif.message,
-                                style: TextStyle(fontSize: 12, height: 1.4, color: textSecondary),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    notif.message,
+                                    style: TextStyle(fontSize: 12, height: 1.4, color: textSecondary),
+                                  ),
+                                  if (notif.type == 'pickup_reminder_admin') ...[
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: AppColors.primaryOrange,
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                          ),
+                                          onPressed: () {
+                                            if (notif.actionRoute.isNotEmpty && notif.actionRoute != 'Dashboard') {
+                                              widget.onNavigateTab(notif.actionRoute, notif.relatedId);
+                                            }
+                                          },
+                                          child: const Text('View Booking', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        OutlinedButton(
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: Colors.teal,
+                                            side: const BorderSide(color: Colors.teal),
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                          ),
+                                          onPressed: () => _confirmCustomerPickup(notif.relatedId),
+                                          child: const Text("Customer Picked Up", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                  if (notif.type == 'return_reminder_admin') ...[
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: AppColors.primaryOrange,
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                          ),
+                                          onPressed: () {
+                                            if (notif.actionRoute.isNotEmpty && notif.actionRoute != 'Dashboard') {
+                                              widget.onNavigateTab(notif.actionRoute, notif.relatedId);
+                                            }
+                                          },
+                                          child: const Text('View Booking', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        OutlinedButton(
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: Colors.teal,
+                                            side: const BorderSide(color: Colors.teal),
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                          ),
+                                          onPressed: () => _confirmVehicleReturn(notif.relatedId),
+                                          child: const Text("Vehicle Returned", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
                             trailing: Row(
@@ -419,5 +501,58 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
       ],
       onChanged: (val) { if (val != null) setState(() => _selectedDateRange = val); },
     );
+  }
+  Future<void> _confirmCustomerPickup(String bookingId) async {
+    try {
+      final snap = await FirebaseDatabase.instance.ref().child('bookings').child(bookingId).get();
+      if (snap.exists && snap.value != null) {
+        final Map bookingMap = snap.value as Map;
+        await BookingService().updateBookingStatus(
+          bookingId,
+          'active',
+          bookingMap['userId']?.toString() ?? '',
+          bookingMap['vehicleId']?.toString() ?? '',
+          bookingMap['vehicleName']?.toString() ?? '',
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Handover confirmed. Booking is now Active.')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating status: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmVehicleReturn(String bookingId) async {
+    try {
+      final snap = await FirebaseDatabase.instance.ref().child('bookings').child(bookingId).get();
+      if (snap.exists && snap.value != null) {
+        final Map bookingMap = snap.value as Map;
+        await BookingService().updateBookingStatus(
+          bookingId,
+          'completed',
+          bookingMap['userId']?.toString() ?? '',
+          bookingMap['vehicleId']?.toString() ?? '',
+          bookingMap['vehicleName']?.toString() ?? '',
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Return confirmed. Booking is now Completed.')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating status: $e')),
+        );
+      }
+    }
   }
 }

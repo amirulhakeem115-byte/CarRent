@@ -8,6 +8,8 @@ import 'constants/colors.dart';
 import 'screens/home_screen.dart';
 import 'services/company_settings_provider.dart';
 import 'services/theme_provider.dart';
+import 'ai/services/ai_service.dart';
+import 'services/user_session.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,13 +20,6 @@ Future<void> main() async {
         options: DefaultFirebaseOptions.currentPlatform,
       );
     }
-
-    // App Check settings for development testing
-    // Set to true if App Check enforcement is active in your Firebase Console
-    // bool enableAppCheckInDebug = false;
-
-    // Persistent debug token registered in Firebase Console under App Check > Manage debug tokens
-    // const String webDebugToken = 'b1761c25-c825-49a0-9932-fed7f28437ad';
 
     await FirebaseAppCheck.instance.activate(
       providerWeb: kDebugMode
@@ -37,6 +32,9 @@ Future<void> main() async {
           ? AppleDebugProvider()
           : AppleAppAttestProvider(),
     );
+
+    // Initialize user session monitoring
+    UserSession().initialize();
   } catch (e) {
     if (e.toString().contains('duplicate-app')) {
       debugPrint('Firebase already initialized: $e');
@@ -50,6 +48,7 @@ Future<void> main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => CompanySettingsProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => AIService()),
       ],
       child: const MyApp(),
     ),

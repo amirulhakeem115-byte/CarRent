@@ -17,6 +17,15 @@ class BookingModel {
   final double discountAmount;
   final bool pointsRedeemedProcessed;
   final bool rewardPointsAwarded;
+  final bool isReturned;
+  
+  // New scheduling fields
+  final String? actualPickupTime;
+  final String? actualReturnTime;
+  final bool pickupReminderSent;
+  final bool returnReminderSent;
+  final String? customerStatus;
+  final String? paymentMethod;
 
   BookingModel({
     required this.id,
@@ -37,6 +46,13 @@ class BookingModel {
     this.discountAmount = 0.0,
     this.pointsRedeemedProcessed = false,
     this.rewardPointsAwarded = false,
+    this.isReturned = false,
+    this.actualPickupTime,
+    this.actualReturnTime,
+    this.pickupReminderSent = false,
+    this.returnReminderSent = false,
+    this.customerStatus,
+    this.paymentMethod,
   });
 
   factory BookingModel.fromMap(
@@ -72,6 +88,13 @@ class BookingModel {
       discountAmount: (data['discountAmount'] ?? 0.0).toDouble(),
       pointsRedeemedProcessed: data['pointsRedeemedProcessed'] ?? false,
       rewardPointsAwarded: data['rewardPointsAwarded'] ?? false,
+      isReturned: data['isReturned'] ?? false,
+      actualPickupTime: data['actualPickupTime'],
+      actualReturnTime: data['actualReturnTime'],
+      pickupReminderSent: data['pickupReminderSent'] ?? false,
+      returnReminderSent: data['returnReminderSent'] ?? false,
+      customerStatus: data['customerStatus'],
+      paymentMethod: data['paymentMethod'],
     );
   }
 
@@ -94,6 +117,13 @@ class BookingModel {
       'discountAmount': discountAmount,
       'pointsRedeemedProcessed': pointsRedeemedProcessed,
       'rewardPointsAwarded': rewardPointsAwarded,
+      'isReturned': isReturned,
+      'actualPickupTime': actualPickupTime,
+      'actualReturnTime': actualReturnTime,
+      'pickupReminderSent': pickupReminderSent,
+      'returnReminderSent': returnReminderSent,
+      'customerStatus': customerStatus,
+      'paymentMethod': paymentMethod,
     };
   }
 

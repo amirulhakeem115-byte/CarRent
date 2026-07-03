@@ -1,5 +1,6 @@
 class ReviewModel {
   final String id;
+  final String bookingId;
   final String vehicleId;
   final String userId;
   final String userName;
@@ -9,6 +10,7 @@ class ReviewModel {
 
   ReviewModel({
     required this.id,
+    required this.bookingId,
     required this.vehicleId,
     required this.userId,
     required this.userName,
@@ -20,6 +22,7 @@ class ReviewModel {
   factory ReviewModel.fromMap(String id, Map<dynamic, dynamic> data) {
     return ReviewModel(
       id: id,
+      bookingId: data['bookingId'] ?? '',
       vehicleId: data['vehicleId'] ?? '',
       userId: data['userId'] ?? '',
       userName: data['userName'] ?? '',
@@ -33,6 +36,7 @@ class ReviewModel {
 
   Map<String, dynamic> toMap() {
     return {
+      'bookingId': bookingId,
       'vehicleId': vehicleId,
       'userId': userId,
       'userName': userName,

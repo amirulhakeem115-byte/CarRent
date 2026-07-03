@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:intl/intl.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/booking_model.dart';
@@ -6,6 +8,8 @@ import 'notification_service.dart';
 import 'vehicle_service.dart';
 import 'reward_service.dart';
 import 'receipt_service.dart';
+import 'company_settings_provider.dart';
+import 'user_role_cache.dart';
 
 class BookingService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref().child('bookings');
@@ -63,13 +67,7 @@ class BookingService {
     final currentUid = FirebaseAuth.instance.currentUser?.uid;
     if (currentUid == null) return bookings;
 
-    String currentRole = 'customer';
-    try {
-      final roleSnap = await FirebaseDatabase.instance.ref().child('users').child(currentUid).child('role').get().timeout(const Duration(seconds: 3));
-      if (roleSnap.exists) {
-        currentRole = roleSnap.value.toString();
-      }
-    } catch (_) {}
+    final currentRole = await UserRoleCache.getRole(currentUid);
     debugPrint('[BookingService] [getBookings] Accessing path: bookings');
     debugPrint('[BookingService] [getBookings] Current UID: $currentUid, Current Role: $currentRole');
 
@@ -88,30 +86,6 @@ class BookingService {
         });
       }
 
-      // Auto-complete ongoing/active bookings that have passed their return date
-      final now = DateTime.now();
-      for (int i = 0; i < bookings.length; i++) {
-        final b = bookings[i];
-        if ((b.status == 'ongoing' || b.status == 'active') && b.returnDate.isBefore(now)) {
-          await updateBookingStatus(b.id, 'completed', b.userId, b.vehicleId, b.vehicleName);
-          bookings[i] = BookingModel(
-            id: b.id,
-            vehicleId: b.vehicleId,
-            vehicleName: b.vehicleName,
-            userId: b.userId,
-            userName: b.userName,
-            userPhone: b.userPhone,
-            pickUpDate: b.pickUpDate,
-            returnDate: b.returnDate,
-            totalPrice: b.totalPrice,
-            depositAmount: b.depositAmount,
-            status: 'completed',
-            notes: b.notes,
-            createdAt: b.createdAt,
-          );
-        }
-      }
-
       debugPrint('[BookingService] [getBookings] Bookings count loaded: ${bookings.length}');
     } catch (e) {
       debugPrint('[BookingService] [getBookings] Error getting bookings: $e');
@@ -120,35 +94,45 @@ class BookingService {
     return bookings;
   }
 
-  Stream<List<BookingModel>> getBookingsStream() async* {
+  Stream<List<BookingModel>> getBookingsStream() {
     final currentUid = FirebaseAuth.instance.currentUser?.uid;
     if (currentUid == null) {
-      yield [];
-      return;
+      return Stream.value([]);
     }
 
-    String currentRole = 'customer';
-    try {
-      final roleSnap = await FirebaseDatabase.instance.ref().child('users').child(currentUid).child('role').get().timeout(const Duration(seconds: 3));
-      if (roleSnap.exists) {
-        currentRole = roleSnap.value.toString();
-      }
-    } catch (_) {}
+    final controller = StreamController<List<BookingModel>>.broadcast();
+    StreamSubscription? sub;
 
-    final Query query = currentRole == 'admin' 
-        ? _db 
-        : _db.orderByChild('userId').equalTo(currentUid);
+    UserRoleCache.getRole(currentUid).then((currentRole) {
+      if (controller.isClosed) return;
+      debugPrint('[BookingService] getBookingsStream — uid: $currentUid, role: $currentRole');
 
-    yield* query.onValue.map((event) {
-      List<BookingModel> bookings = [];
-      if (event.snapshot.exists) {
-        final Map<dynamic, dynamic> data = event.snapshot.value as Map<dynamic, dynamic>;
-        data.forEach((key, value) {
-          bookings.add(BookingModel.fromMap(key.toString(), value as Map<dynamic, dynamic>));
-        });
-      }
-      return bookings;
+      final Query query =
+          currentRole == 'admin' ? _db : _db.orderByChild('userId').equalTo(currentUid);
+
+      sub = query.onValue.listen((event) {
+        if (controller.isClosed) return;
+        List<BookingModel> bookings = [];
+        if (event.snapshot.exists) {
+          final Map<dynamic, dynamic> data =
+              event.snapshot.value as Map<dynamic, dynamic>;
+          data.forEach((key, value) {
+            bookings.add(
+                BookingModel.fromMap(key.toString(), value as Map<dynamic, dynamic>));
+          });
+        }
+        controller.add(bookings);
+      }, onError: (e) {
+        debugPrint('[BookingService] getBookingsStream error: $e');
+        if (!controller.isClosed) controller.add([]);
+      });
+    }).catchError((e) {
+      debugPrint('[BookingService] getBookingsStream role fetch error: $e');
+      if (!controller.isClosed) controller.add([]);
     });
+
+    controller.onCancel = () => sub?.cancel();
+    return controller.stream;
   }
 
   Future<List<BookingModel>> getUserBookings(String userId) async {
@@ -171,25 +155,44 @@ class BookingService {
     return bookings;
   }
 
-  Future<void> updateBookingStatus(String bookingId, String status, String userId, String vehicleId, String vehicleName) async {
+  Future<void> updateBookingStatus(
+    String bookingId,
+    String status,
+    String userId,
+    String vehicleId,
+    String vehicleName, {
+    bool isAutomatic = false,
+  }) async {
     try {
-      await _db.child(bookingId).update({
-        'status': status,
-        'updatedAt': DateTime.now().toIso8601String(),
-      }).timeout(const Duration(seconds: 10));
-
       final String statusLower = status.toLowerCase();
 
-      // Update vehicle status — wrapped independently so a permission error
-      // on the vehicle node never rolls back the booking cancellation.
+      final Map<String, dynamic> updates = {
+        'status': status,
+        'updatedAt': DateTime.now().toIso8601String(),
+      };
+
+      if (statusLower == 'active') {
+        updates['actualPickupTime'] = DateFormat('hh:mm a').format(DateTime.now());
+        updates['actualPickupDate'] = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      }
+
+      if (statusLower == 'completed') {
+        updates['isReturned'] = true;
+        updates['actualReturnTime'] = DateFormat('hh:mm a').format(DateTime.now());
+        updates['actualReturnDate'] = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      }
+
+      await _db.child(bookingId).update(updates).timeout(const Duration(seconds: 10));
+
+      // Update vehicle status
       try {
-        if (statusLower == 'ongoing' || statusLower == 'active' || statusLower == 'approved' || statusLower == 'confirmed') {
+        if (statusLower == 'ongoing' || statusLower == 'active' || statusLower == 'approved' || statusLower == 'confirmed' || statusLower == 'overdue') {
           await _vehicleService.updateVehicleStatus(vehicleId, 'Booked');
         } else if (statusLower == 'completed' || statusLower == 'cancelled' || statusLower == 'rejected' || statusLower == 'pending payment') {
           await _vehicleService.updateVehicleStatus(vehicleId, 'Available');
         }
       } catch (vehicleErr) {
-        debugPrint('[BookingService] Warning: vehicle status update failed (booking cancellation still succeeded): $vehicleErr');
+        debugPrint('[BookingService] Warning: vehicle status update failed: $vehicleErr');
       }
 
       // Create notification
@@ -225,13 +228,13 @@ class BookingService {
         color = '0xFF3B82F6'; // blue
       } else if (statusLower == 'completed') {
         title = 'Rental Completed';
-        message = 'Your rental for $vehicleName is complete. Thank you for renting with us!';
+        message = 'Your booking has been completed successfully.';
         color = '0xFF10B981'; // green
         
         // Also notify admins!
         await _notificationService.notifyAllAdmins(
           title: 'Booking Completed',
-          message: 'Rental completed for $vehicleName (Booking: $bookingId).',
+          message: 'Booking $bookingId has been marked as completed.',
           type: 'booking',
           icon: '📅',
           color: '0xFF10B981',
@@ -239,11 +242,14 @@ class BookingService {
           actionRoute: 'Bookings',
         );
 
-        // Award reward points automatically
-        try {
-          await RewardPointsService().awardPointsForBooking(bookingId);
-        } catch (rewardErr) {
-          debugPrint('[BookingService] Warning: reward points award failed: $rewardErr');
+        // Award reward points automatically if Rewards System is enabled
+        final rewardsEnabled = CompanySettingsProvider().getField('rewardsEnabled', defaultValue: true) as bool;
+        if (rewardsEnabled) {
+          try {
+            await RewardPointsService().awardPointsForBooking(bookingId);
+          } catch (rewardErr) {
+            debugPrint('[BookingService] Warning: reward points award failed: $rewardErr');
+          }
         }
 
         // Trigger automatic receipt check & storage creation
@@ -277,6 +283,22 @@ class BookingService {
           message: '$customerName cancelled booking $bookingId for $vehicleName.',
           type: 'booking',
           icon: '📅',
+          color: '0xFFEF4444',
+          relatedId: bookingId,
+          actionRoute: 'Bookings',
+        );
+      } else if (statusLower == 'overdue') {
+        title = 'Rental Overdue ⚠️';
+        message = 'Your rental has passed its return date. Please contact support or return the vehicle immediately.';
+        color = '0xFFEF4444'; // red
+        icon = '⚠️';
+
+        // Notify admins!
+        await _notificationService.notifyAllAdmins(
+          title: 'Booking Overdue ⚠️',
+          message: 'Booking $bookingId has become overdue.',
+          type: 'booking',
+          icon: '⚠️',
           color: '0xFFEF4444',
           relatedId: bookingId,
           actionRoute: 'Bookings',
