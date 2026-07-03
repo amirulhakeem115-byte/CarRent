@@ -499,89 +499,47 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
-          isDesktop
-              ? Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Vehicle Maintenance Log',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w900,
-                            color: textPrimary,
-                          ),
-                        ),
-                        Text(
-                          'Track fleet repairs, scheduled tune-ups, and cost reports.',
-                          style: TextStyle(fontSize: 12, color: textSecondary),
-                        ),
-                      ],
-                    ),
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryOrange,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 14,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: () => _showAddEditJobDialog(),
-                      icon: const Icon(Icons.add, size: 18),
-                      label: const Text(
-                        'Schedule Service',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Vehicle Maintenance Log',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        color: textPrimary,
-                      ),
-                    ),
-                    Text(
-                      'Track fleet repairs, scheduled tune-ups, and cost reports.',
-                      style: TextStyle(fontSize: 12, color: textSecondary),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primaryOrange,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 14,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        onPressed: () => _showAddEditJobDialog(),
-                        icon: const Icon(Icons.add, size: 18),
-                        label: const Text(
-                          'Schedule Service',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ),
-                  ],
+          // Header (same flow on mobile and desktop)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Vehicle Maintenance Log',
+                style: TextStyle(
+                  fontSize: isDesktop ? 22 : 20,
+                  fontWeight: FontWeight.w900,
+                  color: textPrimary,
                 ),
+              ),
+              Text(
+                'Track fleet repairs, scheduled tune-ups, and cost reports.',
+                style: TextStyle(fontSize: 12, color: textSecondary),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryOrange,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 14,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () => _showAddEditJobDialog(),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text(
+                    'Schedule Service',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 24),
 
           // Stats Grid
@@ -645,87 +603,47 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
               border: Border.all(color: borderColor),
             ),
             padding: const EdgeInsets.all(16),
-            child: isDesktop
-                ? Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _searchController,
-                          style: TextStyle(color: textPrimary),
-                          decoration: InputDecoration(
-                            hintText:
-                                'Search by vehicle, service title, or notes...',
-                            hintStyle: TextStyle(color: textSecondary),
-                            prefixIcon: Icon(
-                              Icons.search,
-                              size: 20,
-                              color: textSecondary,
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              vertical: 8,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      _buildStatusDropdown(
-                        isDark: isDark,
-                        cardColor: surfaceColor,
-                        textPrimary: textPrimary,
-                        borderColor: borderColor,
-                      ),
-                      const SizedBox(width: 16),
-                      _buildVehicleDropdown(
-                        isDark: isDark,
-                        cardColor: surfaceColor,
-                        textPrimary: textPrimary,
-                        borderColor: borderColor,
-                      ),
-                    ],
-                  )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      TextField(
-                        controller: _searchController,
-                        style: TextStyle(color: textPrimary),
-                        decoration: InputDecoration(
-                          hintText: 'Search vehicle, title, or notes...',
-                          hintStyle: TextStyle(color: textSecondary),
-                          prefixIcon: Icon(
-                            Icons.search,
-                            size: 20,
-                            color: textSecondary,
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            vertical: 8,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildStatusDropdown(
-                              isDark: isDark,
-                              cardColor: surfaceColor,
-                              textPrimary: textPrimary,
-                              borderColor: borderColor,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildVehicleDropdown(
-                              isDark: isDark,
-                              cardColor: surfaceColor,
-                              textPrimary: textPrimary,
-                              borderColor: borderColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  controller: _searchController,
+                  style: TextStyle(color: textPrimary),
+                  decoration: InputDecoration(
+                    hintText: 'Search vehicle, title, or notes...',
+                    hintStyle: TextStyle(color: textSecondary),
+                    prefixIcon: Icon(
+                      Icons.search,
+                      size: 20,
+                      color: textSecondary,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 8),
                   ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatusDropdown(
+                        isDark: isDark,
+                        cardColor: surfaceColor,
+                        textPrimary: textPrimary,
+                        borderColor: borderColor,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildVehicleDropdown(
+                        isDark: isDark,
+                        cardColor: surfaceColor,
+                        textPrimary: textPrimary,
+                        borderColor: borderColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
 
@@ -762,22 +680,14 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: borderColor),
                   ),
-                  child: isDesktop
-                      ? _buildDesktopTable(
-                          filteredJobs,
-                          isDark: isDark,
-                          textPrimary: textPrimary,
-                          textSecondary: textSecondary,
-                          borderColor: borderColor,
-                        )
-                      : _buildMobileList(
-                          filteredJobs,
-                          isDark: isDark,
-                          cardColor: cardColor,
-                          textPrimary: textPrimary,
-                          textSecondary: textSecondary,
-                          borderColor: borderColor,
-                        ),
+                  child: _buildMobileList(
+                    filteredJobs,
+                    isDark: isDark,
+                    cardColor: cardColor,
+                    textPrimary: textPrimary,
+                    textSecondary: textSecondary,
+                    borderColor: borderColor,
+                  ),
                 ),
         ],
       ),
