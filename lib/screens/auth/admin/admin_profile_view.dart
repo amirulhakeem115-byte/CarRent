@@ -103,9 +103,14 @@ class _AdminProfileViewState extends State<AdminProfileView> {
 
         _totalVehicles = vehiclesList.length;
         _totalBookingsApproved = bookingsList
-            .where((b) => b.status == 'approved' || b.status == 'ongoing' || b.status == 'completed')
+            .where(
+              (b) =>
+                  b.status == 'approved' ||
+                  b.status == 'ongoing' ||
+                  b.status == 'completed',
+            )
             .length;
-        
+
         _totalPaymentsApproved = paymentsList
             .where((p) => p.status == 'paid' || p.status == 'approved')
             .length;
@@ -113,7 +118,9 @@ class _AdminProfileViewState extends State<AdminProfileView> {
         // Retrieve last login from DB
         final snap = FirebaseAuth.instance.currentUser?.metadata;
         if (snap != null && snap.lastSignInTime != null) {
-          _lastLoginTime = DateFormat('dd MMM yyyy, hh:mm a').format(snap.lastSignInTime!.toLocal());
+          _lastLoginTime = DateFormat(
+            'dd MMM yyyy, hh:mm a',
+          ).format(snap.lastSignInTime!.toLocal());
         }
       }
     } catch (e) {
@@ -140,10 +147,10 @@ class _AdminProfileViewState extends State<AdminProfileView> {
         'phone': _phoneController.text.trim(),
       };
       await _databaseService.updateUser(_adminUser!.id, updatedData);
-      
+
       // Update email in Auth if modified (Note: Requires reauth, usually not done directly without verify flow)
       // For now, keep email synced locally in DB and notify user.
-      
+
       scaffoldMessenger.showSnackBar(
         const SnackBar(
           content: Text('Personal profile settings saved successfully!'),
@@ -172,10 +179,10 @@ class _AdminProfileViewState extends State<AdminProfileView> {
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser != null) {
         await currentUser.updatePassword(_newPasswordController.text.trim());
-        
+
         _newPasswordController.clear();
         _confirmPasswordController.clear();
-        
+
         scaffoldMessenger.showSnackBar(
           const SnackBar(
             content: Text('Password updated successfully!'),
@@ -186,7 +193,8 @@ class _AdminProfileViewState extends State<AdminProfileView> {
     } on FirebaseAuthException catch (e) {
       String msg = 'Password change failed.';
       if (e.code == 'requires-recent-login') {
-        msg = 'Sensitive operation. Please logout and login again to update credentials.';
+        msg =
+            'Sensitive operation. Please logout and login again to update credentials.';
       } else if (e.message != null) {
         msg = e.message!;
       }
@@ -215,18 +223,26 @@ class _AdminProfileViewState extends State<AdminProfileView> {
       if (pickedFile != null) {
         final bytes = await pickedFile.readAsBytes();
         final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
-        
+
         setState(() => _loading = true);
-        await _databaseService.updateUser(_adminUser!.id, {'profileImage': base64Image});
+        await _databaseService.updateUser(_adminUser!.id, {
+          'profileImage': base64Image,
+        });
         scaffoldMessenger.showSnackBar(
-          const SnackBar(content: Text('Profile photo updated!'), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Text('Profile photo updated!'),
+            backgroundColor: Colors.green,
+          ),
         );
         await _loadProfileAndStats();
       }
     } catch (e) {
       debugPrint('Error picking profile image: $e');
       scaffoldMessenger.showSnackBar(
-        SnackBar(content: Text('Failed to pick image: $e'), backgroundColor: Colors.redAccent),
+        SnackBar(
+          content: Text('Failed to pick image: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
       );
     } finally {
       setState(() => _loading = false);
@@ -240,16 +256,144 @@ class _AdminProfileViewState extends State<AdminProfileView> {
       setState(() => _loading = true);
       await _databaseService.updateUser(_adminUser!.id, {'profileImage': ''});
       scaffoldMessenger.showSnackBar(
-        const SnackBar(content: Text('Profile photo removed'), backgroundColor: Colors.orange),
+        const SnackBar(
+          content: Text('Profile photo removed'),
+          backgroundColor: Colors.orange,
+        ),
       );
       await _loadProfileAndStats();
     } catch (e) {
       scaffoldMessenger.showSnackBar(
-        SnackBar(content: Text('Failed to remove image: $e'), backgroundColor: Colors.redAccent),
+        SnackBar(
+          content: Text('Failed to remove image: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
       );
     } finally {
       setState(() => _loading = false);
     }
+  }
+
+  Future<void> _viewProfileImage() async {
+    final image = _adminUser?.profileImage ?? '';
+    if (image.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No profile image to view yet.')),
+      );
+      return;
+    }
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Profile Image',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.secondaryBlue,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: AppImage(
+                    imageSrc: image,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: 320,
+                    placeholder: const Icon(Icons.person, size: 80),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showProfileImageActions() async {
+    if (_adminUser == null) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        final bool hasImage = _adminUser?.profileImage.isNotEmpty == true;
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[400],
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: const Icon(Icons.visibility_outlined),
+                title: const Text('View Profile Image'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _viewProfileImage();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: const Text('Edit Profile Image'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickProfileImage();
+                },
+              ),
+              ListTile(
+                enabled: hasImage,
+                leading: const Icon(
+                  Icons.delete_outline,
+                  color: Colors.redAccent,
+                ),
+                title: const Text(
+                  'Remove Profile Image',
+                  style: TextStyle(color: Colors.redAccent),
+                ),
+                onTap: hasImage
+                    ? () {
+                        Navigator.pop(context);
+                        _removeProfileImage();
+                      }
+                    : null,
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -260,7 +404,9 @@ class _AdminProfileViewState extends State<AdminProfileView> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (_loading && _adminUser == null) {
-      return const Center(child: LoadingWidget(message: 'Retrieving Admin Profile settings...'));
+      return const Center(
+        child: LoadingWidget(message: 'Retrieving Admin Profile settings...'),
+      );
     }
 
     if (_error != null) {
@@ -270,20 +416,31 @@ class _AdminProfileViewState extends State<AdminProfileView> {
           children: [
             const Icon(Icons.error_outline, size: 64, color: Colors.redAccent),
             const SizedBox(height: 16),
-            Text(_error!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Text(
+              _error!,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
             const SizedBox(height: 16),
-            ElevatedButton(onPressed: _loadProfileAndStats, child: const Text('Retry')),
+            ElevatedButton(
+              onPressed: _loadProfileAndStats,
+              child: const Text('Retry'),
+            ),
           ],
         ),
       );
     }
 
-    final String joinDate = _adminUser != null && _adminUser!.createdAt.isNotEmpty
-        ? DateFormat('dd MMMM yyyy').format(DateTime.parse(_adminUser!.createdAt))
+    final String joinDate =
+        _adminUser != null && _adminUser!.createdAt.isNotEmpty
+        ? DateFormat(
+            'dd MMMM yyyy',
+          ).format(DateTime.parse(_adminUser!.createdAt))
         : 'Unknown';
 
     final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final textPrimary = isDark
+        ? const Color(0xFFF8FAFC)
+        : AppColors.secondaryBlue;
     final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
     final borderColor = isDark ? const Color(0xFF334155) : Colors.grey.shade200;
 
@@ -295,7 +452,11 @@ class _AdminProfileViewState extends State<AdminProfileView> {
           // Header info
           Text(
             'Admin Profile Settings',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: textPrimary),
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              color: textPrimary,
+            ),
           ),
           Text(
             'Manage security, credentials, details, and view fleet operations achievements.',
@@ -309,22 +470,41 @@ class _AdminProfileViewState extends State<AdminProfileView> {
                 children: [
                   // Picture Box Card
                   _buildCard(
-                    isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor,
+                    isDark: isDark,
+                    cardColor: cardColor,
+                    textPrimary: textPrimary,
+                    textSecondary: textSecondary,
+                    borderColor: borderColor,
                     child: Column(
                       children: [
                         const SizedBox(height: 8),
-                        CircleAvatar(
-                          radius: 54,
-                          backgroundColor: AppColors.secondaryBlue.withValues(alpha: isDark ? 0.2 : 0.1),
-                          backgroundImage: getAppImageProvider(_adminUser?.profileImage),
-                          child: _adminUser?.profileImage.isNotEmpty != true
-                              ? Icon(Icons.person, size: 54, color: textPrimary)
-                              : null,
+                        GestureDetector(
+                          onTap: _showProfileImageActions,
+                          child: CircleAvatar(
+                            radius: 54,
+                            backgroundColor: AppColors.secondaryBlue.withValues(
+                              alpha: isDark ? 0.2 : 0.1,
+                            ),
+                            backgroundImage: getAppImageProvider(
+                              _adminUser?.profileImage,
+                            ),
+                            child: _adminUser?.profileImage.isNotEmpty != true
+                                ? Icon(
+                                    Icons.person,
+                                    size: 54,
+                                    color: textPrimary,
+                                  )
+                                : null,
+                          ),
                         ),
                         const SizedBox(height: 16),
                         Text(
                           _adminUser?.fullName ?? 'Administrator',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: textPrimary),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            color: textPrimary,
+                          ),
                         ),
                         Text(
                           'Super Administrator',
@@ -336,23 +516,36 @@ class _AdminProfileViewState extends State<AdminProfileView> {
                           children: [
                             OutlinedButton.icon(
                               style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: AppColors.primaryOrange),
+                                side: const BorderSide(
+                                  color: AppColors.primaryOrange,
+                                ),
                                 foregroundColor: AppColors.primaryOrange,
                               ),
                               onPressed: _pickProfileImage,
                               icon: const Icon(Icons.upload, size: 14),
-                              label: const Text('Upload Photo', style: TextStyle(fontSize: 12)),
+                              label: const Text(
+                                'Edit Profile Image',
+                                style: TextStyle(fontSize: 12),
+                              ),
                             ),
                             const SizedBox(width: 8),
                             if (_adminUser?.profileImage.isNotEmpty == true)
                               OutlinedButton.icon(
                                 style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(color: Colors.redAccent),
+                                  side: const BorderSide(
+                                    color: Colors.redAccent,
+                                  ),
                                   foregroundColor: Colors.redAccent,
                                 ),
                                 onPressed: _removeProfileImage,
-                                icon: const Icon(Icons.delete_outline, size: 14),
-                                label: const Text('Remove', style: TextStyle(fontSize: 12)),
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  size: 14,
+                                ),
+                                label: const Text(
+                                  'Remove',
+                                  style: TextStyle(fontSize: 12),
+                                ),
                               ),
                           ],
                         ),
@@ -363,21 +556,60 @@ class _AdminProfileViewState extends State<AdminProfileView> {
                   const SizedBox(height: 24),
 
                   // Fleet Activity Stats Card
-                   _buildCard(
+                  _buildCard(
                     title: 'Account Activity Logs',
                     icon: Icons.history,
-                    isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor,
+                    isDark: isDark,
+                    cardColor: cardColor,
+                    textPrimary: textPrimary,
+                    textSecondary: textSecondary,
+                    borderColor: borderColor,
                     child: Column(
                       children: [
-                        _buildStatRow('Created Date', joinDate, Icons.calendar_today, Colors.blue, textPrimary: textPrimary, textSecondary: textSecondary),
+                        _buildStatRow(
+                          'Created Date',
+                          joinDate,
+                          Icons.calendar_today,
+                          Colors.blue,
+                          textPrimary: textPrimary,
+                          textSecondary: textSecondary,
+                        ),
                         Divider(color: borderColor),
-                        _buildStatRow('Last Telematics Login', _lastLoginTime, Icons.login, Colors.green, textPrimary: textPrimary, textSecondary: textSecondary),
+                        _buildStatRow(
+                          'Last Telematics Login',
+                          _lastLoginTime,
+                          Icons.login,
+                          Colors.green,
+                          textPrimary: textPrimary,
+                          textSecondary: textSecondary,
+                        ),
                         Divider(color: borderColor),
-                        _buildStatRow('Total Fleet Vehicles', '$_totalVehicles units', Icons.directions_car, Colors.indigo, textPrimary: textPrimary, textSecondary: textSecondary),
+                        _buildStatRow(
+                          'Total Fleet Vehicles',
+                          '$_totalVehicles units',
+                          Icons.directions_car,
+                          Colors.indigo,
+                          textPrimary: textPrimary,
+                          textSecondary: textSecondary,
+                        ),
                         Divider(color: borderColor),
-                        _buildStatRow('Approved Rental Bookings', '$_totalBookingsApproved contracts', Icons.book_online, Colors.purple, textPrimary: textPrimary, textSecondary: textSecondary),
+                        _buildStatRow(
+                          'Approved Rental Bookings',
+                          '$_totalBookingsApproved contracts',
+                          Icons.book_online,
+                          Colors.purple,
+                          textPrimary: textPrimary,
+                          textSecondary: textSecondary,
+                        ),
                         Divider(color: borderColor),
-                        _buildStatRow('Processed Fleet Revenues', '$_totalPaymentsApproved transactions', Icons.monetization_on, Colors.teal, textPrimary: textPrimary, textSecondary: textSecondary),
+                        _buildStatRow(
+                          'Processed Fleet Revenues',
+                          '$_totalPaymentsApproved transactions',
+                          Icons.monetization_on,
+                          Colors.teal,
+                          textPrimary: textPrimary,
+                          textSecondary: textSecondary,
+                        ),
                       ],
                     ),
                   ),
@@ -385,7 +617,11 @@ class _AdminProfileViewState extends State<AdminProfileView> {
                   _buildCard(
                     title: 'Theme Settings',
                     icon: Icons.brightness_6_outlined,
-                    isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor,
+                    isDark: isDark,
+                    cardColor: cardColor,
+                    textPrimary: textPrimary,
+                    textSecondary: textSecondary,
+                    borderColor: borderColor,
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -395,18 +631,26 @@ class _AdminProfileViewState extends State<AdminProfileView> {
                             children: [
                               Text(
                                 'THEME MODE',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: isDark ? Colors.grey[400] : Colors.grey[600]),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 10,
+                                  color: isDark
+                                      ? Colors.grey[400]
+                                      : Colors.grey[600],
+                                ),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 themeProvider.themeMode == ThemeMode.system
                                     ? 'System Default'
                                     : themeProvider.themeMode == ThemeMode.light
-                                        ? 'Light Mode'
-                                        : 'Dark Mode',
+                                    ? 'Light Mode'
+                                    : 'Dark Mode',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: isDark ? Colors.white : AppColors.secondaryBlue,
+                                  color: isDark
+                                      ? Colors.white
+                                      : AppColors.secondaryBlue,
                                   fontSize: 14,
                                 ),
                               ),
@@ -420,9 +664,13 @@ class _AdminProfileViewState extends State<AdminProfileView> {
                               themeProvider.setThemeMode(mode);
                             }
                           },
-                          dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                          dropdownColor: isDark
+                              ? const Color(0xFF1E293B)
+                              : Colors.white,
                           style: TextStyle(
-                            color: isDark ? Colors.white : AppColors.secondaryBlue,
+                            color: isDark
+                                ? Colors.white
+                                : AppColors.secondaryBlue,
                             fontWeight: FontWeight.bold,
                           ),
                           items: const [
@@ -452,7 +700,11 @@ class _AdminProfileViewState extends State<AdminProfileView> {
                   _buildCard(
                     title: 'Personal Information Details',
                     icon: Icons.person_outline_outlined,
-                    isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor,
+                    isDark: isDark,
+                    cardColor: cardColor,
+                    textPrimary: textPrimary,
+                    textSecondary: textSecondary,
+                    borderColor: borderColor,
                     child: Form(
                       key: _formKey,
                       child: Column(
@@ -465,12 +717,15 @@ class _AdminProfileViewState extends State<AdminProfileView> {
                               prefixIcon: Icon(Icons.badge_outlined),
                               border: OutlineInputBorder(),
                             ),
-                            validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                            validator: (v) => v == null || v.trim().isEmpty
+                                ? 'Required'
+                                : null,
                           ),
                           const SizedBox(height: 16),
                           TextFormField(
                             controller: _emailController,
-                            enabled: false, // Core user account email requires secure validation to change
+                            enabled:
+                                false, // Core user account email requires secure validation to change
                             decoration: const InputDecoration(
                               labelText: 'Account Email Address (Read-only)',
                               prefixIcon: Icon(Icons.mail_outline),
@@ -493,10 +748,15 @@ class _AdminProfileViewState extends State<AdminProfileView> {
                               backgroundColor: AppColors.secondaryBlue,
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
                             ),
                             onPressed: _savePersonalInformation,
-                            child: const Text('Save Details', style: TextStyle(fontWeight: FontWeight.bold)),
+                            child: const Text(
+                              'Save Details',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
                           ),
                         ],
                       ),
@@ -508,7 +768,11 @@ class _AdminProfileViewState extends State<AdminProfileView> {
                   _buildCard(
                     title: 'Account Security Settings',
                     icon: Icons.lock_outline,
-                    isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor,
+                    isDark: isDark,
+                    cardColor: cardColor,
+                    textPrimary: textPrimary,
+                    textSecondary: textSecondary,
+                    borderColor: borderColor,
                     child: Form(
                       key: _securityFormKey,
                       child: Column(
@@ -521,12 +785,20 @@ class _AdminProfileViewState extends State<AdminProfileView> {
                               labelText: 'New Account Password',
                               prefixIcon: const Icon(Icons.password),
                               suffixIcon: IconButton(
-                                icon: Icon(_obscureNewPass ? Icons.visibility : Icons.visibility_off),
-                                onPressed: () => setState(() => _obscureNewPass = !_obscureNewPass),
+                                icon: Icon(
+                                  _obscureNewPass
+                                      ? Icons.visibility
+                                      : Icons.visibility_off,
+                                ),
+                                onPressed: () => setState(
+                                  () => _obscureNewPass = !_obscureNewPass,
+                                ),
                               ),
                               border: const OutlineInputBorder(),
                             ),
-                            validator: (v) => v == null || v.length < 6 ? 'Password must be at least 6 characters' : null,
+                            validator: (v) => v == null || v.length < 6
+                                ? 'Password must be at least 6 characters'
+                                : null,
                           ),
                           const SizedBox(height: 16),
                           TextFormField(
@@ -536,8 +808,15 @@ class _AdminProfileViewState extends State<AdminProfileView> {
                               labelText: 'Confirm New Password',
                               prefixIcon: const Icon(Icons.lock_reset),
                               suffixIcon: IconButton(
-                                icon: Icon(_obscureConfirmPass ? Icons.visibility : Icons.visibility_off),
-                                onPressed: () => setState(() => _obscureConfirmPass = !_obscureConfirmPass),
+                                icon: Icon(
+                                  _obscureConfirmPass
+                                      ? Icons.visibility
+                                      : Icons.visibility_off,
+                                ),
+                                onPressed: () => setState(
+                                  () => _obscureConfirmPass =
+                                      !_obscureConfirmPass,
+                                ),
                               ),
                               border: const OutlineInputBorder(),
                             ),
@@ -554,10 +833,15 @@ class _AdminProfileViewState extends State<AdminProfileView> {
                               backgroundColor: AppColors.primaryOrange,
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
                             ),
                             onPressed: _changePassword,
-                            child: const Text('Change Password', style: TextStyle(fontWeight: FontWeight.bold)),
+                            child: const Text(
+                              'Change Password',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
                           ),
                         ],
                       ),
@@ -577,11 +861,7 @@ class _AdminProfileViewState extends State<AdminProfileView> {
                     )
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        col1,
-                        const SizedBox(height: 24),
-                        col2,
-                      ],
+                      children: [col1, const SizedBox(height: 24), col2],
                     );
             },
           ),
@@ -605,7 +885,15 @@ class _AdminProfileViewState extends State<AdminProfileView> {
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: isDark ? [] : [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: isDark
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
         border: Border.all(color: borderColor),
       ),
       child: Column(
@@ -618,7 +906,14 @@ class _AdminProfileViewState extends State<AdminProfileView> {
                   Icon(icon, color: textPrimary, size: 20),
                   const SizedBox(width: 8),
                 ],
-                Text(title, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: textPrimary)),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 16,
+                    color: textPrimary,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -629,7 +924,14 @@ class _AdminProfileViewState extends State<AdminProfileView> {
     );
   }
 
-  Widget _buildStatRow(String label, String value, IconData icon, Color color, {required Color textPrimary, required Color textSecondary}) {
+  Widget _buildStatRow(
+    String label,
+    String value,
+    IconData icon,
+    Color color, {
+    required Color textPrimary,
+    required Color textSecondary,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
@@ -644,8 +946,22 @@ class _AdminProfileViewState extends State<AdminProfileView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: TextStyle(fontSize: 11, color: textSecondary, fontWeight: FontWeight.bold)),
-                Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: textPrimary)),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: textSecondary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: textPrimary,
+                  ),
+                ),
               ],
             ),
           ),

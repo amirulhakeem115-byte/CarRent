@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import '../../../services/vehicle_service.dart';
 import '../../../services/branch_service.dart';
 import '../../../models/vehicle_model.dart';
@@ -25,9 +24,6 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
       _isDark ? const Color(0xFFCBD5E1) : AppColors.lightText;
   Color get _borderColor =>
       _isDark ? const Color(0xFF334155) : AppColors.borderGray;
-  bool get _isAndroidMobile =>
-      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
-
   final VehicleService _vehicleService = VehicleService();
   final BranchService _branchService = BranchService();
 
@@ -328,6 +324,103 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
   }
 
   Widget _buildToolbar(bool isDesktop) {
+    final Widget searchField = Container(
+      decoration: BoxDecoration(
+        color: _isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: TextField(
+        controller: _searchController,
+        style: TextStyle(color: _textColor, fontSize: 13),
+        decoration: InputDecoration(
+          hintText: 'Search brand / model...',
+          hintStyle: TextStyle(
+            color: _isDark ? Colors.white30 : Colors.grey,
+            fontSize: 13,
+          ),
+          prefixIcon: Icon(Icons.search, size: 20, color: _subColor),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 12,
+          ),
+        ),
+      ),
+    );
+
+    final Widget sortDropdown = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: _isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          dropdownColor: Theme.of(context).cardColor,
+          value: _sortBy,
+          items: const [
+            DropdownMenuItem(value: 'recommended', child: Text('Recommended')),
+            DropdownMenuItem(
+              value: 'price_asc',
+              child: Text('Price: Low to High'),
+            ),
+            DropdownMenuItem(
+              value: 'price_desc',
+              child: Text('Price: High to Low'),
+            ),
+            DropdownMenuItem(value: 'brand_asc', child: Text('Brand: A-Z')),
+          ],
+          onChanged: (val) {
+            if (val != null) {
+              setState(() => _sortBy = val);
+            }
+          },
+          style: TextStyle(
+            color: _textColor,
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+          ),
+          icon: Icon(Icons.sort, size: 16, color: _textColor),
+        ),
+      ),
+    );
+
+    final Widget viewToggle = Container(
+      decoration: BoxDecoration(
+        color: AppColors.lightGray,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: () => setState(() => _isGridView = true),
+            icon: Icon(
+              Icons.grid_view_rounded,
+              size: 18,
+              color: _isGridView ? AppColors.primaryOrange : Colors.grey,
+            ),
+          ),
+          IconButton(
+            onPressed: () => setState(() => _isGridView = false),
+            icon: Icon(
+              Icons.view_list_rounded,
+              size: 18,
+              color: !_isGridView ? AppColors.primaryOrange : Colors.grey,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    final Widget mobileFilterButton = IconButton(
+      onPressed: _showMobileFiltersBottomSheet,
+      icon: Badge(
+        label: Text('$_activeFiltersCount'),
+        isLabelVisible: _activeFiltersCount > 0,
+        child: Icon(Icons.tune, color: _textColor),
+      ),
+    );
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -335,120 +428,32 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: _borderColor),
       ),
-      child: Row(
-        children: [
-          // Search field - now in toolbar for both desktop and mobile
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: _isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: TextField(
-                controller: _searchController,
-                style: TextStyle(color: _textColor, fontSize: 13),
-                decoration: InputDecoration(
-                  hintText: 'Search brand / model...',
-                  hintStyle: TextStyle(
-                    color: _isDark ? Colors.white30 : Colors.grey,
-                    fontSize: 13,
-                  ),
-                  prefixIcon: Icon(Icons.search, size: 20, color: _subColor),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 12,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          // Sort Dropdown (Recommended)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: _isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                dropdownColor: Theme.of(context).cardColor,
-                value: _sortBy,
-                items: const [
-                  DropdownMenuItem(
-                    value: 'recommended',
-                    child: Text('Recommended'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'price_asc',
-                    child: Text('Price: Low to High'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'price_desc',
-                    child: Text('Price: High to Low'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'brand_asc',
-                    child: Text('Brand: A-Z'),
-                  ),
-                ],
-                onChanged: (val) {
-                  if (val != null) {
-                    setState(() => _sortBy = val);
-                  }
-                },
-                style: TextStyle(
-                  color: _textColor,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-                icon: Icon(Icons.sort, size: 16, color: _textColor),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          // Grid/List toggle
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.lightGray,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
+      child: isDesktop
+          ? Row(
               children: [
-                IconButton(
-                  onPressed: () => setState(() => _isGridView = true),
-                  icon: Icon(
-                    Icons.grid_view_rounded,
-                    size: 18,
-                    color: _isGridView ? AppColors.primaryOrange : Colors.grey,
-                  ),
-                ),
-                IconButton(
-                  onPressed: () => setState(() => _isGridView = false),
-                  icon: Icon(
-                    Icons.view_list_rounded,
-                    size: 18,
-                    color: !_isGridView ? AppColors.primaryOrange : Colors.grey,
-                  ),
+                Expanded(child: searchField),
+                const SizedBox(width: 12),
+                sortDropdown,
+                const SizedBox(width: 12),
+                viewToggle,
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                searchField,
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(child: sortDropdown),
+                    const SizedBox(width: 8),
+                    viewToggle,
+                    const SizedBox(width: 4),
+                    mobileFilterButton,
+                  ],
                 ),
               ],
             ),
-          ),
-          // Mobile filter button
-          if (!isDesktop) ...[
-            const SizedBox(width: 8),
-            IconButton(
-              onPressed: _showMobileFiltersBottomSheet,
-              icon: Badge(
-                label: Text('$_activeFiltersCount'),
-                isLabelVisible: _activeFiltersCount > 0,
-                child: Icon(Icons.tune, color: _textColor),
-              ),
-            ),
-          ],
-        ],
-      ),
     );
   }
 
@@ -1009,7 +1014,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
           mainAxisSpacing: 18,
           childAspectRatio: isDesktop
               ? 0.68
-              : (crossAxisCount == 1 ? (_isAndroidMobile ? 1.22 : 1.35) : 0.72),
+              : (crossAxisCount == 1 ? 1.06 : 0.72),
         ),
         itemBuilder: (context, index) {
           return _buildGridCard(vehicles[index]);

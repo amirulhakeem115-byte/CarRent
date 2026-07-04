@@ -213,6 +213,37 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   StreamSubscription<List<PaymentModel>>? _paymentsSubscription;
   StreamSubscription<List<UserModel>>? _usersSubscription;
 
+  int _mobileNavIndexForActiveTab() {
+    switch (_activeTab) {
+      case 'Bookings':
+        return 1;
+      case 'Notifications':
+        return 2;
+      case 'Admin Profile':
+        return 3;
+      case 'Dashboard':
+      default:
+        return 0;
+    }
+  }
+
+  void _setActiveTabFromMobileIndex(int index) {
+    switch (index) {
+      case 0:
+        _activeTab = 'Dashboard';
+        break;
+      case 1:
+        _activeTab = 'Bookings';
+        break;
+      case 2:
+        _activeTab = 'Notifications';
+        break;
+      case 3:
+        _activeTab = 'Admin Profile';
+        break;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -469,6 +500,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Widget build(BuildContext context) {
     final double width = MediaQuery.of(context).size.width;
     final bool isDesktop = width > 1100;
+    final bool showMobileBottomNav = !isDesktop;
 
     return Scaffold(
       key: _scaffoldKey,
@@ -514,6 +546,37 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         ],
       ),
+      bottomNavigationBar: showMobileBottomNav
+          ? BottomNavigationBar(
+              type: BottomNavigationBarType.fixed,
+              currentIndex: _mobileNavIndexForActiveTab(),
+              selectedItemColor: AppColors.primaryOrange,
+              unselectedItemColor: Colors.grey,
+              onTap: (index) {
+                setState(() {
+                  _setActiveTabFromMobileIndex(index);
+                });
+              },
+              items: const [
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.home_rounded),
+                  label: 'Home',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.calendar_today_rounded),
+                  label: 'Bookings',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.notifications_rounded),
+                  label: 'Alerts',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.person_rounded),
+                  label: 'Profile',
+                ),
+              ],
+            )
+          : null,
     );
   }
 

@@ -378,6 +378,7 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
   Widget build(BuildContext context) {
     final double width = MediaQuery.of(context).size.width;
     final bool isDesktop = width > 950;
+    final bool showMobileBottomNav = !isDesktop;
     final unreadCount = _notifications.where((n) => !n.isRead).length;
 
     // Mapping for Bottom Navigation Items (matches indices: 0, 1, 2, 5)
@@ -458,6 +459,48 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
             ),
           ],
         ),
+        bottomNavigationBar: showMobileBottomNav
+            ? BottomNavigationBar(
+                type: BottomNavigationBarType.fixed,
+                currentIndex: bottomNavIndex,
+                selectedItemColor: AppColors.primaryOrange,
+                unselectedItemColor: Colors.grey,
+                onTap: (index) {
+                  switch (index) {
+                    case 0:
+                      setIndex(0);
+                      break;
+                    case 1:
+                      setIndex(1);
+                      break;
+                    case 2:
+                      setIndex(2);
+                      break;
+                    case 3:
+                      setIndex(6);
+                      break;
+                  }
+                },
+                items: const [
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.home_rounded),
+                    label: 'Home',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.search_rounded),
+                    label: 'Cars',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.calendar_today_rounded),
+                    label: 'Bookings',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.person_rounded),
+                    label: 'Profile',
+                  ),
+                ],
+              )
+            : null,
       ),
     );
   }
