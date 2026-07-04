@@ -2,14 +2,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:intl/intl.dart';
-import 'package:web/web.dart' as web;
 import 'package:provider/provider.dart';
 import '../../../constants/colors.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/database_service.dart';
 import '../../../services/notification_service.dart';
 import '../../../services/company_settings_provider.dart';
+import '../../../services/web_audio_player.dart';
 import '../../../models/user_model.dart';
 import '../../../models/notification_model.dart';
 import '../../../widgets/app_image.dart';
@@ -50,12 +51,14 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
   final NotificationService _notificationService = NotificationService();
+  final FirebaseDatabase _firebaseDatabase = FirebaseDatabase.instance;
 
   late int _currentIndex;
   Widget? _customBody;
   UserModel? _user;
   List<NotificationModel> _notifications = [];
   StreamSubscription<List<NotificationModel>>? _notificationsSubscription;
+  StreamSubscription<DatabaseEvent>? _userProfileSubscription;
   final Set<String> _playedNotificationIds = {};
 
   @override
@@ -88,6 +91,7 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
   @override
   void dispose() {
     _notificationsSubscription?.cancel();
+    _userProfileSubscription?.cancel();
     super.dispose();
   }
 
@@ -101,11 +105,37 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
             _user = userModel;
           });
           _subscribeNotifications(currentUser.uid);
+          _subscribeUserProfile(currentUser.uid);
         }
       } catch (e) {
         debugPrint('Error fetching user for shell: $e');
       }
     }
+  }
+
+  void _subscribeUserProfile(String userId) {
+    _userProfileSubscription?.cancel();
+    _userProfileSubscription = _firebaseDatabase
+        .ref()
+        .child('users')
+        .child(userId)
+        .onValue
+        .listen((event) {
+          if (!mounted ||
+              !event.snapshot.exists ||
+              event.snapshot.value == null) {
+            return;
+          }
+          try {
+            final raw = event.snapshot.value as Map<dynamic, dynamic>;
+            final updatedUser = UserModel.fromMap(userId, raw);
+            setState(() {
+              _user = updatedUser;
+            });
+          } catch (e) {
+            debugPrint('Error parsing realtime user profile: $e');
+          }
+        });
   }
 
   void _subscribeNotifications(String userId) {
@@ -150,9 +180,7 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
   void _playNotificationSound() {
     if (kIsWeb) {
       try {
-        final audioCtx = web.AudioContext();
-        _playTone(audioCtx, 880, 0.1, 0.0);
-        _playTone(audioCtx, 1200, 0.25, 0.08);
+        playNotificationChime();
       } catch (e) {
         debugPrint('Web Audio API error: $e');
       }
@@ -162,35 +190,6 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
       } catch (e) {
         debugPrint('SystemSound play error: $e');
       }
-    }
-  }
-
-  void _playTone(
-    web.AudioContext ctx,
-    double frequency,
-    double duration,
-    double delay,
-  ) {
-    try {
-      final osc = ctx.createOscillator();
-      final gainNode = ctx.createGain();
-
-      osc.connect(gainNode);
-      gainNode.connect(ctx.destination);
-
-      osc.frequency.value = frequency;
-      osc.type = 'sine';
-
-      final startTime = ctx.currentTime + delay;
-      final endTime = startTime + duration;
-
-      gainNode.gain.setValueAtTime(0.08, startTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, endTime);
-
-      osc.start(startTime);
-      osc.stop(endTime);
-    } catch (e) {
-      debugPrint('Tone play error: $e');
     }
   }
 
@@ -297,8 +296,35 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
   }
 
   Future<void> _logout() async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Confirm Logout'),
+          content: const Text('Do you want to log out?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('No'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryOrange,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Yes'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldLogout != true || !mounted) return;
+
     final nav = Navigator.of(context);
     await _authService.logout();
+    if (!mounted) return;
     nav.pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => LoginScreen(onLoggedIn: () {})),
       (route) => false,
@@ -779,6 +805,7 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
   }
 
   Widget _buildProfileAvatar() {
+    final imageProvider = getAppImageProvider(_user?.profileImage);
     return GestureDetector(
       onTap: () {
         setState(() => _currentIndex = 6);
@@ -786,8 +813,8 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
       child: CircleAvatar(
         radius: 18,
         backgroundColor: AppColors.lightGray,
-        backgroundImage: getAppImageProvider(_user?.profileImage),
-        child: _user?.profileImage.isNotEmpty != true
+        backgroundImage: imageProvider,
+        child: _user?.profileImage.isNotEmpty != true || imageProvider == null
             ? const Icon(Icons.person, size: 18, color: AppColors.secondaryBlue)
             : null,
       ),

@@ -26,16 +26,25 @@ Future<void> main() async {
     // Persistent debug token registered in Firebase Console under App Check > Manage debug tokens
     // const String webDebugToken = 'b1761c25-c825-49a0-9932-fed7f28437ad';
 
+    // [source: 1]
     await FirebaseAppCheck.instance.activate(
       providerWeb: kDebugMode
           ? WebDebugProvider(debugToken: 'b1761c25-c825-49a0-9932-fed7f28437ad')
           : ReCaptchaV3Provider('6LeBqystAAAAAJS3i4iO7I6aKG8uh-Dt4NgpET8J'),
+
+      // Update Android to use a custom hardcoded token in Debug mode
       providerAndroid: kDebugMode
-          ? AndroidDebugProvider()
-          : AndroidPlayIntegrityProvider(),
+          ? const AndroidDebugProvider(
+              debugToken: 'b1761c25-c825-49a0-9932-fed7f28437ad',
+            )
+          : const AndroidPlayIntegrityProvider(),
+
+      // Update Apple to use a custom hardcoded token in Debug mode
       providerApple: kDebugMode
-          ? AppleDebugProvider()
-          : AppleAppAttestProvider(),
+          ? const AppleDebugProvider(
+              debugToken: 'b1761c25-c825-49a0-9932-fed7f28437ad',
+            )
+          : const AppleAppAttestProvider(),
     );
   } catch (e) {
     if (e.toString().contains('duplicate-app')) {

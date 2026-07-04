@@ -253,7 +253,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.secondaryBlue,
+                    backgroundColor: AppColors.primaryOrange,
                     foregroundColor: Colors.white,
                   ),
                   onPressed: isSaving
@@ -687,6 +687,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Future<void> _confirmAndLogout() async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Confirm Logout'),
+          content: const Text('Do you want to log out?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('No'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryOrange,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Yes'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldLogout != true || !mounted) return;
+
+    final nav = Navigator.of(context);
+    await _authService.logout();
+    if (!mounted) return;
+    nav.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => LoginScreen(onLoggedIn: () {})),
+      (route) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final double width = MediaQuery.of(context).size.width;
@@ -967,17 +1003,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      onPressed: () async {
-                        final nav = Navigator.of(context);
-                        await _authService.logout();
-                        nav.pushAndRemoveUntil(
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                LoginScreen(onLoggedIn: () {}),
-                          ),
-                          (route) => false,
-                        );
-                      },
+                      onPressed: _confirmAndLogout,
                     ),
                   ],
                 ),

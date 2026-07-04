@@ -7,7 +7,6 @@ import 'dart:ui' as ui;
 import 'dart:async';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
-import 'package:web/web.dart' as web;
 
 import '../../../constants/colors.dart';
 import '../../../services/auth_service.dart';
@@ -44,6 +43,7 @@ import '../../../widgets/loading_widget.dart';
 import '../../../widgets/app_image.dart';
 import '../../../widgets/app_logo.dart';
 import '../../../services/company_settings_provider.dart';
+import '../../../services/web_audio_player.dart';
 import 'package:provider/provider.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -100,9 +100,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   void _playNotificationSound() {
     if (kIsWeb) {
       try {
-        final audioCtx = web.AudioContext();
-        _playTone(audioCtx, 880, 0.1, 0.0);
-        _playTone(audioCtx, 1200, 0.25, 0.08);
+        playNotificationChime();
       } catch (e) {
         debugPrint('Web Audio API error: $e');
       }
@@ -112,35 +110,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       } catch (e) {
         debugPrint('Failed to play system sound: $e');
       }
-    }
-  }
-
-  void _playTone(
-    web.AudioContext ctx,
-    double frequency,
-    double duration,
-    double delay,
-  ) {
-    try {
-      final osc = ctx.createOscillator();
-      final gainNode = ctx.createGain();
-
-      osc.connect(gainNode);
-      gainNode.connect(ctx.destination);
-
-      osc.frequency.value = frequency;
-      osc.type = 'sine';
-
-      final startTime = ctx.currentTime + delay;
-      final endTime = startTime + duration;
-
-      gainNode.gain.setValueAtTime(0.1, startTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, endTime);
-
-      osc.start(startTime);
-      osc.stop(endTime);
-    } catch (e) {
-      debugPrint('Tone play error: $e');
     }
   }
 
@@ -1487,8 +1456,35 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Future<void> _logout() async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Confirm Logout'),
+          content: const Text('Do you want to log out?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('No'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryOrange,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Yes'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldLogout != true || !mounted) return;
+
     final nav = Navigator.of(context);
     await _authService.logout();
+    if (!mounted) return;
     nav.pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => LoginScreen(onLoggedIn: () {})),
       (route) => false,
