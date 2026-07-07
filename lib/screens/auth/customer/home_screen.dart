@@ -18,7 +18,6 @@ import '../../../widgets/app_image.dart';
 import 'vehicle_list_screen.dart';
 import 'vehicle_details_screen.dart';
 import 'customer_responsive_shell.dart';
-import 'reward_history_screen.dart';
 
 class CustomerHomeScreen extends StatefulWidget {
   const CustomerHomeScreen({super.key});

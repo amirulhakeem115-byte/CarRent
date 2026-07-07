@@ -46,7 +46,6 @@ import '../../../widgets/app_logo.dart';
 import '../../../services/company_settings_provider.dart';
 import 'package:provider/provider.dart';
 import '../../../ai/services/ai_service.dart';
-import '../../../ai/models/ai_intent.dart';
 import '../../../ai/widgets/ai_floating_button.dart';
 import '../../../ai/widgets/ai_chat_panel.dart';
 class AdminDashboardScreen extends StatefulWidget {
@@ -67,6 +66,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   final MaintenanceService _maintenanceService = MaintenanceService();
 
   int _totalCars = 0;
+  final int _overdueCount = 0;
   int _totalCustomers = 0;
   double _monthlyRevenue = 0.0;
   int _pendingPaymentsCount = 0;
@@ -216,6 +216,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   StreamSubscription<List<PaymentModel>>? _paymentsSubscription;
   StreamSubscription<List<UserModel>>? _usersSubscription;
 
+  void _handleAIAction() {
+    if (!mounted) return;
+    final aiService = context.read<AIService>();
+    final intent = aiService.lastIntent;
+    if (intent == null) return;
+    // Simple handling: clear intent and possibly switch tabs
+    aiService.clearLastIntent();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -326,6 +335,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     } catch (_) {}
     super.dispose();
   }
+
 
 
   Future<void> _loadDashboardData() async {
@@ -1663,7 +1673,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       'Ongoing': ongoingCount,
       'Completed': completedCount,
       'Cancelled': cancelledCount,
-      'Overdue': overdueCount,
+      'Overdue': _overdueCount,
     };
 
     final totalBookingsCount = statusCounts.values.fold(

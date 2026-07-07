@@ -14,7 +14,6 @@ import '../../../models/user_model.dart';
 import '../../../models/notification_model.dart';
 import '../../../widgets/app_image.dart';
 import '../../../widgets/app_logo.dart';
-import '../login_screen.dart';
 import '../../../ai/services/ai_service.dart';
 import '../../../ai/models/ai_intent.dart';
 import '../../../ai/widgets/ai_floating_button.dart';
@@ -357,14 +356,7 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
     );
   }
 
-  Future<void> _logout() async {
-    final nav = Navigator.of(context);
-    await _authService.logout();
-    nav.pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => LoginScreen(onLoggedIn: () {})),
-      (route) => false,
-    );
-  }
+
 
   String _getRelativeTimeString(DateTime dateTime) {
     final now = DateTime.now();

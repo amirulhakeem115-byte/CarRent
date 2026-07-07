@@ -1834,10 +1834,12 @@ class _HomeScreenState extends State<HomeScreen> {
                             prefixIcon: Icon(Icons.email_outlined),
                           ),
                           validator: (val) {
-                            if (val == null || val.trim().isEmpty)
+                            if (val == null || val.trim().isEmpty) {
                               return 'Email is required';
-                            if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val))
+                            }
+                            if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val)) {
                               return 'Enter a valid email';
+                            }
                             return null;
                           },
                         ),

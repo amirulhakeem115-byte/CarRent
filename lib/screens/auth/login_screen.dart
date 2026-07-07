@@ -429,10 +429,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 keyboardType: TextInputType.emailAddress,
                 focusNode: _emailFocusNode,
                 validator: (val) {
-                  if (val == null || val.trim().isEmpty)
+                  if (val == null || val.trim().isEmpty) {
                     return 'Email is required';
-                  if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val))
+                  }
+                  if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val)) {
                     return 'Enter a valid email';
+                  }
                   return null;
                 },
               ),

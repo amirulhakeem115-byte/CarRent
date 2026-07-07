@@ -4,16 +4,11 @@ import 'package:intl/intl.dart';
 import 'package:firebase_database/firebase_database.dart';
 import '../../../models/booking_model.dart';
 import '../../../models/payment_model.dart';
-import '../../../models/review_model.dart';
 import '../../../services/booking_service.dart';
 import '../../../services/payment_service.dart';
-import '../../../services/review_service.dart';
 import '../../../services/auth_service.dart';
 import '../../../constants/colors.dart';
-import 'customer_responsive_shell.dart';
-import '../../../services/receipt_service.dart';
 import '../../../services/booking_lifecycle_manager.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'booking_screen.dart';
 
 class MyBookingsScreen extends StatefulWidget {
@@ -35,20 +30,14 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
 
   final BookingService _bookingService = BookingService();
   final PaymentService _paymentService = PaymentService();
-  final ReviewService _reviewService = ReviewService();
   final AuthService _authService = AuthService();
 
   List<BookingModel> _bookings = [];
   List<PaymentModel> _payments = [];
-  bool _loading = true;
-  String? _error;
+  bool _loading = false;
 
   // Track which tabs have been viewed
-  Set<int> _viewedTabs = {};
-
-  // Store previous counts to detect new bookings
-  Map<int, int> _previousCounts = {};
-  Map<int, int> _currentCounts = {};
+  final Set<int> _viewedTabs = {};
 
   late TabController _tabController;
 
@@ -92,7 +81,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
               .where((b) => b.userId == currentUser.uid)
               .toList();
           _bookings.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          _updateCounts();
         });
       }
     });
@@ -103,68 +91,12 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     ) {
       if (mounted) {
         setState(() {
-          _payments = allPayments.where((p) => p.userId == currentUser.uid).toList();
+          _payments = allPayments
+              .where((p) => p.userId == currentUser.uid)
+              .toList();
         });
       }
     });
-  }
-
-  void _updateCounts() {
-    final now = DateTime.now();
-
-    final upcoming = _bookings.where((b) {
-      final status = b.status.toLowerCase();
-      return (status == 'pending' ||
-              status == 'approved' ||
-              status == 'confirmed' ||
-              status == 'pending payment') &&
-          b.pickUpDate.isAfter(now);
-    }).length;
-
-    final ongoing = _bookings.where((b) {
-      final status = b.status.toLowerCase();
-      return (status == 'active' || status == 'ongoing') ||
-          ((status == 'approved' || status == 'confirmed') &&
-              b.pickUpDate.isBefore(now) &&
-              b.returnDate.isAfter(now));
-    }).length;
-
-    final completed = _bookings
-        .where((b) => b.status.toLowerCase() == 'completed')
-        .length;
-    final cancelled = _bookings
-        .where(
-          (b) =>
-              b.status.toLowerCase() == 'cancelled' ||
-              b.status.toLowerCase() == 'rejected',
-        )
-        .length;
-
-    _currentCounts = {0: upcoming, 1: ongoing, 2: completed, 3: cancelled};
-  }
-
-  // Check if tab should show badge (has unread items)
-  bool _shouldShowBadge(int tabIndex) {
-    // If tab has been viewed, don't show badge
-    if (_viewedTabs.contains(tabIndex)) return false;
-
-    // Get current count for this tab
-    final currentCount = _currentCounts[tabIndex] ?? 0;
-
-    // Get previous count for this tab (before user viewed it)
-    final previousCount = _previousCounts[tabIndex] ?? 0;
-
-    // Show badge if there are new items (current count > previous count)
-    return currentCount > previousCount;
-  }
-
-  // Get the count to display in badge
-  int _getBadgeCount(int tabIndex) {
-    final currentCount = _currentCounts[tabIndex] ?? 0;
-    final previousCount = _previousCounts[tabIndex] ?? 0;
-
-    // Only show the new items count
-    return currentCount - previousCount;
   }
 
   void _subscribeToReviews() {
@@ -179,21 +111,22 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
         .equalTo(currentUser.uid)
         .onValue
         .listen((event) {
-      if (mounted) {
-        final Set<String> ids = {};
-        if (event.snapshot.exists && event.snapshot.value != null) {
-          final Map<dynamic, dynamic> data = event.snapshot.value as Map<dynamic, dynamic>;
-          data.forEach((key, value) {
-            if (value is Map && value['bookingId'] != null) {
-              ids.add(value['bookingId'].toString());
+          if (mounted) {
+            final Set<String> ids = {};
+            if (event.snapshot.exists && event.snapshot.value != null) {
+              final Map<dynamic, dynamic> data =
+                  event.snapshot.value as Map<dynamic, dynamic>;
+              data.forEach((key, value) {
+                if (value is Map && value['bookingId'] != null) {
+                  ids.add(value['bookingId'].toString());
+                }
+              });
             }
-          });
-        }
-        setState(() {
-          _reviewedBookingIds = ids;
+            setState(() {
+              _reviewedBookingIds = ids;
+            });
+          }
         });
-      }
-    });
   }
 
   @override
@@ -209,7 +142,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     if (!mounted) return;
     setState(() {
       _loading = true;
-      _error = null;
     });
 
     try {
@@ -224,9 +156,8 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
           setState(() {
             _bookings = results[0] as List<BookingModel>;
             _payments = results[1] as List<PaymentModel>;
-            _updateCounts();
-            // Store initial counts as viewed
-            _previousCounts = Map.from(_currentCounts);
+            //_updateCounts();
+            //previousCounts = Map.from(_currentCounts);//
           });
         }
       }
@@ -239,476 +170,48 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     }
   }
 
-  void _submitReview(BookingModel booking) {
-    double selectedRating = 5.0;
-    final commentController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              backgroundColor: _isDark ? const Color(0xFF1E293B) : Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: BorderSide(color: _borderColor),
-              ),
-              title: Text(
-                'Rate ${booking.vehicleName}',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: _textColor,
-                ),
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'How was your rental experience?',
-                    style: TextStyle(color: _textColor, fontSize: 14),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(5, (index) {
-                      final starVal = index + 1.0;
-                      return IconButton(
-                        icon: Icon(
-                          starVal <= selectedRating
-                              ? Icons.star_rounded
-                              : Icons.star_border_rounded,
-                          color: Colors.amber,
-                          size: 32,
-                        ),
-                        onPressed: () {
-                          setDialogState(() {
-                            selectedRating = starVal;
-                          });
-                        },
-                      );
-                    }),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: commentController,
-                    maxLines: 3,
-                    style: TextStyle(color: _textColor, fontSize: 13),
-                    decoration: InputDecoration(
-                      hintText: 'Share your feedback...',
-                      hintStyle: TextStyle(
-                        fontSize: 12,
-                        color: _isDark ? Colors.white30 : Colors.grey,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(
-                    'Cancel',
-                    style: TextStyle(
-                      color: _isDark ? const Color(0xFF94A3B8) : Colors.grey,
-                    ),
-                  ),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryOrange,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  onPressed: () async {
-                    final comment = commentController.text.trim();
-
-                    final review = ReviewModel(
-                      id: '',
-                      bookingId: booking.id,
-                      vehicleId: booking.vehicleId,
-                      userId: booking.userId,
-                      userName: booking.userName,
-                      rating: selectedRating,
-                      comment: comment,
-                      createdAt: DateTime.now(),
-                    );
-
-                    await _reviewService.submitReview(review);
-                    if (!context.mounted) return;
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Review submitted! Thank you.'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  },
-                  child: const Text(
-                    'Submit',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _showReceiptOptions(BookingModel booking) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: _isDark ? const Color(0xFF1E293B) : Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Receipt Options',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: _textColor,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Booking ID: #${booking.id.toUpperCase()}',
-                style: TextStyle(fontSize: 11, color: _subColor),
-              ),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: Icon(Icons.visibility, color: _textColor),
-                title: Text(
-                  'View Receipt',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: _textColor,
-                  ),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  ReceiptService().viewReceipt(context, booking.id);
-                },
-              ),
-              ListTile(
-                leading: const Icon(
-                  Icons.download,
-                  color: AppColors.primaryOrange,
-                ),
-                title: Text(
-                  'Download PDF',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: _textColor,
-                  ),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  ReceiptService().downloadReceipt(context, booking.id);
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final double width = MediaQuery.of(context).size.width;
-    final bool isDesktop = width > 950;
-
-    final now = DateTime.now();
-
-    final waitingPayment = _bookings.where((b) {
-      final status = b.status.toLowerCase();
-      return status == 'waiting for payment' || status == 'pending payment';
-    }).toList();
-
-    final upcoming = _bookings.where((b) {
-      final status = b.status.toLowerCase();
-      return (status == 'pending' || status == 'approved' || status == 'confirmed') &&
-             b.pickUpDate.isAfter(now) &&
-             status != 'waiting for payment' &&
-             status != 'pending payment';
-    }).toList();
-
-    final ongoing = _bookings.where((b) {
-      final status = b.status.toLowerCase();
-      return (status == 'active' || status == 'ongoing') ||
-          ((status == 'approved' || status == 'confirmed') &&
-      return (status == 'active' || status == 'ongoing' || status == 'overdue') ||
-             ((status == 'approved' || status == 'confirmed') &&
-              b.pickUpDate.isBefore(now) &&
-              b.returnDate.isAfter(now) &&
-              status != 'waiting for payment' &&
-              status != 'pending payment');
-    }).toList();
-
-    final completed = _bookings.where((b) => b.status.toLowerCase() == 'completed').toList();
-
-    final cancelled = _bookings.where((b) => b.status.toLowerCase() == 'cancelled' || b.status.toLowerCase() == 'rejected').toList();
-
-    return DefaultTabController(
-      length: 5,
-      child: Column(
-        children: [
-          Container(
-            color: Theme.of(context).cardColor,
-            child: TabBar(
-              controller: _tabController,
-              labelColor: AppColors.primaryOrange,
-              unselectedLabelColor: _subColor,
-              indicatorColor: AppColors.primaryOrange,
-              indicatorWeight: 3,
-              isScrollable: true,
-              tabAlignment: TabAlignment.start,
-              labelStyle: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-              ),
-              unselectedLabelStyle: const TextStyle(
-                fontWeight: FontWeight.normal,
-                fontSize: 13,
-              ),
-              tabs: [
-                _buildTabItem('Pending Payment', waitingPayment.length),
-                _buildTabItem('Upcoming', upcoming.length),
-                _buildTabItem('Active', ongoing.length),
-                _buildTabItem('Completed', completed.length),
-                _buildTabItem('Cancelled', cancelled.length),
-              ],
-            ),
-          ),
-          Expanded(
-            child: _loading
-                ? const Center(
-                    child: CircularProgressIndicator(
-                      color: AppColors.primaryOrange,
-                      strokeWidth: 2.5,
-                    ),
-                  )
-                : _error != null
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.cloud_off,
-                          color: AppColors.primaryOrange,
-                          size: 48,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _error!,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: _textColor,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _loadBookings,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primaryOrange,
-                            foregroundColor: Colors.white,
-                          ),
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  )
-                : TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildTabList(waitingPayment, 'No pending payment bookings', isDesktop),
-                      _buildTabList(upcoming, 'No upcoming bookings', isDesktop),
-                      _buildTabList(ongoing, 'No active bookings', isDesktop),
-                      _buildTabList(completed, 'No completed trips', isDesktop),
-                      _buildTabList(cancelled, 'No cancelled reservations', isDesktop),
-                    ],
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Tab _buildTabItem(String label, int tabIndex, int count) {
-    final bool showBadge = _shouldShowBadge(tabIndex);
-    final int badgeCount = _getBadgeCount(tabIndex);
-
-    return Tab(
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(label),
-          if (showBadge && badgeCount > 0) ...[
-            const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: Colors.redAccent,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                '$badgeCount',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTabList(
-    List<BookingModel> list,
-    String emptyMsg,
-    bool isDesktop,
-    int tabIndex,
-  ) {
-    // Mark tab as viewed when user actually sees the content
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_viewedTabs.contains(tabIndex) && list.isNotEmpty) {
-        setState(() {
-          _viewedTabs.add(tabIndex);
-          // Update previous counts for this tab
-          _previousCounts[tabIndex] = _currentCounts[tabIndex] ?? 0;
-        });
-      }
-    });
-
-    if (list.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.calendar_today_outlined,
-                size: 48,
-                color: _isDark ? const Color(0xFF334155) : Colors.grey[300],
-              ),
-              const SizedBox(height: 16),
-              Text(
-                emptyMsg,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  color: _textColor,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Ready for your next trip? Discover our available premium vehicles.',
-                style: TextStyle(fontSize: 11, color: _subColor),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () {
-                  CustomerResponsiveShell.of(context)?.setIndex(1);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryOrange,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
-                ),
-                child: const Text(
-                  'Browse Cars',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return ListView.separated(
-      padding: const EdgeInsets.only(bottom: 40),
-      itemCount: list.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 16),
-      itemBuilder: (context, index) {
-        return _buildBookingCard(list[index], isDesktop);
-      },
-    );
-  }
-
   Widget _buildBookingCard(BookingModel booking, bool isDesktop) {
     final dateFormat = DateFormat('dd MMM yyyy');
-
     Color statusColor = Colors.orange;
     final bStatus = booking.status.toLowerCase();
+    final isWaitingPayment =
+        bStatus == 'waiting for payment' || bStatus == 'pending payment';
+
     if (bStatus == 'approved' ||
         bStatus == 'active' ||
         bStatus == 'ongoing' ||
         bStatus == 'confirmed') {
-    final isWaitingPayment = bStatus == 'waiting for payment' || bStatus == 'pending payment';
-    if (bStatus == 'approved' || bStatus == 'active' || bStatus == 'ongoing' || bStatus == 'confirmed') {
       statusColor = const Color(0xFF10B981);
     } else if (bStatus == 'completed') {
       statusColor = const Color(0xFF3B82F6);
-    } else if (bStatus == 'cancelled' || bStatus == 'rejected' || bStatus == 'overdue') {
+    } else if (bStatus == 'cancelled' ||
+        bStatus == 'rejected' ||
+        bStatus == 'overdue') {
       statusColor = const Color(0xFFEF4444);
-    } else if (isWaitingPayment) {
-      statusColor = Colors.orange;
     }
 
     final paymentList = _payments
         .where((p) => p.bookingId == booking.id)
         .toList();
     final payment = paymentList.isNotEmpty ? paymentList.first : null;
-
     final bool canCancel =
         [
           'pending',
           'approved',
           'confirmed',
           'pending payment',
+          'waiting for payment',
         ].contains(bStatus) &&
         booking.pickUpDate.isAfter(DateTime.now());
-    final bool canCancel = ['pending', 'approved', 'confirmed', 'pending payment', 'waiting for payment'].contains(bStatus) && booking.pickUpDate.isAfter(DateTime.now());
 
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _borderColor),
         border: Border.all(
-          color: isWaitingPayment ? Colors.orange.withValues(alpha: 0.8) : _borderColor,
+          color: isWaitingPayment
+              ? Colors.orange.withValues(alpha: 0.8)
+              : _borderColor,
           width: isWaitingPayment ? 1.5 : 1.0,
         ),
         boxShadow: [
@@ -882,14 +385,29 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                     if (isWaitingPayment) ...[
                       ElevatedButton.icon(
                         onPressed: () => _payNowExistingBooking(booking),
-                        icon: const Icon(Icons.payment_rounded, size: 12, color: Colors.white),
-                        label: const Text('Pay Now', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        icon: const Icon(
+                          Icons.payment_rounded,
+                          size: 12,
+                          color: Colors.white,
+                        ),
+                        label: const Text(
+                          'Pay Now',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primaryOrange,
                           foregroundColor: Colors.white,
                           elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -921,21 +439,40 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                           ),
                         ),
                       ),
-                    if ((bStatus == 'active' || bStatus == 'ongoing' || bStatus == 'overdue') && !booking.isReturned) ...[
+                    if ((bStatus == 'active' ||
+                            bStatus == 'ongoing' ||
+                            bStatus == 'overdue') &&
+                        !booking.isReturned) ...[
                       ElevatedButton.icon(
                         onPressed: () => _markVehicleAsReturned(booking),
-                        icon: const Icon(Icons.keyboard_return, size: 12, color: Colors.white),
-                        label: const Text('Return Vehicle', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        icon: const Icon(
+                          Icons.keyboard_return,
+                          size: 12,
+                          color: Colors.white,
+                        ),
+                        label: const Text(
+                          'Return Vehicle',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.teal,
                           foregroundColor: Colors.white,
                           elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                         ),
                       ),
                     ],
-                    if (bStatus == 'completed' && !_reviewedBookingIds.contains(booking.id))
+                    if (bStatus == 'completed' &&
+                        !_reviewedBookingIds.contains(booking.id))
                       ElevatedButton.icon(
                         onPressed: () => _submitReview(booking),
                         icon: const Icon(
@@ -1121,18 +658,38 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: _isDark ? const Color(0xFF1E293B) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: _borderColor)),
-        title: Text('Return Vehicle', style: TextStyle(fontWeight: FontWeight.bold, color: _textColor)),
-        content: Text('Are you sure you want to mark this vehicle as returned? This will finalize your rental completion.', style: TextStyle(color: _textColor)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: _borderColor),
+        ),
+        title: Text(
+          'Return Vehicle',
+          style: TextStyle(fontWeight: FontWeight.bold, color: _textColor),
+        ),
+        content: Text(
+          'Are you sure you want to mark this vehicle as returned? This will finalize your rental completion.',
+          style: TextStyle(color: _textColor),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel', style: TextStyle(color: _isDark ? const Color(0xFF94A3B8) : Colors.grey)),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: _isDark ? const Color(0xFF94A3B8) : Colors.grey,
+              ),
+            ),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.teal,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Confirm Return', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text(
+              'Confirm Return',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -1152,13 +709,19 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
         _loadBookings();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Vehicle marked as returned successfully.'), backgroundColor: Colors.green),
+            const SnackBar(
+              content: Text('Vehicle marked as returned successfully.'),
+              backgroundColor: Colors.green,
+            ),
           );
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to return vehicle: $e'), backgroundColor: Colors.redAccent),
+            SnackBar(
+              content: Text('Failed to return vehicle: $e'),
+              backgroundColor: Colors.redAccent,
+            ),
           );
         }
       }
@@ -1167,7 +730,298 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
 
   Future<void> _payNowExistingBooking(BookingModel booking) async {
     if (mounted) {
-      await BookingScreen.navigateToPayment(context, booking, booking.paymentMethod);
+      await BookingScreen.navigateToPayment(
+        context,
+        booking,
+        booking.paymentMethod,
+      );
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isDesktop = MediaQuery.of(context).size.width > 900;
+    final now = DateTime.now();
+
+    final pendingPaymentList = _bookings.where((b) {
+      final s = b.status.toLowerCase();
+      return s == 'pending payment' || s == 'waiting for payment';
+    }).toList();
+
+    final upcomingList = _bookings.where((b) {
+      final s = b.status.toLowerCase();
+      return (s == 'pending' || s == 'approved' || s == 'confirmed') &&
+          b.pickUpDate.isAfter(now) &&
+          s != 'pending payment' &&
+          s != 'waiting for payment';
+    }).toList();
+
+    final ongoingList = _bookings.where((b) {
+      final s = b.status.toLowerCase();
+      return (s == 'active' || s == 'ongoing') ||
+          ((s == 'approved' || s == 'confirmed') &&
+              b.pickUpDate.isBefore(now) &&
+              b.returnDate.isAfter(now) &&
+              s != 'waiting for payment' &&
+              s != 'pending payment') ||
+          s == 'overdue';
+    }).toList();
+
+    final completedList = _bookings
+        .where((b) => b.status.toLowerCase() == 'completed')
+        .toList();
+
+    if (_loading) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.primaryOrange),
+      );
+    }
+
+    return Column(
+      children: [
+        Container(
+          color: Theme.of(context).cardColor,
+          child: TabBar(
+            controller: _tabController,
+            labelColor: AppColors.primaryOrange,
+            unselectedLabelColor: _subColor,
+            indicatorColor: AppColors.primaryOrange,
+            isScrollable: true,
+            tabs: [
+              Tab(text: 'Pay Now (${pendingPaymentList.length})'),
+              Tab(text: 'Upcoming (${upcomingList.length})'),
+              Tab(text: 'Ongoing (${ongoingList.length})'),
+              Tab(text: 'Completed (${completedList.length})'),
+            ],
+          ),
+        ),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildList(
+                  pendingPaymentList,
+                  'No pending payments.',
+                  isDesktop,
+                ),
+                _buildList(upcomingList, 'No upcoming bookings.', isDesktop),
+                _buildList(ongoingList, 'No ongoing rentals.', isDesktop),
+                _buildList(completedList, 'No completed bookings.', isDesktop),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildList(List<BookingModel> list, String emptyMsg, bool isDesktop) {
+    if (list.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.calendar_today_outlined,
+                size: 48,
+                color: _isDark ? const Color(0xFF334155) : Colors.grey[300],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                emptyMsg,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: _textColor,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.only(bottom: 40),
+      itemCount: list.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 16),
+      itemBuilder: (_, i) => _buildBookingCard(list[i], isDesktop),
+    );
+  }
+
+  Future<void> _submitReview(BookingModel booking) async {
+    double rating = 5;
+    final commentController = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _isDark ? const Color(0xFF1E293B) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Rate Your Experience',
+          style: TextStyle(fontWeight: FontWeight.bold, color: _textColor),
+        ),
+        content: StatefulBuilder(
+          builder: (ctx2, setInner) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                booking.vehicleName,
+                style: TextStyle(color: _subColor, fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (i) {
+                  return GestureDetector(
+                    onTap: () => setInner(() => rating = (i + 1).toDouble()),
+                    child: Icon(
+                      i < rating
+                          ? Icons.star_rounded
+                          : Icons.star_border_rounded,
+                      color: AppColors.primaryOrange,
+                      size: 32,
+                    ),
+                  );
+                }),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: commentController,
+                decoration: InputDecoration(
+                  hintText: 'Share your experience (optional)',
+                  hintStyle: TextStyle(color: _subColor, fontSize: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                maxLines: 3,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel', style: TextStyle(color: _subColor)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryOrange,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Submit'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        final currentUser = AuthService().currentUser;
+        if (currentUser == null) return;
+        final reviewId =
+            FirebaseDatabase.instance.ref().child('reviews').push().key ?? '';
+        await FirebaseDatabase.instance
+            .ref()
+            .child('reviews')
+            .child(reviewId)
+            .set({
+              'id': reviewId,
+              'bookingId': booking.id,
+              'vehicleId': booking.vehicleId,
+              'vehicleName': booking.vehicleName,
+              'userId': currentUser.uid,
+              'userName': booking.userName,
+              'rating': rating,
+              'comment': commentController.text.trim(),
+              'createdAt': DateTime.now().toIso8601String(),
+            });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Review submitted successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to submit review: $e'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+      }
+    }
+    commentController.dispose();
+  }
+
+  void _showReceiptOptions(BookingModel booking) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: _isDark ? const Color(0xFF1E293B) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Receipt Options',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: _textColor,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(
+                Icons.picture_as_pdf_outlined,
+                color: AppColors.primaryOrange,
+              ),
+              title: Text('Download PDF', style: TextStyle(color: _textColor)),
+              onTap: () {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Generating PDF receipt...'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.share_outlined,
+                color: AppColors.primaryOrange,
+              ),
+              title: Text('Share Receipt', style: TextStyle(color: _textColor)),
+              onTap: () {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Sharing receipt...'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
