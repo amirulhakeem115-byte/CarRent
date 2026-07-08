@@ -5,6 +5,7 @@ import 'package:firebase_database/firebase_database.dart';
 import '../../../constants/colors.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/reward_service.dart';
+import '../../../services/company_settings_provider.dart';
 
 class RewardHistoryScreen extends StatefulWidget {
   const RewardHistoryScreen({super.key});
@@ -78,10 +79,17 @@ class _RewardHistoryScreenState extends State<RewardHistoryScreen> {
     }
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final status = CompanySettingsProvider().getMembershipStatus(_currentPoints);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: Column(
+      appBar: AppBar(
+        title: const Text('Loyalty Rewards'),
+        elevation: 0,
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 1. Top Balance Banner Card
@@ -182,6 +190,9 @@ class _RewardHistoryScreenState extends State<RewardHistoryScreen> {
               ],
             ),
           ),
+          
+          _buildMembershipTiersGrid(context, isDark, status),
+          const SizedBox(height: 12),
 
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
@@ -199,8 +210,7 @@ class _RewardHistoryScreenState extends State<RewardHistoryScreen> {
           ),
 
           // 2. Transactions List View Stream
-          Expanded(
-            child: StreamBuilder<List<Map<String, dynamic>>>(
+          StreamBuilder<List<Map<String, dynamic>>>(
               stream: _rewardService.getUserTransactionsStream(user.uid),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -264,6 +274,8 @@ class _RewardHistoryScreenState extends State<RewardHistoryScreen> {
                 }
 
                 return ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 20,
                     vertical: 12,
@@ -409,6 +421,162 @@ class _RewardHistoryScreenState extends State<RewardHistoryScreen> {
                 );
               },
             ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+  Widget _buildMembershipTiersGrid(BuildContext context, bool isDark, MembershipStatus status) {
+    final provider = CompanySettingsProvider();
+    final silver = provider.silverThreshold;
+    final gold = provider.goldThreshold;
+    final premium = provider.premiumThreshold;
+
+    final tiers = [
+      {
+        'name': 'Standard',
+        'points': '0 - ${silver - 1}',
+        'benefits': 'Standard earnings, manual approval',
+        'color': const Color(0xFF94A3B8),
+        'icon': Icons.emoji_events_outlined,
+      },
+      {
+        'name': 'Silver',
+        'points': '$silver - ${gold - 1}',
+        'benefits': 'Dynamic discount rewards, priority support',
+        'color': const Color(0xFFCBD5E1),
+        'icon': Icons.verified_user_rounded,
+      },
+      {
+        'name': 'Gold',
+        'points': '$gold - ${premium - 1}',
+        'benefits': 'Priority booking approval, exclusive promos',
+        'color': const Color(0xFFFBBF24),
+        'icon': Icons.stars_rounded,
+      },
+      {
+        'name': 'Premium',
+        'points': '$premium+',
+        'benefits': 'Open Rental access, 1.5x multiplier rewards',
+        'color': const Color(0xFFA78BFA),
+        'icon': Icons.military_tech_rounded,
+      },
+    ];
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : Colors.grey[200]!,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'MEMBERSHIP TIER STATUS',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+              letterSpacing: 1.0,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Column(
+            children: tiers.map((tier) {
+              final isCurrent = status.currentLevel == tier['name'];
+              final tierColor = tier['color'] as Color;
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isCurrent 
+                      ? tierColor.withValues(alpha: isDark ? 0.15 : 0.08)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isCurrent 
+                        ? tierColor.withValues(alpha: 0.5) 
+                        : Colors.transparent,
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      tier['icon'] as IconData,
+                      color: isCurrent ? tierColor : Colors.grey[400],
+                      size: 18,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                tier['name'] as String,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12.5,
+                                  color: isCurrent 
+                                      ? (isDark ? Colors.white : AppColors.secondaryBlue) 
+                                      : Colors.grey[600],
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                '(${tier['points']})',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  color: Colors.grey[400],
+                                ),
+                              ),
+                              if (isCurrent) ...[
+                                const Spacer(),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: tierColor,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Text(
+                                    'ACTIVE',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 7.5,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            tier['benefits'] as String,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: isCurrent 
+                                  ? (isDark ? Colors.white70 : Colors.grey[700]) 
+                                  : Colors.grey[500],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
           ),
         ],
       ),

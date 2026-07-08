@@ -1467,7 +1467,7 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
         if (['cancelled', 'rejected'].contains(b.status.toLowerCase())) statusColor = Colors.red;
 
         final startStr = DateFormat('dd MMM yy').format(b.pickUpDate);
-        final endStr = DateFormat('dd MMM yy').format(b.returnDate);
+        final endStr = b.isOpenRental ? 'Open Rental' : (b.returnDate != null ? DateFormat('dd MMM yy').format(b.returnDate!) : "");
 
         return Card(
           margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),

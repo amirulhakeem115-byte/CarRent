@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../constants/colors.dart';
+import '../../services/user_session.dart';
 import '../models/ai_message.dart';
 import '../models/ai_intent.dart';
 import '../models/ai_response.dart';
@@ -30,7 +32,7 @@ class ConversationSession {
 }
 
 // ─────────────────────────────────────────────────────────────────
-//  Quick command definition
+//  AIQuickCommand model
 // ─────────────────────────────────────────────────────────────────
 
 class AIQuickCommand {
@@ -38,15 +40,11 @@ class AIQuickCommand {
   final String query;
   final IconData icon;
   final Color color;
+
   const AIQuickCommand(this.label, this.query, this.icon, this.color);
 }
 
-// ─────────────────────────────────────────────────────────────────
-//  Role-aware quick command sets (gorgeous styled options)
-// ─────────────────────────────────────────────────────────────────
-
 const List<AIQuickCommand> _customerCommands = [
-  AIQuickCommand('🚗 Book a Car', 'book a car', Icons.directions_car_rounded, Colors.orange),
   AIQuickCommand('📅 My Bookings', 'show my bookings', Icons.calendar_month_rounded, Colors.blue),
   AIQuickCommand('💳 Payment', 'show my payments', Icons.payment_rounded, Colors.green),
   AIQuickCommand('🎁 Rewards', 'show my reward points', Icons.stars_rounded, Colors.amber),
@@ -60,14 +58,19 @@ const List<AIQuickCommand> _customerCommands = [
 
 const List<AIQuickCommand> _adminCommands = [
   AIQuickCommand('📊 Dashboard Summary', 'show dashboard summary', Icons.dashboard_rounded, Colors.blue),
-  AIQuickCommand('🚗 Fleet Status', 'show available cars', Icons.directions_car_rounded, Colors.teal),
-  AIQuickCommand('📅 Active Bookings', 'show active bookings', Icons.calendar_today_rounded, Colors.orange),
-  AIQuickCommand('💰 Revenue', 'what is today\'s revenue?', Icons.monetization_on_rounded, Colors.green),
+  AIQuickCommand('🚗 Vehicle Management', 'manage fleet', Icons.directions_car_rounded, Colors.teal),
+  AIQuickCommand('📅 Today\'s Bookings', 'show today\'s bookings', Icons.calendar_today_rounded, Colors.orange),
+  AIQuickCommand('⏰ Today\'s Pickups', 'today\'s pickups', Icons.access_time_filled_rounded, Colors.amber),
+  AIQuickCommand('↩ Today\'s Returns', 'today\'s returns', Icons.keyboard_return_rounded, Colors.deepOrange),
+  AIQuickCommand('💰 Pending Payments', 'show pending payments', Icons.hourglass_empty_rounded, Colors.red),
+  AIQuickCommand('💵 Revenue', 'revenue stats', Icons.monetization_on_rounded, Colors.green),
   AIQuickCommand('👥 Customers', 'show customer list', Icons.people_rounded, Colors.purple),
-  AIQuickCommand('🛠 Maintenance', 'show maintenance schedule', Icons.build_rounded, Colors.red),
-  AIQuickCommand('📨 Support Inbox', 'open support inbox', Icons.mail_rounded, Colors.indigo),
-  AIQuickCommand('📈 Reports', 'generate reports', Icons.analytics_rounded, Colors.pink),
-  AIQuickCommand('🤖 Business Insights', 'show business insights', Icons.insights_rounded, Colors.amber),
+  AIQuickCommand('📍 Branches', 'show rental branches', Icons.location_on_rounded, Colors.blueGrey),
+  AIQuickCommand('🔧 Maintenance', 'show maintenance schedule', Icons.build_rounded, Colors.grey),
+  AIQuickCommand('🔔 Notifications', 'show notifications', Icons.notifications_rounded, Colors.pink),
+  AIQuickCommand('📈 Reports', 'generate reports', Icons.analytics_rounded, Colors.indigo),
+  AIQuickCommand('📉 Analytics', 'analytics', Icons.trending_up_rounded, Colors.cyan),
+  AIQuickCommand('🎫 Support Tickets', 'open support inbox', Icons.mail_rounded, Colors.teal),
 ];
 
 // ─────────────────────────────────────────────────────────────────
@@ -86,8 +89,26 @@ class AIService with ChangeNotifier {
   String _userRole = 'customer';
   bool _roleLoaded = false;
 
+  String? _lastLoadedUid;
+  StreamSubscription? _roleSubscription;
+
   AIService() {
     _initRole();
+    FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (user?.uid != _lastLoadedUid) {
+        reloadRole();
+      }
+    });
+
+    _roleSubscription = UserSession().roleChanges.listen((newRole) {
+      if (newRole != null && newRole.toLowerCase() != _userRole) {
+        _userRole = newRole.toLowerCase();
+        _sessions.clear();
+        _activeSessionId = null;
+        createNewSession();
+        notifyListeners();
+      }
+    });
   }
 
   // ── Getters ───────────────────────────────────────────────────
@@ -152,8 +173,15 @@ class AIService with ChangeNotifier {
   }
 
   Future<void> _loadUserRole() async {
+    if (UserSession().currentRole != null) {
+      _userRole = UserSession().currentRole!.toLowerCase();
+      _roleLoaded = true;
+      return;
+    }
+
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
+      _lastLoadedUid = uid;
       if (uid == null) {
         _userRole = 'customer';
         _roleLoaded = true;
@@ -316,7 +344,7 @@ class AIService with ChangeNotifier {
       }
 
       // 2. Get response from provider (pass full session messages history)
-      final response = await _provider.sendMessage(text, activeSession!.messages);
+      final response = await _provider.sendMessage(text, activeSession!.messages, userRole: _userRole);
 
       // 3. Build metadata for UI (vehicles, options, branches, action, summary, report)
       final Map<String, dynamic> msgMetadata = {};
@@ -413,5 +441,11 @@ class AIService with ChangeNotifier {
         duration: Duration(seconds: 2),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _roleSubscription?.cancel();
+    super.dispose();
   }
 }

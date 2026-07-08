@@ -3,9 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:intl/intl.dart';
-import 'package:web/web.dart' as web;
 import 'database_service.dart';
 import 'notification_service.dart';
+import 'browser_device_info.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -28,11 +28,12 @@ class AuthService {
     debugPrint('[AUTH] REGISTER STARTED — email: $email');
 
     try {
-      final UserCredential userCredential =
-          await _auth.createUserWithEmailAndPassword(
-        email: email.trim(),
-        password: password.trim(),
-      ).timeout(const Duration(seconds: 15));
+      final UserCredential userCredential = await _auth
+          .createUserWithEmailAndPassword(
+            email: email.trim(),
+            password: password.trim(),
+          )
+          .timeout(const Duration(seconds: 15));
 
       final uid = userCredential.user!.uid;
       debugPrint('[AUTH] REGISTER SUCCESS — uid: $uid');
@@ -66,11 +67,15 @@ class AuthService {
 
       return userCredential;
     } on FirebaseAuthException catch (e) {
-      debugPrint('[AUTH] REGISTER FAILED — code: ${e.code}, message: ${e.message}');
+      debugPrint(
+        '[AUTH] REGISTER FAILED — code: ${e.code}, message: ${e.message}',
+      );
       throw _handleAuthException(e);
     } catch (e) {
       debugPrint('[AUTH] REGISTER FAILED — unknown error: $e');
-      throw Exception('Registration failed. Please check your connection and try again.');
+      throw Exception(
+        'Registration failed. Please check your connection and try again.',
+      );
     }
   }
 
@@ -84,11 +89,12 @@ class AuthService {
     debugPrint('[AUTH] AUTH STARTED — email: $email');
 
     try {
-      final UserCredential userCredential =
-          await _auth.signInWithEmailAndPassword(
-        email: email.trim(),
-        password: password.trim(),
-      ).timeout(const Duration(seconds: 15));
+      final UserCredential userCredential = await _auth
+          .signInWithEmailAndPassword(
+            email: email.trim(),
+            password: password.trim(),
+          )
+          .timeout(const Duration(seconds: 15));
 
       debugPrint('[AUTH] AUTH SUCCESS — uid: ${userCredential.user?.uid}');
 
@@ -96,15 +102,22 @@ class AuthService {
         final uid = userCredential.user!.uid;
         final userModel = await _databaseService.getUser(uid);
         if (userModel != null && userModel.role == 'admin') {
-          final sanitizedEmail = email.replaceAll('.', '_').replaceAll('@', '_');
-          await FirebaseDatabase.instance.ref().child('failed_logins').child(sanitizedEmail).remove();
-          
+          final sanitizedEmail = email
+              .replaceAll('.', '_')
+              .replaceAll('@', '_');
+          await FirebaseDatabase.instance
+              .ref()
+              .child('failed_logins')
+              .child(sanitizedEmail)
+              .remove();
+
           final device = getDeviceInfo();
           final nowStr = DateFormat('dd MMM, hh:mm a').format(DateTime.now());
           final notificationService = NotificationService();
           await notificationService.notifyAllAdmins(
             title: 'System Login',
-            message: 'Administrator ${userModel.fullName} logged in.\nDevice: $device\nTime: $nowStr',
+            message:
+                'Administrator ${userModel.fullName} logged in.\nDevice: $device\nTime: $nowStr',
             type: 'security',
             icon: '🔒',
             color: '0xFF8B5CF6',
@@ -125,7 +138,9 @@ class AuthService {
       throw _handleAuthException(e);
     } catch (e) {
       debugPrint('[AUTH] AUTH FAILED — unknown error: $e');
-      throw Exception('Login failed. Please check your internet connection and try again.');
+      throw Exception(
+        'Login failed. Please check your internet connection and try again.',
+      );
     }
   }
 
@@ -139,7 +154,9 @@ class AuthService {
       if (kIsWeb) {
         // For Web, use Firebase Authentication popup directly
         final GoogleAuthProvider googleProvider = GoogleAuthProvider();
-        userCredential = await _auth.signInWithPopup(googleProvider).timeout(const Duration(seconds: 60));
+        userCredential = await _auth
+            .signInWithPopup(googleProvider)
+            .timeout(const Duration(seconds: 60));
       } else {
         // For Android, use google_sign_in package
         final GoogleSignIn googleSignIn = GoogleSignIn();
@@ -147,14 +164,17 @@ class AuthService {
         if (googleUser == null) {
           throw Exception('Google Sign-In was cancelled by the user.');
         }
-        final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+        final GoogleSignInAuthentication googleAuth =
+            await googleUser.authentication;
         final AuthCredential credential = GoogleAuthProvider.credential(
           accessToken: googleAuth.accessToken,
           idToken: googleAuth.idToken,
         );
-        userCredential = await _auth.signInWithCredential(credential).timeout(const Duration(seconds: 30));
+        userCredential = await _auth
+            .signInWithCredential(credential)
+            .timeout(const Duration(seconds: 30));
       }
-      
+
       final uid = userCredential.user!.uid;
       final email = userCredential.user!.email ?? '';
       final name = userCredential.user!.displayName ?? 'Google User';
@@ -190,14 +210,16 @@ class AuthService {
           debugPrint('Failed to notify admins of registration: $err');
         }
       } else {
-        debugPrint('[AUTH] EXISTING GOOGLE USER — uid: $uid, role: ${existingUser.role}');
+        debugPrint(
+          '[AUTH] EXISTING GOOGLE USER — uid: $uid, role: ${existingUser.role}',
+        );
         // Loaded existing data, do not overwrite role.
       }
-      
+
       // Fetch user profile again to get correct/latest role
       final finalUser = await _databaseService.getUser(uid);
       final role = finalUser?.role ?? 'customer';
-      
+
       // ADD DEBUG LOGS: uid, email, role
       debugPrint('[AUTH] GOOGLE SIGN-IN DEBUG LOGS:');
       debugPrint('[AUTH]   - uid: $uid');
@@ -211,7 +233,8 @@ class AuthService {
           final notificationService = NotificationService();
           await notificationService.notifyAllAdmins(
             title: 'System Login',
-            message: 'Administrator ${finalUser?.fullName ?? name} logged in via Google.\nDevice: $device\nTime: $nowStr',
+            message:
+                'Administrator ${finalUser?.fullName ?? name} logged in via Google.\nDevice: $device\nTime: $nowStr',
             type: 'security',
             icon: '🔒',
             color: '0xFF8B5CF6',
@@ -222,45 +245,19 @@ class AuthService {
           debugPrint('Failed to notify admin google login: $err');
         }
       }
-      
+
       return userCredential;
     } on FirebaseAuthException catch (e) {
-      debugPrint('[AUTH] GOOGLE SIGN-IN FAILED — code: ${e.code}, message: ${e.message}');
+      debugPrint(
+        '[AUTH] GOOGLE SIGN-IN FAILED — code: ${e.code}, message: ${e.message}',
+      );
       throw _handleAuthException(e);
     }
   }
 
   String getDeviceInfo() {
     if (kIsWeb) {
-      try {
-        final userAgent = web.window.navigator.userAgent.toLowerCase();
-        String browser = 'Unknown Browser';
-        if (userAgent.contains('chrome')) {
-          browser = 'Chrome';
-        } else if (userAgent.contains('firefox')) {
-          browser = 'Firefox';
-        } else if (userAgent.contains('safari') && !userAgent.contains('chrome')) {
-          browser = 'Safari';
-        } else if (userAgent.contains('edge')) {
-          browser = 'Edge';
-        }
-        
-        String os = 'Unknown OS';
-        if (userAgent.contains('windows')) {
-          os = 'Windows';
-        } else if (userAgent.contains('macintosh') || userAgent.contains('mac os x')) {
-          os = 'macOS';
-        } else if (userAgent.contains('linux')) {
-          os = 'Linux';
-        } else if (userAgent.contains('iphone') || userAgent.contains('ipad')) {
-          os = 'iOS';
-        } else if (userAgent.contains('android')) {
-          os = 'Android';
-        }
-        return '$browser on $os';
-      } catch (_) {
-        return 'Web Browser';
-      }
+      return getBrowserDeviceInfo();
     } else {
       return defaultTargetPlatform.name;
     }
@@ -269,7 +266,10 @@ class AuthService {
   Future<void> recordFailedLogin(String email) async {
     try {
       final sanitizedEmail = email.replaceAll('.', '_').replaceAll('@', '_');
-      final ref = FirebaseDatabase.instance.ref().child('failed_logins').child(sanitizedEmail);
+      final ref = FirebaseDatabase.instance
+          .ref()
+          .child('failed_logins')
+          .child(sanitizedEmail);
       final snap = await ref.get();
       int count = 1;
       if (snap.exists) {
@@ -287,7 +287,8 @@ class AuthService {
         final notificationService = NotificationService();
         await notificationService.notifyAllAdmins(
           title: 'Failed Login Security Alert',
-          message: 'Multiple failed login attempts detected for account $email.',
+          message:
+              'Multiple failed login attempts detected for account $email.',
           type: 'security',
           icon: '🔒',
           color: '0xFFEF4444',
@@ -308,14 +309,20 @@ class AuthService {
     debugPrint('[AUTH] RESET PASSWORD STARTED — email: $email');
 
     try {
-      await _auth.sendPasswordResetEmail(email: email.trim()).timeout(const Duration(seconds: 15));
+      await _auth
+          .sendPasswordResetEmail(email: email.trim())
+          .timeout(const Duration(seconds: 15));
       debugPrint('[AUTH] RESET PASSWORD SUCCESS — email: $email');
     } on FirebaseAuthException catch (e) {
-      debugPrint('[AUTH] RESET PASSWORD FAILED — code: ${e.code}, message: ${e.message}');
+      debugPrint(
+        '[AUTH] RESET PASSWORD FAILED — code: ${e.code}, message: ${e.message}',
+      );
       throw _handleAuthException(e);
     } catch (e) {
       debugPrint('[AUTH] RESET PASSWORD FAILED — unknown error: $e');
-      throw Exception('Failed to send reset email. Please check your connection and try again.');
+      throw Exception(
+        'Failed to send reset email. Please check your connection and try again.',
+      );
     }
   }
 

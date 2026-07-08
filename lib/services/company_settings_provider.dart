@@ -26,6 +26,28 @@ class CompanySettingsProvider with ChangeNotifier {
   String get openingTime => _settings['openingTime'] ?? '08:00 AM';
   String get closingTime => _settings['closingTime'] ?? '08:00 PM';
   
+  // Membership Thresholds
+  int get silverThreshold {
+    final val = _settings['silverThreshold'];
+    if (val is num) return val.toInt();
+    if (val != null) return int.tryParse(val.toString()) ?? 500;
+    return 500;
+  }
+  
+  int get goldThreshold {
+    final val = _settings['goldThreshold'];
+    if (val is num) return val.toInt();
+    if (val != null) return int.tryParse(val.toString()) ?? 1000;
+    return 1000;
+  }
+  
+  int get premiumThreshold {
+    final val = _settings['premiumThreshold'];
+    if (val is num) return val.toInt();
+    if (val != null) return int.tryParse(val.toString()) ?? 2000;
+    return 2000;
+  }
+  
   // Social media handles as a Map
   Map<String, dynamic> get socialMediaLinks {
     final raw = _settings['socialMediaLinks'];
@@ -122,6 +144,9 @@ class CompanySettingsProvider with ChangeNotifier {
       'companyDescription': 'Leading car rental system providing premium vehicles.',
       'openingTime': '08:00 AM',
       'closingTime': '08:00 PM',
+      'silverThreshold': 500,
+      'goldThreshold': 1000,
+      'premiumThreshold': 2000,
       'socialMediaLinks': {
         'whatsapp': '+60 12-345 6789',
         'facebook': 'https://facebook.com/carrent',
@@ -143,4 +168,88 @@ class CompanySettingsProvider with ChangeNotifier {
     _settings = Map<String, dynamic>.from(newSettings);
     notifyListeners();
   }
+
+  // Centralized Membership Helpers
+  String determineLevel(int points) {
+    if (points >= premiumThreshold) {
+      return 'Premium';
+    } else if (points >= goldThreshold) {
+      return 'Gold';
+    } else if (points >= silverThreshold) {
+      return 'Silver';
+    } else {
+      return 'Standard';
+    }
+  }
+
+  MembershipStatus getMembershipStatus(int points) {
+    final silver = silverThreshold;
+    final gold = goldThreshold;
+    final premium = premiumThreshold;
+
+    if (points >= premium) {
+      return MembershipStatus(
+        currentLevel: 'Premium',
+        points: points,
+        nextLevel: 'Maximum Level Reached',
+        pointsNeededForNext: 0,
+        progress: 1.0,
+        nextLevelThreshold: premium,
+      );
+    } else if (points >= gold) {
+      final needed = premium - points;
+      final range = premium - gold;
+      final prog = range > 0 ? (points - gold) / range : 1.0;
+      return MembershipStatus(
+        currentLevel: 'Gold',
+        points: points,
+        nextLevel: 'Premium',
+        pointsNeededForNext: needed,
+        progress: prog.clamp(0.0, 1.0),
+        nextLevelThreshold: premium,
+      );
+    } else if (points >= silver) {
+      final needed = gold - points;
+      final range = gold - silver;
+      final prog = range > 0 ? (points - silver) / range : 1.0;
+      return MembershipStatus(
+        currentLevel: 'Silver',
+        points: points,
+        nextLevel: 'Gold',
+        pointsNeededForNext: needed,
+        progress: prog.clamp(0.0, 1.0),
+        nextLevelThreshold: gold,
+      );
+    } else {
+      final needed = silver - points;
+      final range = silver;
+      final prog = range > 0 ? points / range : 1.0;
+      return MembershipStatus(
+        currentLevel: 'Standard',
+        points: points,
+        nextLevel: 'Silver',
+        pointsNeededForNext: needed,
+        progress: prog.clamp(0.0, 1.0),
+        nextLevelThreshold: silver,
+      );
+    }
+  }
+}
+
+class MembershipStatus {
+  final String currentLevel;
+  final int points;
+  final String nextLevel;
+  final int pointsNeededForNext;
+  final double progress;
+  final int nextLevelThreshold;
+
+  MembershipStatus({
+    required this.currentLevel,
+    required this.points,
+    required this.nextLevel,
+    required this.pointsNeededForNext,
+    required this.progress,
+    required this.nextLevelThreshold,
+  });
 }

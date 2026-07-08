@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/vehicle_model.dart';
+import '../models/booking_model.dart';
 import 'notification_service.dart';
 import 'booking_lifecycle_manager.dart';
 import 'user_role_cache.dart';
@@ -37,6 +39,47 @@ class VehicleService {
           }
         });
       }
+
+      // Fetch bookings to determine dynamic availability
+      final bookingsSnap = await FirebaseDatabase.instance.ref().child('bookings').get().timeout(const Duration(seconds: 8));
+      List<BookingModel> allBookings = [];
+      if (bookingsSnap.exists && bookingsSnap.value != null) {
+        final Map<dynamic, dynamic> data = bookingsSnap.value as Map<dynamic, dynamic>;
+        data.forEach((key, value) {
+          try {
+            allBookings.add(BookingModel.fromMap(key.toString(), value as Map<dynamic, dynamic>));
+          } catch (e) {
+            debugPrint('Error parsing booking in sync: $e');
+          }
+        });
+      }
+
+      for (int i = 0; i < vehicles.length; i++) {
+        final vehicle = vehicles[i];
+        final hasActiveBooking = allBookings.any((booking) {
+          if (booking.vehicleId != vehicle.id) return false;
+          final statusLower = booking.status.toLowerCase();
+          return statusLower != 'completed' && 
+                 statusLower != 'cancelled' && 
+                 statusLower != 'rejected';
+        });
+
+        final targetStatus = hasActiveBooking ? 'Booked' : 'Available';
+        final isAvailable = !hasActiveBooking;
+
+        if (vehicle.status != targetStatus) {
+          vehicles[i] = vehicle.copyWith(status: targetStatus, isAvailable: isAvailable);
+          try {
+            await _db.child(vehicle.id).update({
+              'status': targetStatus,
+              'isAvailable': isAvailable,
+            });
+          } catch (e) {
+            debugPrint('Error updating synced status for vehicle ${vehicle.id}: $e');
+          }
+        }
+      }
+
       debugPrint('[VehicleService] [getVehicles] Vehicles count loaded: ${vehicles.length}');
     } catch (e) {
       debugPrint('[VehicleService] [getVehicles] Error getting vehicles: $e');
@@ -45,16 +88,80 @@ class VehicleService {
   }
 
   Stream<List<VehicleModel>> getVehiclesStream() {
-    return _db.onValue.map((event) {
-      List<VehicleModel> vehicles = [];
-      if (event.snapshot.exists) {
+    final bookingsDb = FirebaseDatabase.instance.ref().child('bookings');
+    final controller = StreamController<List<VehicleModel>>.broadcast();
+    
+    StreamSubscription? vehiclesSub;
+    StreamSubscription? bookingsSub;
+    
+    Map<String, VehicleModel> latestVehicles = {};
+    Map<String, BookingModel> latestBookings = {};
+    
+    void updateAndEmit() {
+      if (controller.isClosed) return;
+      
+      final List<VehicleModel> syncedVehicles = [];
+      latestVehicles.forEach((vehicleId, vehicle) {
+        final hasActiveBooking = latestBookings.values.any((booking) {
+          if (booking.vehicleId != vehicle.id) return false;
+          final statusLower = booking.status.toLowerCase();
+          return statusLower != 'completed' && 
+                 statusLower != 'cancelled' && 
+                 statusLower != 'rejected';
+        });
+        
+        final targetStatus = hasActiveBooking ? 'Booked' : 'Available';
+        final isAvailable = !hasActiveBooking;
+        
+        VehicleModel finalVehicle = vehicle;
+        if (vehicle.status != targetStatus) {
+          finalVehicle = vehicle.copyWith(status: targetStatus, isAvailable: isAvailable);
+          _db.child(vehicle.id).update({
+            'status': targetStatus,
+            'isAvailable': isAvailable,
+          }).catchError((e) {
+            debugPrint('Error updating synced status in stream for ${vehicle.id}: $e');
+          });
+        }
+        
+        syncedVehicles.add(finalVehicle);
+      });
+      
+      controller.add(syncedVehicles);
+    }
+    
+    vehiclesSub = _db.onValue.listen((event) {
+      latestVehicles.clear();
+      if (event.snapshot.exists && event.snapshot.value != null) {
         final Map<dynamic, dynamic> data = event.snapshot.value as Map<dynamic, dynamic>;
         data.forEach((key, value) {
-          vehicles.add(VehicleModel.fromMap(key.toString(), value as Map<dynamic, dynamic>));
+          if (value is Map) {
+            latestVehicles[key.toString()] = VehicleModel.fromMap(key.toString(), value);
+          }
         });
       }
-      return vehicles;
+      updateAndEmit();
     });
+    
+    bookingsSub = bookingsDb.onValue.listen((event) {
+      latestBookings.clear();
+      if (event.snapshot.exists && event.snapshot.value != null) {
+        final Map<dynamic, dynamic> data = event.snapshot.value as Map<dynamic, dynamic>;
+        data.forEach((key, value) {
+          if (value is Map) {
+            latestBookings[key.toString()] = BookingModel.fromMap(key.toString(), value);
+          }
+        });
+      }
+      updateAndEmit();
+    });
+    
+    controller.onCancel = () {
+      vehiclesSub?.cancel();
+      bookingsSub?.cancel();
+    };
+    
+    return controller.stream;
   }
 
   Future<void> addVehicle(VehicleModel vehicle) async {

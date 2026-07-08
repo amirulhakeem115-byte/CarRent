@@ -216,6 +216,19 @@ class ReceiptService {
     final String paymentDateStr = paymentMap['paymentDate'] ?? booking.createdAt.toIso8601String();
     final DateTime paymentDate = DateTime.tryParse(paymentDateStr) ?? booking.createdAt;
 
+    final int actualDaysCount;
+    if (booking.isOpenRental) {
+      if (booking.actualReturnTimestamp != null && booking.actualPickupTimestamp != null) {
+        final diff = booking.actualReturnTimestamp!.difference(booking.actualPickupTimestamp!);
+        final days = (diff.inHours / 24.0).ceil();
+        actualDaysCount = days <= 0 ? 1 : days;
+      } else {
+        actualDaysCount = 1;
+      }
+    } else {
+      actualDaysCount = booking.rentalDays <= 0 ? 1 : booking.rentalDays;
+    }
+
     // Cost calculations
     final double rentalFee = booking.totalPrice + booking.discountAmount;
     final double discount = booking.discountAmount;
@@ -494,7 +507,12 @@ class ReceiptService {
                                   children: [
                                     pw.Text('RETURN BRANCH', style: pw.TextStyle(fontSize: 7, color: greyColor, fontWeight: pw.FontWeight.bold)),
                                     pw.Text(returnBranch, style: pw.TextStyle(fontSize: 8, color: navyColor, fontWeight: pw.FontWeight.bold)),
-                                    pw.Text(DateFormat('dd MMM yyyy, hh:mm a').format(booking.returnDate), style: pw.TextStyle(fontSize: 7, color: greyColor)),
+                                    pw.Text(
+                                      booking.isOpenRental
+                                          ? 'OPEN RENTAL'
+                                          : (booking.returnDate != null ? DateFormat('dd MMM yyyy, hh:mm a').format(booking.returnDate!) : ""),
+                                      style: pw.TextStyle(fontSize: 7, color: greyColor),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -512,11 +530,11 @@ class ReceiptService {
                       child: pw.Column(
                         children: [
                           pw.Text(
-                            '${booking.rentalDays}',
+                            '$actualDaysCount',
                             style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 16),
                           ),
                           pw.Text(
-                            booking.rentalDays == 1 ? 'DAY' : 'DAYS',
+                            actualDaysCount == 1 ? 'DAY' : 'DAYS',
                             style: pw.TextStyle(color: PdfColors.white, fontSize: 6, fontWeight: pw.FontWeight.bold),
                           ),
                         ],
@@ -561,7 +579,7 @@ class ReceiptService {
                     children: [
                       pw.Padding(
                         padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        child: pw.Text('Rental Fee (${booking.rentalDays} days @ RM ${vehicleMap['pricePerDay'] ?? booking.totalPrice / booking.rentalDays}/day)', style: pw.TextStyle(fontSize: 8)),
+                        child: pw.Text('Rental Fee ($actualDaysCount days @ RM ${vehicleMap['pricePerDay'] ?? booking.totalPrice / actualDaysCount}/day)', style: pw.TextStyle(fontSize: 8)),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),

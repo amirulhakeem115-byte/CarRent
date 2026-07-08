@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../models/vehicle_model.dart';
 import '../../../models/branch_model.dart';
@@ -53,8 +54,12 @@ class _VehiclesViewState extends State<VehiclesView> {
       _error = null;
     });
     try {
-      _vehicles = await _vehicleService.getVehicles().timeout(const Duration(seconds: 10));
-      _branches = await _branchService.getBranches().timeout(const Duration(seconds: 10));
+      _vehicles = await _vehicleService.getVehicles().timeout(
+        const Duration(seconds: 10),
+      );
+      _branches = await _branchService.getBranches().timeout(
+        const Duration(seconds: 10),
+      );
     } catch (e) {
       debugPrint('Error loading vehicles data: $e');
       setState(() {
@@ -87,11 +92,19 @@ class _VehiclesViewState extends State<VehiclesView> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Vehicle'),
-        content: const Text('Are you sure you want to remove this vehicle from the database?'),
+        content: const Text(
+          'Are you sure you want to remove this vehicle from the database?',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Delete'),
           ),
@@ -113,13 +126,21 @@ class _VehiclesViewState extends State<VehiclesView> {
       _categoryFilter = 'All';
     }
 
-    final availableStatusesFilter = ['All', 'Available', 'Booked', 'Maintenance', 'Inactive'];
+    final availableStatusesFilter = [
+      'All',
+      'Available',
+      'Booked',
+      'Maintenance',
+      'Inactive',
+    ];
     if (!availableStatusesFilter.contains(_statusFilter)) {
       _statusFilter = 'All';
     }
 
     if (_loading) {
-      return const Center(child: LoadingWidget(message: 'Loading fleet vehicles...'));
+      return const Center(
+        child: LoadingWidget(message: 'Loading fleet vehicles...'),
+      );
     }
 
     if (_error != null) {
@@ -127,9 +148,20 @@ class _VehiclesViewState extends State<VehiclesView> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 64),
+            const Icon(
+              Icons.error_outline_rounded,
+              color: Colors.redAccent,
+              size: 64,
+            ),
             const SizedBox(height: 16),
-            Text(_error!, style: const TextStyle(fontSize: 16, color: AppColors.secondaryBlue, fontWeight: FontWeight.w600)),
+            Text(
+              _error!,
+              style: const TextStyle(
+                fontSize: 16,
+                color: AppColors.secondaryBlue,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: _loadData,
@@ -138,8 +170,13 @@ class _VehiclesViewState extends State<VehiclesView> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryOrange,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ],
@@ -149,15 +186,25 @@ class _VehiclesViewState extends State<VehiclesView> {
 
     // Calculations based directly on status
     final totalVehicles = _vehicles.length;
-    final availableVehicles = _vehicles.where((v) => v.status.toLowerCase() == 'available').length;
-    final rentedVehicles = _vehicles.where((v) => v.status.toLowerCase() == 'booked').length;
-    final maintenanceVehiclesCount = _vehicles.where((v) => v.status.toLowerCase() == 'maintenance').length;
+    final availableVehicles = _vehicles
+        .where((v) => v.status.toLowerCase() == 'available')
+        .length;
+    final rentedVehicles = _vehicles
+        .where((v) => v.status.toLowerCase() == 'booked')
+        .length;
+    final maintenanceVehiclesCount = _vehicles
+        .where((v) => v.status.toLowerCase() == 'maintenance')
+        .length;
 
     // Filters application
     final filteredVehicles = _vehicles.where((v) {
-      final matchesSearch = '${v.brand} ${v.model}'.toLowerCase().contains(_searchQuery) || v.plateNumber.toLowerCase().contains(_searchQuery);
-      final matchesCategory = _categoryFilter == 'All' || v.category.toLowerCase() == _categoryFilter.toLowerCase();
-      
+      final matchesSearch =
+          '${v.brand} ${v.model}'.toLowerCase().contains(_searchQuery) ||
+          v.plateNumber.toLowerCase().contains(_searchQuery);
+      final matchesCategory =
+          _categoryFilter == 'All' ||
+          v.category.toLowerCase() == _categoryFilter.toLowerCase();
+
       bool matchesStatus = true;
       if (_statusFilter != 'All') {
         matchesStatus = v.status.toLowerCase() == _statusFilter.toLowerCase();
@@ -168,10 +215,18 @@ class _VehiclesViewState extends State<VehiclesView> {
 
     final double width = MediaQuery.of(context).size.width;
     final bool isDesktop = width > 1100;
+    final bool isAndroidMobile =
+        !kIsWeb &&
+        defaultTargetPlatform == TargetPlatform.android &&
+        width <= 600;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final surfaceColor = isDark ? const Color(0xFF111827) : const Color(0xFFF1F5F9);
-    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final surfaceColor = isDark
+        ? const Color(0xFF111827)
+        : const Color(0xFFF1F5F9);
+    final textPrimary = isDark
+        ? const Color(0xFFF8FAFC)
+        : AppColors.secondaryBlue;
     final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
     final borderColor = isDark ? const Color(0xFF334155) : Colors.grey.shade200;
 
@@ -189,8 +244,21 @@ class _VehiclesViewState extends State<VehiclesView> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Fleet Inventory', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textPrimary)),
-                          Text('Manage vehicle assets, pricing models, and branch allocations.', style: TextStyle(fontSize: 12, color: textSecondary)),
+                          Text(
+                            'Fleet Inventory',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              color: textPrimary,
+                            ),
+                          ),
+                          Text(
+                            'Manage vehicle assets, pricing models, and branch allocations.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: textSecondary,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -204,8 +272,18 @@ class _VehiclesViewState extends State<VehiclesView> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Fleet Inventory', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textPrimary)),
-                        Text('Manage vehicle assets, pricing models, and branch allocations.', style: TextStyle(fontSize: 12, color: textSecondary)),
+                        Text(
+                          'Fleet Inventory',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            color: textPrimary,
+                          ),
+                        ),
+                        Text(
+                          'Manage vehicle assets, pricing models, and branch allocations.',
+                          style: TextStyle(fontSize: 12, color: textSecondary),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -220,13 +298,53 @@ class _VehiclesViewState extends State<VehiclesView> {
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
             shrinkWrap: true,
-            childAspectRatio: isDesktop ? 2.2 : 1.5,
+            childAspectRatio: isDesktop ? 2.2 : (isAndroidMobile ? 1.26 : 1.5),
             physics: const NeverScrollableScrollPhysics(),
             children: [
-              _buildStatCard('Total Vehicles', totalVehicles.toString(), Icons.directions_car, Colors.indigo, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
-              _buildStatCard('Available Units', availableVehicles.toString(), Icons.check_circle_outline, Colors.green, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
-              _buildStatCard('Rented / Active Booked', rentedVehicles.toString(), Icons.car_rental, Colors.orange, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
-              _buildStatCard('Under Maintenance', maintenanceVehiclesCount.toString(), Icons.build_circle_outlined, Colors.redAccent, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+              _buildStatCard(
+                'Total Vehicles',
+                totalVehicles.toString(),
+                Icons.directions_car,
+                Colors.indigo,
+                isDark: isDark,
+                cardColor: cardColor,
+                textPrimary: textPrimary,
+                textSecondary: textSecondary,
+                borderColor: borderColor,
+              ),
+              _buildStatCard(
+                'Available Units',
+                availableVehicles.toString(),
+                Icons.check_circle_outline,
+                Colors.green,
+                isDark: isDark,
+                cardColor: cardColor,
+                textPrimary: textPrimary,
+                textSecondary: textSecondary,
+                borderColor: borderColor,
+              ),
+              _buildStatCard(
+                'Rented / Active Booked',
+                rentedVehicles.toString(),
+                Icons.car_rental,
+                Colors.orange,
+                isDark: isDark,
+                cardColor: cardColor,
+                textPrimary: textPrimary,
+                textSecondary: textSecondary,
+                borderColor: borderColor,
+              ),
+              _buildStatCard(
+                'Under Maintenance',
+                maintenanceVehiclesCount.toString(),
+                Icons.build_circle_outlined,
+                Colors.redAccent,
+                isDark: isDark,
+                cardColor: cardColor,
+                textPrimary: textPrimary,
+                textSecondary: textSecondary,
+                borderColor: borderColor,
+              ),
             ],
           ),
           const SizedBox(height: 24),
@@ -247,17 +365,36 @@ class _VehiclesViewState extends State<VehiclesView> {
                           controller: _searchController,
                           style: TextStyle(color: textPrimary),
                           decoration: InputDecoration(
-                            hintText: 'Search by make, model, or plate number...',
-                            hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.7)),
-                            prefixIcon: Icon(Icons.search, size: 20, color: textSecondary),
-                            contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                            hintText:
+                                'Search by make, model, or plate number...',
+                            hintStyle: TextStyle(
+                              color: textSecondary.withValues(alpha: 0.7),
+                            ),
+                            prefixIcon: Icon(
+                              Icons.search,
+                              size: 20,
+                              color: textSecondary,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 8,
+                            ),
                           ),
                         ),
                       ),
                       const SizedBox(width: 16),
-                      _buildCategoryDropdown(isDark: isDark, cardColor: surfaceColor, textPrimary: textPrimary, borderColor: borderColor),
+                      _buildCategoryDropdown(
+                        isDark: isDark,
+                        cardColor: surfaceColor,
+                        textPrimary: textPrimary,
+                        borderColor: borderColor,
+                      ),
                       const SizedBox(width: 12),
-                      _buildStatusDropdown(isDark: isDark, cardColor: surfaceColor, textPrimary: textPrimary, borderColor: borderColor),
+                      _buildStatusDropdown(
+                        isDark: isDark,
+                        cardColor: surfaceColor,
+                        textPrimary: textPrimary,
+                        borderColor: borderColor,
+                      ),
                     ],
                   )
                 : Column(
@@ -268,17 +405,39 @@ class _VehiclesViewState extends State<VehiclesView> {
                         style: TextStyle(color: textPrimary),
                         decoration: InputDecoration(
                           hintText: 'Search by make, model, or plate number...',
-                          hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.7)),
-                          prefixIcon: Icon(Icons.search, size: 20, color: textSecondary),
-                          contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                          hintStyle: TextStyle(
+                            color: textSecondary.withValues(alpha: 0.7),
+                          ),
+                          prefixIcon: Icon(
+                            Icons.search,
+                            size: 20,
+                            color: textSecondary,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 8,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
                       Row(
                         children: [
-                          Expanded(child: _buildCategoryDropdown(isDark: isDark, cardColor: surfaceColor, textPrimary: textPrimary, borderColor: borderColor)),
+                          Expanded(
+                            child: _buildCategoryDropdown(
+                              isDark: isDark,
+                              cardColor: surfaceColor,
+                              textPrimary: textPrimary,
+                              borderColor: borderColor,
+                            ),
+                          ),
                           const SizedBox(width: 12),
-                          Expanded(child: _buildStatusDropdown(isDark: isDark, cardColor: surfaceColor, textPrimary: textPrimary, borderColor: borderColor)),
+                          Expanded(
+                            child: _buildStatusDropdown(
+                              isDark: isDark,
+                              cardColor: surfaceColor,
+                              textPrimary: textPrimary,
+                              borderColor: borderColor,
+                            ),
+                          ),
                         ],
                       ),
                     ],
@@ -299,9 +458,16 @@ class _VehiclesViewState extends State<VehiclesView> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.directions_car, size: 64, color: textSecondary),
+                        Icon(
+                          Icons.directions_car,
+                          size: 64,
+                          color: textSecondary,
+                        ),
                         const SizedBox(height: 16),
-                        Text('No fleet assets found matching filters.', style: TextStyle(color: textSecondary)),
+                        Text(
+                          'No fleet assets found matching filters.',
+                          style: TextStyle(color: textSecondary),
+                        ),
                       ],
                     ),
                   ),
@@ -312,7 +478,7 @@ class _VehiclesViewState extends State<VehiclesView> {
                   itemCount: filteredVehicles.length,
                   itemBuilder: (context, index) {
                     final vehicle = filteredVehicles[index];
-                    
+
                     Color statusColor = Colors.green;
                     String statusLabel = 'AVAILABLE';
                     final statusLower = vehicle.status.toLowerCase();
@@ -349,31 +515,49 @@ class _VehiclesViewState extends State<VehiclesView> {
                                       height: 80,
                                       width: 110,
                                       color: surfaceColor,
-                                      child: Icon(Icons.directions_car, color: textSecondary),
+                                      child: Icon(
+                                        Icons.directions_car,
+                                        color: textSecondary,
+                                      ),
                                     ),
                                   ),
                                 ),
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Row(
                                         children: [
                                           Text(
                                             '${vehicle.brand} ${vehicle.model}',
-                                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textPrimary),
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                              color: textPrimary,
+                                            ),
                                           ),
                                           const SizedBox(width: 8),
                                           Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 2,
+                                            ),
                                             decoration: BoxDecoration(
-                                              color: statusColor.withValues(alpha: 0.15),
-                                              borderRadius: BorderRadius.circular(6),
+                                              color: statusColor.withValues(
+                                                alpha: 0.15,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
                                             ),
                                             child: Text(
                                               statusLabel,
-                                              style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 9),
+                                              style: TextStyle(
+                                                color: statusColor,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 9,
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -381,19 +565,39 @@ class _VehiclesViewState extends State<VehiclesView> {
                                       const SizedBox(height: 4),
                                       Text(
                                         'Plate: ${vehicle.plateNumber} | Category: ${vehicle.category} | Hub: ${vehicle.branchName.isNotEmpty ? vehicle.branchName : "General Hub"}',
-                                        style: TextStyle(color: textSecondary, fontSize: 12),
+                                        style: TextStyle(
+                                          color: textSecondary,
+                                          fontSize: 12,
+                                        ),
                                       ),
                                       const SizedBox(height: 8),
                                       Row(
                                         children: [
                                           Text(
                                             'RM ${vehicle.pricePerDay.toStringAsFixed(0)} / day',
-                                            style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryOrange, fontSize: 14),
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              color: AppColors.primaryOrange,
+                                              fontSize: 14,
+                                            ),
                                           ),
                                           const SizedBox(width: 24),
-                                          Text('Change Status:', style: TextStyle(fontSize: 11, color: textSecondary, fontWeight: FontWeight.bold)),
+                                          Text(
+                                            'Change Status:',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: textSecondary,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
                                           const SizedBox(width: 8),
-                                          _buildChangeStatusDropdown(vehicle, isDark: isDark, cardColor: surfaceColor, textPrimary: textPrimary, borderColor: borderColor),
+                                          _buildChangeStatusDropdown(
+                                            vehicle,
+                                            isDark: isDark,
+                                            cardColor: surfaceColor,
+                                            textPrimary: textPrimary,
+                                            borderColor: borderColor,
+                                          ),
                                         ],
                                       ),
                                     ],
@@ -402,12 +606,24 @@ class _VehiclesViewState extends State<VehiclesView> {
                                 Column(
                                   children: [
                                     IconButton(
-                                      icon: Icon(Icons.edit_outlined, color: textPrimary, size: 20),
-                                      onPressed: () => _showAddEditVehicleDialog(vehicle: vehicle),
+                                      icon: Icon(
+                                        Icons.edit_outlined,
+                                        color: textPrimary,
+                                        size: 20,
+                                      ),
+                                      onPressed: () =>
+                                          _showAddEditVehicleDialog(
+                                            vehicle: vehicle,
+                                          ),
                                     ),
                                     IconButton(
-                                      icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
-                                      onPressed: () => _deleteVehicle(vehicle.id),
+                                      icon: const Icon(
+                                        Icons.delete_outline_rounded,
+                                        color: Colors.redAccent,
+                                        size: 20,
+                                      ),
+                                      onPressed: () =>
+                                          _deleteVehicle(vehicle.id),
                                     ),
                                   ],
                                 ),
@@ -427,27 +643,44 @@ class _VehiclesViewState extends State<VehiclesView> {
                                       height: 150,
                                       width: double.infinity,
                                       color: surfaceColor,
-                                      child: Icon(Icons.directions_car, color: textSecondary),
+                                      child: Icon(
+                                        Icons.directions_car,
+                                        color: textSecondary,
+                                      ),
                                     ),
                                   ),
                                 ),
                                 const SizedBox(height: 12),
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     Text(
                                       '${vehicle.brand} ${vehicle.model}',
-                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textPrimary),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                        color: textPrimary,
+                                      ),
                                     ),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 2,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: statusColor.withValues(alpha: 0.15),
+                                        color: statusColor.withValues(
+                                          alpha: 0.15,
+                                        ),
                                         borderRadius: BorderRadius.circular(6),
                                       ),
                                       child: Text(
                                         statusLabel,
-                                        style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 9),
+                                        style: TextStyle(
+                                          color: statusColor,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 9,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -455,33 +688,66 @@ class _VehiclesViewState extends State<VehiclesView> {
                                 const SizedBox(height: 4),
                                 Text(
                                   'Plate: ${vehicle.plateNumber} | Category: ${vehicle.category}\nHub: ${vehicle.branchName.isNotEmpty ? vehicle.branchName : "General Hub"}',
-                                  style: TextStyle(color: textSecondary, fontSize: 12),
+                                  style: TextStyle(
+                                    color: textSecondary,
+                                    fontSize: 12,
+                                  ),
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
                                   'RM ${vehicle.pricePerDay.toStringAsFixed(0)} / day',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryOrange, fontSize: 15),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.primaryOrange,
+                                    fontSize: 15,
+                                  ),
                                 ),
                                 Divider(height: 20, color: borderColor),
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     Row(
                                       children: [
-                                        Text('Status:', style: TextStyle(fontSize: 11, color: textSecondary, fontWeight: FontWeight.bold)),
+                                        Text(
+                                          'Status:',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: textSecondary,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
                                         const SizedBox(width: 8),
-                                        _buildChangeStatusDropdown(vehicle, isDark: isDark, cardColor: surfaceColor, textPrimary: textPrimary, borderColor: borderColor),
+                                        _buildChangeStatusDropdown(
+                                          vehicle,
+                                          isDark: isDark,
+                                          cardColor: surfaceColor,
+                                          textPrimary: textPrimary,
+                                          borderColor: borderColor,
+                                        ),
                                       ],
                                     ),
                                     Row(
                                       children: [
                                         IconButton(
-                                          icon: Icon(Icons.edit_outlined, color: textPrimary, size: 20),
-                                          onPressed: () => _showAddEditVehicleDialog(vehicle: vehicle),
+                                          icon: Icon(
+                                            Icons.edit_outlined,
+                                            color: textPrimary,
+                                            size: 20,
+                                          ),
+                                          onPressed: () =>
+                                              _showAddEditVehicleDialog(
+                                                vehicle: vehicle,
+                                              ),
                                         ),
                                         IconButton(
-                                          icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
-                                          onPressed: () => _deleteVehicle(vehicle.id),
+                                          icon: const Icon(
+                                            Icons.delete_outline_rounded,
+                                            color: Colors.redAccent,
+                                            size: 20,
+                                          ),
+                                          onPressed: () =>
+                                              _deleteVehicle(vehicle.id),
                                         ),
                                       ],
                                     ),
@@ -507,11 +773,19 @@ class _VehiclesViewState extends State<VehiclesView> {
       ),
       onPressed: () => _showAddEditVehicleDialog(),
       icon: const Icon(Icons.add, size: 18),
-      label: const Text('Add Vehicle', style: TextStyle(fontWeight: FontWeight.bold)),
+      label: const Text(
+        'Add Vehicle',
+        style: TextStyle(fontWeight: FontWeight.bold),
+      ),
     );
   }
 
-  Widget _buildCategoryDropdown({required bool isDark, required Color cardColor, required Color textPrimary, required Color borderColor}) {
+  Widget _buildCategoryDropdown({
+    required bool isDark,
+    required Color cardColor,
+    required Color textPrimary,
+    required Color borderColor,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
@@ -523,7 +797,11 @@ class _VehiclesViewState extends State<VehiclesView> {
         value: _categoryFilter,
         underline: const SizedBox(),
         dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-        style: TextStyle(color: textPrimary, fontWeight: FontWeight.bold, fontSize: 13),
+        style: TextStyle(
+          color: textPrimary,
+          fontWeight: FontWeight.bold,
+          fontSize: 13,
+        ),
         items: ['All', 'Economy', 'Sedan', 'SUV', 'MPV'].map((s) {
           return DropdownMenuItem(value: s, child: Text(s));
         }).toList(),
@@ -538,7 +816,12 @@ class _VehiclesViewState extends State<VehiclesView> {
     );
   }
 
-  Widget _buildStatusDropdown({required bool isDark, required Color cardColor, required Color textPrimary, required Color borderColor}) {
+  Widget _buildStatusDropdown({
+    required bool isDark,
+    required Color cardColor,
+    required Color textPrimary,
+    required Color borderColor,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
@@ -550,8 +833,14 @@ class _VehiclesViewState extends State<VehiclesView> {
         value: _statusFilter,
         underline: const SizedBox(),
         dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-        style: TextStyle(color: textPrimary, fontWeight: FontWeight.bold, fontSize: 13),
-        items: ['All', 'Available', 'Booked', 'Maintenance', 'Inactive'].map((s) {
+        style: TextStyle(
+          color: textPrimary,
+          fontWeight: FontWeight.bold,
+          fontSize: 13,
+        ),
+        items: ['All', 'Available', 'Booked', 'Maintenance', 'Inactive'].map((
+          s,
+        ) {
           return DropdownMenuItem(value: s, child: Text(s));
         }).toList(),
         onChanged: (val) {
@@ -565,7 +854,13 @@ class _VehiclesViewState extends State<VehiclesView> {
     );
   }
 
-  Widget _buildChangeStatusDropdown(VehicleModel vehicle, {required bool isDark, required Color cardColor, required Color textPrimary, required Color borderColor}) {
+  Widget _buildChangeStatusDropdown(
+    VehicleModel vehicle, {
+    required bool isDark,
+    required Color cardColor,
+    required Color textPrimary,
+    required Color borderColor,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8),
       height: 32,
@@ -576,12 +871,22 @@ class _VehiclesViewState extends State<VehiclesView> {
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
-          value: ['Available', 'Booked', 'Maintenance', 'Inactive'].contains(vehicle.status)
+          value:
+              [
+                'Available',
+                'Booked',
+                'Maintenance',
+                'Inactive',
+              ].contains(vehicle.status)
               ? vehicle.status
               : 'Available',
           icon: const Icon(Icons.arrow_drop_down, size: 16),
           dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-          style: TextStyle(fontSize: 11, color: textPrimary, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: 11,
+            color: textPrimary,
+            fontWeight: FontWeight.bold,
+          ),
           onChanged: (val) async {
             if (val != null) {
               await _vehicleService.updateVehicleStatus(vehicle.id, val);
@@ -599,42 +904,71 @@ class _VehiclesViewState extends State<VehiclesView> {
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, Color color, {
+  Widget _buildStatCard(
+    String label,
+    String value,
+    IconData icon,
+    Color color, {
     required bool isDark,
     required Color cardColor,
     required Color textPrimary,
     required Color textSecondary,
     required Color borderColor,
   }) {
+    final bool isCompactMobile = MediaQuery.of(context).size.width <= 600;
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isCompactMobile ? 14 : 16),
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: borderColor),
-        boxShadow: isDark ? [] : [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4)),
-        ],
+        boxShadow: isDark
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.02),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: EdgeInsets.all(isCompactMobile ? 10 : 12),
             decoration: BoxDecoration(
               color: color.withValues(alpha: isDark ? 0.2 : 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: color, size: 24),
+            child: Icon(icon, color: color, size: isCompactMobile ? 22 : 24),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: isCompactMobile ? 12 : 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(label, style: TextStyle(color: textSecondary, fontSize: 11, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
-                Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textPrimary)),
+                Text(
+                  label,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: textSecondary,
+                    fontSize: isCompactMobile ? 10 : 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: isCompactMobile ? 2 : 4),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: isCompactMobile ? 14 : 16,
+                    color: textPrimary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ),
@@ -690,12 +1024,18 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
     final vehicle = widget.vehicle;
     _brandController = TextEditingController(text: vehicle?.brand ?? '');
     _modelController = TextEditingController(text: vehicle?.model ?? '');
-    _yearController = TextEditingController(text: vehicle != null ? vehicle.year.toString() : '');
+    _yearController = TextEditingController(
+      text: vehicle != null ? vehicle.year.toString() : '',
+    );
     _plateController = TextEditingController(text: vehicle?.plateNumber ?? '');
     _colorController = TextEditingController(text: vehicle?.color ?? '');
-    _priceController = TextEditingController(text: vehicle != null ? vehicle.pricePerDay.toString() : '');
+    _priceController = TextEditingController(
+      text: vehicle != null ? vehicle.pricePerDay.toString() : '',
+    );
     _descController = TextEditingController(text: vehicle?.description ?? '');
-    _mileageController = TextEditingController(text: vehicle != null ? vehicle.mileage.toString() : '');
+    _mileageController = TextEditingController(
+      text: vehicle != null ? vehicle.mileage.toString() : '',
+    );
 
     _transmission = vehicle?.transmission ?? 'Automatic';
     _fuelType = vehicle?.fuelType ?? 'Petrol';
@@ -727,7 +1067,11 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
     final statusLower = _status.toLowerCase().replaceAll(RegExp(r'\s+'), '');
     if (statusLower == 'available') {
       _status = 'Available';
-    } else if (statusLower == 'booked' || statusLower == 'reserved' || statusLower == 'rented' || statusLower == 'activebooked' || statusLower == 'bookedvehicle') {
+    } else if (statusLower == 'booked' ||
+        statusLower == 'reserved' ||
+        statusLower == 'rented' ||
+        statusLower == 'activebooked' ||
+        statusLower == 'bookedvehicle') {
       _status = 'Booked';
     } else if (statusLower == 'maintenance') {
       _status = 'Maintenance';
@@ -738,7 +1082,9 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
     }
 
     if (vehicle != null && widget.branches.isNotEmpty) {
-      final matching = widget.branches.where((b) => b.name == vehicle.branchName || b.id == vehicle.branchId);
+      final matching = widget.branches.where(
+        (b) => b.name == vehicle.branchName || b.id == vehicle.branchId,
+      );
       if (matching.isNotEmpty) {
         _selectedBranch = matching.first;
       }
@@ -746,14 +1092,21 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
       _selectedBranch = widget.branches.first;
     }
 
-    if (_selectedBranch != null && !widget.branches.any((b) => b.id == _selectedBranch!.id)) {
-      _selectedBranch = widget.branches.isNotEmpty ? widget.branches.first : null;
+    if (_selectedBranch != null &&
+        !widget.branches.any((b) => b.id == _selectedBranch!.id)) {
+      _selectedBranch = widget.branches.isNotEmpty
+          ? widget.branches.first
+          : null;
     } else if (_selectedBranch != null) {
-      _selectedBranch = widget.branches.firstWhere((b) => b.id == _selectedBranch!.id);
+      _selectedBranch = widget.branches.firstWhere(
+        (b) => b.id == _selectedBranch!.id,
+      );
     }
 
     _imageUrl = vehicle?.mainImage;
-    _gallery = vehicle?.gallery != null ? List<String>.from(vehicle!.gallery) : [];
+    _gallery = vehicle?.gallery != null
+        ? List<String>.from(vehicle!.gallery)
+        : [];
   }
 
   @override
@@ -774,7 +1127,13 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
     final isEdit = widget.vehicle != null;
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      title: Text(isEdit ? 'Edit Vehicle Spec' : 'Add New Vehicle', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+      title: Text(
+        isEdit ? 'Edit Vehicle Spec' : 'Add New Vehicle',
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          color: AppColors.secondaryBlue,
+        ),
+      ),
       content: Container(
         width: MediaQuery.of(context).size.width * 0.9,
         constraints: const BoxConstraints(maxWidth: 500),
@@ -797,8 +1156,10 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
                           if (pickedFile != null) {
                             setState(() => _uploadingImage = true);
                             final bytes = await pickedFile.readAsBytes();
-                            final filename = 'vehicle_${DateTime.now().millisecondsSinceEpoch}.jpg';
-                            final url = await widget.vehicleService.uploadVehicleImage(bytes, filename);
+                            final filename =
+                                'vehicle_${DateTime.now().millisecondsSinceEpoch}.jpg';
+                            final url = await widget.vehicleService
+                                .uploadVehicleImage(bytes, filename);
                             setState(() {
                               _imageUrl = url;
                               _uploadingImage = false;
@@ -818,22 +1179,39 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: _uploadingImage
-                      ? const Center(child: CircularProgressIndicator(color: AppColors.primaryOrange))
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            color: AppColors.primaryOrange,
+                          ),
+                        )
                       : _imageUrl != null
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(16),
-                              child: AppImage(imageSrc: _imageUrl!, fit: BoxFit.cover),
-                            )
-                          : Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.add_a_photo_outlined, size: 36, color: Colors.grey[400]),
-                                  const SizedBox(height: 8),
-                                  Text('Upload Car Photo', style: TextStyle(color: Colors.grey[500], fontSize: 12)),
-                                ],
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: AppImage(
+                            imageSrc: _imageUrl!,
+                            fit: BoxFit.cover,
+                          ),
+                        )
+                      : Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.add_a_photo_outlined,
+                                size: 36,
+                                color: Colors.grey[400],
                               ),
-                            ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Upload Car Photo',
+                                style: TextStyle(
+                                  color: Colors.grey[500],
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -843,7 +1221,11 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   'Gallery Images',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.secondaryBlue),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    color: AppColors.secondaryBlue,
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
@@ -852,46 +1234,55 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
                 child: ListView(
                   scrollDirection: Axis.horizontal,
                   children: [
-                    ..._gallery.map((gImg) => SizedBox(
-                      width: 88,
-                      height: 80,
-                      child: Stack(
-                        children: [
-                          Container(
-                            margin: const EdgeInsets.only(right: 8),
-                            width: 80,
-                            height: 80,
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey[300]!),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: AppImage(imageSrc: gImg, fit: BoxFit.cover),
-                            ),
-                          ),
-                          Positioned(
-                            top: 2,
-                            right: 10,
-                            child: InkWell(
-                              onTap: () {
-                                setState(() {
-                                  _gallery.remove(gImg);
-                                });
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.all(2),
-                                decoration: const BoxDecoration(
-                                  color: Colors.redAccent,
-                                  shape: BoxShape.circle,
+                    ..._gallery.map(
+                      (gImg) => SizedBox(
+                        width: 88,
+                        height: 80,
+                        child: Stack(
+                          children: [
+                            Container(
+                              margin: const EdgeInsets.only(right: 8),
+                              width: 80,
+                              height: 80,
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey[300]!),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: AppImage(
+                                  imageSrc: gImg,
+                                  fit: BoxFit.cover,
                                 ),
-                                child: const Icon(Icons.close, size: 10, color: Colors.white),
                               ),
                             ),
-                          ),
-                        ],
+                            Positioned(
+                              top: 2,
+                              right: 10,
+                              child: InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    _gallery.remove(gImg);
+                                  });
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.redAccent,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.close,
+                                    size: 10,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    )),
+                    ),
                     // Plus Button
                     InkWell(
                       onTap: _uploadingGallery
@@ -907,8 +1298,10 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
                                 if (pickedFile != null) {
                                   setState(() => _uploadingGallery = true);
                                   final bytes = await pickedFile.readAsBytes();
-                                  final filename = 'vehicle_gal_${DateTime.now().millisecondsSinceEpoch}.jpg';
-                                  final url = await widget.vehicleService.uploadVehicleImage(bytes, filename);
+                                  final filename =
+                                      'vehicle_gal_${DateTime.now().millisecondsSinceEpoch}.jpg';
+                                  final url = await widget.vehicleService
+                                      .uploadVehicleImage(bytes, filename);
                                   setState(() {
                                     _gallery.add(url);
                                     _uploadingGallery = false;
@@ -928,8 +1321,16 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: _uploadingGallery
-                            ? const Center(child: CircularProgressIndicator(color: AppColors.primaryOrange, strokeWidth: 2))
-                            : Icon(Icons.add_photo_alternate_outlined, color: Colors.grey[400]),
+                            ? const Center(
+                                child: CircularProgressIndicator(
+                                  color: AppColors.primaryOrange,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Icon(
+                                Icons.add_photo_alternate_outlined,
+                                color: Colors.grey[400],
+                              ),
                       ),
                     ),
                   ],
@@ -937,46 +1338,101 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
               ),
               const SizedBox(height: 12),
 
-              TextField(controller: _brandController, decoration: const InputDecoration(labelText: 'Brand / Make (e.g. Proton)')),
-              TextField(controller: _modelController, decoration: const InputDecoration(labelText: 'Model (e.g. Saga)')),
-              TextField(controller: _yearController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Manufacture Year')),
-              TextField(controller: _plateController, decoration: const InputDecoration(labelText: 'Plate Number')),
-              TextField(controller: _colorController, decoration: const InputDecoration(labelText: 'Exterior Color')),
-              TextField(controller: _priceController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Rental Rate Per Day (RM)')),
-              TextField(controller: _mileageController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Mileage (km)')),
-              TextField(controller: _descController, maxLines: 2, decoration: const InputDecoration(labelText: 'Short Description')),
+              TextField(
+                controller: _brandController,
+                decoration: const InputDecoration(
+                  labelText: 'Brand / Make (e.g. Proton)',
+                ),
+              ),
+              TextField(
+                controller: _modelController,
+                decoration: const InputDecoration(
+                  labelText: 'Model (e.g. Saga)',
+                ),
+              ),
+              TextField(
+                controller: _yearController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Manufacture Year',
+                ),
+              ),
+              TextField(
+                controller: _plateController,
+                decoration: const InputDecoration(labelText: 'Plate Number'),
+              ),
+              TextField(
+                controller: _colorController,
+                decoration: const InputDecoration(labelText: 'Exterior Color'),
+              ),
+              TextField(
+                controller: _priceController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Rental Rate Per Day (RM)',
+                ),
+              ),
+              TextField(
+                controller: _mileageController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Mileage (km)'),
+              ),
+              TextField(
+                controller: _descController,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Short Description',
+                ),
+              ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 initialValue: _category,
                 decoration: const InputDecoration(labelText: 'Category'),
-                items: ['Economy', 'Sedan', 'SUV', 'MPV'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                items: ['Economy', 'Sedan', 'SUV', 'MPV']
+                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                    .toList(),
                 onChanged: (val) => setState(() => _category = val!),
               ),
               DropdownButtonFormField<String>(
                 initialValue: _transmission,
                 decoration: const InputDecoration(labelText: 'Transmission'),
-                items: ['Automatic', 'Manual'].map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+                items: ['Automatic', 'Manual']
+                    .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                    .toList(),
                 onChanged: (val) => setState(() => _transmission = val!),
               ),
               DropdownButtonFormField<String>(
                 initialValue: _fuelType,
                 decoration: const InputDecoration(labelText: 'Fuel Type'),
-                items: ['Petrol', 'Diesel', 'Hybrid', 'Electric'].map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
+                items: ['Petrol', 'Diesel', 'Hybrid', 'Electric']
+                    .map((f) => DropdownMenuItem(value: f, child: Text(f)))
+                    .toList(),
                 onChanged: (val) => setState(() => _fuelType = val!),
               ),
               DropdownButtonFormField<int>(
                 initialValue: _seats,
                 decoration: const InputDecoration(labelText: 'Seats Count'),
-                items: [4, 5, 7, 8].map((s) => DropdownMenuItem(value: s, child: Text('$s Seats'))).toList(),
+                items: [4, 5, 7, 8]
+                    .map(
+                      (s) =>
+                          DropdownMenuItem(value: s, child: Text('$s Seats')),
+                    )
+                    .toList(),
                 onChanged: (val) => setState(() => _seats = val!),
               ),
               DropdownButtonFormField<String>(
                 initialValue: _status,
                 decoration: const InputDecoration(labelText: 'Vehicle Status'),
                 items: const [
-                  DropdownMenuItem(value: 'Available', child: Text('Available')),
+                  DropdownMenuItem(
+                    value: 'Available',
+                    child: Text('Available'),
+                  ),
                   DropdownMenuItem(value: 'Booked', child: Text('Booked')),
-                  DropdownMenuItem(value: 'Maintenance', child: Text('Under Maintenance')),
+                  DropdownMenuItem(
+                    value: 'Maintenance',
+                    child: Text('Under Maintenance'),
+                  ),
                   DropdownMenuItem(value: 'Inactive', child: Text('Inactive')),
                 ],
                 onChanged: (val) => setState(() => _status = val!),
@@ -984,8 +1440,14 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
               if (widget.branches.isNotEmpty)
                 DropdownButtonFormField<BranchModel>(
                   initialValue: _selectedBranch,
-                  decoration: const InputDecoration(labelText: 'Assigned Branch Hub'),
-                  items: widget.branches.map((b) => DropdownMenuItem(value: b, child: Text(b.name))).toList(),
+                  decoration: const InputDecoration(
+                    labelText: 'Assigned Branch Hub',
+                  ),
+                  items: widget.branches
+                      .map(
+                        (b) => DropdownMenuItem(value: b, child: Text(b.name)),
+                      )
+                      .toList(),
                   onChanged: (val) => setState(() => _selectedBranch = val),
                 ),
             ],
@@ -993,12 +1455,17 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.secondaryBlue,
             foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
           onPressed: () async {
             if (_brandController.text.trim().isEmpty ||
@@ -1010,12 +1477,16 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
 
             final brand = _brandController.text.trim();
             final model = _modelController.text.trim();
-            final year = int.tryParse(_yearController.text.trim()) ?? DateTime.now().year;
+            final year =
+                int.tryParse(_yearController.text.trim()) ??
+                DateTime.now().year;
             final plate = _plateController.text.trim().toUpperCase();
             final color = _colorController.text.trim();
-            final price = double.tryParse(_priceController.text.trim()) ?? 150.0;
+            final price =
+                double.tryParse(_priceController.text.trim()) ?? 150.0;
             final desc = _descController.text.trim();
-            final mileage = int.tryParse(_mileageController.text.trim()) ?? 25000;
+            final mileage =
+                int.tryParse(_mileageController.text.trim()) ?? 25000;
 
             if (isEdit) {
               await widget.vehicleService.updateVehicle(widget.vehicle!.id, {
@@ -1033,7 +1504,8 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
                 'category': _category,
                 'mileage': mileage,
                 'branchId': _selectedBranch?.id ?? widget.vehicle!.branchId,
-                'branchName': _selectedBranch?.name ?? widget.vehicle!.branchName,
+                'branchName':
+                    _selectedBranch?.name ?? widget.vehicle!.branchName,
                 'status': _status,
                 'isAvailable': _status == 'Available',
                 'gallery': _gallery,
@@ -1052,7 +1524,9 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
                 pricePerDay: price,
                 isAvailable: _status == 'Available',
                 status: _status,
-                mainImage: _imageUrl ?? 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&q=80&w=600',
+                mainImage:
+                    _imageUrl ??
+                    'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&q=80&w=600',
                 description: desc,
                 createdAt: DateTime.now().toIso8601String(),
                 category: _category,

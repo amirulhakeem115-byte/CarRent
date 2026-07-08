@@ -88,9 +88,19 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
     final String address = companySettings.companyAddress;
     final String hours = companySettings.businessHours;
 
-    return SingleChildScrollView(
-      child: Column(
-        children: [
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: _textColor),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
           // Hero Header
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -462,8 +472,9 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
           _buildFooter(isDesktop),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildContactCard({
     required IconData icon,

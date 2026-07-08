@@ -7,7 +7,6 @@ import 'dart:ui' as ui;
 import 'dart:async';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
-import 'package:web/web.dart' as web;
 
 import '../../../constants/colors.dart';
 import '../../../services/auth_service.dart';
@@ -19,6 +18,7 @@ import '../../../models/user_model.dart';
 import '../../../models/vehicle_model.dart';
 import '../../../models/booking_model.dart';
 import '../../../models/payment_model.dart';
+import '../../../models/review_model.dart';
 import '../../../services/notification_service.dart';
 import '../../../models/notification_model.dart';
 import '../../../services/tracking_service.dart';
@@ -44,10 +44,14 @@ import '../../../widgets/loading_widget.dart';
 import '../../../widgets/app_image.dart';
 import '../../../widgets/app_logo.dart';
 import '../../../services/company_settings_provider.dart';
+import '../../../services/web_audio_player.dart';
 import 'package:provider/provider.dart';
 import '../../../ai/services/ai_service.dart';
+import '../../../ai/models/ai_intent.dart';
+import '../../../ai/admin/admin_ai_assistant_view.dart';
 import '../../../ai/widgets/ai_floating_button.dart';
 import '../../../ai/widgets/ai_chat_panel.dart';
+
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
 
@@ -77,10 +81,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   List<VehicleModel> _vehicles = [];
   List<UserModel> _users = [];
   List<MaintenanceJobModel> _maintenanceJobs = [];
+  List<ReviewModel> _reviews = [];
+  List<Map<String, dynamic>> _rewardTransactions = [];
   bool _loading = true;
   String? _error;
+  Timer? _refreshTimer;
 
   String _activeTab = 'Dashboard';
+  String? _aiFilteredPeriod;
+  String? _aiFilteredType;
+  StreamSubscription? _reviewsSubscription;
+  StreamSubscription? _rewardsSubscription;
 
   final NotificationService _notificationService = NotificationService();
   StreamSubscription<List<NotificationModel>>? _adminNotificationsSubscription;
@@ -103,9 +114,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   void _playNotificationSound() {
     if (kIsWeb) {
       try {
-        final audioCtx = web.AudioContext();
-        _playTone(audioCtx, 880, 0.1, 0.0);
-        _playTone(audioCtx, 1200, 0.25, 0.08);
+        playNotificationChime();
       } catch (e) {
         debugPrint('Web Audio API error: $e');
       }
@@ -115,35 +124,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       } catch (e) {
         debugPrint('Failed to play system sound: $e');
       }
-    }
-  }
-
-  void _playTone(
-    web.AudioContext ctx,
-    double frequency,
-    double duration,
-    double delay,
-  ) {
-    try {
-      final osc = ctx.createOscillator();
-      final gainNode = ctx.createGain();
-
-      osc.connect(gainNode);
-      gainNode.connect(ctx.destination);
-
-      osc.frequency.value = frequency;
-      osc.type = 'sine';
-
-      final startTime = ctx.currentTime + delay;
-      final endTime = startTime + duration;
-
-      gainNode.gain.setValueAtTime(0.1, startTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, endTime);
-
-      osc.start(startTime);
-      osc.stop(endTime);
-    } catch (e) {
-      debugPrint('Tone play error: $e');
     }
   }
 
@@ -216,13 +196,35 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   StreamSubscription<List<PaymentModel>>? _paymentsSubscription;
   StreamSubscription<List<UserModel>>? _usersSubscription;
 
-  void _handleAIAction() {
-    if (!mounted) return;
-    final aiService = context.read<AIService>();
-    final intent = aiService.lastIntent;
-    if (intent == null) return;
-    // Simple handling: clear intent and possibly switch tabs
-    aiService.clearLastIntent();
+  int _mobileNavIndexForActiveTab() {
+    switch (_activeTab) {
+      case 'Bookings':
+        return 1;
+      case 'Notifications':
+        return 2;
+      case 'Admin Profile':
+        return 3;
+      case 'Dashboard':
+      default:
+        return 0;
+    }
+  }
+
+  void _setActiveTabFromMobileIndex(int index) {
+    switch (index) {
+      case 0:
+        _activeTab = 'Dashboard';
+        break;
+      case 1:
+        _activeTab = 'Bookings';
+        break;
+      case 2:
+        _activeTab = 'Notifications';
+        break;
+      case 3:
+        _activeTab = 'Admin Profile';
+        break;
+    }
   }
 
   @override
@@ -232,6 +234,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     _subscribeNotifications();
     _subscribeTracking();
     _subscribeToLiveData();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         context.read<AIService>().addListener(_handleAIAction);
@@ -248,13 +255,26 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         setState(() {
           _bookings = bookingsList;
           _bookings.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          _activeBookingsCount = _bookings.where((b) => b.status == 'pending' || b.status == 'approved' || b.status == 'ongoing' || b.status == 'Confirmed' || b.status == 'active').length;
-          
+          _activeBookingsCount = _bookings
+              .where(
+                (b) =>
+                    b.status == 'pending' ||
+                    b.status == 'approved' ||
+                    b.status == 'ongoing' ||
+                    b.status == 'Confirmed' ||
+                    b.status == 'active',
+              )
+              .length;
+
           for (var booking in _bookings) {
             final bStat = booking.status.toLowerCase();
-            if (bStat == 'ongoing' || bStat == 'approved' || bStat == 'confirmed' || bStat == 'active') {
+            if (bStat == 'ongoing' ||
+                bStat == 'approved' ||
+                bStat == 'confirmed' ||
+                bStat == 'active') {
               if (!_simulators.containsKey(booking.vehicleId)) {
-                _simulators[booking.vehicleId] = _trackingService.startRouteSimulation(booking.vehicleId);
+                _simulators[booking.vehicleId] = _trackingService
+                    .startRouteSimulation(booking.vehicleId);
               }
             }
           }
@@ -319,16 +339,92 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         });
       }
     });
+
+    _reviewsSubscription?.cancel();
+    _reviewsSubscription = FirebaseDatabase.instance
+        .ref()
+        .child('reviews')
+        .onValue
+        .listen((event) {
+      if (mounted) {
+        final List<ReviewModel> reviews = [];
+        if (event.snapshot.exists && event.snapshot.value != null) {
+          try {
+            final data = event.snapshot.value;
+            if (data is Map) {
+              data.forEach((key, value) {
+                if (value is Map) {
+                  reviews.add(ReviewModel.fromMap(key.toString(), value));
+                }
+              });
+            }
+          } catch (e) {
+            debugPrint('Error parsing reviews: $e');
+          }
+        }
+        setState(() {
+          _reviews = reviews;
+        });
+      }
+    });
+
+    _rewardsSubscription?.cancel();
+    _rewardsSubscription = FirebaseDatabase.instance
+        .ref()
+        .child('reward_transactions')
+        .onValue
+        .listen((event) {
+      if (mounted) {
+        final List<Map<String, dynamic>> txs = [];
+        if (event.snapshot.exists && event.snapshot.value != null) {
+          try {
+            final rawVal = event.snapshot.value;
+            if (rawVal is Map) {
+              rawVal.forEach((userKey, userTxsValue) {
+                if (userTxsValue is Map) {
+                  userTxsValue.forEach((txKey, txValue) {
+                    if (txValue is Map) {
+                      final tx = Map<String, dynamic>.from(txValue);
+                      tx['id'] = txKey.toString();
+                      tx['userId'] = userKey.toString();
+                      txs.add(tx);
+                    }
+                  });
+                } else if (userTxsValue is List) {
+                  for (int i = 0; i < userTxsValue.length; i++) {
+                    final txValue = userTxsValue[i];
+                    if (txValue is Map) {
+                      final tx = Map<String, dynamic>.from(txValue);
+                      tx['id'] = i.toString();
+                      tx['userId'] = userKey.toString();
+                      txs.add(tx);
+                    }
+                  }
+                }
+              });
+            }
+          } catch (e) {
+            debugPrint('Error parsing reward transactions: $e');
+          }
+        }
+        setState(() {
+          _rewardTransactions = txs;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _adminNotificationsSubscription?.cancel();
     _trackingSubscription?.cancel();
     _bookingsSubscription?.cancel();
     _vehiclesSubscription?.cancel();
     _paymentsSubscription?.cancel();
     _usersSubscription?.cancel();
+    _reviewsSubscription?.cancel();
+    _rewardsSubscription?.cancel();
     _simulators.forEach((_, sim) => sim?.cancel());
     try {
       context.read<AIService>().removeListener(_handleAIAction);
@@ -336,7 +432,54 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     super.dispose();
   }
 
+  void _handleAIAction() {
+    if (!mounted) return;
+    final aiService = context.read<AIService>();
+    final intent = aiService.lastIntent;
+    if (intent == null) return;
 
+    setState(() {
+      if (intent is DashboardIntent) {
+        _activeTab = 'Dashboard';
+        aiService.clearLastIntent();
+      } else if (intent is BookingIntent) {
+        _activeTab = 'Bookings';
+        aiService.clearLastIntent();
+      } else if (intent is PaymentIntent) {
+        _activeTab = 'Payments';
+        aiService.clearLastIntent();
+      } else if (intent is CustomerIntent) {
+        _activeTab = 'Customers';
+        aiService.clearLastIntent();
+      } else if (intent is MaintenanceIntent) {
+        _activeTab = 'Vehicle Maintenance';
+        aiService.clearLastIntent();
+      } else if (intent is BranchIntent) {
+        _activeTab = 'Locations';
+        aiService.clearLastIntent();
+      } else if (intent is ReportIntent) {
+        _activeTab = 'Reports';
+        _aiFilteredPeriod = intent.parameters['timeframe'] ?? intent.parameters['period'];
+        _aiFilteredType = intent.parameters['type'];
+        aiService.clearLastIntent();
+      } else if (intent is SupportIntent) {
+        _activeTab = 'Support Inbox';
+        aiService.clearLastIntent();
+      } else if (intent is ProfileIntent) {
+        _activeTab = 'Admin Profile';
+        aiService.clearLastIntent();
+      } else if (intent is NotificationIntent) {
+        _activeTab = 'Notifications';
+        aiService.clearLastIntent();
+      } else if (intent is RewardIntent) {
+        _activeTab = 'Reward Points';
+        aiService.clearLastIntent();
+      } else if (intent is VehicleSearchIntent) {
+        _activeTab = 'Cars';
+        aiService.clearLastIntent();
+      }
+    });
+  }
 
   Future<void> _loadDashboardData() async {
     if (!mounted) return;
@@ -371,13 +514,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           .where((v) => v.status.toLowerCase() == 'available')
           .length;
 
-      _activeBookingsCount = _bookings.where((b) => b.status == 'pending' || b.status == 'approved' || b.status == 'ongoing').length;
+      _activeBookingsCount = _bookings
+          .where(
+            (b) =>
+                b.status == 'pending' ||
+                b.status == 'approved' ||
+                b.status == 'ongoing',
+          )
+          .length;
 
       // Automatically trigger mock hardware simulator for active bookings
       for (var booking in _bookings) {
         if (booking.status == 'ongoing' || booking.status == 'approved') {
           if (!_simulators.containsKey(booking.vehicleId)) {
-            _simulators[booking.vehicleId] = _trackingService.startRouteSimulation(booking.vehicleId);
+            _simulators[booking.vehicleId] = _trackingService
+                .startRouteSimulation(booking.vehicleId);
           }
         }
       }
@@ -472,6 +623,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Widget build(BuildContext context) {
     final double width = MediaQuery.of(context).size.width;
     final bool isDesktop = width > 1100;
+    final bool showMobileBottomNav = !isDesktop;
 
     return Scaffold(
       key: _scaffoldKey,
@@ -517,11 +669,70 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         ],
       ),
-      floatingActionButton: AIFloatingButton(
-        onTap: () => showAIChatModal(context),
-        isOpen: false,
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      floatingActionButton: _activeTab == 'AI Assistant'
+          ? null
+          : AIFloatingButton(
+              onTap: () async {
+                final result = await showAIChatModal(context);
+                if (result != null && result is String && mounted) {
+                  setState(() {
+                    if (result == 'search_vehicles') {
+                      _activeTab = 'Cars';
+                    } else if (result == 'view_bookings') {
+                      _activeTab = 'Bookings';
+                    } else if (result == 'view_payments') {
+                      _activeTab = 'Payments';
+                    } else if (result == 'view_support') {
+                      _activeTab = 'Support Inbox';
+                    } else if (result == 'view_branches') {
+                      _activeTab = 'Locations';
+                    } else if (result == 'view_notifications') {
+                      _activeTab = 'Notifications';
+                    } else if (result == 'view_maintenance') {
+                      _activeTab = 'Vehicle Maintenance';
+                    } else if (result == 'view_reports') {
+                      _activeTab = 'Reports';
+                    } else if (result == 'view_customers') {
+                      _activeTab = 'Customers';
+                    } else if (result == 'view_dashboard') {
+                      _activeTab = 'Dashboard';
+                    }
+                  });
+                }
+              },
+              isOpen: false,
+            ),
+      bottomNavigationBar: showMobileBottomNav
+          ? BottomNavigationBar(
+              type: BottomNavigationBarType.fixed,
+              currentIndex: _mobileNavIndexForActiveTab(),
+              selectedItemColor: AppColors.primaryOrange,
+              unselectedItemColor: Colors.grey,
+              onTap: (index) {
+                setState(() {
+                  _setActiveTabFromMobileIndex(index);
+                });
+              },
+              items: const [
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.home_rounded),
+                  label: 'Home',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.calendar_today_rounded),
+                  label: 'Bookings',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.notifications_rounded),
+                  label: 'Alerts',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.person_rounded),
+                  label: 'Profile',
+                ),
+              ],
+            )
+          : null,
     );
   }
 
@@ -582,6 +793,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             vehicles: _vehicles,
             users: _users,
             maintenanceJobs: _maintenanceJobs,
+            reviews: _reviews,
+            rewardTransactions: _rewardTransactions,
+            initialPeriod: _aiFilteredPeriod,
+            initialType: _aiFilteredType,
+            onClearAIFilters: () {
+              setState(() {
+                _aiFilteredPeriod = null;
+                _aiFilteredType = null;
+              });
+            },
           ),
         );
         break;
@@ -598,7 +819,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         tabContent = const Expanded(child: AdminProfileView());
         break;
       case 'AI Assistant':
-        tabContent = const Expanded(child: AIChatPanel(onClose: null));
+        tabContent = const Expanded(child: AdminAIAssistantView());
         break;
       case 'Notifications':
         tabContent = Expanded(
@@ -670,35 +891,79 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             child: ListView(
               padding: const EdgeInsets.symmetric(vertical: 12),
               children: [
-                _buildSidebarTile(Icons.dashboard_outlined, 'Dashboard', () => setState(() => _activeTab = 'Dashboard')),
-                _buildSidebarTile(Icons.directions_car_filled_outlined, 'Cars', () => setState(() => _activeTab = 'Cars')),
-                _buildSidebarTile(Icons.calendar_today_outlined, 'Bookings', () => setState(() => _activeTab = 'Bookings')),
-                _buildSidebarTile(Icons.people_outline_rounded, 'Customers', () => setState(() => _activeTab = 'Customers')),
-                _buildSidebarTile(Icons.payment_outlined, 'Payments', () => setState(() => _activeTab = 'Payments')),
-                _buildSidebarTile(Icons.stars_rounded, 'Reward Points', () => setState(() => _activeTab = 'Reward Points')),
-                _buildSidebarTile(Icons.map_outlined, 'Vehicle Tracking', () => setState(() => _activeTab = 'Vehicle Tracking')),
-                _buildSidebarTile(Icons.build_outlined, 'Vehicle Maintenance', () => setState(() => _activeTab = 'Vehicle Maintenance')),
-                _buildSidebarTile(Icons.storefront_outlined, 'Locations', () => setState(() => _activeTab = 'Locations')),
-                _buildSidebarTile(Icons.assessment_outlined, 'Reports', () => setState(() => _activeTab = 'Reports')),
-                _buildSidebarTile(Icons.notifications_none_outlined, 'Notifications', () => setState(() => _activeTab = 'Notifications')),
-                _buildSidebarTile(Icons.mail_outline_rounded, 'Support Inbox', () => setState(() => _activeTab = 'Support Inbox')),
-                _buildSidebarTile(Icons.qr_code_2, 'QR Payment Settings', () => setState(() => _activeTab = 'QR Payment Settings')),
-                _buildSidebarTile(Icons.settings_outlined, 'Company Settings', () => setState(() => _activeTab = 'Company Settings')),
-                _buildSidebarTile(Icons.person_outline, 'Admin Profile', () => setState(() => _activeTab = 'Admin Profile')),
+                _buildSidebarTile(
+                  Icons.dashboard_outlined,
+                  'Dashboard',
+                  () => setState(() => _activeTab = 'Dashboard'),
+                ),
+                _buildSidebarTile(
+                  Icons.directions_car_filled_outlined,
+                  'Cars',
+                  () => setState(() => _activeTab = 'Cars'),
+                ),
+                _buildSidebarTile(
+                  Icons.calendar_today_outlined,
+                  'Bookings',
+                  () => setState(() => _activeTab = 'Bookings'),
+                ),
+                _buildSidebarTile(
+                  Icons.people_outline_rounded,
+                  'Customers',
+                  () => setState(() => _activeTab = 'Customers'),
+                ),
+                _buildSidebarTile(
+                  Icons.payment_outlined,
+                  'Payments',
+                  () => setState(() => _activeTab = 'Payments'),
+                ),
+                _buildSidebarTile(
+                  Icons.stars_rounded,
+                  'Reward Points',
+                  () => setState(() => _activeTab = 'Reward Points'),
+                ),
+                _buildSidebarTile(
+                  Icons.map_outlined,
+                  'Vehicle Tracking',
+                  () => setState(() => _activeTab = 'Vehicle Tracking'),
+                ),
+                _buildSidebarTile(
+                  Icons.build_outlined,
+                  'Vehicle Maintenance',
+                  () => setState(() => _activeTab = 'Vehicle Maintenance'),
+                ),
+                _buildSidebarTile(
+                  Icons.storefront_outlined,
+                  'Locations',
+                  () => setState(() => _activeTab = 'Locations'),
+                ),
+                _buildSidebarTile(
+                  Icons.assessment_outlined,
+                  'Reports',
+                  () => setState(() => _activeTab = 'Reports'),
+                ),
+                _buildSidebarTile(
+                  Icons.psychology_outlined,
+                  'AI Assistant',
+                  () => setState(() => _activeTab = 'AI Assistant'),
+                ),
+                _buildSidebarTile(
+                  Icons.mail_outline_rounded,
+                  'Support Inbox',
+                  () => setState(() => _activeTab = 'Support Inbox'),
+                ),
+                _buildSidebarTile(
+                  Icons.qr_code_2,
+                  'QR Payment Settings',
+                  () => setState(() => _activeTab = 'QR Payment Settings'),
+                ),
+                _buildSidebarTile(
+                  Icons.settings_outlined,
+                  'Company Settings',
+                  () => setState(() => _activeTab = 'Company Settings'),
+                ),
               ],
             ),
           ),
-          const Divider(color: Colors.white12, height: 1),
-          _buildSidebarTile(Icons.logout, 'Logout', () async {
-            final nav = Navigator.of(context);
-            await _authService.logout();
-            nav.pushAndRemoveUntil(
-              MaterialPageRoute(
-                builder: (context) => LoginScreen(onLoggedIn: () {}),
-              ),
-              (route) => false,
-            );
-          }),
           const SizedBox(height: 16),
         ],
       ),
@@ -1341,10 +1606,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         _adminUser?.profileImage,
                       ),
                       child: _adminUser?.profileImage.isNotEmpty != true
-                          ? const Icon(
+                          ? Icon(
                               Icons.person,
                               size: 18,
-                              color: AppColors.secondaryBlue,
+                              color: _isDark
+                                  ? const Color(0xFFF8FAFC)
+                                  : AppColors.secondaryBlue,
                             )
                           : null,
                     ),
@@ -1356,22 +1623,31 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         children: [
                           Text(
                             _adminUser?.fullName ?? 'Admin',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 13,
-                              color: AppColors.secondaryBlue,
+                              color: _isDark
+                                  ? const Color(0xFFF8FAFC)
+                                  : AppColors.secondaryBlue,
                             ),
                           ),
-                          const Text(
+                          Text(
                             'Super Administrator',
-                            style: TextStyle(fontSize: 9, color: Colors.grey),
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: _isDark
+                                  ? const Color(0xFFE2E8F0)
+                                  : Colors.grey,
+                            ),
                           ),
                         ],
                       ),
-                      const Icon(
+                      Icon(
                         Icons.arrow_drop_down,
                         size: 16,
-                        color: AppColors.secondaryBlue,
+                        color: _isDark
+                            ? const Color(0xFFF8FAFC)
+                            : AppColors.secondaryBlue,
                       ),
                     ],
                   ],
@@ -1385,8 +1661,35 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Future<void> _logout() async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Confirm Logout'),
+          content: const Text('Do you want to log out?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('No'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryOrange,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Yes'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldLogout != true || !mounted) return;
+
     final nav = Navigator.of(context);
     await _authService.logout();
+    if (!mounted) return;
     nav.pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => LoginScreen(onLoggedIn: () {})),
       (route) => false,
@@ -1467,7 +1770,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       physics: const NeverScrollableScrollPhysics(),
       crossAxisSpacing: 16,
       mainAxisSpacing: 16,
-      childAspectRatio: isDesktop ? 1.05 : 1.25,
+      childAspectRatio: isDesktop ? 1.05 : 0.94,
       children: [
         _buildStatsCard(
           'Total Vehicles',
@@ -1529,8 +1832,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     String trendText,
     bool isPositiveAction,
   ) {
+    final bool isCompactMobile = MediaQuery.of(context).size.width <= 600;
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isCompactMobile ? 14 : 16),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
@@ -1562,8 +1867,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ),
               if (label.contains('Pending') && _pendingPaymentsCount > 0)
                 Container(
-                  width: 8,
-                  height: 8,
+                  width: isCompactMobile ? 7 : 8,
+                  height: isCompactMobile ? 7 : 8,
                   decoration: const BoxDecoration(
                     color: Colors.red,
                     shape: BoxShape.circle,
@@ -1571,7 +1876,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 ),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: isCompactMobile ? 6 : 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1579,21 +1884,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Colors.grey,
-                    fontSize: 11,
+                    fontSize: isCompactMobile ? 10 : 11,
                     fontWeight: FontWeight.bold,
                   ),
-                  maxLines: 1,
+                  maxLines: isCompactMobile ? 2 : 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: isCompactMobile ? 2 : 4),
                 FittedBox(
                   fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
                   child: Text(
                     value,
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: isCompactMobile ? 16 : 18,
                       fontWeight: FontWeight.w900,
                       color: _isDark
                           ? const Color(0xFFF8FAFC)
@@ -1604,8 +1910,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: isCompactMobile ? 2 : 4),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Icon(
                 label.contains('Revenue')
@@ -1620,14 +1927,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     : (label.contains('Pending') && _pendingPaymentsCount > 0
                           ? Colors.orange
                           : Colors.grey),
-                size: 12,
+                size: isCompactMobile ? 11 : 12,
               ),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
                   trendText,
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: isCompactMobile ? 9 : 10,
                     fontWeight: FontWeight.bold,
                     color: label.contains('Revenue')
                         ? (isPositiveAction ? Colors.green : Colors.red)
@@ -1636,7 +1943,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               ? Colors.orange
                               : Colors.grey),
                   ),
-                  maxLines: 1,
+                  maxLines: isCompactMobile ? 2 : 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -1661,12 +1968,26 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       }
     }
 
-    int pendingCount = _bookings.where((b) => b.status.toLowerCase() == 'pending').length;
-    int approvedCount = _bookings.where((b) => b.status.toLowerCase() == 'approved').length;
-    int ongoingCount = _bookings.where((b) => b.status.toLowerCase() == 'ongoing').length;
-    int completedCount = _bookings.where((b) => b.status.toLowerCase() == 'completed').length;
-    int cancelledCount = _bookings.where((b) => b.status.toLowerCase() == 'cancelled' || b.status.toLowerCase() == 'rejected').length;
-    
+    int pendingCount = _bookings
+        .where((b) => b.status.toLowerCase() == 'pending')
+        .length;
+    int approvedCount = _bookings
+        .where((b) => b.status.toLowerCase() == 'approved')
+        .length;
+    int ongoingCount = _bookings
+        .where((b) => b.status.toLowerCase() == 'ongoing')
+        .length;
+    int completedCount = _bookings
+        .where((b) => b.status.toLowerCase() == 'completed')
+        .length;
+    int cancelledCount = _bookings
+        .where(
+          (b) =>
+              b.status.toLowerCase() == 'cancelled' ||
+              b.status.toLowerCase() == 'rejected',
+        )
+        .length;
+
     Map<String, int> statusCounts = {
       'Pending': pendingCount,
       'Approved': approvedCount,
@@ -1859,11 +2180,36 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildLegendRow('Pending', pendingCount, totalBookingsCount, Colors.orange),
-                    _buildLegendRow('Approved', approvedCount, totalBookingsCount, Colors.blue),
-                    _buildLegendRow('Ongoing', ongoingCount, totalBookingsCount, Colors.teal),
-                    _buildLegendRow('Completed', completedCount, totalBookingsCount, Colors.green),
-                    _buildLegendRow('Cancelled', cancelledCount, totalBookingsCount, Colors.redAccent),
+                    _buildLegendRow(
+                      'Pending',
+                      pendingCount,
+                      totalBookingsCount,
+                      Colors.orange,
+                    ),
+                    _buildLegendRow(
+                      'Approved',
+                      approvedCount,
+                      totalBookingsCount,
+                      Colors.blue,
+                    ),
+                    _buildLegendRow(
+                      'Ongoing',
+                      ongoingCount,
+                      totalBookingsCount,
+                      Colors.teal,
+                    ),
+                    _buildLegendRow(
+                      'Completed',
+                      completedCount,
+                      totalBookingsCount,
+                      Colors.green,
+                    ),
+                    _buildLegendRow(
+                      'Cancelled',
+                      cancelledCount,
+                      totalBookingsCount,
+                      Colors.redAccent,
+                    ),
                   ],
                 ),
               ),
@@ -2999,6 +3345,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         : AppColors.secondaryBlue;
     final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
 
+    double pricePerDay = 100.0;
+    try {
+      pricePerDay = _vehicles.firstWhere((v) => v.id == booking.vehicleId).pricePerDay;
+    } catch (_) {}
+    final overdue = BookingService.getOverdueDetails(booking, pricePerDay);
+
     showDialog(
       context: context,
       builder: (context) {
@@ -3031,14 +3383,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   ),
                   _buildDetailDialogRow(
                     'Return Date',
-                    DateFormat(
-                      'dd MMM yyyy, hh:mm a',
-                    ).format(booking.returnDate),
+                    booking.isOpenRental
+                        ? 'Open Rental'
+                        : (booking.returnDate != null ? DateFormat('dd MMM yyyy, hh:mm a').format(booking.returnDate!) : ""),
                   ),
                   _buildDetailDialogRow(
                     'Total Paid Price',
                     'RM ${booking.totalPrice.toStringAsFixed(2)}',
                   ),
+                  if (overdue['isOverdue'] == true) ...[
+                    _buildDetailDialogRow('⚠️ Overdue Duration', '${overdue['days']} days, ${overdue['hours']} hours', valueColor: Colors.redAccent),
+                    _buildDetailDialogRow('⚠️ Late Fees Accrued', 'RM ${overdue['charges'].toStringAsFixed(2)}', valueColor: Colors.redAccent),
+                    _buildDetailDialogRow('⚠️ Current Total', 'RM ${(booking.totalPrice + overdue['charges']).toStringAsFixed(2)}', valueColor: Colors.redAccent),
+                  ],
                   _buildDetailDialogRow(
                     'Deposit Amount',
                     'RM ${booking.depositAmount.toStringAsFixed(2)}',
@@ -3130,11 +3487,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  Widget _buildDetailDialogRow(String label, String value) {
+  Widget _buildDetailDialogRow(String label, String value, {Color? valueColor}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textPrimary = isDark
+    final textPrimary = valueColor ?? (isDark
         ? const Color(0xFFF8FAFC)
-        : AppColors.secondaryBlue;
+        : AppColors.secondaryBlue);
     final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
 
     return Padding(

@@ -56,6 +56,89 @@ class _HomeScreenState extends State<HomeScreen> {
   final GlobalKey _aboutKey = GlobalKey();
   final GlobalKey _contactKey = GlobalKey();
 
+  static const List<Map<String, dynamic>> _supplementalBranchOptions = [
+    {
+      'id': 'kl_klcc',
+      'branchName': 'Kuala Lumpur - KLCC',
+      'address': 'Suria KLCC Concourse Level, 50088 Kuala Lumpur',
+      'phone': '+603-23821234',
+      'latitude': 3.1579,
+      'longitude': 101.7123,
+    },
+    {
+      'id': 'kl_mid_valley',
+      'branchName': 'Kuala Lumpur - Mid Valley',
+      'address': 'Mid Valley Megamall Arrival Bay, 59200 Kuala Lumpur',
+      'phone': '+603-22871234',
+      'latitude': 3.1186,
+      'longitude': 101.6769,
+    },
+    {
+      'id': 'johor_bahru_city_square',
+      'branchName': 'Johor Bahru - City Square',
+      'address': 'City Square Arrival Bay, 80000 Johor Bahru, Johor',
+      'phone': '+607-2231234',
+      'latitude': 1.4631,
+      'longitude': 103.7649,
+    },
+    {
+      'id': 'kelantan_kota_bharu',
+      'branchName': 'Kelantan - Kota Bharu',
+      'address': 'Jalan Sultan Yahya Petra, 15200 Kota Bharu, Kelantan',
+      'phone': '+609-7481234',
+      'latitude': 6.1254,
+      'longitude': 102.2381,
+    },
+    {
+      'id': 'penang_george_town',
+      'branchName': 'Penang - George Town',
+      'address': 'Lebuh Pantai Service Hub, 10300 George Town, Penang',
+      'phone': '+604-2611234',
+      'latitude': 5.4141,
+      'longitude': 100.3288,
+    },
+    {
+      'id': 'melaka_sentral',
+      'branchName': 'Melaka - Melaka Sentral',
+      'address': 'Terminal Melaka Sentral, 75400 Melaka',
+      'phone': '+606-2881234',
+      'latitude': 2.2343,
+      'longitude': 102.2530,
+    },
+    {
+      'id': 'perak_ipoh',
+      'branchName': 'Perak - Ipoh',
+      'address': 'Jalan Sultan Abdul Jalil Hub, 30300 Ipoh, Perak',
+      'phone': '+605-2411234',
+      'latitude': 4.5975,
+      'longitude': 101.0901,
+    },
+    {
+      'id': 'pahang_kuantan',
+      'branchName': 'Pahang - Kuantan',
+      'address': 'Jalan Besar Service Centre, 25000 Kuantan, Pahang',
+      'phone': '+609-5171234',
+      'latitude': 3.8077,
+      'longitude': 103.3260,
+    },
+    {
+      'id': 'sabah_kota_kinabalu',
+      'branchName': 'Sabah - Kota Kinabalu',
+      'address': 'Jalan Tun Fuad Stephens, 88000 Kota Kinabalu, Sabah',
+      'phone': '+6088-212345',
+      'latitude': 5.9804,
+      'longitude': 116.0735,
+    },
+    {
+      'id': 'sarawak_kuching',
+      'branchName': 'Sarawak - Kuching',
+      'address': 'Jalan Padungan Mobility Hub, 93100 Kuching, Sarawak',
+      'phone': '+6082-241234',
+      'latitude': 1.5533,
+      'longitude': 110.3592,
+    },
+  ];
+
   void _scrollToSection(GlobalKey key) {
     final context = key.currentContext;
     if (context != null) {
@@ -65,6 +148,47 @@ class _HomeScreenState extends State<HomeScreen> {
         curve: Curves.easeInOut,
       );
     }
+  }
+
+  List<BranchModel> _buildHomeBranchOptions(List<BranchModel> branches) {
+    if (branches.isEmpty) {
+      branches = _branchService.getDefaultBranches();
+    }
+
+    final existingNames = branches
+        .map((branch) => branch.branchName.trim().toLowerCase())
+        .toSet();
+    final expandedBranches = <BranchModel>[];
+    BranchModel? branchTemplate;
+
+    for (final branch in branches) {
+      expandedBranches.add(branch);
+      branchTemplate ??= branch;
+    }
+
+    final template =
+        branchTemplate ?? _branchService.getDefaultBranches().first;
+
+    for (final option in _supplementalBranchOptions) {
+      final optionName = option['branchName'].toString().toLowerCase();
+      if (existingNames.contains(optionName)) {
+        continue;
+      }
+      expandedBranches.add(
+        BranchModel(
+          id: option['id'] as String,
+          branchName: option['branchName'] as String,
+          address: option['address'] as String,
+          phone: option['phone'] as String,
+          latitude: option['latitude'] as double,
+          longitude: option['longitude'] as double,
+          operatingHours: template.operatingHours,
+          status: template.status,
+        ),
+      );
+    }
+
+    return expandedBranches;
   }
 
   @override
@@ -114,12 +238,14 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       try {
-        _branches = await _branchService.getBranches().timeout(
-          const Duration(seconds: 8),
+        _branches = _buildHomeBranchOptions(
+          await _branchService.getBranches().timeout(
+            const Duration(seconds: 8),
+          ),
         );
       } catch (branchErr) {
         debugPrint('Error getting branches: $branchErr.');
-        _branches = [];
+        _branches = _buildHomeBranchOptions([]);
       }
 
       try {
@@ -129,10 +255,6 @@ class _HomeScreenState extends State<HomeScreen> {
       } catch (vehicleErr) {
         debugPrint('Error getting vehicles: $vehicleErr.');
         _vehicles = [];
-      }
-
-      if (_branches.isNotEmpty) {
-        _selectedPickupBranch = _branches.first;
       }
     } catch (e) {
       debugPrint('Unexpected error loading home data: $e');
@@ -231,6 +353,52 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  List<DropdownMenuItem<BranchModel>> _buildBranchDropdownItems() {
+    return [
+      const DropdownMenuItem<BranchModel>(
+        value: null,
+        child: _BranchDropdownItem(
+          label: '--Please select--',
+          isPlaceholder: true,
+        ),
+      ),
+      ..._branches.map((branch) {
+        return DropdownMenuItem<BranchModel>(
+          value: branch,
+          child: _BranchDropdownItem(label: branch.name),
+        );
+      }),
+    ];
+  }
+
+  Widget _buildHeaderNavigation() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        NavHoverLink(text: 'Home', onTap: () => _scrollToSection(_homeKey)),
+        NavHoverLink(
+          text: 'Fleet',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const VehicleListScreen(),
+              ),
+            );
+          },
+        ),
+        NavHoverLink(
+          text: 'About Us',
+          onTap: () => _scrollToSection(_aboutKey),
+        ),
+        NavHoverLink(
+          text: 'Contact',
+          onTap: () => _scrollToSection(_contactKey),
+        ),
+      ],
+    );
+  }
+
   @override
   void dispose() {
     _contactNameController.dispose();
@@ -249,7 +417,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
       appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(80),
+        preferredSize: Size.fromHeight(isDesktop ? 80 : 124),
         child: ClipRRect(
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
@@ -273,130 +441,114 @@ class _HomeScreenState extends State<HomeScreen> {
                     horizontal: isDesktop ? 80 : 20,
                     vertical: 10,
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Branding logo with gradient-like look
-                      GestureDetector(
-                        onTap: () => _scrollToSection(_homeKey),
-                        child: MouseRegion(
-                          cursor: SystemMouseCursors.click,
-                          child: Row(
-                            children: [
-                              const AppLogo(
-                                size: 28,
-                                fallbackColor: AppColors.primaryOrange,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          GestureDetector(
+                            onTap: () => _scrollToSection(_homeKey),
+                            child: MouseRegion(
+                              cursor: SystemMouseCursors.click,
+                              child: Row(
+                                children: [
+                                  const AppLogo(
+                                    size: 28,
+                                    fallbackColor: AppColors.primaryOrange,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    companyName,
+                                    style: TextStyle(
+                                      fontSize: isDesktop ? 22 : 18,
+                                      fontWeight: FontWeight.w900,
+                                      color: AppColors.secondaryBlue,
+                                      letterSpacing: 1.5,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 12),
-                              Text(
-                                companyName,
-                                style: TextStyle(
-                                  fontSize: isDesktop ? 22 : 18,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppColors.secondaryBlue,
-                                  letterSpacing: 1.5,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      // Navigation Links using NavHoverLink
-                      if (isDesktop)
-                        Row(
-                          children: [
-                            NavHoverLink(
-                              text: 'Home',
-                              onTap: () => _scrollToSection(_homeKey),
                             ),
-                            NavHoverLink(
-                              text: 'Fleet',
-                              onTap: () {
+                          ),
+                          if (isDesktop) _buildHeaderNavigation(),
+                          ElevatedButton(
+                            onPressed: () {
+                              if (_user != null) {
+                                if (_user!.role == 'admin') {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const AdminDashboardScreen(),
+                                    ),
+                                  );
+                                } else {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const CustomerResponsiveShell(),
+                                    ),
+                                  );
+                                }
+                              } else {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
                                     builder: (context) =>
-                                        const VehicleListScreen(),
+                                        LoginScreen(onLoggedIn: () {}),
                                   ),
-                                );
-                              },
-                            ),
-                            NavHoverLink(
-                              text: 'About Us',
-                              onTap: () => _scrollToSection(_aboutKey),
-                            ),
-                            NavHoverLink(
-                              text: 'Contact',
-                              onTap: () => _scrollToSection(_contactKey),
-                            ),
-                          ],
-                        ),
-                      // Login/Register or Dashboard Button
-                      ElevatedButton(
-                        onPressed: () {
-                          if (_user != null) {
-                            if (_user!.role == 'admin') {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      const AdminDashboardScreen(),
-                                ),
-                              );
-                            } else {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      const CustomerResponsiveShell(),
-                                ),
-                              );
-                            }
-                          } else {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    LoginScreen(onLoggedIn: () {}),
+                                ).then((_) => _loadData());
+                              }
+                            },
+                            style: ButtonStyle(
+                              backgroundColor:
+                                  WidgetStateProperty.resolveWith<Color?>((
+                                    Set<WidgetState> states,
+                                  ) {
+                                    if (states.contains(WidgetState.hovered)) {
+                                      return AppColors.primaryOrange;
+                                    }
+                                    return AppColors.secondaryBlue;
+                                  }),
+                              foregroundColor: WidgetStateProperty.all<Color>(
+                                Colors.white,
                               ),
-                            ).then((_) => _loadData());
-                          }
-                        },
-                        style: ButtonStyle(
-                          backgroundColor:
-                              WidgetStateProperty.resolveWith<Color?>((
-                                Set<WidgetState> states,
-                              ) {
-                                if (states.contains(WidgetState.hovered)) {
-                                  return AppColors.primaryOrange;
-                                }
-                                return AppColors.secondaryBlue;
-                              }),
-                          foregroundColor: WidgetStateProperty.all<Color>(
-                            Colors.white,
-                          ),
-                          padding: WidgetStateProperty.all<EdgeInsetsGeometry>(
-                            EdgeInsets.symmetric(
-                              horizontal: isDesktop ? 24 : 16,
-                              vertical: isDesktop ? 18 : 12,
+                              padding:
+                                  WidgetStateProperty.all<EdgeInsetsGeometry>(
+                                    EdgeInsets.symmetric(
+                                      horizontal: isDesktop ? 24 : 16,
+                                      vertical: isDesktop ? 18 : 12,
+                                    ),
+                                  ),
+                              shape: WidgetStateProperty.all<OutlinedBorder>(
+                                RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              elevation: WidgetStateProperty.all<double>(0),
+                            ),
+                            child: Text(
+                              _user != null
+                                  ? 'MY DASHBOARD'
+                                  : 'LOGIN / REGISTER',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
                             ),
                           ),
-                          shape: WidgetStateProperty.all<OutlinedBorder>(
-                            RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                          elevation: WidgetStateProperty.all<double>(0),
-                        ),
-                        child: Text(
-                          _user != null ? 'MY DASHBOARD' : 'LOGIN / REGISTER',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
+                        ],
                       ),
+                      if (!isDesktop) ...[
+                        const SizedBox(height: 12),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: _buildHeaderNavigation(),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -577,7 +729,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 40),
-                Row(
+                Flex(
+                  direction: isDesktop ? Axis.horizontal : Axis.vertical,
+                  crossAxisAlignment: isDesktop
+                      ? CrossAxisAlignment.center
+                      : CrossAxisAlignment.stretch,
                   children: [
                     ElevatedButton(
                       onPressed: () => _scrollToSection(_aboutKey),
@@ -604,7 +760,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    SizedBox(
+                      width: isDesktop ? 16 : 0,
+                      height: isDesktop ? 0 : 12,
+                    ),
                     OutlinedButton(
                       onPressed: () {
                         Navigator.push(
@@ -629,6 +788,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
                             'Browse Fleet',
@@ -725,24 +886,22 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: DropdownButtonHideUnderline(
                           child: DropdownButton<BranchModel>(
                             value: _selectedPickupBranch,
+                            hint: const Text(
+                              '--please select--',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.lightText,
+                                fontSize: 13,
+                              ),
+                            ),
+                            dropdownColor: Colors.white,
                             isExpanded: true,
+                            borderRadius: BorderRadius.circular(16),
                             icon: const Icon(
                               Icons.location_on_outlined,
                               color: AppColors.primaryOrange,
                             ),
-                            items: _branches.map((b) {
-                              return DropdownMenuItem(
-                                value: b,
-                                child: Text(
-                                  b.name,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.secondaryBlue,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              );
-                            }).toList(),
+                            items: _buildBranchDropdownItems(),
                             onChanged: (val) =>
                                 setState(() => _selectedPickupBranch = val),
                           ),
@@ -2116,8 +2275,12 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 60),
               Divider(color: Colors.white.withValues(alpha: 0.1), thickness: 1),
               const SizedBox(height: 24),
-              Row(
+              Flex(
+                direction: isDesktop ? Axis.horizontal : Axis.vertical,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: isDesktop
+                    ? CrossAxisAlignment.center
+                    : CrossAxisAlignment.start,
                 children: [
                   Text(
                     '© 2026 ${CompanySettingsProvider().companyName}. All rights reserved.',
@@ -2125,6 +2288,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       color: Colors.white.withValues(alpha: 0.4),
                       fontSize: 12,
                     ),
+                  ),
+                  SizedBox(
+                    width: isDesktop ? 16 : 0,
+                    height: isDesktop ? 0 : 8,
                   ),
                   Text(
                     'SaaS Web Platform v2.0',
@@ -2161,6 +2328,63 @@ class _HomeScreenState extends State<HomeScreen> {
         style: TextStyle(
           color: Colors.white.withValues(alpha: 0.6),
           fontSize: 13,
+        ),
+      ),
+    );
+  }
+}
+
+class _BranchDropdownItem extends StatefulWidget {
+  final String label;
+  final bool isPlaceholder;
+
+  const _BranchDropdownItem({required this.label, this.isPlaceholder = false});
+
+  @override
+  State<_BranchDropdownItem> createState() => _BranchDropdownItemState();
+}
+
+class _BranchDropdownItemState extends State<_BranchDropdownItem> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = widget.isPlaceholder
+        ? AppColors.lightText
+        : AppColors.secondaryBlue;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      cursor: SystemMouseCursors.click,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOut,
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: _isHovered
+              ? AppColors.primaryOrange.withValues(alpha: 0.08)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: _isHovered
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 14,
+                    offset: const Offset(0, 6),
+                  ),
+                ]
+              : const [],
+        ),
+        child: Text(
+          widget.label,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            color: textColor,
+            fontSize: 13,
+          ),
         ),
       ),
     );

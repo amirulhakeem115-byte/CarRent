@@ -8,6 +8,7 @@ import 'booking_service.dart';
 import 'reward_service.dart';
 import 'receipt_service.dart';
 import 'user_role_cache.dart';
+import 'company_settings_provider.dart';
 
 class PaymentService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref().child('payments');
@@ -259,22 +260,58 @@ class PaymentService {
             final vehicleName = bookingData['vehicleName'] as String?;
             if (vehicleId != null && vehicleName != null) {
               final bookingService = BookingService();
+              final currentBookingStatus = bookingData['status'] as String?;
+              final bool isFinalPaymentFlow = currentBookingStatus == 'Awaiting Final Payment';
+
               if (isApproved) {
-                await bookingService.updateBookingStatus(bookingId, 'Confirmed', userId, vehicleId, vehicleName);
-                // Deduct redeemed reward points if any
-                try {
-                  await RewardPointsService().deductPointsForBooking(bookingId);
-                } catch (rewardErr) {
-                  debugPrint('[PaymentService] Warning: reward points deduction failed: $rewardErr');
-                }
-                // Trigger automatic receipt check & storage creation
-                try {
-                  await ReceiptService().triggerAutomaticReceiptCheck(bookingId);
-                } catch (receiptErr) {
-                  debugPrint('[PaymentService] Warning: receipt check failed: $receiptErr');
+                if (isFinalPaymentFlow) {
+                  // Final payment approved -> Complete booking, make vehicle available
+                  await bookingService.updateBookingStatus(bookingId, 'completed', userId, vehicleId, vehicleName);
+                  try {
+                    await FirebaseDatabase.instance.ref().child('vehicles').child(vehicleId).update({'status': 'Available'});
+                  } catch (vErr) {
+                    debugPrint('Error updating vehicle to Available on final payment clearance: $vErr');
+                  }
+                  
+                  // Award reward points automatically if enabled
+                  final rewardsEnabled = CompanySettingsProvider().getField('rewardsEnabled', defaultValue: true) as bool;
+                  if (rewardsEnabled) {
+                    try {
+                      await RewardPointsService().awardPointsForBooking(bookingId);
+                    } catch (rewardErr) {
+                      debugPrint('Error awarding reward points on final invoice clearance: $rewardErr');
+                    }
+                  }
+
+                  // Trigger automatic receipt check
+                  try {
+                    await ReceiptService().triggerAutomaticReceiptCheck(bookingId);
+                  } catch (receiptErr) {
+                    debugPrint('Error generating receipt on final invoice clearance: $receiptErr');
+                  }
+                } else {
+                  // Upfront payment approved -> Confirm booking
+                  await bookingService.updateBookingStatus(bookingId, 'Confirmed', userId, vehicleId, vehicleName);
+                  // Deduct redeemed reward points if any
+                  try {
+                    await RewardPointsService().deductPointsForBooking(bookingId);
+                  } catch (rewardErr) {
+                    debugPrint('[PaymentService] Warning: reward points deduction failed: $rewardErr');
+                  }
+                  // Trigger automatic receipt check & storage creation
+                  try {
+                    await ReceiptService().triggerAutomaticReceiptCheck(bookingId);
+                  } catch (receiptErr) {
+                    debugPrint('[PaymentService] Warning: receipt check failed: $receiptErr');
+                  }
                 }
               } else {
-                await bookingService.updateBookingStatus(bookingId, 'Pending Payment', userId, vehicleId, vehicleName);
+                if (isFinalPaymentFlow) {
+                  // Keep status as Awaiting Final Payment
+                  // Nothing extra to do, status remains 'Awaiting Final Payment'
+                } else {
+                  await bookingService.updateBookingStatus(bookingId, 'Pending Payment', userId, vehicleId, vehicleName);
+                }
               }
             }
           }

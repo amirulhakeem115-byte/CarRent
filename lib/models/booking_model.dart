@@ -6,7 +6,7 @@ class BookingModel {
   final String userName;
   final String userPhone;
   final DateTime pickUpDate;
-  final DateTime returnDate;
+  final DateTime? returnDate;
   final double totalPrice;
   final double depositAmount;
   final String status;
@@ -27,6 +27,17 @@ class BookingModel {
   final String? customerStatus;
   final String? paymentMethod;
 
+  // New Extension & Return Inspection fields
+  final Map<String, dynamic>? extensionRequest;
+  final Map<String, dynamic>? returnInspection;
+  final double lateFees;
+  final double finalAmount;
+
+  // Open Rental fields
+  final bool isOpenRental;
+  final DateTime? actualPickupTimestamp;
+  final DateTime? actualReturnTimestamp;
+
   BookingModel({
     required this.id,
     required this.vehicleId,
@@ -35,7 +46,7 @@ class BookingModel {
     required this.userName,
     required this.userPhone,
     required this.pickUpDate,
-    required this.returnDate,
+    this.returnDate,
     required this.totalPrice,
     required this.depositAmount,
     required this.status,
@@ -53,6 +64,13 @@ class BookingModel {
     this.returnReminderSent = false,
     this.customerStatus,
     this.paymentMethod,
+    this.extensionRequest,
+    this.returnInspection,
+    this.lateFees = 0.0,
+    this.finalAmount = 0.0,
+    this.isOpenRental = false,
+    this.actualPickupTimestamp,
+    this.actualReturnTimestamp,
   });
 
   factory BookingModel.fromMap(
@@ -69,9 +87,9 @@ class BookingModel {
       pickUpDate: DateTime.parse(
         data['pickUpDate'] ?? DateTime.now().toIso8601String(),
       ),
-      returnDate: DateTime.parse(
-        data['returnDate'] ?? DateTime.now().toIso8601String(),
-      ),
+      returnDate: data['returnDate'] != null
+          ? DateTime.parse(data['returnDate'] as String)
+          : null,
       totalPrice: (data['totalPrice'] ?? 0).toDouble(),
       depositAmount: (data['depositAmount'] ?? 0).toDouble(),
       status: data['status'] ?? 'pending',
@@ -95,6 +113,21 @@ class BookingModel {
       returnReminderSent: data['returnReminderSent'] ?? false,
       customerStatus: data['customerStatus'],
       paymentMethod: data['paymentMethod'],
+      extensionRequest: data['extensionRequest'] != null
+          ? Map<String, dynamic>.from(data['extensionRequest'] as Map)
+          : null,
+      returnInspection: data['returnInspection'] != null
+          ? Map<String, dynamic>.from(data['returnInspection'] as Map)
+          : null,
+      lateFees: (data['lateFees'] ?? 0.0).toDouble(),
+      finalAmount: (data['finalAmount'] ?? 0.0).toDouble(),
+      isOpenRental: data['isOpenRental'] ?? false,
+      actualPickupTimestamp: data['actualPickupTimestamp'] != null
+          ? DateTime.parse(data['actualPickupTimestamp'] as String)
+          : null,
+      actualReturnTimestamp: data['actualReturnTimestamp'] != null
+          ? DateTime.parse(data['actualReturnTimestamp'] as String)
+          : null,
     );
   }
 
@@ -106,7 +139,7 @@ class BookingModel {
       'userName': userName,
       'userPhone': userPhone,
       'pickUpDate': pickUpDate.toIso8601String(),
-      'returnDate': returnDate.toIso8601String(),
+      'returnDate': returnDate?.toIso8601String(),
       'totalPrice': totalPrice,
       'depositAmount': depositAmount,
       'status': status,
@@ -124,10 +157,20 @@ class BookingModel {
       'returnReminderSent': returnReminderSent,
       'customerStatus': customerStatus,
       'paymentMethod': paymentMethod,
+      'extensionRequest': extensionRequest,
+      'returnInspection': returnInspection,
+      'lateFees': lateFees,
+      'finalAmount': finalAmount,
+      'isOpenRental': isOpenRental,
+      'actualPickupTimestamp': actualPickupTimestamp?.toIso8601String(),
+      'actualReturnTimestamp': actualReturnTimestamp?.toIso8601String(),
     };
   }
 
   int get rentalDays {
-    return returnDate.difference(pickUpDate).inDays;
+    if (isOpenRental) return 1;
+    if (returnDate == null) return 0;
+    final diff = returnDate!.difference(pickUpDate).inDays;
+    return diff <= 0 ? 1 : diff;
   }
 }

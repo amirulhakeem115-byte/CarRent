@@ -74,13 +74,13 @@ void main() {
       );
 
       // Verify that return date is in future
-      expect(now.isBefore(booking.returnDate), true);
+      expect(now.isBefore(booking.returnDate!), true);
       
       // Expected: No change, stays active
       String finalStatus = booking.status;
       if (booking.isReturned) {
         finalStatus = 'completed';
-      } else if ((booking.status == 'ongoing' || booking.status == 'active') && now.isAfter(booking.returnDate)) {
+      } else if ((booking.status == 'ongoing' || booking.status == 'active') && now.isAfter(booking.returnDate!)) {
         finalStatus = 'overdue';
       }
       expect(finalStatus, 'active');
@@ -108,13 +108,13 @@ void main() {
       );
 
       // Verify that return date is in future
-      expect(now.isBefore(booking.returnDate), true);
+      expect(now.isBefore(booking.returnDate!), true);
       
       // Expected: Transitions to completed
       String finalStatus = booking.status;
       if (booking.isReturned) {
         finalStatus = 'completed';
-      } else if ((booking.status == 'ongoing' || booking.status == 'active') && now.isAfter(booking.returnDate)) {
+      } else if ((booking.status == 'ongoing' || booking.status == 'active') && now.isAfter(booking.returnDate!)) {
         finalStatus = 'overdue';
       }
       expect(finalStatus, 'completed');
@@ -142,13 +142,13 @@ void main() {
       );
 
       // Verify return date has passed
-      expect(now.isAfter(booking.returnDate), true);
+      expect(now.isAfter(booking.returnDate!), true);
       
       // Apply lifecycle logic
       String finalStatus = booking.status;
       if (booking.isReturned) {
         finalStatus = 'completed';
-      } else if ((booking.status == 'ongoing' || booking.status == 'active') && now.isAfter(booking.returnDate)) {
+      } else if ((booking.status == 'ongoing' || booking.status == 'active') && now.isAfter(booking.returnDate!)) {
         finalStatus = 'overdue';
       }
       expect(finalStatus, 'overdue');
@@ -176,13 +176,13 @@ void main() {
       );
 
       // Verify return date has passed
-      expect(now.isAfter(booking.returnDate), true);
+      expect(now.isAfter(booking.returnDate!), true);
       
       // Apply lifecycle logic
       String finalStatus = booking.status;
       if (booking.isReturned) {
         finalStatus = 'completed';
-      } else if ((booking.status == 'ongoing' || booking.status == 'active') && now.isAfter(booking.returnDate)) {
+      } else if ((booking.status == 'ongoing' || booking.status == 'active') && now.isAfter(booking.returnDate!)) {
         finalStatus = 'overdue';
       }
       expect(finalStatus, 'completed');

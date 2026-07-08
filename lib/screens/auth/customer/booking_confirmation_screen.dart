@@ -215,7 +215,7 @@ class BookingConfirmationScreen extends StatelessWidget {
                                         _detailRow('Booking Reference', booking.id.toUpperCase(), isDark, isCode: true),
                                         _detailRow('Status', booking.status, isDark, highlightValue: true),
                                         _detailRow('Check-in Date', dateTimeFormat.format(booking.pickUpDate), isDark),
-                                        _detailRow('Check-out Date', dateTimeFormat.format(booking.returnDate), isDark),
+                                        _detailRow('Check-out Date', booking.isOpenRental ? 'Open Rental' : (booking.returnDate != null ? dateTimeFormat.format(booking.returnDate!) : ""), isDark),
                                         _detailRow('Rental Duration', '$days Day${days == 1 ? '' : 's'}', isDark),
                                         const SizedBox(height: 16),
                                         const Divider(color: Colors.white10),

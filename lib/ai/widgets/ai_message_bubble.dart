@@ -10,6 +10,7 @@ import '../../screens/auth/customer/booking_screen.dart';
 import '../models/ai_message.dart';
 import '../services/ai_service.dart';
 import '../../widgets/app_image.dart';
+import '../../widgets/reward_points_slider.dart';
 
 class AIMessageBubble extends StatelessWidget {
   final AIMessage message;
@@ -228,6 +229,15 @@ class AIMessageBubble extends StatelessWidget {
                   }
                 },
               ),
+            ),
+          ],
+
+          // Dynamic Reward Points Slider Card (Customer)
+          if (!isUser && action == 'redeem_rewards_slider') ...[
+            const SizedBox(height: 10),
+            Padding(
+              padding: const EdgeInsets.only(left: 36),
+              child: _buildRewardPointsSliderCard(context, isDark),
             ),
           ],
 
@@ -1176,5 +1186,25 @@ class AIMessageBubble extends StatelessWidget {
     final hour = dateTime.hour.toString().padLeft(2, '0');
     final minute = dateTime.minute.toString().padLeft(2, '0');
     return '$hour:$minute';
+  }
+
+  Widget _buildRewardPointsSliderCard(BuildContext context, bool isDark) {
+    final available = message.metadata?['availablePoints'] as int? ?? 0;
+    final limit = message.metadata?['maxPointsLimit'] as int? ?? 1000;
+
+    return SizedBox(
+      width: 320,
+      child: RewardPointsSlider(
+        initialValue: 0,
+        availablePoints: available,
+        maxPointsLimit: limit,
+        isAdmin: false,
+        showConfirmButton: true,
+        confirmButtonLabel: 'Apply Discount',
+        onConfirmed: (val) {
+          context.read<AIService>().sendMessage('Redeem $val points');
+        },
+      ),
+    );
   }
 }

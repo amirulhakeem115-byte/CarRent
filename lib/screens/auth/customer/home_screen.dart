@@ -14,6 +14,7 @@ import '../../../models/vehicle_model.dart';
 import '../../../models/booking_model.dart';
 import '../../../models/payment_model.dart';
 import '../../../widgets/app_image.dart';
+import '../../../services/company_settings_provider.dart';
 
 import 'vehicle_list_screen.dart';
 import 'vehicle_details_screen.dart';
@@ -284,6 +285,8 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 children: [
                   _buildStatsRow(),
                   const SizedBox(height: 20),
+                  _buildMembershipProgressCard(context),
+                  const SizedBox(height: 20),
                   _buildLastPaymentCard(),
                   const SizedBox(height: 24),
                   _buildQuickActions(context),
@@ -488,9 +491,11 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         statusColor = const Color(0xFFF59E0B);
     }
 
+    final bool isCompactMobile = MediaQuery.of(context).size.width <= 600;
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: EdgeInsets.all(isCompactMobile ? 16 : 18),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
@@ -513,32 +518,39 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryOrange.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryOrange.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.payment_rounded,
+                        color: AppColors.primaryOrange,
+                        size: 16,
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.payment_rounded,
-                      color: AppColors.primaryOrange,
-                      size: 16,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'LAST PAYMENT SUMMARY',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: _textColor,
+                          fontSize: isCompactMobile ? 10 : 11,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'LAST PAYMENT SUMMARY',
-                    style: TextStyle(
-                      color: _textColor,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
@@ -566,55 +578,111 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             color: _isDark ? const Color(0xFF334155) : AppColors.borderGray,
           ),
           const SizedBox(height: 14),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    vehicleName,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: _textColor,
+          if (isCompactMobile)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  vehicleName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: _textColor,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${DateFormat('dd MMM yyyy').format(lastPayment.paymentDate)} at ${lastPayment.paymentTime ?? DateFormat('HH:mm:ss').format(lastPayment.paymentDate)}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 10.5, color: _subColor),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  lastPayment.paymentMethod,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 10.5, color: _subColor),
+                ),
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'RM ${lastPayment.amount.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 18,
+                      color: AppColors.primaryOrange,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Row(
+                ),
+              ],
+            )
+          else
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${DateFormat('dd MMM yyyy').format(lastPayment.paymentDate)} at ${lastPayment.paymentTime ?? DateFormat('HH:mm:ss').format(lastPayment.paymentDate)}',
-                        style: TextStyle(fontSize: 11, color: _subColor),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        width: 4,
-                        height: 4,
-                        decoration: const BoxDecoration(
-                          color: Colors.grey,
-                          shape: BoxShape.circle,
+                        vehicleName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: _textColor,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        lastPayment.paymentMethod,
-                        style: TextStyle(fontSize: 11, color: _subColor),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '${DateFormat('dd MMM yyyy').format(lastPayment.paymentDate)} at ${lastPayment.paymentTime ?? DateFormat('HH:mm:ss').format(lastPayment.paymentDate)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 11, color: _subColor),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            width: 4,
+                            height: 4,
+                            decoration: const BoxDecoration(
+                              color: Colors.grey,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              lastPayment.paymentMethod,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 11, color: _subColor),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
-              Text(
-                'RM ${lastPayment.amount.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 18,
-                  color: AppColors.primaryOrange,
                 ),
-              ),
-            ],
-          ),
+                const SizedBox(width: 12),
+                Text(
+                  'RM ${lastPayment.amount.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 18,
+                    color: AppColors.primaryOrange,
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
     );
@@ -1016,7 +1084,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          dateFormat.format(booking.returnDate),
+                          booking.isOpenRental
+                              ? 'Open Rental'
+                              : (booking.returnDate != null ? dateFormat.format(booking.returnDate!) : ""),
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
@@ -1421,6 +1491,219 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMembershipProgressCard(BuildContext context) {
+    final points = _user?.rewardPoints ?? 0;
+    final status = CompanySettingsProvider().getMembershipStatus(points);
+
+    Color levelColor;
+    List<Color> gradientColors;
+    IconData levelIcon;
+    List<String> benefits = [];
+
+    switch (status.currentLevel) {
+      case 'Premium':
+        levelColor = const Color(0xFFA78BFA);
+        gradientColors = [const Color(0xFF6D28D9), const Color(0xFF4C1D95)];
+        levelIcon = Icons.military_tech_rounded;
+        benefits = [
+          'Open Rental access (no upfront payment!)',
+          '1.5x Reward Points earning multiplier',
+          'Priority booking approval & support'
+        ];
+        break;
+      case 'Gold':
+        levelColor = const Color(0xFFFBBF24);
+        gradientColors = [const Color(0xFFD97706), const Color(0xFFB45309)];
+        levelIcon = Icons.stars_rounded;
+        benefits = [
+          'Priority booking approval',
+          'Exclusive promotions',
+          'Dynamic discount points redemptions'
+        ];
+        break;
+      case 'Silver':
+        levelColor = const Color(0xFFCBD5E1);
+        gradientColors = [const Color(0xFF475569), const Color(0xFF334155)];
+        levelIcon = Icons.verified_user_rounded;
+        benefits = [
+          'Dynamic discount points redemptions',
+          'Priority customer support channels'
+        ];
+        break;
+      default: // Standard
+        levelColor = const Color(0xFF94A3B8);
+        gradientColors = [const Color(0xFF374151), const Color(0xFF1F2937)];
+        levelIcon = Icons.emoji_events_outlined;
+        benefits = [
+          'Standard points earning',
+          'Standard booking approval'
+        ];
+    }
+
+    final int pct = (status.progress * 100).toInt();
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: gradientColors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: gradientColors.first.withValues(alpha: 0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -20,
+            top: -20,
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.05),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(levelIcon, color: levelColor, size: 24),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${status.currentLevel} Member',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        'Loyalty Status',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'REWARD POINTS',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$points pts',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      status.currentLevel == 'Premium' 
+                          ? 'Maximum Membership Level Reached.' 
+                          : '${status.pointsNeededForNext} more points to unlock ${status.nextLevel}.',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (status.currentLevel != 'Premium')
+                      Text(
+                        '$pct%',
+                        style: TextStyle(
+                          color: levelColor,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: LinearProgressIndicator(
+                    value: status.currentLevel == 'Premium' ? 1.0 : status.progress,
+                    backgroundColor: Colors.white.withValues(alpha: 0.15),
+                    valueColor: AlwaysStoppedAnimation<Color>(levelColor),
+                    minHeight: 8,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'CURRENT MEMBERSHIP BENEFITS',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ...benefits.map((b) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    children: [
+                      Icon(Icons.check_circle_outline, color: levelColor, size: 12),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          b,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )),
+              ],
+            ),
           ),
         ],
       ),

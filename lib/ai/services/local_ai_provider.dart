@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
@@ -9,12 +10,14 @@ import '../../services/branch_service.dart';
 import '../../services/payment_service.dart';
 import '../../services/maintenance_service.dart';
 import '../../services/database_service.dart';
-import '../../services/notification_service.dart';
 import '../../models/vehicle_model.dart';
 import '../../models/booking_model.dart';
 import '../../models/payment_model.dart';
 import '../../models/maintenance_job_model.dart';
+import '../../models/user_model.dart';
+import '../../models/notification_model.dart';
 import '../../services/review_service.dart';
+import '../../services/company_settings_provider.dart';
 import '../models/ai_message.dart';
 import '../models/ai_intent.dart';
 import '../models/ai_response.dart';
@@ -36,6 +39,7 @@ class BookingSessionState {
   String? branch;
   DateTime? pickupDate;
   DateTime? returnDate;
+  bool isOpenRental = false;
   String? pickupTime;
   int pointsToRedeem = 0;
   double? suggestedAlternativeBudget;
@@ -99,6 +103,7 @@ class BookingSessionState {
     branch = null;
     pickupDate = null;
     returnDate = null;
+    isOpenRental = false;
     pickupTime = null;
     pointsToRedeem = 0;
     suggestedAlternativeBudget = null;
@@ -153,7 +158,7 @@ class LocalAIProvider implements AIProvider {
   }
 
   @override
-  Future<AIResponse> sendMessage(String text, List<AIMessage> history) async {
+  Future<AIResponse> sendMessage(String text, List<AIMessage> history, {required String userRole}) async {
     // Add artificial delay to simulate thinking time (500ms)
     await Future.delayed(const Duration(milliseconds: 500));
 
@@ -161,6 +166,49 @@ class LocalAIProvider implements AIProvider {
     final session = _bookingSessions.putIfAbsent(uid, () => BookingSessionState());
 
     final cleanedText = text.trim().toLowerCase();
+    final intent = _intentEngine.detectIntent(text);
+    final Map<String, dynamic> customParams = Map<String, dynamic>.from(intent.parameters);
+
+    if (userRole == 'admin') {
+      return await _processAdminMessage(text, session, customParams, intent);
+    }
+
+    // Strict Role-Based Access Control (RBAC) Checks
+    if (userRole == 'customer') {
+      final isForbiddenQuery = 
+          intent is ReportIntent ||
+          intent is MaintenanceIntent ||
+          intent is CustomerIntent ||
+          (intent is DashboardIntent && !cleanedText.contains('back to dashboard')) ||
+          (intent is PaymentIntent && (cleanedText.contains('revenue') || cleanedText.contains('stats') || cleanedText.contains('statistics') || cleanedText.contains('total') || cleanedText.contains('all payments'))) ||
+          cleanedText.contains('manage fleet') ||
+          cleanedText.contains('verify customer') ||
+          cleanedText.contains('generate reports') ||
+          cleanedText.contains('overdue bookings') ||
+          cleanedText.contains('today\'s bookings') ||
+          cleanedText.contains('maintenance records') ||
+          cleanedText.contains('revenue trends') ||
+          cleanedText.contains('peak booking') ||
+          cleanedText.contains('most rented') ||
+          cleanedText.contains('least rented') ||
+          cleanedText.contains('popular branch') ||
+          session.adminReportStep > 0 ||
+          session.adminFleetStep > 0 ||
+          session.adminVerifyStep > 0;
+
+      if (isForbiddenQuery) {
+        session.reset();
+        return AIResponse(
+          message: "I'm sorry, but you do not have permission to access administrative functions. Please log in with an administrator account to perform this action.",
+          intent: const UnknownIntent(confidence: 1.0),
+          confidence: 1.0,
+          action: 'permission_denied',
+          parameters: const {
+            'options': ['🚗 Book a Car', '❓ FAQs', '💬 Contact Support', 'Back to Dashboard']
+          },
+        );
+      }
+    }
 
     // Abort/Reset hook
     if (history.length <= 1 || 
@@ -182,8 +230,109 @@ class LocalAIProvider implements AIProvider {
       }
     }
 
-    final intent = _intentEngine.detectIntent(text);
-    final Map<String, dynamic> customParams = Map<String, dynamic>.from(intent.parameters);
+
+
+    // Dynamic Reset Hook for New Explicit Requests
+    bool isNewExplicitRequest = false;
+    if (intent is BookingIntent && customParams['action'] == 'book_vehicle') {
+      isNewExplicitRequest = true;
+    } else if (cleanedText.startsWith('book') || cleanedText.startsWith('rent') || cleanedText.contains('want to book') || cleanedText.contains('i want to rent')) {
+      isNewExplicitRequest = true;
+    }
+
+    if (isNewExplicitRequest) {
+      session.reset();
+      
+      List<VehicleModel> vehicles = [];
+      try {
+        vehicles = await VehicleService().getVehicles();
+      } catch (_) {}
+
+      final entities = _extractEntities(text, vehicles);
+      final VehicleModel? matchedVehicle = entities['vehicle'];
+      final String? category = entities['category'];
+      final String? transmission = entities['transmission'];
+      final double? budget = entities['budget'];
+
+      if (matchedVehicle != null) {
+        // Verify availability
+        if (matchedVehicle.status.toLowerCase() != 'available') {
+          session.reset();
+          return AIResponse(
+            message: "No matching vehicle was found.", // Do not guess or substitute.
+            intent: intent,
+            confidence: 1.0,
+            action: 'error',
+            parameters: customParams,
+          );
+        }
+
+        // Verify branch
+        final branchName = matchedVehicle.branchName.isEmpty ? 'Kuala Lumpur' : matchedVehicle.branchName;
+        final branches = await BranchService().getBranches();
+        if (!branches.any((b) => b.name.toLowerCase() == branchName.toLowerCase())) {
+          session.reset();
+          return AIResponse(
+            message: "No matching vehicle was found.",
+            intent: intent,
+            confidence: 1.0,
+            action: 'error',
+            parameters: customParams,
+          );
+        }
+
+        session.vehicleId = matchedVehicle.id;
+        session.vehicleName = '${matchedVehicle.brand} ${matchedVehicle.model}';
+        session.vehiclePrice = matchedVehicle.pricePerDay;
+        session.type = matchedVehicle.category;
+        session.branch = branchName;
+        
+        session.currentStep = 3; // Go directly to dates selection!
+        
+        final nextMsg = await _askBranchSelection(session, customParams);
+        return AIResponse(
+          message: nextMsg,
+          intent: intent,
+          confidence: 1.0,
+          action: 'booking_flow_active',
+          parameters: customParams,
+        );
+      } else if (category != null || budget != null || transmission != null) {
+        // Filter available vehicles to see if any exist matching these filters
+        final filtered = vehicles.where((v) {
+          if (v.status.toLowerCase() != 'available') return false;
+          if (category != null && v.category.toLowerCase() != category.toLowerCase()) return false;
+          if (transmission != null && v.transmission.toLowerCase() != transmission.toLowerCase()) return false;
+          if (budget != null && v.pricePerDay > budget) return false;
+          return true;
+        }).toList();
+
+        if (filtered.isEmpty) {
+          session.reset();
+          return AIResponse(
+            message: "No matching vehicle was found.", // Do not substitute.
+            intent: intent,
+            confidence: 1.0,
+            action: 'error',
+            parameters: customParams,
+          );
+        }
+
+        session.type = category ?? 'Any';
+        session.budget = budget;
+        session.transmission = transmission;
+        session.currentStep = 2; // Ask them to select from list
+
+        final nextMsg = await _askVehicleCardList(session, customParams);
+        return AIResponse(
+          message: nextMsg,
+          intent: intent,
+          confidence: 1.0,
+          action: 'booking_flow_active',
+          parameters: customParams,
+        );
+      }
+    }
 
     // Intercept payment triggers
     if (cleanedText.startsWith('pay booking #') || cleanedText.startsWith('choose payment method for booking #')) {
@@ -300,6 +449,21 @@ class LocalAIProvider implements AIProvider {
     //  2. Admin Report Guided Flow
     // ─────────────────────────────────────────────────────────────────────────
     if (intent is ReportIntent || cleanedText == 'generate reports' || cleanedText.contains('report')) {
+      final tf = intent.parameters['timeframe'] as String?;
+      final tp = intent.parameters['type'] as String?;
+      if (tf != null && tp != null) {
+        customParams['timeframe'] = tf;
+        customParams['type'] = tp;
+        customParams['action'] = 'view_reports';
+        return AIResponse(
+          message: "📊 **Generating report...**\n\nDirectly opening the **$tf $tp Report** for you.",
+          intent: intent,
+          confidence: 1.0,
+          action: 'view_reports',
+          parameters: customParams,
+        );
+      }
+
       session.reset();
       session.adminReportStep = 1;
       customParams['options'] = ['Today', 'This Week', 'This Month', 'Cancel'];
@@ -362,6 +526,30 @@ class LocalAIProvider implements AIProvider {
     } else if (session.extensionStep > 0) {
       final res = await _processBookingExtensionFlow(text, session, customParams);
       return AIResponse(message: res, intent: intent, confidence: 1.0, action: 'extend_flow', parameters: customParams);
+    } else if (cleanedText.contains('return my vehicle') || cleanedText.contains('return my car') || cleanedText.contains('return vehicle') || (intent is BookingIntent && cleanedText.contains('return'))) {
+      final bookings = await BookingService().getBookings();
+      final myActive = bookings.where((b) => b.userId == uid && (b.status == 'ongoing' || b.status.toLowerCase() == 'active' || b.status.toLowerCase() == 'overdue')).toList();
+      if (myActive.isEmpty) {
+        return AIResponse(
+          message: "You do not have any active bookings that can be returned at the moment.",
+          intent: intent,
+          confidence: 1.0,
+          action: 'error',
+          parameters: const {},
+        );
+      }
+      
+      final target = myActive.first;
+      await BookingService().requestReturn(target.id);
+      customParams['options'] = ['My Bookings', 'Back to Dashboard'];
+      return AIResponse(
+        message: "🔔 **Return Request Submitted!**\n\nI have requested a return for your rental of **${target.vehicleName}** (Booking #${target.id.substring(0, 5).toUpperCase()}).\n\n"
+                 "The Admin has been notified to schedule an inspection. Please wait for completion.",
+        intent: intent,
+        confidence: 1.0,
+        action: 'request_return',
+        parameters: {'bookingId': target.id},
+      );
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -437,7 +625,7 @@ class LocalAIProvider implements AIProvider {
     }
 
     // Default Customer booking flow wizard
-    final responseMessage = await _processBookingFlow(text, session, customParams, intent);
+    final responseMessage = await _processBookingFlow(text, session, customParams, intent, userRole);
     String action = customParams['action'] ?? _getFallbackAction(intent);
     if (session.currentStep > 0) {
       action = 'booking_flow_active';
@@ -949,30 +1137,27 @@ class LocalAIProvider implements AIProvider {
           final bSnap = await FirebaseDatabase.instance.ref().child('bookings').child(bId).get();
           if (bSnap.exists) {
             final b = Map.from(bSnap.value as Map);
-            final rentalDays = newDate.difference(DateTime.parse(b['pickUpDate'])).inDays;
             final vSnap = await FirebaseDatabase.instance.ref().child('vehicles').child(b['vehicleId']).get();
             double pPerDay = 180.0;
             if (vSnap.exists) {
               pPerDay = double.tryParse((vSnap.value as Map)['pricePerDay']?.toString() ?? '') ?? 180.0;
             }
-            final newTotal = (rentalDays <= 0 ? 1 : rentalDays) * pPerDay;
 
-            await FirebaseDatabase.instance.ref().child('bookings').child(bId).update({
-              'returnDate': newDate.toIso8601String(),
-              'totalPrice': newTotal,
-            });
+            final currentReturn = DateTime.parse(b['returnDate']);
+            final daysDiff = newDate.difference(currentReturn).inDays;
+            final extraCost = (daysDiff <= 0 ? 1 : daysDiff) * pPerDay;
 
-            // Create notification
-            await NotificationService().createNotification(
-              userId: b['userId'] ?? '',
-              title: 'Booking Extended',
-              message: 'Your booking #${bId.substring(0, 5).toUpperCase()} has been extended to ${DateFormat('dd MMM yyyy').format(newDate)}.',
-              type: 'booking',
+            await BookingService().requestExtension(
+              bId,
+              newDate,
+              extraCost,
+              status: 'pending',
+              paymentStatus: 'unpaid',
             );
           }
           session.reset();
           params['options'] = ['My Bookings', 'Back to Dashboard'];
-          return "📅 **Booking Extended Successfully!**\n\nYour return schedule has been updated in the database.";
+          return "📅 **Extension Request Submitted!**\n\nYour request has been submitted to the Admin for approval. You will be notified once it is approved.";
         } catch (e) {
           session.reset();
           return "Extension failed: $e";
@@ -1309,7 +1494,7 @@ class LocalAIProvider implements AIProvider {
   //  Default Customer booking flow wizard
   // ─────────────────────────────────────────────────────────────────────────
 
-  Future<String> _processBookingFlow(String text, BookingSessionState session, Map<String, dynamic> params, AIIntent intent) async {
+  Future<String> _processBookingFlow(String text, BookingSessionState session, Map<String, dynamic> params, AIIntent intent, String userRole) async {
     final textLower = text.toLowerCase().trim();
     
     // Check for extension request redirect
@@ -1370,35 +1555,55 @@ class LocalAIProvider implements AIProvider {
       case 2: // Vehicle Selected -> Ask Branch
         final regExp = RegExp(r'\[(.*?)\]');
         final match = regExp.firstMatch(text);
-        if (match != null) {
-          session.vehicleId = match.group(1);
-        } else {
-          session.vehicleId = text;
+        final searchId = (match != null ? match.group(1) : text) ?? '';
+
+        if (searchId.trim().isEmpty) {
+          session.reset();
+          return "No matching vehicle was found.";
         }
 
-        if (session.vehicleId != null) {
-          try {
-            final vehicles = await VehicleService().getVehicles();
-            var v = vehicles.firstWhere(
-              (item) => item.id == session.vehicleId,
-              orElse: () => vehicles.firstWhere(
-                (item) => '${item.brand} ${item.model}'.toLowerCase().contains(session.vehicleId!.toLowerCase()),
-                orElse: () => vehicles.firstWhere(
-                  (item) => item.model.toLowerCase().contains(session.vehicleId!.toLowerCase()),
-                ),
-              ),
-            );
-            session.vehicleId = v.id;
-            session.vehicleName = '${v.brand} ${v.model}';
-            session.vehiclePrice = v.pricePerDay;
-          } catch (_) {
-            session.vehicleName = text;
-            session.vehiclePrice = 180.0;
+        try {
+          final vehicles = await VehicleService().getVehicles();
+          VehicleModel? matchedVehicle;
+          for (final v in vehicles) {
+            if (v.id.toLowerCase() == searchId.toLowerCase() ||
+                '${v.brand} ${v.model}'.toLowerCase() == searchId.toLowerCase() ||
+                '${v.brand} ${v.model}'.toLowerCase().contains(searchId.toLowerCase()) ||
+                v.model.toLowerCase().contains(searchId.toLowerCase())) {
+              matchedVehicle = v;
+              break;
+            }
           }
-        }
 
-        session.currentStep = 3;
-        return await _askBranchSelection(session, params);
+          if (matchedVehicle == null) {
+            session.reset();
+            return "No matching vehicle was found.";
+          }
+
+          if (matchedVehicle.status.toLowerCase() != 'available') {
+            session.reset();
+            return "No matching vehicle was found.";
+          }
+
+          final branchName = matchedVehicle.branchName.isEmpty ? 'Kuala Lumpur' : matchedVehicle.branchName;
+          final branches = await BranchService().getBranches();
+          if (!branches.any((b) => b.name.toLowerCase() == branchName.toLowerCase())) {
+            session.reset();
+            return "No matching vehicle was found.";
+          }
+
+          session.vehicleId = matchedVehicle.id;
+          session.vehicleName = '${matchedVehicle.brand} ${matchedVehicle.model}';
+          session.vehiclePrice = matchedVehicle.pricePerDay;
+          session.type = matchedVehicle.category;
+          session.branch = branchName;
+
+          session.currentStep = 3;
+          return await _askBranchSelection(session, params);
+        } catch (_) {
+          session.reset();
+          return "No matching vehicle was found.";
+        }
 
       case 3: // Branch Selected -> Ask Pickup Date
         List<String> branchNames = [];
@@ -1443,6 +1648,42 @@ class LocalAIProvider implements AIProvider {
         return "Pickup time: **${session.pickupTime}**.\n\n**Step 6 of 8**: Click the button below to pick your Return Date:";
 
       case 6: // Return Date Selected -> Ask Reward Points
+        final isOpenRequested = textLower.contains("don't know") ||
+            textLower.contains("do not know") ||
+            textLower.contains("open rental") ||
+            textLower.contains("open return") ||
+            textLower.contains("not sure") ||
+            textLower.contains("no fixed");
+
+        if (isOpenRequested) {
+          session.isOpenRental = true;
+          session.returnDate = null;
+          
+          session.currentStep = 7;
+          final uid = FirebaseAuth.instance.currentUser?.uid;
+          int rewardPoints = 0;
+          if (uid != null) {
+            try {
+              final user = await DatabaseService().getUser(uid);
+              rewardPoints = user?.rewardPoints ?? 0;
+            } catch (_) {}
+          }
+
+          if (rewardPoints > 0) {
+            final disc = rewardPoints * 0.10;
+            params['options'] = [
+              'No discount',
+              'Redeem $rewardPoints Points (RM ${disc.toStringAsFixed(0)} off)'
+            ];
+            return "You have selected an **Open Rental** (active until returned).\n\n"
+                "**Step 7 of 8**: You have **$rewardPoints** reward points available. Would you like to redeem them for a discount?";
+          } else {
+            session.pointsToRedeem = 0;
+            session.currentStep = 8;
+            return await _showBookingSummary(session, params);
+          }
+        }
+
         if (textLower.contains('return')) {
           final date = _extractDate(text);
           if (date == null) {
@@ -1453,6 +1694,7 @@ class LocalAIProvider implements AIProvider {
             params['request_date'] = 'return';
             return "Return date must be after pick-up date! Select a valid return date:";
           }
+          session.isOpenRental = false;
           session.returnDate = date;
           
           session.currentStep = 7;
@@ -1507,7 +1749,7 @@ class LocalAIProvider implements AIProvider {
           }
 
           try {
-            final rentalDays = session.returnDate!.difference(session.pickupDate!).inDays;
+            final rentalDays = session.isOpenRental ? 1 : session.returnDate!.difference(session.pickupDate!).inDays;
             final daysCount = rentalDays <= 0 ? 1 : rentalDays;
             final double basePrice = daysCount * (session.vehiclePrice ?? 180.0);
             final double discount = session.pointsToRedeem * 0.10;
@@ -1522,11 +1764,13 @@ class LocalAIProvider implements AIProvider {
             final bookingId = bookingRef.key!;
 
             DateTime pDate = session.pickupDate!;
-            DateTime rDate = session.returnDate!;
+            DateTime? rDate = session.isOpenRental ? null : session.returnDate;
             try {
               final parsedTime = DateFormat('hh:mm a').parse(session.pickupTime ?? '09:00 AM');
               pDate = DateTime(session.pickupDate!.year, session.pickupDate!.month, session.pickupDate!.day, parsedTime.hour, parsedTime.minute);
-              rDate = DateTime(session.returnDate!.year, session.returnDate!.month, session.returnDate!.day, parsedTime.hour, parsedTime.minute);
+              if (rDate != null) {
+                rDate = DateTime(rDate.year, rDate.month, rDate.day, parsedTime.hour, parsedTime.minute);
+              }
             } catch (_) {}
 
             final booking = BookingModel(
@@ -1538,6 +1782,7 @@ class LocalAIProvider implements AIProvider {
               userPhone: activeUserPhone,
               pickUpDate: pDate,
               returnDate: rDate,
+              isOpenRental: session.isOpenRental,
               totalPrice: finalTotal,
               depositAmount: deposit,
               status: 'Waiting for Payment', 
@@ -1636,7 +1881,7 @@ class LocalAIProvider implements AIProvider {
         }
 
       default:
-        return await _generateResponse(intent, text, session);
+        return await _generateResponse(intent, text, session, userRole);
     }
   }
 
@@ -1694,7 +1939,7 @@ class LocalAIProvider implements AIProvider {
   }
 
   Future<String> _showBookingSummary(BookingSessionState session, Map<String, dynamic> params) async {
-    final rentalDays = session.returnDate!.difference(session.pickupDate!).inDays;
+    final rentalDays = session.isOpenRental ? 1 : session.returnDate!.difference(session.pickupDate!).inDays;
     final daysCount = rentalDays <= 0 ? 1 : rentalDays;
     final double basePrice = daysCount * (session.vehiclePrice ?? 180.0);
     final double discount = session.pointsToRedeem * 0.10;
@@ -1707,9 +1952,9 @@ class LocalAIProvider implements AIProvider {
       'vehicleId': session.vehicleId,
       'branch': session.branch,
       'pickupDate': DateFormat('dd MMM yyyy').format(session.pickupDate!),
-      'returnDate': DateFormat('dd MMM yyyy').format(session.returnDate!),
+      'returnDate': session.isOpenRental ? 'Open Rental' : DateFormat('dd MMM yyyy').format(session.returnDate!),
       'pickupTime': session.pickupTime ?? '09:00 AM',
-      'days': daysCount,
+      'days': session.isOpenRental ? 'Open Ended' : daysCount,
       'pricePerDay': session.vehiclePrice,
       'totalPrice': basePrice,
       'discount': discount,
@@ -1718,20 +1963,35 @@ class LocalAIProvider implements AIProvider {
       'deposit': deposit,
       'balance': balance,
       'pointsToRedeem': session.pointsToRedeem,
+      'isOpenRental': session.isOpenRental,
     };
 
     params['summary'] = summary;
     params['options'] = ['Confirm Booking', 'Edit Details', 'Cancel Checkout'];
 
-    return "**Step 8 of 8**: Please review your Premium Booking Summary checkout receipt below:";
+    return "📋 **Booking Summary Confirmation**\n\n"
+        "• **Vehicle**: ${session.vehicleName}\n"
+        "• **Branch**: ${session.branch}\n"
+        "• **Pickup Date**: ${DateFormat('dd MMM yyyy').format(session.pickupDate!)}\n"
+        "• **Pickup Time**: ${session.pickupTime ?? '09:00 AM'}\n"
+        "• **Return Date**: ${session.isOpenRental ? 'Open Rental' : DateFormat('dd MMM yyyy').format(session.returnDate!)}\n"
+        "• **Rental Duration**: ${session.isOpenRental ? 'Open Ended' : '$daysCount Day(s)'}\n"
+        "• **Base Price**: RM ${basePrice.toStringAsFixed(2)} ${session.isOpenRental ? '(Daily Rate / deposit)' : '(RM ${session.vehiclePrice?.toStringAsFixed(0) ?? '180'}/day)'}\n"
+        "• **Discount Applied**: -RM ${discount.toStringAsFixed(2)}\n"
+        "• **Final Total**: RM ${finalTotal.toStringAsFixed(2)}\n"
+        "• **Deposit Amount**: RM ${deposit.toStringAsFixed(2)} (30% to confirm booking)\n"
+        "• **Payment Method**: Pending Checkout Selection\n\n"
+        "**Confirm Booking?**";
   }
 
   // ─────────────────────────────────────────────────────────────────────────
   //  General AI responses & intent logic (role-aware live Firebase stats)
   // ─────────────────────────────────────────────────────────────────────────
 
-  Future<String> _generateResponse(AIIntent intent, String text, BookingSessionState session) async {
+  Future<String> _generateResponse(AIIntent intent, String text, BookingSessionState session, String role) async {
     final textLower = text.toLowerCase();
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+
     if (textLower.contains('review') || textLower.contains('rating') || textLower.contains('feedback') || textLower.contains('comment') || textLower.contains('stars')) {
       List<VehicleModel> vehicles = [];
       try {
@@ -1767,11 +2027,152 @@ class LocalAIProvider implements AIProvider {
       }
     }
 
-    if (intent is UnknownIntent || intent.confidence < 0.5) {
-      return "I couldn't find that information in the current system data. Please select one of our guided popular actions cards or FAQs!";
+    final action = intent.parameters['action'];
+
+    // ──────────────────────────────────────────
+    // ADMIN FLOWS
+    // ──────────────────────────────────────────
+    if (role == 'admin') {
+      if (intent is BookingIntent) {
+        List<BookingModel> bookings = [];
+        try { bookings = await BookingService().getBookings(); } catch (_) {}
+
+        if (action == 'admin_today_bookings' || textLower.contains('today')) {
+          final today = DateTime.now();
+          final todayStr = DateFormat('yyyy-MM-dd').format(today);
+          final todayBookings = bookings.where((b) => DateFormat('yyyy-MM-dd').format(b.pickUpDate) == todayStr).toList();
+
+          if (todayBookings.isEmpty) return "Based on live Firebase data, there are no bookings scheduled for pickup today.";
+          return "Found **${todayBookings.length}** active bookings scheduled for pick-up today:\n"
+              "${todayBookings.map((b) => '• **${b.userName}** - ${b.vehicleName} (Ref: `#${b.id.substring(0, 5).toUpperCase()}`, Status: **${b.status}** - RM ${b.totalPrice.toStringAsFixed(0)})').join('\n')}";
+        }
+
+        if (action == 'admin_overdue_bookings' || textLower.contains('overdue')) {
+          final overdue = bookings.where((b) => b.status.toLowerCase() == 'overdue').toList();
+          
+          if (overdue.isEmpty) return "Based on live Firebase data, there are currently no overdue bookings.";
+          return "🚨 Found **${overdue.length}** overdue vehicle bookings in system database:\n"
+              "${overdue.map((b) => '• **${b.userName}** (${b.userPhone}) - ${b.vehicleName} (Ref: `#${b.id.substring(0, 5).toUpperCase()}`, Return Date: **${b.returnDate != null ? DateFormat('dd MMM').format(b.returnDate!) : "Open Rental"}** - Status: **${b.status.toUpperCase()}**)').join('\n')}";
+        }
+
+        return "Opening administrative bookings tab. There are currently **${bookings.length}** total reservations saved in the system.";
+      }
+
+      if (intent is VehicleSearchIntent || action == 'admin_available_vehicles' || (textLower.contains('available') && textLower.contains('car'))) {
+        List<VehicleModel> vehicles = [];
+        try { vehicles = await VehicleService().getVehicles(); } catch (_) {}
+        final available = vehicles.where((v) => v.status.toLowerCase() == 'available').toList();
+
+        if (available.isEmpty) return "Based on live Firebase fleet records, there are currently no available vehicles.";
+        return "🚗 Found **${available.length}** currently available vehicles in the database:\n"
+            "${available.map((v) => '• **${v.brand} ${v.model}** (Plate: **${v.plateNumber}**, Rate: **RM ${v.pricePerDay.toStringAsFixed(0)}/day** - Branch: **${v.branchName.isEmpty ? 'Kuala Lumpur' : v.branchName}**)').join('\n')}";
+      }
+
+      if (intent is MaintenanceIntent || action == 'admin_maintenance_schedule' || textLower.contains('maintenance')) {
+        List<dynamic> jobs = [];
+        try { jobs = await MaintenanceService().getMaintenanceJobs(); } catch (_) {}
+        final activeJobs = jobs.where((j) => j.status == 'Scheduled' || j.status == 'In Progress').toList();
+
+        if (activeJobs.isEmpty) return "Based on live Firebase maintenance records, there are no active or scheduled maintenance jobs.";
+        return "🔧 Found **${activeJobs.length}** active/scheduled maintenance logs:\n"
+            "${activeJobs.map((j) => '• **${j.vehicleName}**: ${j.title} (${j.status}) - Cost: **RM ${j.cost.toStringAsFixed(2)}** (End Date: **${j.endDate}**)').join('\n')}";
+      }
+
+      if (intent is PaymentIntent || action == 'admin_payment_stats' || textLower.contains('revenue') || textLower.contains('payment')) {
+        List<PaymentModel> payments = [];
+        try { payments = await PaymentService().getPayments(); } catch (_) {}
+        
+        double totalRev = 0.0;
+        int approvedCount = 0;
+        int pendingCount = 0;
+        double pendingAmount = 0.0;
+        final Map<String, int> methods = {};
+        
+        for (final p in payments) {
+          final pStat = (p.paymentStatus ?? p.status).toLowerCase();
+          if (pStat == 'approved' || pStat == 'paid') {
+            totalRev += p.amount;
+            approvedCount++;
+            methods[p.paymentMethod] = (methods[p.paymentMethod] ?? 0) + 1;
+          } else if (pStat == 'pending' || pStat == 'waiting') {
+            pendingCount++;
+            pendingAmount += p.amount;
+          }
+        }
+
+        return "💰 **Payment & Revenue Statistics Summary** (Live Firebase data):\n\n"
+            "• **Total Revenue (Paid/Approved)**: RM ${totalRev.toStringAsFixed(2)} ($approvedCount transactions)\n"
+            "• **Pending Clearance**: RM ${pendingAmount.toStringAsFixed(2)} ($pendingCount transactions)\n"
+            "• **Payment Method breakdown (Approved)**:\n"
+            "${methods.entries.map((e) => '  - ${e.key}: ${e.value} times').join('\n')}";
+      }
+
+      if (intent is CustomerIntent || action == 'admin_customer_info' || textLower.contains('customer')) {
+        List<UserModel> users = [];
+        try { users = await DatabaseService().getUsers(); } catch (_) {}
+        final customers = users.where((u) => u.role == 'customer').toList();
+
+        if (customers.isEmpty) return "Based on live Firebase records, no customer profiles are stored.";
+        
+        final listStr = customers.take(10).map((u) {
+          final status = u.licenseStatus == 'verified' ? '✅ Verified' : (u.licenseStatus == 'pending' ? '⏳ Pending' : '❌ Unverified');
+          return "• **${u.fullName}** - ${u.email} (${u.phone.isEmpty ? 'No Phone' : u.phone}) [License: $status]";
+        }).join('\n');
+
+        return "👥 **Customer Registry Overview** (Displaying first 10 matches):\n\n"
+            "$listStr\n\nTotal Customers registered: **${customers.length}**.";
+      }
+
+      if (intent is DashboardIntent || action == 'admin_dashboard_stats' || textLower.contains('dashboard') || textLower.contains('statistics')) {
+        List<BookingModel> bookings = [];
+        List<VehicleModel> vehicles = [];
+        List<PaymentModel> payments = [];
+        List<UserModel> users = [];
+        try {
+          bookings = await BookingService().getBookings();
+          vehicles = await VehicleService().getVehicles();
+          payments = await PaymentService().getPayments();
+          users = await DatabaseService().getUsers();
+        } catch (_) {}
+
+        final availableCount = vehicles.where((v) => v.status.toLowerCase() == 'available').length;
+        final overdueCount = bookings.where((b) => b.status.toLowerCase() == 'overdue').length;
+        final pendingPaymentsCount = payments.where((p) => (p.paymentStatus ?? p.status).toLowerCase() == 'pending').length;
+
+        return "📊 **Carent System Dashboard Statistics** (Live Firebase Summary):\n\n"
+            "• **Total Fleet size**: ${vehicles.length} Vehicles (**$availableCount available**)\n"
+            "• **Reservations**: ${bookings.length} Bookings (**$overdueCount overdue**)\n"
+            "• **Payments Ledger**: ${payments.length} Transactions (**$pendingPaymentsCount pending**)\n"
+            "• **User Accounts**: ${users.length} Users (**${users.where((u) => u.role == 'customer').length} customers**)";
+      }
+
+      if (intent is NotificationIntent || action == 'admin_notifications' || textLower.contains('notification')) {
+        final snap = await FirebaseDatabase.instance.ref().child('notifications').get();
+        final list = <NotificationModel>[];
+        if (snap.exists) {
+          final Map<dynamic, dynamic> data = snap.value as Map<dynamic, dynamic>;
+          data.forEach((k, v) {
+            list.add(NotificationModel.fromMap(k.toString(), v as Map));
+          });
+        }
+        
+        list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        final recent = list.take(5).toList();
+
+        if (recent.isEmpty) return "Based on live Firebase notifications log, there are currently no recent alerts.";
+        return "🔔 **Recent System Alerts & Notifications**:\n\n"
+            "${recent.map((n) => '• [${DateFormat('dd MMM HH:mm').format(n.createdAt)}] **${n.title}**: ${n.message}').join('\n')}";
+      }
     }
 
+    // ──────────────────────────────────────────
+    // CUSTOMER FLOWS
+    // ──────────────────────────────────────────
     if (intent is VehicleSearchIntent) {
+      if (action == 'recommend_vehicles' || textLower.contains('recommend')) {
+        return await _recommendVehicles(uid ?? 'guest', intent.parameters);
+      }
+
       final category = intent.parameters['category']?.toString();
       final maxPrice = intent.parameters['max_price'] as double?;
       final transmission = intent.parameters['transmission']?.toString();
@@ -1802,101 +2203,178 @@ class LocalAIProvider implements AIProvider {
     }
 
     if (intent is BookingIntent) {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) return "Please log in to manage bookings.";
+      List<BookingModel> bookings = [];
+      try { bookings = await BookingService().getUserBookings(uid); } catch (_) {}
 
-      String role = 'customer';
-      try {
-        final user = await DatabaseService().getUser(uid);
-        role = user?.role ?? 'customer';
-      } catch (_) {}
-
-      final action = intent.parameters['action'];
-
-      if (role == 'admin') {
-        List<BookingModel> bookings = [];
-        try { bookings = await BookingService().getBookings(); } catch (_) {}
-        
-        if (action == 'admin_today_bookings') {
-          final today = DateTime.now();
-          final todayStr = DateFormat('yyyy-MM-dd').format(today);
-          final todayBookings = bookings.where((b) => DateFormat('yyyy-MM-dd').format(b.pickUpDate) == todayStr).toList();
-
-          if (todayBookings.isEmpty) return "There are no bookings scheduled for pickup today.";
-          return "Found **${todayBookings.length}** active bookings scheduled for pick-up today:\n"
-              "${todayBookings.map((b) => '• **${b.userName}** - ${b.vehicleName} (RM ${b.totalPrice.toStringAsFixed(0)})').join('\n')}";
-        }
-        return "Opening administrative bookings tab. There are currently **${bookings.length}** total reservations saved in the system.";
-      } else {
-        // Customer
-        List<BookingModel> bookings = [];
-        try { bookings = await BookingService().getUserBookings(uid); } catch (_) {}
-
-        if (action == 'cancel_booking') {
-          final active = bookings.where((b) => b.status.toLowerCase() != 'completed' && b.status.toLowerCase() != 'cancelled' && b.status.toLowerCase() != 'rejected').toList();
-          if (active.isEmpty) return "You do not have any active bookings that can be cancelled.";
-          return "Opening the bookings cancellation screen. Please select the active booking you wish to cancel.";
-        }
-
-        if (bookings.isEmpty) return "I couldn't find any bookings on your customer account in Firebase.";
-        final latest = bookings.first;
-        return "I found **${bookings.length}** bookings on your account. Your latest booking: **${latest.vehicleName}** (Status: **${latest.status.toUpperCase()}**).";
+      if (action == 'cancel_booking') {
+        final active = bookings.where((b) => b.status.toLowerCase() != 'completed' && b.status.toLowerCase() != 'cancelled' && b.status.toLowerCase() != 'rejected').toList();
+        if (active.isEmpty) return "You do not have any active bookings that can be cancelled.";
+        return "Opening the bookings cancellation screen. Please select the active booking you wish to cancel.";
       }
+
+      if (bookings.isEmpty) return "I couldn't find any bookings on your customer account in Firebase.";
+      final listStr = bookings.map((b) => "• **${b.vehicleName}** (Ref: `#${b.id.substring(0, 5).toUpperCase()}`, Status: **${b.status.toUpperCase()}**) - Pickup: **${DateFormat('dd MMM yyyy').format(b.pickUpDate)}**").join('\n');
+      return "📜 **My Active & Past Bookings** (Live tracking):\n\n$listStr";
     }
 
     if (intent is RewardIntent) {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) return "Please log in to view reward points.";
-
       int points = 0;
       try { points = await RewardPointsService().getUserPoints(uid); } catch (_) {}
+      final status = CompanySettingsProvider().getMembershipStatus(points);
       final discount = RewardPointsService().calculateDiscount(points);
+
+      // Check if user is asking "What membership am I?" or similar
+      if (textLower.contains('what membership') || textLower.contains('my membership') || textLower.contains('what tier') || textLower.contains('my tier') || textLower.contains('what level') || textLower.contains('my level') || textLower.contains('membership level') || textLower.contains('membership tier')) {
+        String benefits = '';
+        switch (status.currentLevel) {
+          case 'Premium':
+            benefits = "Open Rental access (no upfront payment!), 1.5x Reward Points earning multiplier, and priority booking approval.";
+            break;
+          case 'Gold':
+            benefits = "Priority booking approval, exclusive promotions, and dynamic discount points redemptions.";
+            break;
+          case 'Silver':
+            benefits = "Dynamic discount rewards, priority support, and standard earnings.";
+            break;
+          default:
+            benefits = "Standard points earnings and standard booking approval.";
+        }
+        
+        String nextLevelMsg = status.currentLevel == 'Premium'
+            ? "You have reached the maximum membership level! 🎉"
+            : "You need **${status.pointsNeededForNext}** more points to unlock **${status.nextLevel}** membership.";
+            
+        return "⭐ **My Membership Details** ⭐\n\n"
+            "• **Current Tier**: **${status.currentLevel} Member**\n"
+            "• **Reward Points**: **$points points**\n"
+            "• **Tier Benefits**: $benefits\n\n"
+            "$nextLevelMsg";
+      }
+
+      // Check if user is asking "How do I unlock Open Rental?" or similar
+      if (textLower.contains('unlock open rental') || textLower.contains('open rental access') || textLower.contains('how to get open rental') || textLower.contains('how do i get open rental')) {
+        if (status.currentLevel == 'Premium') {
+          return "🎉 **Open Rental is unlocked!** As a **Premium Member**, you are eligible for Open Rental with no upfront payment. Simply choose the 'Open Rental' return option during checkout!";
+        }
+        
+        final needed = CompanySettingsProvider().premiumThreshold - points;
+        return "🚙 **Unlocking Open Rental**\n\n"
+            "Open Rental is an exclusive feature available only for **Premium Members** (requires **${CompanySettingsProvider().premiumThreshold} points**).\n\n"
+            "• Your Current Tier: **${status.currentLevel} Member**\n"
+            "• Your Reward Points: **$points points**\n"
+            "• Points Needed for Premium: **$needed points**\n\n"
+            "Complete more bookings or payments to earn points and unlock Open Rental!";
+      }
+
+      final matchRedeem = RegExp(r'(?:redeem|use|select)\s*(\d+)').firstMatch(textLower);
+      if (matchRedeem != null) {
+        final ptsToRedeem = int.tryParse(matchRedeem.group(1) ?? '') ?? 0;
+        int limit = 1000;
+        try {
+          final limitSnap = await FirebaseDatabase.instance.ref().child('company_settings').child('maxRewardPointsLimit').get();
+          if (limitSnap.exists && limitSnap.value != null) {
+            limit = int.tryParse(limitSnap.value.toString()) ?? 1000;
+          }
+        } catch (_) {}
+        final maxAllowed = min(points, limit);
+        if (ptsToRedeem > maxAllowed) {
+          return "You cannot redeem $ptsToRedeem points. Your maximum allowed redemption is $maxAllowed points.";
+        }
+        
+        if (session.currentStep == 7) {
+          session.pointsToRedeem = ptsToRedeem;
+          session.currentStep = 8;
+          return await _showBookingSummary(session, intent.parameters);
+        } else {
+          final discAmt = ptsToRedeem * 0.10;
+          return "Confirmed! You have selected to redeem **$ptsToRedeem** reward points. This is equivalent to **RM ${discAmt.toStringAsFixed(2)}** discount on your next rental. 🎁";
+        }
+      }
+
+      if (textLower.contains('use') || textLower.contains('redeem') || textLower.contains('apply')) {
+        intent.parameters['action'] = 'redeem_rewards_slider';
+        intent.parameters['availablePoints'] = points;
+        int limit = 1000;
+        try {
+          final limitSnap = await FirebaseDatabase.instance.ref().child('company_settings').child('maxRewardPointsLimit').get();
+          if (limitSnap.exists && limitSnap.value != null) {
+            limit = int.tryParse(limitSnap.value.toString()) ?? 1000;
+          }
+        } catch (_) {}
+        intent.parameters['maxPointsLimit'] = limit;
+        return "Sure! Please use the interactive slider below to select how many reward points you would like to redeem for a discount. 🛍️";
+      }
 
       return "You have **$points** loyalty reward points balance. This is equivalent to **RM ${discount.toStringAsFixed(2)}** discount on your next rent! ⭐";
     }
 
     if (intent is PaymentIntent) {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) return "Please log in to view payments.";
 
-      String role = 'customer';
-      try {
-        final user = await DatabaseService().getUser(uid);
-        role = user?.role ?? 'customer';
-      } catch (_) {}
+      if (intent.parameters['action'] == 'check_debts') {
+        List<BookingModel> bookings = [];
+        List<VehicleModel> vehicles = [];
+        try {
+          bookings = await BookingService().getUserBookings(uid);
+          vehicles = await VehicleService().getVehicles();
+        } catch (_) {}
 
-      final action = intent.parameters['action'];
+        final activeBookings = bookings.where((b) {
+          final s = b.status.toLowerCase();
+          return s == 'active' || s == 'ongoing' || s == 'overdue' || s == 'awaiting final payment' || s == 'return requested';
+        }).toList();
 
-      if (role == 'admin') {
-        if (action == 'admin_revenue_today') {
-          double rev = 0.0;
-          try {
-            final payments = await PaymentService().getPayments();
-            final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
-            for (final p in payments) {
-              final pStat = (p.paymentStatus ?? p.status).toLowerCase();
-              if (pStat == 'approved' || pStat == 'paid') {
-                if (DateFormat('yyyy-MM-dd').format(p.paymentDate) == todayStr) {
-                  rev += p.amount;
-                }
-              }
-            }
-          } catch (_) {}
-          return "Today's approved ledger revenue is **RM ${rev.toStringAsFixed(2)}**. 💰";
+        if (activeBookings.isEmpty) {
+          return "😊 You have no active rentals or outstanding balances at the moment. All payments are fully cleared!";
         }
-        return "Opening administrative payments ledger overview.";
-      } else {
-        return "Opening your payments history screen.";
+
+        final now = DateTime.now();
+        String response = "💰 **Your Outstanding Balance & Rental Charges**:\n\n";
+        for (final b in activeBookings) {
+          double pricePerDay = 100.0;
+          try {
+            pricePerDay = vehicles.firstWhere((v) => v.id == b.vehicleId).pricePerDay;
+          } catch (_) {}
+
+          final overdue = BookingService.getOverdueDetails(b, pricePerDay, now: now);
+          
+          final cleaningFee = (b.returnInspection?['cleaningFee'] ?? 0.0).toDouble();
+          final damageFee = (b.returnInspection?['damageFee'] ?? 0.0).toDouble();
+          final extraCharges = (b.returnInspection?['extraCharges'] ?? 0.0).toDouble();
+          
+          final overdueCharges = (overdue['charges'] as num).toDouble();
+          final rentalCost = b.totalPrice;
+          final totalOwed = rentalCost + overdueCharges + cleaningFee + damageFee + extraCharges;
+
+          response += "🚗 **Vehicle: ${b.vehicleName}** (Ref: `#${b.id.substring(0, 5).toUpperCase()}`)\n"
+              "  - Rental Cost: **RM ${rentalCost.toStringAsFixed(2)}**\n"
+              "  - Overdue Charges: **RM ${overdueCharges.toStringAsFixed(2)}** (${overdue['days']}d ${overdue['hours']}h overdue)\n"
+              "  - Cleaning Fee: **RM ${cleaningFee.toStringAsFixed(2)}**\n"
+              "  - Damage Fee: **RM ${damageFee.toStringAsFixed(2)}**\n"
+              "  - Other Charges: **RM ${extraCharges.toStringAsFixed(2)}**\n"
+              "  - **Current Total Owed**: **RM ${totalOwed.toStringAsFixed(2)}**\n"
+              "  - Booking Status: **${b.status}**\n\n";
+        }
+        
+        response += "To complete payment, please visit the **Pay Now** tab under your Bookings menu.";
+        return response;
       }
+
+      List<PaymentModel> payments = [];
+      try { payments = await PaymentService().getPayments(); } catch (_) {}
+      final userPayments = payments.where((p) => p.userId == uid || p.customerUid == uid).toList();
+
+      if (userPayments.isEmpty) {
+        return "Based on live Firebase data, you have no payment transactions recorded.";
+      }
+      final listStr = userPayments.map((p) => "• **RM ${p.amount.toStringAsFixed(2)}** for Booking `#${p.bookingId.substring(0, 5).toUpperCase()}` (Ref: `${p.transactionId}`, Date: **${DateFormat('dd MMM yyyy').format(p.paymentDate)}** - Status: **${p.status.toUpperCase()}** - Method: **${p.paymentMethod}**)").join('\n');
+      return "💳 **My Payment Transaction Ledger**:\n\n$listStr";
     }
 
     if (intent is MaintenanceIntent) {
-      List<dynamic> jobs = [];
-      try {
-        jobs = await MaintenanceService().getMaintenanceJobs();
-      } catch (_) {}
-      final activeJobs = jobs.where((j) => j.status == 'Scheduled' || j.status == 'In Progress').toList();
-      return "Opening vehicle maintenance dashboard. Currently tracking **${activeJobs.length}** active repair/service schedules in the system.";
+      return "The maintenance portal is only accessible by administrative operators.";
     }
 
     if (intent is SupportIntent) {
@@ -1921,7 +2399,647 @@ class LocalAIProvider implements AIProvider {
       return "Redirecting navigation to your request...";
     }
 
+    if (intent is UnknownIntent || intent.confidence < 0.5) {
+      return "I couldn't find that information in the current system data. Please select one of our guided popular actions cards or FAQs!";
+    }
+
     return "Redirecting to your request... 🚗";
+  }
+
+  Future<AIResponse> _processAdminMessage(
+    String text,
+    BookingSessionState session,
+    Map<String, dynamic> params,
+    AIIntent intent,
+  ) async {
+    final cleanedText = text.trim().toLowerCase();
+    final textLower = cleanedText;
+
+    // AI admin extension approvals
+    if (textLower.contains('approve') && (textLower.contains('extension') || textLower.contains('extend'))) {
+      final bookings = await BookingService().getBookings();
+      BookingModel? targetBooking;
+      for (final b in bookings) {
+        if (b.extensionRequest != null && b.extensionRequest!['status'] == 'pending') {
+          final lowerName = b.userName.toLowerCase();
+          final lowerId = b.id.toLowerCase();
+          final cleanQuery = textLower.replaceAll('approve', '').replaceAll('extension', '').replaceAll('extend', '').replaceAll('\'s', '').trim();
+          if (lowerName.contains(cleanQuery) || lowerId.contains(cleanQuery) || cleanQuery.isEmpty) {
+            targetBooking = b;
+            break;
+          }
+        }
+      }
+
+      if (targetBooking != null) {
+        await BookingService().approveExtension(targetBooking.id);
+        return AIResponse(
+          message: "🎉 **Confirmed!** Successfully approved the rental extension request for **${targetBooking.userName}**'s booking **#${targetBooking.id.substring(0, 5).toUpperCase()}**.\n\n"
+                   "• Customer: **${targetBooking.userName}**\n"
+                   "• New Return: **${DateFormat('dd MMM yyyy hh:mm a').format(DateTime.parse(targetBooking.extensionRequest!['newReturnDate']))}**\n"
+                   "• Additional cost added: **RM ${targetBooking.extensionRequest!['additionalCost'].toStringAsFixed(2)}**",
+          intent: intent,
+          confidence: 1.0,
+          action: 'approve_extension',
+          parameters: {'bookingId': targetBooking.id},
+        );
+      } else {
+        return AIResponse(
+          message: "Could not find any pending extension request matching your search query.",
+          intent: intent,
+          confidence: 1.0,
+          action: 'error',
+          parameters: const {},
+        );
+      }
+    }
+
+    // AI admin return completion
+    if ((textLower.contains('complete') || textLower.contains('finish')) && (textLower.contains('return') || textLower.contains('checkout'))) {
+      final bookings = await BookingService().getBookings();
+      BookingModel? targetBooking;
+      for (final b in bookings) {
+        final statusLower = b.status.toLowerCase();
+        if (statusLower == 'return requested' || statusLower == 'active' || statusLower == 'ongoing' || statusLower == 'overdue') {
+          final lowerName = b.userName.toLowerCase();
+          final lowerId = b.id.toLowerCase();
+          final cleanQuery = textLower.replaceAll('complete', '').replaceAll('finish', '').replaceAll('return', '').replaceAll('checkout', '').replaceAll('for', '').replaceAll('booking', '').replaceAll('#', '').replaceAll('\'s', '').trim();
+          if (lowerName.contains(cleanQuery) || lowerId.contains(cleanQuery) || cleanQuery.isEmpty) {
+            targetBooking = b;
+            break;
+          }
+        }
+      }
+
+      if (targetBooking != null) {
+        final inspection = {
+          'condition': 'Excellent',
+          'fuelLevel': 'Full (8/8)',
+          'mileage': 10000,
+          'damageNotes': 'None (AI Automated Quick Complete)',
+          'cleaningFee': 0.0,
+          'extraCharges': 0.0,
+          'completedAt': DateTime.now().toIso8601String(),
+        };
+        await BookingService().completeReturn(targetBooking.id, inspection);
+        return AIResponse(
+          message: "✅ **Return Completed!** Booking **#${targetBooking.id.substring(0, 5).toUpperCase()}** has been successfully returned and finalized.\n\n"
+                   "• Customer: **${targetBooking.userName}**\n"
+                   "• Vehicle: **${targetBooking.vehicleName}**\n"
+                   "• Status: **Completed** 🏁",
+          intent: intent,
+          confidence: 1.0,
+          action: 'complete_return',
+          parameters: {'bookingId': targetBooking.id},
+        );
+      } else {
+        return AIResponse(
+          message: "Could not find any active or return-requested booking matching your query.",
+          intent: intent,
+          confidence: 1.0,
+          action: 'error',
+          parameters: const {},
+        );
+      }
+    }
+
+    // 0. Reward points adjustments
+    if (textLower.contains('reward points') || textLower.contains('points')) {
+      final addMatch = RegExp(r'(?:add|credit)\s+(\d+)\s+(?:reward\s+)?points\s+(?:to\s+)?([a-zA-Z\s]+)').firstMatch(textLower);
+      final deductMatch = RegExp(r'(?:remove|deduct|debit)\s+(\d+)\s+(?:reward\s+)?points\s+(?:from\s+)?([a-zA-Z\s]+)').firstMatch(textLower);
+
+      if (addMatch != null || deductMatch != null) {
+        final isAdd = addMatch != null;
+        final match = isAdd ? addMatch : deductMatch!;
+        final amount = int.tryParse(match.group(1) ?? '') ?? 0;
+        final targetName = (match.group(2) ?? '').trim();
+
+        if (amount <= 0) {
+          return AIResponse(
+            message: "Amount must be a positive number.",
+            intent: intent,
+            confidence: 1.0,
+            action: 'error',
+            parameters: const {},
+          );
+        }
+
+        List<UserModel> users = [];
+        try { users = await DatabaseService().getUsers(); } catch (_) {}
+        final customers = users.where((u) => u.role == 'customer').toList();
+        UserModel? matchedCustomer;
+        for (final c in customers) {
+          if (c.fullName.toLowerCase().contains(targetName.toLowerCase())) {
+            matchedCustomer = c;
+            break;
+          }
+        }
+
+        if (matchedCustomer == null) {
+          return AIResponse(
+            message: "Could not find a customer named '$targetName' in the database.",
+            intent: intent,
+            confidence: 1.0,
+            action: 'error',
+            parameters: const {},
+          );
+        }
+
+        try {
+          final change = isAdd ? amount : -amount;
+          await RewardPointsService().adjustPoints(
+            matchedCustomer.id,
+            change,
+            "AI Assistant Adjustment",
+          );
+          final updatedPoints = max(0, matchedCustomer.rewardPoints + change);
+          final actionLabel = isAdd ? "credited to" : "deducted from";
+          return AIResponse(
+            message: "🎉 **Confirmed!** Successfully $actionLabel **${matchedCustomer.fullName}**'s account by **$amount** reward points.\n\n"
+                     "• User: **${matchedCustomer.fullName}**\n"
+                     "• Adjustment: **${change >= 0 ? '+' : ''}$change points**\n"
+                     "• New Balance: **$updatedPoints Points** ⭐",
+            intent: intent,
+            confidence: 1.0,
+            action: 'admin_adjust_points_success',
+            parameters: const {'options': ['📊 Dashboard', 'Reward Points']},
+          );
+        } catch (e) {
+          return AIResponse(
+            message: "Failed to adjust points for ${matchedCustomer.fullName}: $e",
+            intent: intent,
+            confidence: 1.0,
+            action: 'error',
+            parameters: const {},
+          );
+        }
+      }
+    }
+
+    // 1. Complete Booking #123
+    if (textLower.startsWith('complete booking #') || textLower.startsWith('complete booking ')) {
+      final id = text.split('#').last.trim();
+      try {
+        await FirebaseDatabase.instance.ref().child('bookings').child(id).update({'status': 'Completed'});
+        return AIResponse(
+          message: "🎉 **Booking #${id.substring(0, 5).toUpperCase()} has been marked as COMPLETED!**",
+          intent: const BookingIntent(confidence: 1.0),
+          confidence: 1.0,
+          action: 'complete_booking_success',
+          parameters: const {'options': ['📊 Dashboard', "Today's Bookings", "Overdue Bookings"]},
+        );
+      } catch (e) {
+        return AIResponse(message: "Failed to complete booking: $e", intent: intent, confidence: 1.0, action: 'error', parameters: const {});
+      }
+    }
+
+    // 2. Cancel Booking #123
+    if (textLower.startsWith('cancel booking #') || textLower.startsWith('cancel booking ')) {
+      final id = text.split('#').last.trim();
+      try {
+        final bSnap = await FirebaseDatabase.instance.ref().child('bookings').child(id).get();
+        if (bSnap.exists) {
+          final data = Map<dynamic, dynamic>.from(bSnap.value as Map);
+          final uid = data['userId'] ?? '';
+          final vehicleId = data['vehicleId'] ?? '';
+          final vehicleName = data['vehicleName'] ?? 'Vehicle';
+          await BookingService().cancelBooking(id, uid, vehicleId, vehicleName);
+          return AIResponse(
+            message: "🚨 **Booking #${id.substring(0, 5).toUpperCase()} has been CANCELLED successfully!**",
+            intent: const BookingIntent(confidence: 1.0),
+            confidence: 1.0,
+            action: 'cancel_booking_success',
+            parameters: const {'options': ['📊 Dashboard', "Today's Bookings", "Overdue Bookings"]},
+          );
+        }
+      } catch (e) {
+        return AIResponse(message: "Failed to cancel booking: $e", intent: intent, confidence: 1.0, action: 'error', parameters: const {});
+      }
+    }
+
+    // 3. Verify Payment #123
+    if (textLower.startsWith('verify payment #') || textLower.startsWith('verify payment ')) {
+      final id = text.split('#').last.trim();
+      try {
+        await FirebaseDatabase.instance.ref().child('payments').child(id).update({'status': 'Approved', 'paymentStatus': 'Approved'});
+        return AIResponse(
+          message: "💳 **Payment Proof Verified & Approved!** Transaction ID updated.",
+          intent: const PaymentIntent(confidence: 1.0),
+          confidence: 1.0,
+          action: 'verify_payment_success',
+          parameters: const {'options': ['📊 Dashboard', 'Show Pending Payments']},
+        );
+      } catch (e) {
+        return AIResponse(message: "Failed to verify payment: $e", intent: intent, confidence: 1.0, action: 'error', parameters: const {});
+      }
+    }
+
+    // 4. Open Booking #123
+    if (textLower.startsWith('open booking #') || textLower.startsWith('open booking ')) {
+      final id = text.split('#').last.trim();
+      return AIResponse(
+        message: "Opening Booking details panel for reference `#${id.toUpperCase()}`... 📅",
+        intent: const BookingIntent(confidence: 1.0),
+        confidence: 1.0,
+        action: 'view_bookings',
+        parameters: {
+          'bookingId': id,
+          'options': ['📊 Dashboard', "Today's Bookings", "Overdue Bookings"]
+        },
+      );
+    }
+
+    // 5. Open Vehicle [ID] or open vehicle details
+    if (textLower.startsWith('open vehicle ') || textLower.contains('vehicle details')) {
+      final id = text.split(' ').last.trim().replaceAll('[', '').replaceAll(']', '');
+      return AIResponse(
+        message: "Opening vehicle registry details panel... 🚗",
+        intent: const VehicleSearchIntent(confidence: 1.0),
+        confidence: 1.0,
+        action: 'search_vehicles',
+        parameters: {
+          'vehicleId': id,
+          'options': ['📊 Dashboard', 'Show Available Cars']
+        },
+      );
+    }
+
+    // 6. Complete Maintenance / Schedule Maintenance
+    if (textLower.startsWith('complete maintenance for ') || textLower.contains('complete maintenance')) {
+      final plate = text.split(' ').last.trim().toUpperCase();
+      try {
+        final jobs = await MaintenanceService().getMaintenanceJobs();
+        final matched = jobs.firstWhere((j) => (j.vehicleName.toUpperCase() == plate || j.vehicleName.toUpperCase().contains(plate)) && j.status != 'Completed');
+        await FirebaseDatabase.instance.ref().child('maintenance').child(matched.id).update({'status': 'Completed'});
+        return AIResponse(
+          message: "🔧 **Maintenance for vehicle $plate marked as Completed!** Vehicle status returned to Available.",
+          intent: const MaintenanceIntent(confidence: 1.0),
+          confidence: 1.0,
+          action: 'complete_maintenance_success',
+          parameters: const {'options': ['📊 Dashboard', 'Maintenance Schedule']},
+        );
+      } catch (e) {
+        return AIResponse(message: "Failed to update maintenance status for $plate: $e", intent: intent, confidence: 1.0, action: 'error', parameters: const {});
+      }
+    }
+
+    // 7. Overdue bookings statistics
+    if (textLower.contains('overdue')) {
+      List<BookingModel> bookings = [];
+      List<VehicleModel> vehicles = [];
+      try {
+        bookings = await BookingService().getBookings();
+        vehicles = await VehicleService().getVehicles();
+      } catch (_) {}
+      
+      final now = DateTime.now();
+      final overdue = bookings.where((b) {
+        if (b.status.toLowerCase() == 'completed' || b.status.toLowerCase() == 'cancelled' || b.status.toLowerCase() == 'rejected') return false;
+        if (b.isReturned || b.isOpenRental || b.returnDate == null) return false;
+        return now.isAfter(b.returnDate!);
+      }).toList();
+
+      if (overdue.isEmpty) {
+        return AIResponse(
+          message: "🎉 Excellent! There are currently **no overdue bookings** registered in the system.",
+          intent: intent,
+          confidence: 1.0,
+          action: 'admin_overdue_bookings',
+          parameters: const {'options': ['📊 Dashboard', 'Show Available Cars']},
+        );
+      }
+      final listStr = overdue.map((b) {
+        double pricePerDay = 100.0;
+        try {
+          pricePerDay = vehicles.firstWhere((v) => v.id == b.vehicleId).pricePerDay;
+        } catch (_) {}
+        final overdueDetails = BookingService.getOverdueDetails(b, pricePerDay, now: now);
+
+        return "• **${b.vehicleName}** (Ref: `#${b.id.substring(0, 5).toUpperCase()}`)\n"
+            "  - Customer: **${b.userName}** (${b.userPhone})\n"
+            "  - Due Return: **${b.returnDate != null ? DateFormat('dd MMM yyyy hh:mm a').format(b.returnDate!) : "Open Rental"}**\n"
+            "  - Overdue Time: **${overdueDetails['days']}d ${overdueDetails['hours']}h**\n"
+            "  - Current Charges: **RM ${overdueDetails['charges'].toStringAsFixed(2)}**\n"
+            "  - Payment Status: **${b.status}**";
+      }).join('\n\n');
+
+      // Create quick action chips for overdue bookings
+      final List<String> opt = [];
+      for (final b in overdue.take(3)) {
+        opt.add("Open Booking #${b.id}");
+        opt.add("Complete Booking #${b.id}");
+      }
+      opt.add('📊 Dashboard');
+
+      return AIResponse(
+        message: "🚨 **Overdue Reservations List** (Live Overdue tracking):\n\n$listStr",
+        intent: intent,
+        confidence: 1.0,
+        action: 'admin_overdue_bookings',
+        parameters: {'options': opt},
+      );
+    }
+
+    // 8. Pending Payments / Verify QR Payments
+    if (textLower.contains('pending payment') || textLower.contains('pending payments') || textLower.contains('verify payment') || textLower.contains('verify qr')) {
+      List<PaymentModel> payments = [];
+      try { payments = await PaymentService().getPayments(); } catch (_) {}
+      final pending = payments.where((p) => (p.paymentStatus ?? p.status).toLowerCase() == 'pending').toList();
+      if (pending.isEmpty) {
+        return AIResponse(
+          message: "All payment transactions are fully cleared and verified! No pending verifications.",
+          intent: intent,
+          confidence: 1.0,
+          action: 'admin_payment_stats',
+          parameters: const {'options': ['📊 Dashboard', 'Revenue Today']},
+        );
+      }
+      final listStr = pending.map((p) => 
+        "• **RM ${p.amount.toStringAsFixed(2)}** (Ref: `#${p.id.substring(0, 5).toUpperCase()}`) for Booking Ref: `#${p.bookingId.substring(0, 5).toUpperCase()}`\n"
+        "  - Payment Method: **${p.paymentMethod}** (Uploaded: ${DateFormat('dd MMM').format(p.paymentDate)})"
+      ).join('\n\n');
+
+      final List<String> opt = [];
+      for (final p in pending.take(3)) {
+        opt.add("Verify Payment #${p.id}");
+      }
+      opt.add('📊 Dashboard');
+
+      return AIResponse(
+        message: "⏳ **Pending Payments Verification Queue**:\n\n$listStr",
+        intent: intent,
+        confidence: 1.0,
+        action: 'admin_payment_stats',
+        parameters: {'options': opt},
+      );
+    }
+
+    // 9. Vehicles needing maintenance or due for service
+    if (textLower.contains('need maintenance') || textLower.contains('needing maintenance') || textLower.contains('due for service') || textLower.contains('under maintenance')) {
+      List<VehicleModel> vehicles = [];
+      try { vehicles = await VehicleService().getVehicles(); } catch (_) {}
+      
+      final needingMaintenance = vehicles.where((v) => 
+        v.status.toLowerCase() == 'maintenance' || 
+        v.status.toLowerCase() == 'unavailable'
+      ).toList();
+
+      if (needingMaintenance.isEmpty) {
+        return AIResponse(
+          message: "🚗 All fleet vehicles are fully operational and available! No vehicles currently require servicing.",
+          intent: intent,
+          confidence: 1.0,
+          action: 'admin_maintenance_schedule',
+          parameters: const {'options': ['📊 Dashboard', 'Show Available Cars']},
+        );
+      }
+
+      final listStr = needingMaintenance.map((v) => 
+        "• **${v.brand} ${v.model}** (Plate: **${v.plateNumber}**)\n"
+        "  - Current Status: **${v.status.toUpperCase()}** (Branch: ${v.branchName})"
+      ).join('\n\n');
+
+      final List<String> opt = [];
+      for (final v in needingMaintenance.take(4)) {
+        opt.add("Complete Maintenance for ${v.plateNumber}");
+      }
+      opt.add('📊 Dashboard');
+
+      return AIResponse(
+        message: "🔧 **Vehicles Under Maintenance / Needing Service**:\n\n$listStr",
+        intent: intent,
+        confidence: 1.0,
+        action: 'admin_maintenance_schedule',
+        parameters: {'options': opt},
+      );
+    }
+
+    // 10. Dashboard Stats
+    if (intent is DashboardIntent || textLower.contains('dashboard') || textLower.contains('summary') || textLower.contains('statistics')) {
+      List<BookingModel> bookings = [];
+      List<VehicleModel> vehicles = [];
+      List<PaymentModel> payments = [];
+      List<UserModel> users = [];
+      try {
+        bookings = await BookingService().getBookings();
+        vehicles = await VehicleService().getVehicles();
+        payments = await PaymentService().getPayments();
+        users = await DatabaseService().getUsers();
+      } catch (_) {}
+
+      final availableCount = vehicles.where((v) => v.status.toLowerCase() == 'available').length;
+      final overdueCount = bookings.where((b) => b.status.toLowerCase() == 'overdue').length;
+      final pendingPaymentsCount = payments.where((p) => (p.paymentStatus ?? p.status).toLowerCase() == 'pending').length;
+
+      return AIResponse(
+        message: "📊 **Carent System Dashboard Statistics** (Live Firebase Summary):\n\n"
+            "• **Total Fleet size**: ${vehicles.length} Vehicles (**$availableCount available**)\n"
+            "• **Reservations**: ${bookings.length} Bookings (**$overdueCount overdue**)\n"
+            "• **Payments Ledger**: ${payments.length} Transactions (**$pendingPaymentsCount pending**)\n"
+            "• **User Accounts**: ${users.length} Users (**${users.where((u) => u.role == 'customer').length} customers**)",
+        intent: intent,
+        confidence: 1.0,
+        action: 'admin_dashboard_stats',
+        parameters: const {
+          'options': ["Today's Bookings", "Overdue Bookings", "Available Cars", "Maintenance Schedule"]
+        },
+      );
+    }
+
+    // 11. Today's Bookings / Pickups / Returns
+    if (intent is BookingIntent && (params['action'] == 'admin_today_bookings' || textLower.contains('today'))) {
+      List<BookingModel> bookings = [];
+      try { bookings = await BookingService().getBookings(); } catch (_) {}
+      final today = DateTime.now();
+      final todayStr = DateFormat('yyyy-MM-dd').format(today);
+      final todayBookings = bookings.where((b) => DateFormat('yyyy-MM-dd').format(b.pickUpDate) == todayStr).toList();
+
+      if (todayBookings.isEmpty) {
+        return AIResponse(
+          message: "Based on live Firebase data, there are no bookings scheduled for pickup today.",
+          intent: intent,
+          confidence: 1.0,
+          action: 'admin_today_bookings',
+          parameters: const {'options': ['📊 Dashboard', 'Show Available Cars']},
+        );
+      }
+      final listStr = todayBookings.map((b) => 
+        "• **${b.userName}** - ${b.vehicleName} (Ref: `#${b.id.substring(0, 5).toUpperCase()}`, Status: **${b.status}** - RM ${b.totalPrice.toStringAsFixed(0)})"
+      ).join('\n');
+
+      final List<String> opt = [];
+      for (final b in todayBookings.take(3)) {
+        opt.add("Open Booking #${b.id}");
+        opt.add("Complete Booking #${b.id}");
+      }
+      opt.add('📊 Dashboard');
+
+      return AIResponse(
+        message: "Found **${todayBookings.length}** active bookings scheduled for pick-up today:\n$listStr",
+        intent: intent,
+        confidence: 1.0,
+        action: 'admin_today_bookings',
+        parameters: {'options': opt},
+      );
+    }
+
+    // 12. Available Vehicles Search
+    if (intent is VehicleSearchIntent || textLower.contains('available') || textLower.contains('fleet')) {
+      List<VehicleModel> vehicles = [];
+      try { vehicles = await VehicleService().getVehicles(); } catch (_) {}
+      final available = vehicles.where((v) => v.status.toLowerCase() == 'available').toList();
+
+      if (available.isEmpty) {
+        return AIResponse(
+          message: "Based on live Firebase fleet records, there are currently no available vehicles.",
+          intent: intent,
+          confidence: 1.0,
+          action: 'admin_available_vehicles',
+          parameters: const {'options': ['📊 Dashboard', 'Maintenance Schedule']},
+        );
+      }
+      final listStr = available.map((v) => 
+        "• **${v.brand} ${v.model}** (Plate: **${v.plateNumber}**, Rate: **RM ${v.pricePerDay.toStringAsFixed(0)}/day** - Branch: **${v.branchName.isEmpty ? 'Kuala Lumpur' : v.branchName}**)"
+      ).join('\n');
+
+      return AIResponse(
+        message: "🚗 Found **${available.length}** currently available vehicles in the database:\n$listStr",
+        intent: intent,
+        confidence: 1.0,
+        action: 'admin_available_vehicles',
+        parameters: const {'options': ['📊 Dashboard', 'Maintenance Schedule']},
+      );
+    }
+
+    // 13. Revenue Statistics
+    if (intent is PaymentIntent || textLower.contains('revenue') || textLower.contains('sales') || textLower.contains('profit')) {
+      List<PaymentModel> payments = [];
+      try { payments = await PaymentService().getPayments(); } catch (_) {}
+      
+      double totalRev = 0.0;
+      int approvedCount = 0;
+      int pendingCount = 0;
+      double pendingAmount = 0.0;
+      final Map<String, int> methods = {};
+      
+      for (final p in payments) {
+        final pStat = (p.paymentStatus ?? p.status).toLowerCase();
+        if (pStat == 'approved' || pStat == 'paid') {
+          totalRev += p.amount;
+          approvedCount++;
+          methods[p.paymentMethod] = (methods[p.paymentMethod] ?? 0) + 1;
+        } else if (pStat == 'pending' || pStat == 'waiting') {
+          pendingCount++;
+          pendingAmount += p.amount;
+        }
+      }
+
+      return AIResponse(
+        message: "💰 **Payment & Revenue Statistics Summary** (Live Firebase data):\n\n"
+            "• **Total Revenue (Paid/Approved)**: RM ${totalRev.toStringAsFixed(2)} ($approvedCount transactions)\n"
+            "• **Pending Clearance**: RM ${pendingAmount.toStringAsFixed(2)} ($pendingCount transactions)\n"
+            "• **Payment Method breakdown (Approved)**:\n"
+            "${methods.entries.map((e) => '  - ${e.key}: ${e.value} times').join('\n')}",
+        intent: intent,
+        confidence: 1.0,
+        action: 'admin_payment_stats',
+        parameters: const {'options': ['📊 Dashboard', 'Pending Payments']},
+      );
+    }
+
+    // 14. Support Tickets
+    if (intent is SupportIntent || textLower.contains('support') || textLower.contains('inbox') || textLower.contains('tickets')) {
+      return AIResponse(
+        message: "Opening the support tickets management dashboard view... 📥",
+        intent: intent,
+        confidence: 1.0,
+        action: 'view_support',
+        parameters: const {'options': ['📊 Dashboard', 'Show Pending Payments']},
+      );
+    }
+
+    // 15. Customer Lookup / Registry
+    if (intent is CustomerIntent || textLower.contains('customer') || textLower.contains('user')) {
+      List<UserModel> users = [];
+      try { users = await DatabaseService().getUsers(); } catch (_) {}
+      final customers = users.where((u) => u.role == 'customer').toList();
+
+      if (customers.isEmpty) {
+        return AIResponse(
+          message: "Based on live Firebase records, no customer profiles are stored.",
+          intent: intent,
+          confidence: 1.0,
+          action: 'admin_customer_info',
+          parameters: const {'options': ['📊 Dashboard']},
+        );
+      }
+      final listStr = customers.take(10).map((u) {
+        final status = u.licenseStatus == 'verified' ? '✅ Verified' : (u.licenseStatus == 'pending' ? '⏳ Pending' : '❌ Unverified');
+        return "• **${u.fullName}** - ${u.email} (${u.phone.isEmpty ? 'No Phone' : u.phone}) [License: $status]";
+      }).join('\n');
+
+      return AIResponse(
+        message: "👥 **Customer Registry Overview** (Displaying first 10 matches):\n\n"
+            "$listStr\n\nTotal Customers registered: **${customers.length}**.",
+        intent: intent,
+        confidence: 1.0,
+        action: 'admin_customer_info',
+        parameters: const {'options': ['📊 Dashboard', 'Verify Customer Documents']},
+      );
+    }
+
+    // 16. Reports flow or timeframe report
+    if (intent is ReportIntent || textLower.contains('report')) {
+      final tf = intent.parameters['timeframe'] as String?;
+      final tp = intent.parameters['type'] as String?;
+      if (tf != null && tp != null) {
+        return AIResponse(
+          message: "📊 **Generating report...**\n\nDirectly opening the **$tf $tp Report** for you.",
+          intent: intent,
+          confidence: 1.0,
+          action: 'view_reports',
+          parameters: {
+            'timeframe': tf,
+            'type': tp,
+            'action': 'view_reports',
+          },
+        );
+      }
+
+      session.reset();
+      session.adminReportStep = 1;
+      return AIResponse(
+        message: "Please select a timeframe for generating the ledger report summary:",
+        intent: intent,
+        confidence: 1.0,
+        action: 'report_flow',
+        parameters: const {
+          'options': ['Today', 'This Week', 'This Month', 'Cancel']
+        },
+      );
+    }
+
+    // 17. Live Tracking Maps
+    if (textLower.contains('track') || textLower.contains('map') || textLower.contains('location')) {
+      return AIResponse(
+        message: "Opening the real-time vehicle GPS tracking map... 🗺️",
+        intent: intent,
+        confidence: 1.0,
+        action: 'view_tracking',
+        parameters: const {'options': ['📊 Dashboard', 'Show Available Cars']},
+      );
+    }
+
+    // Default general management response
+    return AIResponse(
+      message: "I am your Admin Management Assistant. I can help you monitor dashboard stats, check overdue bookings, track pending payments, manage maintenance schedules, view system reports, or update vehicle profiles.\n\nHow can I help you manage the system today?",
+      intent: intent,
+      confidence: intent.confidence,
+      action: 'admin_general',
+      parameters: const {
+        'options': ["📊 Dashboard", "Today's Bookings", "Overdue Bookings", "Available Cars", "Maintenance Schedule"]
+      },
+    );
   }
 
   String _getFallbackAction(AIIntent intent) {
@@ -1942,6 +3060,131 @@ class LocalAIProvider implements AIProvider {
     if (intent is CustomerIntent) return 'view_customers';
     if (intent is NavigationIntent) return 'navigate_to';
     return 'unknown';
+  }
+
+  Map<String, dynamic> _extractEntities(String text, List<VehicleModel> vehicles) {
+    final lower = text.toLowerCase();
+    VehicleModel? matchedVehicle;
+    String? matchedCategory;
+    String? matchedTransmission;
+    double? matchedBudget;
+
+    // 1. Match exact brand + model or model
+    for (final v in vehicles) {
+      final brandModel = '${v.brand} ${v.model}'.toLowerCase();
+      final modelOnly = v.model.toLowerCase();
+      
+      if (lower.contains(brandModel) || lower.contains(modelOnly)) {
+        matchedVehicle = v;
+        break;
+      }
+    }
+
+    // 2. Match Category
+    final categories = vehicles.map((v) => v.category).toSet().toList();
+    for (final cat in categories) {
+      if (lower.contains(cat.toLowerCase())) {
+        matchedCategory = cat;
+        break;
+      }
+    }
+    if (matchedCategory == null) {
+      if (lower.contains('suv')) {
+        matchedCategory = 'SUV';
+      } else if (lower.contains('sedan')) {
+        matchedCategory = 'Sedan';
+      } else if (lower.contains('hatchback')) {
+        matchedCategory = 'Hatchback';
+      } else if (lower.contains('luxury') || lower.contains('premium')) {
+        matchedCategory = 'Luxury';
+      } else if (lower.contains('mpv') || lower.contains('family')) {
+        matchedCategory = 'Family';
+      } else if (lower.contains('pickup') || lower.contains('truck')) {
+        matchedCategory = 'Pickup';
+      }
+    }
+
+    // 3. Match Transmission
+    if (lower.contains('automatic') || lower.contains('auto')) {
+      matchedTransmission = 'Automatic';
+    } else if (lower.contains('manual')) {
+      matchedTransmission = 'Manual';
+    }
+
+    // 4. Match Budget
+    final budgetRegex = RegExp(r'(?:under|below|max|rm)\s*(\d+)');
+    final match = budgetRegex.firstMatch(lower);
+    if (match != null) {
+      matchedBudget = double.tryParse(match.group(1) ?? '');
+    }
+
+    return {
+      'vehicle': matchedVehicle,
+      'category': matchedCategory,
+      'transmission': matchedTransmission,
+      'budget': matchedBudget,
+    };
+  }
+
+  Future<String> _recommendVehicles(String uid, Map<String, dynamic> params) async {
+    final vehicles = await VehicleService().getVehicles();
+    final available = vehicles.where((v) => v.status.toLowerCase() == 'available').toList();
+    
+    if (available.isEmpty) {
+      return "I checked our live database, but all vehicles are currently rented out. Please check back later!";
+    }
+
+    // Try to find previous rentals for this customer to understand preference
+    String? preferredCategory;
+    try {
+      final bookings = await BookingService().getUserBookings(uid);
+      if (bookings.isNotEmpty) {
+        final countMap = <String, int>{};
+        for (final b in bookings) {
+          final vSnap = await FirebaseDatabase.instance.ref().child('vehicles').child(b.vehicleId).get();
+          if (vSnap.exists) {
+            final cat = (vSnap.value as Map)['category']?.toString();
+            if (cat != null) {
+              countMap[cat] = (countMap[cat] ?? 0) + 1;
+            }
+          }
+        }
+        if (countMap.isNotEmpty) {
+          final sorted = countMap.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+          preferredCategory = sorted.first.key;
+        }
+      }
+    } catch (_) {}
+
+    // Let's sort available vehicles by ratings and match preferences
+    final ratedVehicles = <VehicleModel, double>{};
+    for (final v in available) {
+      final reviews = await ReviewService().getVehicleReviews(v.id);
+      double avg = 4.5;
+      if (reviews.isNotEmpty) {
+        avg = reviews.map((r) => r.rating).reduce((a, b) => a + b) / reviews.length;
+      }
+      ratedVehicles[v] = avg;
+    }
+
+    final sortedRecommendations = available.toList();
+    sortedRecommendations.sort((a, b) {
+      if (preferredCategory != null) {
+        if (a.category == preferredCategory && b.category != preferredCategory) return -1;
+        if (a.category != preferredCategory && b.category == preferredCategory) return 1;
+      }
+      final ratingA = ratedVehicles[a] ?? 4.5;
+      final ratingB = ratedVehicles[b] ?? 4.5;
+      return ratingB.compareTo(ratingA);
+    });
+
+    final listStr = sortedRecommendations.take(3).map((v) {
+      final rating = ratedVehicles[v] ?? 4.5;
+      return "• **${v.brand} ${v.model}** [RM ${v.pricePerDay.toStringAsFixed(0)}/day] - Category: **${v.category}** (${v.seats} seats, ${v.transmission}) - Rating: **${rating.toStringAsFixed(1)}⭐**";
+    }).join('\n');
+
+    return "🌟 **Personalized AI Vehicle Recommendations** (Based on live database):\n\n"
+        "$listStr\n\nTo book any of these, simply type **'Book <model>'** to launch the wizard!";
   }
 
   // ── Helper parsing methods ──────────────────────────────────────────

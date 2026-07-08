@@ -16,6 +16,136 @@ class BookingService {
   final VehicleService _vehicleService = VehicleService();
   final NotificationService _notificationService = NotificationService();
 
+  static double calculateOverdueCharges(BookingModel booking, double pricePerDay, {DateTime? now}) {
+    if (booking.isOpenRental || booking.returnDate == null) return 0.0;
+    
+    final statusLower = booking.status.toLowerCase();
+    
+    // Freeze and stop calculations immediately when Completed, Cancelled or Rejected, returning saved lateFees
+    if (statusLower == 'completed' || statusLower == 'cancelled' || statusLower == 'rejected') {
+      return booking.lateFees;
+    }
+    
+    // Freeze and stop calculations immediately if the booking is marked as returned (e.g. Awaiting Final Payment / Inspection Completed)
+    if (booking.isReturned) {
+      return booking.lateFees;
+    }
+    
+    // Only calculate overdue if booking status is Active, Ongoing, Return Requested, Awaiting Return, or Awaiting Final Payment
+    final bool isStatusValid = statusLower == 'active' || 
+                               statusLower == 'ongoing' || 
+                               statusLower == 'return requested' || 
+                               statusLower == 'awaiting return' ||
+                               statusLower == 'awaiting final payment';
+    if (!isStatusValid) return 0.0;
+    
+    final referenceTime = now ?? DateTime.now();
+    if (referenceTime.isBefore(booking.returnDate!)) return 0.0;
+    
+    final diff = referenceTime.difference(booking.returnDate!);
+    final totalHours = diff.inHours;
+    if (totalHours <= 0) return 0.0;
+    
+    final days = totalHours ~/ 24;
+    final remainingHours = totalHours % 24;
+    
+    return (days * pricePerDay) + (remainingHours * 20.0);
+  }
+
+  static Map<String, dynamic> getOverdueDetails(BookingModel booking, double pricePerDay, {DateTime? now}) {
+    if (booking.isOpenRental || booking.returnDate == null) {
+      return {
+        'isOverdue': false,
+        'days': 0,
+        'hours': 0,
+        'charges': 0.0,
+      };
+    }
+    
+    final statusLower = booking.status.toLowerCase();
+    
+    // If Completed, Cancelled, or Rejected, return frozen values
+    if (statusLower == 'completed' || statusLower == 'cancelled' || statusLower == 'rejected') {
+      return {
+        'isOverdue': false,
+        'days': 0,
+        'hours': 0,
+        'charges': booking.lateFees,
+      };
+    }
+    
+    // If returned but awaiting final payment, return frozen values
+    if (booking.isReturned) {
+      final returnTime = booking.actualReturnTimestamp ?? booking.updatedAt ?? DateTime.now();
+      final isPast = returnTime.isAfter(booking.returnDate!);
+      if (!isPast) {
+        return {
+          'isOverdue': false,
+          'days': 0,
+          'hours': 0,
+          'charges': 0.0,
+        };
+      }
+      final diff = returnTime.difference(booking.returnDate!);
+      final totalHours = diff.inHours;
+      final days = totalHours ~/ 24;
+      final remainingHours = totalHours % 24;
+      return {
+        'isOverdue': false,
+        'days': days,
+        'hours': remainingHours,
+        'charges': booking.lateFees,
+      };
+    }
+    
+    // Only calculate overdue if booking status is Active, Ongoing, Return Requested, Awaiting Return, or Awaiting Final Payment
+    final bool isStatusValid = statusLower == 'active' || 
+                               statusLower == 'ongoing' || 
+                               statusLower == 'return requested' || 
+                               statusLower == 'awaiting return' ||
+                               statusLower == 'awaiting final payment';
+    if (!isStatusValid) {
+      return {
+        'isOverdue': false,
+        'days': 0,
+        'hours': 0,
+        'charges': 0.0,
+      };
+    }
+    
+    final referenceTime = now ?? DateTime.now();
+    if (referenceTime.isBefore(booking.returnDate!)) {
+      return {
+        'isOverdue': false,
+        'days': 0,
+        'hours': 0,
+        'charges': 0.0,
+      };
+    }
+    
+    final diff = referenceTime.difference(booking.returnDate!);
+    final totalHours = diff.inHours;
+    if (totalHours <= 0) {
+      return {
+        'isOverdue': false,
+        'days': 0,
+        'hours': 0,
+        'charges': 0.0,
+      };
+    }
+    
+    final days = totalHours ~/ 24;
+    final remainingHours = totalHours % 24;
+    final charges = (days * pricePerDay) + (remainingHours * 20.0);
+    
+    return {
+      'isOverdue': true,
+      'days': days,
+      'hours': remainingHours,
+      'charges': charges,
+    };
+  }
+
   Future<void> createBooking(BookingModel booking) async {
     try {
       await _db.child(booking.id).set(booking.toMap()).timeout(const Duration(seconds: 10));
@@ -174,12 +304,14 @@ class BookingService {
       if (statusLower == 'active') {
         updates['actualPickupTime'] = DateFormat('hh:mm a').format(DateTime.now());
         updates['actualPickupDate'] = DateFormat('yyyy-MM-dd').format(DateTime.now());
+        updates['actualPickupTimestamp'] = DateTime.now().toIso8601String();
       }
 
       if (statusLower == 'completed') {
         updates['isReturned'] = true;
         updates['actualReturnTime'] = DateFormat('hh:mm a').format(DateTime.now());
         updates['actualReturnDate'] = DateFormat('yyyy-MM-dd').format(DateTime.now());
+        updates['actualReturnTimestamp'] = DateTime.now().toIso8601String();
       }
 
       await _db.child(bookingId).update(updates).timeout(const Duration(seconds: 10));
@@ -187,7 +319,11 @@ class BookingService {
       // Update vehicle status
       try {
         if (statusLower == 'ongoing' || statusLower == 'active' || statusLower == 'approved' || statusLower == 'confirmed' || statusLower == 'overdue') {
-          await _vehicleService.updateVehicleStatus(vehicleId, 'Booked');
+          if (statusLower == 'active') {
+            await _vehicleService.updateVehicleStatus(vehicleId, 'Rented');
+          } else {
+            await _vehicleService.updateVehicleStatus(vehicleId, 'Booked');
+          }
         } else if (statusLower == 'completed' || statusLower == 'cancelled' || statusLower == 'rejected' || statusLower == 'pending payment') {
           await _vehicleService.updateVehicleStatus(vehicleId, 'Available');
         }
@@ -317,6 +453,344 @@ class BookingService {
       );
     } catch (e) {
       debugPrint('Error updating booking status: $e');
+      rethrow;
+    }
+  }
+
+  Future<bool> isVehicleAvailableForExtension(
+    String vehicleId,
+    DateTime currentReturn,
+    DateTime newReturn,
+    String excludeBookingId,
+  ) async {
+    try {
+      final snapshot = await _db.get();
+      if (!snapshot.exists || snapshot.value == null) return true;
+      final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
+      for (final entry in data.entries) {
+        final bId = entry.key.toString();
+        if (bId == excludeBookingId) continue;
+        final val = entry.value as Map;
+        final status = (val['status'] ?? '').toString().toLowerCase();
+        if (status == 'cancelled' || status == 'rejected' || status == 'completed') continue;
+        final vId = (val['vehicleId'] ?? '').toString();
+        if (vId != vehicleId) continue;
+        final bStart = DateTime.parse(val['pickUpDate']);
+        final returnDateStr = val['returnDate'];
+        final bEnd = returnDateStr != null
+            ? DateTime.parse(returnDateStr)
+            : DateTime.now().add(const Duration(days: 365));
+        if (currentReturn.isBefore(bEnd) && newReturn.isAfter(bStart)) {
+          return false;
+        }
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Error checking vehicle availability for extension: $e');
+      return false;
+    }
+  }
+
+  Future<void> requestExtension(
+    String bookingId,
+    DateTime newReturn,
+    double cost, {
+    String status = 'pending',
+    String paymentStatus = 'unpaid',
+  }) async {
+    try {
+      final updates = {
+        'extensionRequest': {
+          'newReturnDate': newReturn.toIso8601String(),
+          'additionalCost': cost,
+          'status': status,
+          'paymentStatus': paymentStatus,
+          'requestedAt': DateTime.now().toIso8601String(),
+        }
+      };
+      await _db.child(bookingId).update(updates).timeout(const Duration(seconds: 10));
+
+      // Notify Admin
+      await _notificationService.notifyAllAdmins(
+        title: "Extension Request ⚠️",
+        message: "Customer requested extension for Booking #$bookingId.",
+        type: 'extension_request',
+        icon: '⚠️',
+        color: '0xFFF59E0B',
+        relatedId: bookingId,
+        actionRoute: 'Bookings',
+      );
+    } catch (e) {
+      debugPrint('Error requesting extension: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> approveExtension(String bookingId) async {
+    try {
+      final snap = await _db.child(bookingId).get();
+      if (!snap.exists || snap.value == null) throw 'Booking not found';
+      final data = Map<dynamic, dynamic>.from(snap.value as Map);
+      final booking = BookingModel.fromMap(bookingId, data);
+      
+      final ext = booking.extensionRequest;
+      if (ext == null) throw 'No extension request found';
+
+      final newReturn = DateTime.parse(ext['newReturnDate']);
+      final addCost = (ext['additionalCost'] ?? 0.0).toDouble();
+
+      final Map<String, dynamic> updates = {
+        'returnDate': newReturn.toIso8601String(),
+        'totalPrice': booking.totalPrice + addCost,
+        'extensionRequest/status': 'approved',
+        'updatedAt': DateTime.now().toIso8601String(),
+      };
+
+      await _db.child(bookingId).update(updates).timeout(const Duration(seconds: 10));
+
+      // Notify Customer
+      await _notificationService.createNotification(
+        userId: booking.userId,
+        title: "Extension Approved 🎉",
+        message: "Extension approved until ${DateFormat('dd MMM yyyy hh:mm a').format(newReturn)}.",
+        type: 'extension_approved',
+        icon: '🎉',
+        color: '0xFF10B981',
+        relatedId: bookingId,
+        actionRoute: 'Dashboard',
+      );
+    } catch (e) {
+      debugPrint('Error approving extension: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> rejectExtension(String bookingId) async {
+    try {
+      final snap = await _db.child(bookingId).get();
+      if (!snap.exists || snap.value == null) throw 'Booking not found';
+      final data = Map<dynamic, dynamic>.from(snap.value as Map);
+      final booking = BookingModel.fromMap(bookingId, data);
+
+      await _db.child(bookingId).update({
+        'extensionRequest/status': 'rejected',
+        'updatedAt': DateTime.now().toIso8601String(),
+      }).timeout(const Duration(seconds: 10));
+
+      // Notify Customer
+      await _notificationService.createNotification(
+        userId: booking.userId,
+        title: "Extension Rejected ❌",
+        message: "Your extension request for ${booking.vehicleName} was rejected.",
+        type: 'extension_rejected',
+        icon: '❌',
+        color: '0xFFEF4444',
+        relatedId: bookingId,
+        actionRoute: 'Dashboard',
+      );
+    } catch (e) {
+      debugPrint('Error rejecting extension: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> requestReturn(String bookingId) async {
+    try {
+      final snap = await _db.child(bookingId).get();
+      if (!snap.exists || snap.value == null) throw 'Booking not found';
+      final data = Map<dynamic, dynamic>.from(snap.value as Map);
+      final booking = BookingModel.fromMap(bookingId, data);
+
+      await _db.child(bookingId).update({
+        'status': 'Return Requested',
+        'updatedAt': DateTime.now().toIso8601String(),
+      }).timeout(const Duration(seconds: 10));
+
+      // Notify Admin
+      await _notificationService.notifyAllAdmins(
+        title: "Return Request 🔔",
+        message: "${booking.userName} wants to return vehicle ${booking.vehicleName}.",
+        type: 'return_request',
+        icon: '🔔',
+        color: '0xFF3B82F6',
+        relatedId: bookingId,
+        actionRoute: 'Bookings',
+      );
+    } catch (e) {
+      debugPrint('Error requesting return: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> completeReturn(String bookingId, Map<String, dynamic> inspection) async {
+    try {
+      final snap = await _db.child(bookingId).get();
+      if (!snap.exists || snap.value == null) throw 'Booking not found';
+      final data = Map<dynamic, dynamic>.from(snap.value as Map);
+      final booking = BookingModel.fromMap(bookingId, data);
+
+      // Fetch vehicle price per day
+      double pricePerDay = 100.0;
+      try {
+        final vSnap = await FirebaseDatabase.instance.ref().child('vehicles').child(booking.vehicleId).get();
+        if (vSnap.exists) {
+          pricePerDay = ((vSnap.value as Map)['pricePerDay'] ?? 100.0).toDouble();
+        }
+      } catch (_) {}
+
+      // Calculate base cost and overdue charges
+      double baseCost = booking.totalPrice;
+      final now = DateTime.now();
+
+      if (booking.isOpenRental) {
+        final pickup = booking.actualPickupTimestamp ?? booking.pickUpDate;
+        final diff = now.difference(pickup);
+        final hours = diff.inHours;
+        final d = (hours / 24.0).ceil();
+        final days = d <= 0 ? 1 : d;
+        baseCost = days * pricePerDay;
+      }
+
+      // Calculate overdue charges using the precise rules
+      final lateFees = BookingService.calculateOverdueCharges(booking, pricePerDay, now: now);
+
+      final cleaningFee = (inspection['cleaningFee'] ?? 0.0).toDouble();
+      final damageFee = (inspection['damageFee'] ?? 0.0).toDouble();
+      final extraCharges = (inspection['extraCharges'] ?? 0.0).toDouble();
+      final finalAmount = baseCost - booking.discountAmount + lateFees + cleaningFee + damageFee + extraCharges;
+
+      final Map<String, dynamic> updates = {
+        'status': 'Awaiting Final Payment',
+        'isReturned': true,
+        'actualReturnTime': DateFormat('hh:mm a').format(now),
+        'actualReturnDate': DateFormat('yyyy-MM-dd').format(now),
+        'actualReturnTimestamp': now.toIso8601String(),
+        'totalPrice': baseCost - booking.discountAmount,
+        'lateFees': lateFees,
+        'finalAmount': finalAmount,
+        'returnInspection': inspection,
+        'updatedAt': now.toIso8601String(),
+      };
+
+      await _db.child(bookingId).update(updates).timeout(const Duration(seconds: 10));
+
+      // Update vehicle status to 'Inspection Completed'
+      try {
+        await _vehicleService.updateVehicleStatus(booking.vehicleId, 'Inspection Completed');
+      } catch (e) {
+        debugPrint('Error updating vehicle status to Inspection Completed: $e');
+      }
+
+      // Create a pending final payment record
+      final Map<String, dynamic> paymentData = {
+        'bookingId': bookingId,
+        'userId': booking.userId,
+        'customerUid': booking.userId,
+        'amount': finalAmount,
+        'depositAmount': 0.0,
+        'balanceAmount': finalAmount,
+        'paymentMethod': 'FPX',
+        'status': 'Pending Verification',
+        'paymentStatus': 'Pending Verification',
+        'paymentDate': now.toIso8601String(),
+        'rewardPointsAwarded': false,
+      };
+      
+      final newPaymentRef = FirebaseDatabase.instance.ref().child('payments').push();
+      paymentData['id'] = newPaymentRef.key!;
+      await newPaymentRef.set(paymentData).timeout(const Duration(seconds: 10));
+
+      // -------------------------------------------------------------
+      // CUSTOMER NOTIFICATIONS
+      // -------------------------------------------------------------
+      // 1. Vehicle Returned
+      await _notificationService.createNotification(
+        userId: booking.userId,
+        title: "Vehicle Returned 🚗",
+        message: "Your returned vehicle ${booking.vehicleName} has been received and inspected.",
+        type: 'booking',
+        icon: '🚗',
+        color: '0xFF3B82F6',
+        relatedId: bookingId,
+        actionRoute: 'Dashboard',
+      );
+
+      // 2. Final Invoice Ready
+      await _notificationService.createNotification(
+        userId: booking.userId,
+        title: "Final Invoice Ready 📄",
+        message: "The final invoice for booking #${bookingId.substring(0, 5).toUpperCase()} is ready.",
+        type: 'payment',
+        icon: '📄',
+        color: '0xFF10B981',
+        relatedId: newPaymentRef.key!,
+        actionRoute: 'Dashboard',
+      );
+
+      // 3. Overdue Charges Updated
+      if (lateFees > 0) {
+        await _notificationService.createNotification(
+          userId: booking.userId,
+          title: "Overdue Charges Updated ⚠️",
+          message: "An overdue fee of RM ${lateFees.toStringAsFixed(2)} has been charged.",
+          type: 'booking',
+          icon: '⚠️',
+          color: '0xFFEF4444',
+          relatedId: bookingId,
+          actionRoute: 'Dashboard',
+        );
+      }
+
+      // 4. Payment Required
+      await _notificationService.createNotification(
+        userId: booking.userId,
+        title: "Payment Required 💳",
+        message: "An outstanding balance of RM ${finalAmount.toStringAsFixed(2)} requires payment clearance.",
+        type: 'payment',
+        icon: '💳',
+        color: '0xFFEF4444',
+        relatedId: newPaymentRef.key!,
+        actionRoute: 'Dashboard',
+      );
+
+      // -------------------------------------------------------------
+      // ADMIN NOTIFICATIONS
+      // -------------------------------------------------------------
+      // 1. Customer Returned Vehicle
+      await _notificationService.notifyAllAdmins(
+        title: "Vehicle Returned 🚗",
+        message: "Customer ${booking.userName} has returned vehicle ${booking.vehicleName}.",
+        type: 'return_request',
+        icon: '🚗',
+        color: '0xFF3B82F6',
+        relatedId: bookingId,
+        actionRoute: 'Bookings',
+      );
+
+      // 2. Invoice Generated
+      await _notificationService.notifyAllAdmins(
+        title: "Invoice Generated 📄",
+        message: "Invoice generated for #${bookingId.substring(0, 5).toUpperCase()}. Amount: RM ${finalAmount.toStringAsFixed(2)}.",
+        type: 'payment',
+        icon: '📄',
+        color: '0xFF10B981',
+        relatedId: newPaymentRef.key!,
+        actionRoute: 'Payments',
+      );
+
+      // 3. Payment Pending
+      await _notificationService.notifyAllAdmins(
+        title: "Final Payment Pending 🕐",
+        message: "Final payment clearance pending for booking #${bookingId.substring(0, 5).toUpperCase()}.",
+        type: 'payment',
+        icon: '🕐',
+        color: '0xFFF59E0B',
+        relatedId: newPaymentRef.key!,
+        actionRoute: 'Payments',
+      );
+
+    } catch (e) {
+      debugPrint('Error completing return: $e');
       rethrow;
     }
   }

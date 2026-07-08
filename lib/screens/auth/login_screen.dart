@@ -35,17 +35,12 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _rememberMe = false;
   String? _error;
 
-  final FocusNode _emailFocusNode = FocusNode();
   List<String> _recentEmails = [];
-  OverlayEntry? _overlayEntry;
-  final LayerLink _layerLink = LayerLink();
-  final GlobalKey _emailKey = GlobalKey();
 
   @override
   void initState() {
     super.initState();
     _loadSavedEmails();
-    _emailFocusNode.addListener(_onEmailFocusChange);
   }
 
   Future<void> _loadSavedEmails() async {
@@ -62,98 +57,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _onEmailFocusChange() {
-    if (_emailFocusNode.hasFocus) {
-      _showOverlay();
-    } else {
-      _hideOverlay();
-    }
-  }
-
-  void _showOverlay() {
-    _hideOverlay();
-    if (_recentEmails.isEmpty) return;
-
-    final overlayState = Overlay.of(context);
-    final renderBox =
-        _emailKey.currentContext?.findRenderObject() as RenderBox?;
-    if (renderBox == null) return;
-    final size = renderBox.size;
-
-    _overlayEntry = OverlayEntry(
-      builder: (context) {
-        return Positioned(
-          width: size.width,
-          child: CompositedTransformFollower(
-            link: _layerLink,
-            showWhenUnlinked: false,
-            offset: Offset(0, size.height + 6),
-            child: Material(
-              elevation: 8,
-              borderRadius: BorderRadius.circular(16),
-              color: Colors.white,
-              shadowColor: Colors.black.withValues(alpha: 0.1),
-              child: Container(
-                constraints: const BoxConstraints(maxHeight: 250),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.grey[200]!),
-                ),
-                child: ListView.separated(
-                  padding: EdgeInsets.zero,
-                  shrinkWrap: true,
-                  itemCount: _recentEmails.length,
-                  separatorBuilder: (context, index) =>
-                      const Divider(height: 1, color: AppColors.borderGray),
-                  itemBuilder: (context, index) {
-                    final email = _recentEmails[index];
-                    return ListTile(
-                      dense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 4,
-                      ),
-                      title: Text(
-                        email,
-                        style: const TextStyle(
-                          color: AppColors.secondaryBlue,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                      ),
-                      trailing: IconButton(
-                        icon: const Icon(
-                          Icons.delete_outline,
-                          color: Colors.redAccent,
-                          size: 20,
-                        ),
-                        onPressed: () => _deleteEmail(email),
-                      ),
-                      onTap: () {
-                        setState(() {
-                          _emailController.text = email;
-                        });
-                        _emailFocusNode.unfocus();
-                      },
-                    );
-                  },
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-
-    overlayState.insert(_overlayEntry!);
-  }
-
-  void _hideOverlay() {
-    _overlayEntry?.remove();
-    _overlayEntry = null;
-  }
-
   Future<void> _deleteEmail(String email) async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -167,9 +70,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     if (_recentEmails.isEmpty) {
-      _hideOverlay();
-    } else {
-      _showOverlay();
+      setState(() {});
     }
   }
 
@@ -346,9 +247,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    _hideOverlay();
-    _emailFocusNode.removeListener(_onEmailFocusChange);
-    _emailFocusNode.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -417,29 +315,74 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          CompositedTransformTarget(
-            link: _layerLink,
-            child: Container(
-              key: _emailKey,
-              child: CustomTextField(
-                controller: _emailController,
-                labelText: '',
-                hintText: 'Enter your email',
-                prefixIcon: Icons.email_outlined,
-                keyboardType: TextInputType.emailAddress,
-                focusNode: _emailFocusNode,
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) {
-                    return 'Email is required';
-                  }
-                  if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val)) {
-                    return 'Enter a valid email';
-                  }
-                  return null;
-                },
+          CustomTextField(
+            controller: _emailController,
+            labelText: '',
+            hintText: 'Enter your email',
+            prefixIcon: Icons.email_outlined,
+            keyboardType: TextInputType.emailAddress,
+            validator: (val) {
+              if (val == null || val.trim().isEmpty) {
+                return 'Email is required';
+              }
+              if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val)) {
+                return 'Enter a valid email';
+              }
+              return null;
+            },
+          ),
+          if (_recentEmails.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Recent accounts',
+                style: TextStyle(
+                  color: isDark ? Colors.white54 : AppColors.lightText,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
-          ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _recentEmails.map((email) {
+                final bool isSelected = _emailController.text.trim() == email;
+                return InputChip(
+                  label: Text(email),
+                  selected: isSelected,
+                  onSelected: (_) {
+                    setState(() {
+                      _emailController.text = email;
+                    });
+                  },
+                  deleteIcon: const Icon(Icons.close, size: 18),
+                  onDeleted: () => _deleteEmail(email),
+                  backgroundColor: isDark
+                      ? const Color(0xFF1E293B)
+                      : Colors.white,
+                  selectedColor: AppColors.primaryOrange.withValues(
+                    alpha: 0.15,
+                  ),
+                  side: BorderSide(
+                    color: isSelected
+                        ? AppColors.primaryOrange
+                        : (isDark
+                              ? const Color(0xFF334155)
+                              : Colors.grey[300]!),
+                  ),
+                  labelStyle: TextStyle(
+                    color: isSelected
+                        ? AppColors.primaryOrange
+                        : (isDark ? Colors.white70 : AppColors.secondaryBlue),
+                    fontSize: 12,
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
           const SizedBox(height: 20),
 
           // Password label and field

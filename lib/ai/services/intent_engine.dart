@@ -40,6 +40,11 @@ class IntentEngine {
     double confidence = 0.0;
     final Map<String, dynamic> params = {};
 
+    if (text.contains('recommend') || text.contains('suggestion') || text.contains('what should i') || text.contains('best car')) {
+      confidence = 0.95;
+      params['action'] = 'recommend_vehicles';
+    }
+
     // Check Categories
     if (text.contains('suv') || text.contains('suvs') || text.contains('sports utility') || text.contains('sport utility')) {
       confidence = 0.95;
@@ -130,6 +135,9 @@ class IntentEngine {
       if (text.contains('cancel') || text.contains('cancellation') || text.contains('terminate')) {
         confidence = 0.95;
         params['action'] = 'cancel_booking';
+      } else if (text.contains('overdue')) {
+        confidence = 0.95;
+        params['action'] = 'admin_overdue_bookings';
       } else if (text.contains('today') || text.contains('current')) {
         confidence = 0.95;
         params['action'] = 'admin_today_bookings';
@@ -148,6 +156,9 @@ class IntentEngine {
       if (text.contains('cancel') && (text.contains('my car') || text.contains('my ride'))) {
         confidence = 0.80;
         params['action'] = 'cancel_booking';
+      } else if (text.contains('overdue')) {
+        confidence = 0.90;
+        params['action'] = 'admin_overdue_bookings';
       }
     }
 
@@ -280,6 +291,10 @@ class IntentEngine {
       }
     }
 
+    if (confidence > 0) {
+      params['action'] = 'admin_notifications';
+    }
+
     return NotificationIntent(confidence: confidence, parameters: params);
   }
 
@@ -309,11 +324,17 @@ class IntentEngine {
     double confidence = 0.0;
     final Map<String, dynamic> params = {};
 
-    final dashboardKeywords = ['dashboard', 'home', 'main screen', 'overview', 'panel', 'summary'];
+    final dashboardKeywords = ['dashboard', 'home', 'main screen', 'overview', 'panel', 'summary', 'system stats', 'statistics'];
     for (final kw in dashboardKeywords) {
       if (text.contains(kw)) {
         confidence = 0.85;
         break;
+      }
+    }
+
+    if (confidence > 0) {
+      if (text.contains('stat') || text.contains('summary')) {
+        params['action'] = 'admin_dashboard_stats';
       }
     }
 
@@ -325,7 +346,7 @@ class IntentEngine {
     double confidence = 0.0;
     final Map<String, dynamic> params = {};
 
-    final paymentKeywords = ['payment', 'payments', 'revenue', 'sales', 'ledger', 'pay', 'transaction', 'transactions', 'earnings', 'statement'];
+    final paymentKeywords = ['payment', 'payments', 'revenue', 'sales', 'ledger', 'pay', 'transaction', 'transactions', 'earnings', 'statement', 'owe', 'due', 'outstanding', 'how much do i'];
     bool hasKeyword = false;
     for (final kw in paymentKeywords) {
       if (text.contains(kw)) {
@@ -336,9 +357,15 @@ class IntentEngine {
 
     if (hasKeyword) {
       confidence = 0.70;
-      if (text.contains('revenue') || text.contains('sales') || text.contains('earnings')) {
+      if (text.contains('owe') || text.contains('due') || text.contains('outstanding') || text.contains('how much')) {
+        confidence = 0.95;
+        params['action'] = 'check_debts';
+      } else if (text.contains('revenue') || text.contains('sales') || text.contains('earnings')) {
         confidence = 0.95;
         params['action'] = 'admin_revenue_today';
+      } else if (text.contains('statistics') || text.contains('stats') || text.contains('summary')) {
+        confidence = 0.95;
+        params['action'] = 'admin_payment_stats';
       } else {
         confidence = 0.90;
         params['action'] = 'view_payments';
@@ -358,6 +385,12 @@ class IntentEngine {
       if (text.contains(kw)) {
         confidence = 0.90;
         break;
+      }
+    }
+
+    if (confidence > 0) {
+      if (text.contains('schedule') || text.contains('list') || text.contains('show') || text.contains('all')) {
+        params['action'] = 'admin_maintenance_schedule';
       }
     }
 
@@ -384,6 +417,68 @@ class IntentEngine {
       confidence = 0.90;
     }
 
+    // Parse timeframe
+    String? timeframe;
+    if (text.contains('today')) {
+      timeframe = 'Today';
+    } else if (text.contains('yesterday')) {
+      timeframe = 'Yesterday';
+    } else if (text.contains('last 7 days') || text.contains('7 days')) {
+      timeframe = 'Last 7 Days';
+    } else if (text.contains('last week')) {
+      timeframe = 'Last Week';
+    } else if (text.contains('this week')) {
+      timeframe = 'This Week';
+    } else if (text.contains('last month')) {
+      timeframe = 'Last Month';
+    } else if (text.contains('this month')) {
+      timeframe = 'This Month';
+    } else if (text.contains('last 3 months') || text.contains('3 months')) {
+      timeframe = 'Last 3 Months';
+    } else if (text.contains('last 6 months') || text.contains('6 months')) {
+      timeframe = 'Last 6 Months';
+    } else if (text.contains('last year')) {
+      timeframe = 'Last Year';
+    } else if (text.contains('this year')) {
+      timeframe = 'This Year';
+    }
+    if (timeframe != null) {
+      params['timeframe'] = timeframe;
+    }
+
+    // Parse report type
+    String? type;
+    if (text.contains('payment') || text.contains('payments')) {
+      type = 'Payments';
+    } else if (text.contains('revenue') || text.contains('earnings') || text.contains('sales') || text.contains('income')) {
+      type = 'Revenue';
+    } else if (text.contains('booking') || text.contains('bookings') || text.contains('rentals') || text.contains('rental')) {
+      if (text.contains('overdue')) {
+        type = 'Overdue Rentals';
+      } else if (text.contains('open')) {
+        type = 'Open Rentals';
+      } else {
+        type = 'Bookings';
+      }
+    } else if (text.contains('vehicle') || text.contains('vehicles') || text.contains('car') || text.contains('cars') || text.contains('fleet')) {
+      type = 'Vehicles';
+    } else if (text.contains('maintenance') || text.contains('repair') || text.contains('repairs') || text.contains('service')) {
+      type = 'Maintenance';
+    } else if (text.contains('customer') || text.contains('customers') || text.contains('user') || text.contains('users') || text.contains('client') || text.contains('clients')) {
+      type = 'Customers';
+    } else if (text.contains('reward') || text.contains('rewards') || text.contains('point') || text.contains('points')) {
+      type = 'Reward Points';
+    } else if (text.contains('review') || text.contains('reviews') || text.contains('rating') || text.contains('ratings') || text.contains('feedback')) {
+      type = 'Reviews';
+    } else if (text.contains('overdue')) {
+      type = 'Overdue Rentals';
+    } else if (text.contains('open')) {
+      type = 'Open Rentals';
+    }
+    if (type != null) {
+      params['type'] = type;
+    }
+
     return ReportIntent(confidence: confidence, parameters: params);
   }
 
@@ -392,12 +487,16 @@ class IntentEngine {
     double confidence = 0.0;
     final Map<String, dynamic> params = {};
 
-    final customerKeywords = ['customer', 'customers', 'users', 'clients', 'customer list', 'client list', 'members'];
+    final customerKeywords = ['customer', 'customers', 'users', 'clients', 'customer list', 'client list', 'members', 'info', 'lookup'];
     for (final kw in customerKeywords) {
       if (text.contains(kw)) {
         confidence = 0.90;
         break;
       }
+    }
+
+    if (confidence > 0) {
+      params['action'] = 'admin_customer_info';
     }
 
     return CustomerIntent(confidence: confidence, parameters: params);

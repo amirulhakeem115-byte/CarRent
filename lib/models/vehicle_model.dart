@@ -194,4 +194,38 @@ class VehicleModel {
       'maintenance': maintenance,
     };
   }
+
+  VehicleModel copyWith({
+    bool? isAvailable,
+    String? status,
+  }) {
+    return VehicleModel(
+      id: id,
+      brand: brand,
+      model: model,
+      year: year,
+      plateNumber: plateNumber,
+      color: color,
+      transmission: transmission,
+      fuelType: fuelType,
+      seats: seats,
+      pricePerDay: pricePerDay,
+      isAvailable: isAvailable ?? this.isAvailable,
+      status: status ?? this.status,
+      mainImage: mainImage,
+      description: description,
+      createdAt: createdAt,
+      category: category,
+      mileage: mileage,
+      branchId: branchId,
+      branchName: branchName,
+      engine: engine,
+      condition: condition,
+      ac: ac,
+      rentalDemand: rentalDemand,
+      gallery: gallery,
+      equipment: equipment,
+      maintenance: maintenance,
+    );
+  }
 }

@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/booking_model.dart';
 import 'notification_service.dart';
 import 'user_role_cache.dart';
+import 'company_settings_provider.dart';
 
 class RewardPointsService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref();
@@ -200,8 +201,11 @@ class RewardPointsService {
     required String paymentId,
   }) async {
     try {
+      final int currentPoints = await getUserPoints(userId);
+      final isPremium = CompanySettingsProvider().determineLevel(currentPoints) == 'Premium';
       // Calculate earned points (1 point for every RM10 spent)
-      final int earned = calculateEarnedPoints(paymentAmount);
+      final int basePoints = calculateEarnedPoints(paymentAmount);
+      final int earned = isPremium ? (basePoints * 1.5).floor() : basePoints;
       if (earned <= 0) return;
 
       // Update user points balance in users/$userId/rewardPoints
@@ -284,8 +288,11 @@ class RewardPointsService {
         return;
       }
 
+      final int currentPoints = await getUserPoints(booking.userId);
+      final isPremium = CompanySettingsProvider().determineLevel(currentPoints) == 'Premium';
       // Calculate earned points
-      final int earned = calculateEarnedPoints(booking.totalPrice);
+      final int basePoints = calculateEarnedPoints(booking.totalPrice);
+      final int earned = isPremium ? (basePoints * 1.5).floor() : basePoints;
       if (earned <= 0) return;
 
       // Update user points balance

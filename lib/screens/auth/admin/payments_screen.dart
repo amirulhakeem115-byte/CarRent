@@ -337,7 +337,7 @@ class _PaymentsViewState extends State<PaymentsView> {
                 _buildDetailRow('Booking Reference', payment.bookingId),
                 if (booking != null) ...[
                   _buildDetailRow('Pick-up Date', DateFormat('dd MMM yyyy').format(booking.pickUpDate)),
-                  _buildDetailRow('Return Date', DateFormat('dd MMM yyyy').format(booking.returnDate)),
+                  _buildDetailRow('Return Date', booking.isOpenRental ? 'Open Rental' : (booking.returnDate != null ? DateFormat('dd MMM yyyy').format(booking.returnDate!) : "")),
                   _buildDetailRow('Booking Total', 'RM ${booking.totalPrice.toStringAsFixed(2)}'),
                 ],
                 const Divider(height: 20),

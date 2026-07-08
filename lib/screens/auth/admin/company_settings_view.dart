@@ -31,6 +31,9 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
   final _companyDescriptionController = TextEditingController();
   final _openingTimeController = TextEditingController();
   final _closingTimeController = TextEditingController();
+  final _silverThresholdController = TextEditingController();
+  final _goldThresholdController = TextEditingController();
+  final _premiumThresholdController = TextEditingController();
 
   // Socials
   final _socialWhatsappController = TextEditingController();
@@ -50,7 +53,7 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
         setState(() => _activeTab = _tabController.index);
@@ -72,6 +75,9 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
     _companyDescriptionController.dispose();
     _openingTimeController.dispose();
     _closingTimeController.dispose();
+    _silverThresholdController.dispose();
+    _goldThresholdController.dispose();
+    _premiumThresholdController.dispose();
     _socialWhatsappController.dispose();
     _socialFacebookController.dispose();
     _socialInstagramController.dispose();
@@ -108,7 +114,10 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
     _supportWhatsappController.text = support['whatsapp']?.toString() ?? '';
     _supportHotlineController.text = support['hotline']?.toString() ?? '';
     _supportEmailController.text = support['email']?.toString() ?? '';
-
+    _silverThresholdController.text = provider.silverThreshold.toString();
+    _goldThresholdController.text = provider.goldThreshold.toString();
+    _premiumThresholdController.text = provider.premiumThreshold.toString();
+ 
     _logoUrl = provider.companyLogo;
   }
 
@@ -197,7 +206,10 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
           'whatsapp': _supportWhatsappController.text.trim(),
           'hotline': _supportHotlineController.text.trim(),
           'email': _supportEmailController.text.trim(),
-        }
+        },
+        'silverThreshold': int.tryParse(_silverThresholdController.text.trim()) ?? 500,
+        'goldThreshold': int.tryParse(_goldThresholdController.text.trim()) ?? 1000,
+        'premiumThreshold': int.tryParse(_premiumThresholdController.text.trim()) ?? 2000,
       };
 
       final provider =
@@ -309,6 +321,7 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
                   Tab(icon: Icon(Icons.business_outlined, size: 18), text: 'Branding & Profile'),
                   Tab(icon: Icon(Icons.share_outlined, size: 18), text: 'Social Channels'),
                   Tab(icon: Icon(Icons.support_agent_outlined, size: 18), text: 'Support & Hotline'),
+                  Tab(icon: Icon(Icons.stars_rounded, size: 18), text: 'Membership Thresholds'),
                 ],
               ),
             ),
@@ -406,6 +419,9 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
         break;
       case 2:
         tabContent = _buildSupportTab(textPrimary: textPrimary, textSecondary: textSecondary);
+        break;
+      case 3:
+        tabContent = _buildMembershipTab(textPrimary: textPrimary, textSecondary: textSecondary);
         break;
       default:
         tabContent = _buildProfileTab(textPrimary: textPrimary, textSecondary: textSecondary);
@@ -653,6 +669,71 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
     );
   }
 
+  Widget _buildMembershipTab({required Color textPrimary, required Color textSecondary}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Membership Level Thresholds Settings',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary)),
+        const SizedBox(height: 8),
+        Text('Configure reward point thresholds for automatic membership tier assignments.',
+            style: TextStyle(fontSize: 12, color: textSecondary)),
+        const SizedBox(height: 24),
+        TextFormField(
+          controller: _silverThresholdController,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Silver Level Threshold (Points)',
+            hintText: 'e.g. 500',
+            prefixIcon: Icon(Icons.verified_user_rounded),
+          ),
+          validator: (val) {
+            if (val == null || val.trim().isEmpty) return 'Silver threshold is required';
+            final parsed = int.tryParse(val);
+            if (parsed == null || parsed < 0) return 'Must be a positive integer';
+            return null;
+          },
+        ),
+        const SizedBox(height: 16),
+        TextFormField(
+          controller: _goldThresholdController,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Gold Level Threshold (Points)',
+            hintText: 'e.g. 1000',
+            prefixIcon: Icon(Icons.stars_rounded),
+          ),
+          validator: (val) {
+            if (val == null || val.trim().isEmpty) return 'Gold threshold is required';
+            final parsed = int.tryParse(val);
+            if (parsed == null || parsed < 0) return 'Must be a positive integer';
+            final silverVal = int.tryParse(_silverThresholdController.text);
+            if (silverVal != null && parsed <= silverVal) return 'Gold threshold must be higher than Silver';
+            return null;
+          },
+        ),
+        const SizedBox(height: 16),
+        TextFormField(
+          controller: _premiumThresholdController,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Premium Level Threshold (Points)',
+            hintText: 'e.g. 2000',
+            prefixIcon: Icon(Icons.military_tech_rounded),
+          ),
+          validator: (val) {
+            if (val == null || val.trim().isEmpty) return 'Premium threshold is required';
+            final parsed = int.tryParse(val);
+            if (parsed == null || parsed < 0) return 'Must be a positive integer';
+            final goldVal = int.tryParse(_goldThresholdController.text);
+            if (goldVal != null && parsed <= goldVal) return 'Premium threshold must be higher than Gold';
+            return null;
+          },
+        ),
+      ],
+    );
+  }
+ 
   Widget _buildPreviewCard({
     required bool isDark,
     required Color cardColor,

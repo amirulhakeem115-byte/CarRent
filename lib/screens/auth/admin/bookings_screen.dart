@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_database/firebase_database.dart';
 import '../../../models/booking_model.dart';
+import '../../../models/vehicle_model.dart';
 import '../../../services/booking_service.dart';
+import '../../../services/vehicle_service.dart';
 import '../../../widgets/loading_widget.dart';
 import '../../../constants/colors.dart';
 
@@ -15,8 +18,10 @@ class BookingsView extends StatefulWidget {
 
 class _BookingsViewState extends State<BookingsView> {
   final BookingService _bookingService = BookingService();
+  final VehicleService _vehicleService = VehicleService();
 
   List<BookingModel> _bookings = [];
+  List<VehicleModel> _vehicles = [];
   bool _loading = true;
   String _selectedFilter = 'All'; // 'All', 'Pending', 'Approved', 'Ongoing', 'Completed', 'Cancelled', 'Overdue'
   String? _error;
@@ -24,6 +29,7 @@ class _BookingsViewState extends State<BookingsView> {
   String _searchQuery = '';
 
   StreamSubscription<List<BookingModel>>? _bookingsSubscription;
+  StreamSubscription<List<VehicleModel>>? _vehiclesSubscription;
 
   @override
   void initState() {
@@ -47,12 +53,22 @@ class _BookingsViewState extends State<BookingsView> {
         });
       }
     });
+
+    _vehiclesSubscription?.cancel();
+    _vehiclesSubscription = _vehicleService.getVehiclesStream().listen((vList) {
+      if (mounted) {
+        setState(() {
+          _vehicles = vList;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     _bookingsSubscription?.cancel();
+    _vehiclesSubscription?.cancel();
     super.dispose();
   }
 
@@ -92,6 +108,11 @@ class _BookingsViewState extends State<BookingsView> {
     final dateFormat = DateFormat('dd MMM yyyy');
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final sheetBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    double pricePerDay = 100.0;
+    try {
+      pricePerDay = _vehicles.firstWhere((v) => v.id == booking.vehicleId).pricePerDay;
+    } catch (_) {}
+    final overdue = BookingService.getOverdueDetails(booking, pricePerDay);
     final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
 
     showModalBottomSheet(
@@ -137,9 +158,26 @@ class _BookingsViewState extends State<BookingsView> {
                 _buildDetailRow(context, 'Vehicle Name', booking.vehicleName),
                 _buildDetailRow(context, 'Customer Name', booking.userName),
                 _buildDetailRow(context, 'Customer Phone', booking.userPhone),
-                _buildDetailRow(context, 'Rental Duration', '${dateFormat.format(booking.pickUpDate)} to ${dateFormat.format(booking.returnDate)} (${booking.rentalDays} days)'),
+                _buildDetailRow(
+                  context,
+                  'Rental Duration',
+                  booking.isOpenRental
+                      ? '${dateFormat.format(booking.pickUpDate)} to OPEN RENTAL (Open Ended)'
+                      : '${dateFormat.format(booking.pickUpDate)} to ${booking.returnDate != null ? dateFormat.format(booking.returnDate!) : ""} (${booking.rentalDays} days)',
+                ),
                 _buildDetailRow(context, 'Deposit Lodged', 'RM ${booking.depositAmount.toStringAsFixed(2)}'),
-                _buildDetailRow(context, 'Total Cost', 'RM ${booking.totalPrice.toStringAsFixed(2)}'),
+                _buildDetailRow(
+                  context,
+                  booking.isOpenRental && booking.status.toLowerCase() == 'active' ? 'Current Estimated Cost' : 'Total Cost',
+                  booking.isOpenRental && booking.status.toLowerCase() == 'active'
+                      ? 'RM ${_getDynamicPrice(booking).toStringAsFixed(2)} (for ${_getElapsedDays(booking)} days)'
+                      : 'RM ${booking.totalPrice.toStringAsFixed(2)}',
+                ),
+                if (overdue['isOverdue'] == true) ...[
+                  _buildDetailRow(context, '⚠️ Overdue Duration', '${overdue['days']} days, ${overdue['hours']} hours', textColor: Colors.redAccent),
+                  _buildDetailRow(context, '⚠️ Late Fees Accrued', 'RM ${overdue['charges'].toStringAsFixed(2)}', textColor: Colors.redAccent),
+                  _buildDetailRow(context, '⚠️ Current Total', 'RM ${(booking.totalPrice + overdue['charges']).toStringAsFixed(2)}', textColor: Colors.redAccent),
+                ],
                 if (booking.notes != null && booking.notes!.isNotEmpty)
                   _buildDetailRow(context, 'Special Remarks', booking.notes!, isItalic: true),
                 const Divider(height: 32),
@@ -174,17 +212,20 @@ class _BookingsViewState extends State<BookingsView> {
                           Navigator.pop(context);
                           _updateStatus(booking, 'active');
                         },
-                        child: const Text('Handover Keys (Active)'),
+                        child: Text(booking.isOpenRental ? 'Vehicle Picked Up' : 'Handover Keys (Active)'),
                       ),
                     ],
-                    if (booking.status == 'ongoing' || booking.status.toLowerCase() == 'active' || booking.status.toLowerCase() == 'overdue') ...[
+                    if (booking.status.toLowerCase() == 'return requested' ||
+                        booking.status == 'ongoing' ||
+                        booking.status.toLowerCase() == 'active' ||
+                        booking.status.toLowerCase() == 'overdue') ...[
                       ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo, foregroundColor: Colors.white),
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
                         onPressed: () {
                           Navigator.pop(context);
-                          _updateStatus(booking, 'completed');
+                          _showReturnInspectionDialog(booking);
                         },
-                        child: const Text('Return Keys (Mark Completed)'),
+                        child: const Text('Inspect & Complete Return'),
                       ),
                     ],
                     if (booking.status != 'cancelled' && booking.status != 'completed' && booking.status != 'rejected') ...[
@@ -199,6 +240,43 @@ class _BookingsViewState extends State<BookingsView> {
                     ],
                   ],
                 ),
+                if (booking.extensionRequest != null &&
+                    booking.extensionRequest!['status'] == 'pending') ...[
+                  const Divider(height: 32),
+                  Text('Extension Request Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textPrimary)),
+                  const SizedBox(height: 8),
+                  _buildDetailRow(context, 'Requested Return', DateFormat('dd MMM yyyy hh:mm a').format(DateTime.parse(booking.extensionRequest!['newReturnDate']))),
+                  _buildDetailRow(context, 'Additional Cost', 'RM ${booking.extensionRequest!['additionalCost'].toStringAsFixed(2)}'),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                        onPressed: () async {
+                          Navigator.pop(context);
+                          setState(() => _loading = true);
+                          await _bookingService.approveExtension(booking.id);
+                          _loadBookings();
+                        },
+                        child: const Text('Approve Extension'),
+                      ),
+                      const SizedBox(width: 12),
+                      OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.redAccent,
+                          side: const BorderSide(color: Colors.redAccent),
+                        ),
+                        onPressed: () async {
+                          Navigator.pop(context);
+                          setState(() => _loading = true);
+                          await _bookingService.rejectExtension(booking.id);
+                          _loadBookings();
+                        },
+                        child: const Text('Reject Extension'),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -207,9 +285,9 @@ class _BookingsViewState extends State<BookingsView> {
     );
   }
 
-  Widget _buildDetailRow(BuildContext context, String label, String value, {bool isItalic = false}) {
+  Widget _buildDetailRow(BuildContext context, String label, String value, {bool isItalic = false, Color? textColor}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final textPrimary = textColor ?? (isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue);
     final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -262,7 +340,7 @@ class _BookingsViewState extends State<BookingsView> {
     final totalBookings = _bookings.length;
     final activeBookings = _bookings.where((b) {
       final s = b.status.toLowerCase();
-      return s == 'approved' || s == 'ongoing' || s == 'active' || s == 'overdue' || s == 'confirmed';
+      return s == 'approved' || s == 'ongoing' || s == 'active' || s == 'overdue' || s == 'confirmed' || s == 'return requested';
     }).length;
     final completedBookings = _bookings.where((b) => b.status.toLowerCase() == 'completed').length;
     final cancelledBookings = _bookings.where((b) {
@@ -275,7 +353,9 @@ class _BookingsViewState extends State<BookingsView> {
       final matchesSearch = b.id.toLowerCase().contains(_searchQuery) ||
           b.userName.toLowerCase().contains(_searchQuery) ||
           b.vehicleName.toLowerCase().contains(_searchQuery);
-      final matchesStatus = _selectedFilter == 'All' || b.status.toLowerCase() == _selectedFilter.toLowerCase();
+      final matchesStatus = _selectedFilter == 'All' ||
+          b.status.toLowerCase() == _selectedFilter.toLowerCase() ||
+          (_selectedFilter == 'Ongoing' && (b.status.toLowerCase() == 'active' || b.status.toLowerCase() == 'ongoing' || b.status.toLowerCase() == 'return requested' || b.status.toLowerCase() == 'overdue'));
       return matchesSearch && matchesStatus;
     }).toList();
 
@@ -467,7 +547,15 @@ class _BookingsViewState extends State<BookingsView> {
             DataCell(Text(b.userName, style: TextStyle(color: textPrimary))),
             DataCell(Text(b.vehicleName, style: TextStyle(color: textPrimary))),
             DataCell(Text(dateFormat.format(b.pickUpDate), style: TextStyle(color: textSecondary))),
-            DataCell(Text(dateFormat.format(b.returnDate), style: TextStyle(color: textSecondary))),
+            DataCell(Text(
+              b.isOpenRental
+                  ? 'OPEN RENTAL'
+                  : (b.returnDate != null ? dateFormat.format(b.returnDate!) : ""),
+              style: TextStyle(
+                color: b.isOpenRental ? Colors.green : textSecondary,
+                fontWeight: b.isOpenRental ? FontWeight.bold : FontWeight.normal,
+              ),
+            )),
             DataCell(Text('RM ${b.totalPrice.toStringAsFixed(2)}', style: TextStyle(color: textPrimary))),
             DataCell(
               Container(
@@ -483,7 +571,7 @@ class _BookingsViewState extends State<BookingsView> {
                   icon: Icon(Icons.visibility_outlined, color: textPrimary, size: 18),
                   onPressed: () => _showBookingDetails(b),
                 ),
-                if (bStat == 'active' || bStat == 'ongoing' || bStat == 'overdue') ...[
+                if (bStat == 'return requested' || bStat == 'active' || bStat == 'ongoing' || bStat == 'overdue') ...[
                   const SizedBox(width: 8),
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
@@ -492,9 +580,9 @@ class _BookingsViewState extends State<BookingsView> {
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                     ),
-                    onPressed: () => _confirmCompleteBooking(b),
+                    onPressed: () => _showReturnInspectionDialog(b),
                     icon: const Icon(Icons.check_circle_outline, size: 12),
-                    label: const Text('Complete Booking', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                    label: const Text('Inspect & Complete', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ],
@@ -534,7 +622,16 @@ class _BookingsViewState extends State<BookingsView> {
                   children: [
                     const SizedBox(height: 4),
                     Text('Customer: ${b.userName}', style: TextStyle(fontSize: 12, color: textSecondary)),
-                    Text('${dateFormat.format(b.pickUpDate)} → ${dateFormat.format(b.returnDate)}', style: TextStyle(fontSize: 12, color: textSecondary)),
+                    Text(
+                      b.isOpenRental
+                          ? '${dateFormat.format(b.pickUpDate)} → OPEN RENTAL'
+                          : '${dateFormat.format(b.pickUpDate)} → ${b.returnDate != null ? dateFormat.format(b.returnDate!) : ""}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: b.isOpenRental ? Colors.green : textSecondary,
+                        fontWeight: b.isOpenRental ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
                     Text('RM ${b.totalPrice.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primaryOrange)),
                   ],
                 ),
@@ -545,7 +642,7 @@ class _BookingsViewState extends State<BookingsView> {
                 ),
                 onTap: () => _showBookingDetails(b),
               ),
-              if (bStat == 'active' || bStat == 'ongoing' || bStat == 'overdue')
+              if (bStat == 'return requested' || bStat == 'active' || bStat == 'ongoing' || bStat == 'overdue')
                 Padding(
                   padding: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
                   child: SizedBox(
@@ -557,9 +654,9 @@ class _BookingsViewState extends State<BookingsView> {
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
-                      onPressed: () => _confirmCompleteBooking(b),
+                      onPressed: () => _showReturnInspectionDialog(b),
                       icon: const Icon(Icons.check_circle_outline, size: 14),
-                      label: const Text('Complete Booking', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      label: const Text('Inspect & Complete', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ),
@@ -593,50 +690,185 @@ class _BookingsViewState extends State<BookingsView> {
     );
   }
 
-  Future<void> _confirmCompleteBooking(BookingModel booking) async {
-    final confirm = await showDialog<bool>(
+  Future<void> _showReturnInspectionDialog(BookingModel booking) async {
+    final mileageController = TextEditingController(text: '10000');
+    final damageController = TextEditingController();
+    final damageFeeController = TextEditingController(text: '0.00');
+    final cleaningController = TextEditingController(text: '0.00');
+    final extraController = TextEditingController(text: '0.00');
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : AppColors.secondaryBlue;
+
+    try {
+      final snap = await FirebaseDatabase.instance.ref().child('vehicles').child(booking.vehicleId).get();
+      if (snap.exists) {
+        final curMil = (snap.value as Map)['mileage']?.toString() ?? '10000';
+        mileageController.text = curMil;
+      }
+    } catch (_) {}
+
+    String selectedCondition = 'Excellent';
+    String selectedFuel = 'Full (8/8)';
+
+    if (!mounted) return;
+
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        return AlertDialog(
-          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text(
-            'Complete Booking',
-            style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white : AppColors.secondaryBlue),
-          ),
-          content: Text(
-            'Are you sure the customer has returned the vehicle?',
-            style: TextStyle(color: isDark ? const Color(0xFFCBD5E1) : Colors.black87),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text('Cancel', style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : Colors.grey)),
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Return Vehicle Inspection',
+          style: TextStyle(fontWeight: FontWeight.bold, color: textColor),
+        ),
+        content: StatefulBuilder(
+          builder: (ctx2, setInnerState) => SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: selectedCondition,
+                  decoration: const InputDecoration(labelText: 'Vehicle Condition'),
+                  dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  style: TextStyle(color: textColor),
+                  items: ['Excellent', 'Good', 'Fair', 'Damaged'].map((c) {
+                    return DropdownMenuItem(value: c, child: Text(c, style: TextStyle(color: textColor)));
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setInnerState(() => selectedCondition = val);
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: selectedFuel,
+                  decoration: const InputDecoration(labelText: 'Fuel Level'),
+                  dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  style: TextStyle(color: textColor),
+                  items: ['Full (8/8)', '3/4', '1/2', '1/4', 'Empty'].map((f) {
+                    return DropdownMenuItem(value: f, child: Text(f, style: TextStyle(color: textColor)));
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setInnerState(() => selectedFuel = val);
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: mileageController,
+                  keyboardType: TextInputType.number,
+                  style: TextStyle(color: textColor),
+                  decoration: const InputDecoration(labelText: 'Current Mileage (km)'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: damageController,
+                  style: TextStyle(color: textColor),
+                  decoration: const InputDecoration(labelText: 'Damage Notes / Description', hintText: 'Describe any new damages'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: damageFeeController,
+                  keyboardType: TextInputType.number,
+                  style: TextStyle(color: textColor),
+                  decoration: const InputDecoration(labelText: 'Damage Fee (RM)'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: cleaningController,
+                  keyboardType: TextInputType.number,
+                  style: TextStyle(color: textColor),
+                  decoration: const InputDecoration(labelText: 'Cleaning Fee (RM)'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: extraController,
+                  keyboardType: TextInputType.number,
+                  style: TextStyle(color: textColor),
+                  decoration: const InputDecoration(labelText: 'Extra Charges / Fees (RM)'),
+                ),
+              ],
             ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.teal,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Complete Booking', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ],
-        );
-      },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Complete Return', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
     );
 
-    if (confirm == true) {
-      await _bookingService.updateBookingStatus(
-        booking.id,
-        'completed',
-        booking.userId,
-        booking.vehicleId,
-        booking.vehicleName,
-      );
-      _loadBookings();
+    if (confirmed == true) {
+      final double cleanFee = double.tryParse(cleaningController.text.trim()) ?? 0.0;
+      final double damageFee = double.tryParse(damageFeeController.text.trim()) ?? 0.0;
+      final double extraFee = double.tryParse(extraController.text.trim()) ?? 0.0;
+      final int mil = int.tryParse(mileageController.text.trim()) ?? 0;
+
+      final Map<String, dynamic> inspectionData = {
+        'condition': selectedCondition,
+        'fuelLevel': selectedFuel,
+        'mileage': mil,
+        'damageNotes': damageController.text.trim().isNotEmpty ? damageController.text.trim() : 'None',
+        'damageFee': damageFee,
+        'cleaningFee': cleanFee,
+        'extraCharges': extraFee,
+        'completedAt': DateTime.now().toIso8601String(),
+      };
+
+      setState(() => _loading = true);
+      try {
+        await _bookingService.completeReturn(booking.id, inspectionData);
+        
+        if (mil > 0) {
+          await FirebaseDatabase.instance.ref().child('vehicles').child(booking.vehicleId).update({'mileage': mil});
+        }
+
+        _loadBookings();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Vehicle returned and booking completed successfully.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        setState(() => _loading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to complete return: $e'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+      }
     }
+  }
+
+  int _getElapsedDays(BookingModel booking) {
+    final pickup = booking.actualPickupTimestamp ?? booking.pickUpDate;
+    final diff = DateTime.now().difference(pickup);
+    final days = (diff.inHours / 24.0).ceil();
+    return days <= 0 ? 1 : days;
+  }
+
+  double _getDynamicPrice(BookingModel booking) {
+    if (!booking.isOpenRental || booking.status.toLowerCase() != 'active') {
+      return booking.totalPrice;
+    }
+    final days = _getElapsedDays(booking);
+    return days * booking.totalPrice;
   }
 }

@@ -605,8 +605,13 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
               const SizedBox(height: 20),
               _buildDetailRow('Reservation Ref ID', booking.id),
               _buildDetailRow('Vehicle Name', booking.vehicleName),
-              _buildDetailRow('Rental Days', '${booking.rentalDays} days'),
-              _buildDetailRow('Rental Duration', '${dateFormat.format(booking.pickUpDate)} to ${dateFormat.format(booking.returnDate)}'),
+              _buildDetailRow('Rental Days', booking.isOpenRental ? 'Open Ended' : '${booking.rentalDays} days'),
+              _buildDetailRow(
+                'Rental Duration',
+                booking.isOpenRental
+                    ? '${dateFormat.format(booking.pickUpDate)} to OPEN RENTAL'
+                    : '${dateFormat.format(booking.pickUpDate)} to ${booking.returnDate != null ? dateFormat.format(booking.returnDate!) : ""}',
+              ),
               _buildDetailRow('Security Deposit', 'RM ${booking.depositAmount.toStringAsFixed(2)}'),
               _buildDetailRow('Total Price Paid', 'RM ${booking.totalPrice.toStringAsFixed(2)}'),
               if (booking.notes != null && booking.notes!.isNotEmpty)

@@ -103,8 +103,8 @@ class BookingLifecycleManager {
         }
         
         // 2. Return Reminder (1 hour before return date/time)
-        if (statusLower == 'active' || statusLower == 'ongoing') {
-          final difference = booking.returnDate.difference(now);
+        if ((statusLower == 'active' || statusLower == 'ongoing') && !booking.isOpenRental) {
+          final difference = booking.returnDate!.difference(now);
           final bool returnReminderSent = booking.returnReminderSent;
           
           if (!returnReminderSent && difference.inMinutes > 0 && difference.inMinutes <= 60) {
@@ -140,7 +140,7 @@ class BookingLifecycleManager {
         // 3. Status Transitions (active/ongoing/overdue)
         if (statusLower == 'active' || statusLower == 'ongoing' || statusLower == 'overdue') {
           // Case 1: Vehicle is marked as returned (returned early or returned on time)
-          if (booking.isReturned) {
+          if (booking.isReturned && statusLower != 'awaiting final payment') {
             if (statusLower != 'completed') {
               debugPrint('[BookingLifecycleManager] Automatically completing booking ${booking.id} (isReturned is true)');
               await _bookingService.updateBookingStatus(
@@ -154,7 +154,7 @@ class BookingLifecycleManager {
             }
           }
           // Case 2: Return datetime has passed and isReturned is false
-          else if (now.isAfter(booking.returnDate) || now.isAtSameMomentAs(booking.returnDate)) {
+          else if (!booking.isOpenRental && booking.returnDate != null && (now.isAfter(booking.returnDate!) || now.isAtSameMomentAs(booking.returnDate!))) {
             if (statusLower != 'overdue') {
               debugPrint('[BookingLifecycleManager] Transitioning booking ${booking.id} to OVERDUE');
               await _bookingService.updateBookingStatus(

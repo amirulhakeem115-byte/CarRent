@@ -182,7 +182,18 @@ class _HistoryScreenState extends State<HistoryScreen>
       itemCount: _bookings.length,
       itemBuilder: (context, index) {
         final b = _bookings[index];
-        final days = b.returnDate.difference(b.pickUpDate).inDays;
+        final int days;
+        if (b.isOpenRental) {
+          if (b.actualReturnTimestamp != null && b.actualPickupTimestamp != null) {
+            final diff = b.actualReturnTimestamp!.difference(b.actualPickupTimestamp!);
+            final d = (diff.inHours / 24.0).ceil();
+            days = d <= 0 ? 1 : d;
+          } else {
+            days = 1;
+          }
+        } else {
+          days = b.returnDate != null ? b.returnDate!.difference(b.pickUpDate).inDays : 0;
+        }
         return Container(
           margin: const EdgeInsets.only(bottom: 14),
           decoration: BoxDecoration(
@@ -262,7 +273,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                       child: _infoTile(
                         Icons.event_rounded,
                         'Return',
-                        DateFormat('dd MMM yyyy').format(b.returnDate),
+                        b.isOpenRental ? 'Open Rental' : (b.returnDate != null ? DateFormat('dd MMM yyyy').format(b.returnDate!) : ""),
                       ),
                     ),
                     Expanded(
