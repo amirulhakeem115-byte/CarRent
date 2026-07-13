@@ -60,7 +60,7 @@ class BookingScreen extends StatefulWidget {
       if (vehicleSnap.exists) {
         final vData = Map<dynamic, dynamic>.from(vehicleSnap.value as Map);
         final vehicle = VehicleModel.fromMap(booking.vehicleId, vData);
-        
+
         final bool isExt = methodOrAmount is double;
         final double? extAmt = isExt ? methodOrAmount : null;
         final String? initialMethod = isExt ? null : methodOrAmount as String?;
@@ -207,7 +207,9 @@ class _BookingScreenState extends State<BookingScreen> {
             _userName = profile.fullName;
             _userPhone = profile.phone;
             _availablePoints = profile.rewardPoints;
-            final isPrem = CompanySettingsProvider().determineLevel(_availablePoints) == 'Premium';
+            final isPrem =
+                CompanySettingsProvider().determineLevel(_availablePoints) ==
+                'Premium';
             if (!isPrem) {
               _isOpenRental = false;
             }
@@ -399,12 +401,16 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   void _triggerPaymentFlow() {
-    if (_pickupDate == null || _pickupTime == null || (!_isOpenRental && _returnDate == null)) {
+    if (_pickupDate == null ||
+        _pickupTime == null ||
+        (!_isOpenRental && _returnDate == null)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_isOpenRental
-              ? 'Please select pick-up date and time'
-              : 'Please select pick-up date, time and return date'),
+          content: Text(
+            _isOpenRental
+                ? 'Please select pick-up date and time'
+                : 'Please select pick-up date, time and return date',
+          ),
         ),
       );
       return;
@@ -428,7 +434,9 @@ class _BookingScreenState extends State<BookingScreen> {
 
   void _showOpenRentalConfirmationDialog() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final titleColor = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final titleColor = isDark
+        ? const Color(0xFFF8FAFC)
+        : AppColors.secondaryBlue;
     final textColor = isDark ? const Color(0xFFCBD5E1) : Colors.black87;
 
     showDialog(
@@ -449,7 +457,10 @@ class _BookingScreenState extends State<BookingScreen> {
               const SizedBox(width: 8),
               Text(
                 'Open Rental Booking',
-                style: TextStyle(fontWeight: FontWeight.bold, color: titleColor),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: titleColor,
+                ),
               ),
             ],
           ),
@@ -488,9 +499,7 @@ class _BookingScreenState extends State<BookingScreen> {
               },
               child: const Text(
                 'Confirm Booking',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
           ],
@@ -1622,7 +1631,8 @@ class _BookingScreenState extends State<BookingScreen> {
         // Notify Admin of Payment Completion for Extension
         await NotificationService().notifyAllAdmins(
           title: "Extension Payment Completed ✅",
-          message: "Payment of RM ${amount.toStringAsFixed(2)} completed for Booking #${widget.existingBooking!.id.substring(0, 5).toUpperCase()} extension.",
+          message:
+              "Payment of RM ${amount.toStringAsFixed(2)} completed for Booking #${widget.existingBooking!.id.substring(0, 5).toUpperCase()} extension.",
           type: 'payment_completed',
           icon: '✅',
           color: '0xFF10B981',
@@ -1746,19 +1756,18 @@ class _BookingScreenState extends State<BookingScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         backgroundColor: isDark ? const Color(0xFF1B2436) : Colors.white,
         elevation: 0,
         leading: IconButton(
           icon: Icon(
-            Icons.arrow_back,
+            Icons.arrow_back_ios_new_rounded,
             color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
+            size: 18,
           ),
+          tooltip: 'Back',
           onPressed: () {
-            if (_currentStep == 3) {
-              setState(() => _currentStep = 2);
-            } else {
-              Navigator.pop(context);
-            }
+            Navigator.maybePop(context);
           },
         ),
         title: Text(
@@ -1794,25 +1803,33 @@ class _BookingScreenState extends State<BookingScreen> {
             ),
         ],
       ),
-      body: _loading
-          ? const Center(
-              child: LoadingWidget(
-                message: 'Processing your reservation booking...',
+      body: SafeArea(
+        top: false,
+        child: _loading
+            ? const Center(
+                child: LoadingWidget(
+                  message: 'Processing your reservation booking...',
+                ),
+              )
+            : SingleChildScrollView(
+                child: Column(
+                  children: [
+                    _buildProgressIndicator(isDark),
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        20,
+                        20,
+                        20,
+                        20 + MediaQuery.of(context).viewPadding.bottom + 56,
+                      ),
+                      child: _currentStep == 2
+                          ? _buildStep2BookingDetails(isDark)
+                          : _buildStep3PaymentMockup(isDark),
+                    ),
+                  ],
+                ),
               ),
-            )
-          : SingleChildScrollView(
-              child: Column(
-                children: [
-                  _buildProgressIndicator(isDark),
-                  Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: _currentStep == 2
-                        ? _buildStep2BookingDetails(isDark)
-                        : _buildStep3PaymentMockup(isDark),
-                  ),
-                ],
-              ),
-            ),
+      ),
     );
   }
 
@@ -1921,7 +1938,9 @@ class _BookingScreenState extends State<BookingScreen> {
   // STEP 2: Booking Details Panel Screen
   Widget _buildStep2BookingDetails(bool isDark) {
     final settingsProvider = CompanySettingsProvider();
-    final membershipStatus = settingsProvider.getMembershipStatus(_availablePoints);
+    final membershipStatus = settingsProvider.getMembershipStatus(
+      _availablePoints,
+    );
     final isPremium = membershipStatus.currentLevel == 'Premium';
     final dateFormat = DateFormat('yyyy-MM-dd');
     final headingStyle = TextStyle(
@@ -2123,10 +2142,14 @@ class _BookingScreenState extends State<BookingScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
-                    color: !_isOpenRental ? AppColors.primaryOrange.withValues(alpha: 0.1) : cardColor,
+                    color: !_isOpenRental
+                        ? AppColors.primaryOrange.withValues(alpha: 0.1)
+                        : cardColor,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: !_isOpenRental ? AppColors.primaryOrange : borderColor,
+                      color: !_isOpenRental
+                          ? AppColors.primaryOrange
+                          : borderColor,
                       width: 1.5,
                     ),
                   ),
@@ -2157,7 +2180,9 @@ class _BookingScreenState extends State<BookingScreen> {
                     : () {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Open Rental is only available for Premium members.'),
+                            content: Text(
+                              'Open Rental is only available for Premium members.',
+                            ),
                             backgroundColor: Colors.redAccent,
                           ),
                         );
@@ -2167,7 +2192,9 @@ class _BookingScreenState extends State<BookingScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     decoration: BoxDecoration(
-                      color: _isOpenRental ? Colors.green.withValues(alpha: 0.1) : cardColor,
+                      color: _isOpenRental
+                          ? Colors.green.withValues(alpha: 0.1)
+                          : cardColor,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: _isOpenRental ? Colors.green : borderColor,
@@ -2190,7 +2217,9 @@ class _BookingScreenState extends State<BookingScreen> {
                               fontWeight: FontWeight.bold,
                               color: _isOpenRental
                                   ? Colors.green
-                                  : (isDark ? Colors.white : AppColors.secondaryBlue),
+                                  : (isDark
+                                        ? Colors.white
+                                        : AppColors.secondaryBlue),
                             ),
                           ),
                         ],
@@ -2209,7 +2238,9 @@ class _BookingScreenState extends State<BookingScreen> {
             decoration: BoxDecoration(
               color: Colors.redAccent.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.redAccent.withValues(alpha: 0.2)),
+              border: Border.all(
+                color: Colors.redAccent.withValues(alpha: 0.2),
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2231,7 +2262,11 @@ class _BookingScreenState extends State<BookingScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                Divider(color: Colors.redAccent.withValues(alpha: 0.3), thickness: 0.5, height: 1),
+                Divider(
+                  color: Colors.redAccent.withValues(alpha: 0.3),
+                  thickness: 0.5,
+                  height: 1,
+                ),
                 const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2253,7 +2288,9 @@ class _BookingScreenState extends State<BookingScreen> {
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white : AppColors.secondaryBlue,
+                            color: isDark
+                                ? Colors.white
+                                : AppColors.secondaryBlue,
                           ),
                         ),
                       ],
@@ -2356,8 +2393,8 @@ class _BookingScreenState extends State<BookingScreen> {
                             _isOpenRental
                                 ? '♾ Open Rental'
                                 : (_returnDate != null
-                                    ? dateFormat.format(_returnDate!)
-                                    : 'Select Date'),
+                                      ? dateFormat.format(_returnDate!)
+                                      : 'Select Date'),
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               color: isDark
@@ -2379,7 +2416,9 @@ class _BookingScreenState extends State<BookingScreen> {
                     vertical: 14,
                   ),
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
+                    color: isDark
+                        ? const Color(0xFF0F172A)
+                        : AppColors.lightGray,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: borderColor),
                   ),
@@ -2401,7 +2440,9 @@ class _BookingScreenState extends State<BookingScreen> {
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: _pickupTime != null
-                              ? (isDark ? Colors.white : AppColors.secondaryBlue)
+                              ? (isDark
+                                    ? Colors.white
+                                    : AppColors.secondaryBlue)
                               : Colors.grey,
                           fontSize: 13,
                         ),
@@ -2546,7 +2587,9 @@ class _BookingScreenState extends State<BookingScreen> {
           height: 52,
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: _isOpenRental ? Colors.green : AppColors.primaryOrange,
+              backgroundColor: _isOpenRental
+                  ? Colors.green
+                  : AppColors.primaryOrange,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
@@ -2589,7 +2632,11 @@ class _BookingScreenState extends State<BookingScreen> {
     final textMuted = isDark ? const Color(0xFF94A3B8) : Colors.grey[500]!;
 
     final pickupDateStr = DateFormat('dd MMM yyyy').format(_pickupDate!);
-    final returnDateStr = _isOpenRental ? 'Open Rental' : (_returnDate != null ? DateFormat('dd MMM yyyy').format(_returnDate!) : "");
+    final returnDateStr = _isOpenRental
+        ? 'Open Rental'
+        : (_returnDate != null
+              ? DateFormat('dd MMM yyyy').format(_returnDate!)
+              : "");
 
     final payAmount = _paymentOption == 'Deposit'
         ? _depositAmount
@@ -2767,7 +2814,9 @@ class _BookingScreenState extends State<BookingScreen> {
                           ),
                         ),
                         Text(
-                          _isOpenRental ? returnDateStr : '$returnDateStr • ${_pickupTime ?? "10:00 AM"}',
+                          _isOpenRental
+                              ? returnDateStr
+                              : '$returnDateStr • ${_pickupTime ?? "10:00 AM"}',
                           style: TextStyle(fontSize: 10, color: textMuted),
                         ),
                       ],
@@ -2834,7 +2883,9 @@ class _BookingScreenState extends State<BookingScreen> {
           child: Column(
             children: [
               _buildPriceRow(
-                widget.isExtension ? 'Extension Cost' : 'Base Rental ($_rentalDays Days)',
+                widget.isExtension
+                    ? 'Extension Cost'
+                    : 'Base Rental ($_rentalDays Days)',
                 'RM ${_totalPrice.toStringAsFixed(2)}',
                 isDark: isDark,
               ),
@@ -2946,7 +2997,10 @@ class _BookingScreenState extends State<BookingScreen> {
                   RewardPointsSlider(
                     initialValue: _pointsToRedeem,
                     availablePoints: _availablePoints,
-                    maxPointsLimit: CompanySettingsProvider().getField('maxRewardPointsLimit', defaultValue: 1000),
+                    maxPointsLimit: CompanySettingsProvider().getField(
+                      'maxRewardPointsLimit',
+                      defaultValue: 1000,
+                    ),
                     isAdmin: false,
                     showConfirmButton: false,
                     onChanged: (val) {
@@ -3101,7 +3155,8 @@ class _BookingScreenState extends State<BookingScreen> {
             ),
             onPressed:
                 (_agreeToTerms &&
-                    (widget.isExtension || widget.vehicle.status.toLowerCase() == 'available'))
+                    (widget.isExtension ||
+                        widget.vehicle.status.toLowerCase() == 'available'))
                 ? _triggerPaymentFlow
                 : null,
             child: Row(

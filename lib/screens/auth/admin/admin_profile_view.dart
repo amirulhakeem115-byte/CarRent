@@ -512,44 +512,76 @@ class _AdminProfileViewState extends State<AdminProfileView> {
                           style: TextStyle(color: textSecondary, fontSize: 12),
                         ),
                         const SizedBox(height: 20),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                side: const BorderSide(
-                                  color: AppColors.primaryOrange,
-                                ),
-                                foregroundColor: AppColors.primaryOrange,
-                              ),
-                              onPressed: _pickProfileImage,
-                              icon: const Icon(Icons.upload, size: 14),
-                              label: const Text(
-                                'Edit Profile Image',
-                                style: TextStyle(fontSize: 12),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            if (_adminUser?.profileImage.isNotEmpty == true)
-                              OutlinedButton.icon(
-                                style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(
-                                    color: Colors.redAccent,
+                        if (_adminUser?.profileImage.isNotEmpty == true)
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                    side: const BorderSide(
+                                      color: AppColors.primaryOrange,
+                                    ),
+                                    foregroundColor: AppColors.primaryOrange,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 12,
+                                    ),
                                   ),
-                                  foregroundColor: Colors.redAccent,
-                                ),
-                                onPressed: _removeProfileImage,
-                                icon: const Icon(
-                                  Icons.delete_outline,
-                                  size: 14,
-                                ),
-                                label: const Text(
-                                  'Remove',
-                                  style: TextStyle(fontSize: 12),
+                                  onPressed: _pickProfileImage,
+                                  icon: const Icon(Icons.upload, size: 14),
+                                  label: const FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      'Edit Profile Image',
+                                      style: TextStyle(fontSize: 12),
+                                    ),
+                                  ),
                                 ),
                               ),
-                          ],
-                        ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                    side: const BorderSide(
+                                      color: Colors.redAccent,
+                                    ),
+                                    foregroundColor: Colors.redAccent,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 12,
+                                    ),
+                                  ),
+                                  onPressed: _removeProfileImage,
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    size: 14,
+                                  ),
+                                  label: const FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      'Remove',
+                                      style: TextStyle(fontSize: 12),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        else
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(
+                                color: AppColors.primaryOrange,
+                              ),
+                              foregroundColor: AppColors.primaryOrange,
+                            ),
+                            onPressed: _pickProfileImage,
+                            icon: const Icon(Icons.upload, size: 14),
+                            label: const Text(
+                              'Edit Profile Image',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                          ),
                         const SizedBox(height: 8),
                       ],
                     ),

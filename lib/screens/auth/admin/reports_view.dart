@@ -14,7 +14,9 @@ import '../../../models/booking_model.dart';
 import '../../../models/payment_model.dart';
 import '../../../models/maintenance_job_model.dart';
 import '../../../models/review_model.dart';
-import '../../../services/file_download_helper.dart' if (dart.library.html) '../../../services/file_download_web.dart' as download_helper;
+import '../../../services/file_download_helper.dart'
+    if (dart.library.html) '../../../services/file_download_web.dart'
+    as download_helper;
 import '../../../services/company_settings_provider.dart';
 
 class ReportsView extends StatefulWidget {
@@ -83,12 +85,14 @@ class _ReportsViewState extends State<ReportsView> {
   @override
   void didUpdateWidget(covariant ReportsView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.initialPeriod != null && widget.initialPeriod != oldWidget.initialPeriod) {
+    if (widget.initialPeriod != null &&
+        widget.initialPeriod != oldWidget.initialPeriod) {
       setState(() {
         _selectedPeriod = widget.initialPeriod!;
       });
     }
-    if (widget.initialType != null && widget.initialType != oldWidget.initialType) {
+    if (widget.initialType != null &&
+        widget.initialType != oldWidget.initialType) {
       setState(() {
         _selectedReportType = widget.initialType!;
       });
@@ -119,7 +123,12 @@ class _ReportsViewState extends State<ReportsView> {
   }
 
   // ── Date Filtering Helper ──────────────────────────────────────────────────
-  bool _isDateInPeriod(DateTime date, String period, {DateTime? startDate, DateTime? endDate}) {
+  bool _isDateInPeriod(
+    DateTime date,
+    String period, {
+    DateTime? startDate,
+    DateTime? endDate,
+  }) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final targetDate = DateTime(date.year, date.month, date.day);
@@ -128,52 +137,64 @@ class _ReportsViewState extends State<ReportsView> {
       case 'Today':
         return targetDate.isAtSameMomentAs(today);
       case 'Yesterday':
-        return targetDate.isAtSameMomentAs(today.subtract(const Duration(days: 1)));
+        return targetDate.isAtSameMomentAs(
+          today.subtract(const Duration(days: 1)),
+        );
       case 'Last 7 Days':
         final start = today.subtract(const Duration(days: 6));
-        return (targetDate.isAfter(start) || targetDate.isAtSameMomentAs(start)) && 
-               (targetDate.isBefore(today) || targetDate.isAtSameMomentAs(today));
+        return (targetDate.isAfter(start) ||
+                targetDate.isAtSameMomentAs(start)) &&
+            (targetDate.isBefore(today) || targetDate.isAtSameMomentAs(today));
       case 'This Week':
         final start = today.subtract(Duration(days: today.weekday - 1));
-        return (targetDate.isAfter(start) || targetDate.isAtSameMomentAs(start)) && 
-               (targetDate.isBefore(today) || targetDate.isAtSameMomentAs(today));
+        return (targetDate.isAfter(start) ||
+                targetDate.isAtSameMomentAs(start)) &&
+            (targetDate.isBefore(today) || targetDate.isAtSameMomentAs(today));
       case 'Last Week':
         final start = today.subtract(Duration(days: today.weekday - 1 + 7));
         final end = start.add(const Duration(days: 6));
-        return (targetDate.isAfter(start) || targetDate.isAtSameMomentAs(start)) && 
-               (targetDate.isBefore(end) || targetDate.isAtSameMomentAs(end));
+        return (targetDate.isAfter(start) ||
+                targetDate.isAtSameMomentAs(start)) &&
+            (targetDate.isBefore(end) || targetDate.isAtSameMomentAs(end));
       case 'This Month':
         final start = DateTime(today.year, today.month, 1);
-        return (targetDate.isAfter(start) || targetDate.isAtSameMomentAs(start)) && 
-               (targetDate.isBefore(today) || targetDate.isAtSameMomentAs(today));
+        return (targetDate.isAfter(start) ||
+                targetDate.isAtSameMomentAs(start)) &&
+            (targetDate.isBefore(today) || targetDate.isAtSameMomentAs(today));
       case 'Last Month':
         final start = DateTime(today.year, today.month - 1, 1);
         final end = DateTime(today.year, today.month, 0);
-        return (targetDate.isAfter(start) || targetDate.isAtSameMomentAs(start)) && 
-               (targetDate.isBefore(end) || targetDate.isAtSameMomentAs(end));
+        return (targetDate.isAfter(start) ||
+                targetDate.isAtSameMomentAs(start)) &&
+            (targetDate.isBefore(end) || targetDate.isAtSameMomentAs(end));
       case 'Last 3 Months':
         final start = today.subtract(const Duration(days: 90));
-        return (targetDate.isAfter(start) || targetDate.isAtSameMomentAs(start)) && 
-               (targetDate.isBefore(today) || targetDate.isAtSameMomentAs(today));
+        return (targetDate.isAfter(start) ||
+                targetDate.isAtSameMomentAs(start)) &&
+            (targetDate.isBefore(today) || targetDate.isAtSameMomentAs(today));
       case 'Last 6 Months':
         final start = today.subtract(const Duration(days: 180));
-        return (targetDate.isAfter(start) || targetDate.isAtSameMomentAs(start)) && 
-               (targetDate.isBefore(today) || targetDate.isAtSameMomentAs(today));
+        return (targetDate.isAfter(start) ||
+                targetDate.isAtSameMomentAs(start)) &&
+            (targetDate.isBefore(today) || targetDate.isAtSameMomentAs(today));
       case 'This Year':
         final start = DateTime(today.year, 1, 1);
-        return (targetDate.isAfter(start) || targetDate.isAtSameMomentAs(start)) && 
-               (targetDate.isBefore(today) || targetDate.isAtSameMomentAs(today));
+        return (targetDate.isAfter(start) ||
+                targetDate.isAtSameMomentAs(start)) &&
+            (targetDate.isBefore(today) || targetDate.isAtSameMomentAs(today));
       case 'Last Year':
         final start = DateTime(today.year - 1, 1, 1);
         final end = DateTime(today.year - 1, 12, 31);
-        return (targetDate.isAfter(start) || targetDate.isAtSameMomentAs(start)) && 
-               (targetDate.isBefore(end) || targetDate.isAtSameMomentAs(end));
+        return (targetDate.isAfter(start) ||
+                targetDate.isAtSameMomentAs(start)) &&
+            (targetDate.isBefore(end) || targetDate.isAtSameMomentAs(end));
       case 'Custom Date Range':
         if (startDate == null || endDate == null) return true;
         final start = DateTime(startDate.year, startDate.month, startDate.day);
         final end = DateTime(endDate.year, endDate.month, endDate.day);
-        return (targetDate.isAfter(start) || targetDate.isAtSameMomentAs(start)) && 
-               (targetDate.isBefore(end) || targetDate.isAtSameMomentAs(end));
+        return (targetDate.isAfter(start) ||
+                targetDate.isAtSameMomentAs(start)) &&
+            (targetDate.isBefore(end) || targetDate.isAtSameMomentAs(end));
       default:
         return true;
     }
@@ -194,21 +215,38 @@ class _ReportsViewState extends State<ReportsView> {
   // ── Filtering Logic ────────────────────────────────────────────────────────
   List<BookingModel> _getFilteredBookings() {
     return widget.bookings.where((b) {
-      if (!_isDateInPeriod(b.pickUpDate, _selectedPeriod, startDate: _startDate, endDate: _endDate)) return false;
+      if (!_isDateInPeriod(
+        b.pickUpDate,
+        _selectedPeriod,
+        startDate: _startDate,
+        endDate: _endDate,
+      ))
+        return false;
       if (_selectedBranch != 'All') {
         final v = _getVehicleById(b.vehicleId);
-        if (v == null || (v.branchName != _selectedBranch && v.branchId != _selectedBranch)) return false;
+        if (v == null ||
+            (v.branchName != _selectedBranch && v.branchId != _selectedBranch))
+          return false;
       }
-      if (_selectedVehicle != 'All' && b.vehicleId != _selectedVehicle) return false;
-      if (_selectedCustomer != 'All' && b.userId != _selectedCustomer) return false;
-      if (_selectedBookingStatus != 'All' && b.status.toLowerCase() != _selectedBookingStatus.toLowerCase()) return false;
+      if (_selectedVehicle != 'All' && b.vehicleId != _selectedVehicle)
+        return false;
+      if (_selectedCustomer != 'All' && b.userId != _selectedCustomer)
+        return false;
+      if (_selectedBookingStatus != 'All' &&
+          b.status.toLowerCase() != _selectedBookingStatus.toLowerCase())
+        return false;
       if (_selectedVehicleStatus != 'All') {
         final v = _getVehicleById(b.vehicleId);
-        if (v == null || v.status.toLowerCase() != _selectedVehicleStatus.toLowerCase()) return false;
+        if (v == null ||
+            v.status.toLowerCase() != _selectedVehicleStatus.toLowerCase())
+          return false;
       }
       if (_selectedMembershipLevel != 'All') {
         final u = _getUserById(b.userId);
-        if (u == null || CompanySettingsProvider().determineLevel(u.rewardPoints) != _selectedMembershipLevel) return false;
+        if (u == null ||
+            CompanySettingsProvider().determineLevel(u.rewardPoints) !=
+                _selectedMembershipLevel)
+          return false;
       }
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
@@ -224,32 +262,72 @@ class _ReportsViewState extends State<ReportsView> {
 
   List<PaymentModel> _getFilteredPayments() {
     return widget.payments.where((p) {
-      if (!_isDateInPeriod(p.paymentDate, _selectedPeriod, startDate: _startDate, endDate: _endDate)) return false;
-      final b = widget.bookings.firstWhere((bk) => bk.id == p.bookingId, orElse: () => BookingModel(id: '', vehicleId: '', vehicleName: '', userId: '', userName: '', userPhone: '', pickUpDate: DateTime.now(), totalPrice: 0.0, depositAmount: 0.0, status: '', createdAt: DateTime.now()));
+      if (!_isDateInPeriod(
+        p.paymentDate,
+        _selectedPeriod,
+        startDate: _startDate,
+        endDate: _endDate,
+      ))
+        return false;
+      final b = widget.bookings.firstWhere(
+        (bk) => bk.id == p.bookingId,
+        orElse: () => BookingModel(
+          id: '',
+          vehicleId: '',
+          vehicleName: '',
+          userId: '',
+          userName: '',
+          userPhone: '',
+          pickUpDate: DateTime.now(),
+          totalPrice: 0.0,
+          depositAmount: 0.0,
+          status: '',
+          createdAt: DateTime.now(),
+        ),
+      );
       if (b.id.isNotEmpty) {
         if (_selectedBranch != 'All') {
           final v = _getVehicleById(b.vehicleId);
-          if (v == null || (v.branchName != _selectedBranch && v.branchId != _selectedBranch)) return false;
+          if (v == null ||
+              (v.branchName != _selectedBranch &&
+                  v.branchId != _selectedBranch))
+            return false;
         }
-        if (_selectedVehicle != 'All' && b.vehicleId != _selectedVehicle) return false;
-        if (_selectedBookingStatus != 'All' && b.status.toLowerCase() != _selectedBookingStatus.toLowerCase()) return false;
+        if (_selectedVehicle != 'All' && b.vehicleId != _selectedVehicle)
+          return false;
+        if (_selectedBookingStatus != 'All' &&
+            b.status.toLowerCase() != _selectedBookingStatus.toLowerCase())
+          return false;
         if (_selectedVehicleStatus != 'All') {
           final v = _getVehicleById(b.vehicleId);
-          if (v == null || v.status.toLowerCase() != _selectedVehicleStatus.toLowerCase()) return false;
+          if (v == null ||
+              v.status.toLowerCase() != _selectedVehicleStatus.toLowerCase())
+            return false;
         }
-      } else if (_selectedBranch != 'All' || _selectedVehicle != 'All' || _selectedBookingStatus != 'All' || _selectedVehicleStatus != 'All') {
+      } else if (_selectedBranch != 'All' ||
+          _selectedVehicle != 'All' ||
+          _selectedBookingStatus != 'All' ||
+          _selectedVehicleStatus != 'All') {
         return false;
       }
-      if (_selectedCustomer != 'All' && p.userId != _selectedCustomer) return false;
+      if (_selectedCustomer != 'All' && p.userId != _selectedCustomer)
+        return false;
       final status = (p.paymentStatus ?? p.status).toLowerCase();
-      if (_selectedPaymentStatus != 'All' && status != _selectedPaymentStatus.toLowerCase()) return false;
+      if (_selectedPaymentStatus != 'All' &&
+          status != _selectedPaymentStatus.toLowerCase())
+        return false;
       if (_selectedMembershipLevel != 'All') {
         final u = _getUserById(p.userId);
-        if (u == null || CompanySettingsProvider().determineLevel(u.rewardPoints) != _selectedMembershipLevel) return false;
+        if (u == null ||
+            CompanySettingsProvider().determineLevel(u.rewardPoints) !=
+                _selectedMembershipLevel)
+          return false;
       }
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
-        if (!p.id.toLowerCase().contains(q) && !p.bookingId.toLowerCase().contains(q)) return false;
+        if (!p.id.toLowerCase().contains(q) &&
+            !p.bookingId.toLowerCase().contains(q))
+          return false;
       }
       return true;
     }).toList();
@@ -258,13 +336,28 @@ class _ReportsViewState extends State<ReportsView> {
   List<VehicleModel> _getFilteredVehicles() {
     return widget.vehicles.where((v) {
       final vDate = _parseDateString(v.createdAt);
-      if (vDate != null && !_isDateInPeriod(vDate, _selectedPeriod, startDate: _startDate, endDate: _endDate)) return false;
-      if (_selectedBranch != 'All' && v.branchName != _selectedBranch && v.branchId != _selectedBranch) return false;
+      if (vDate != null &&
+          !_isDateInPeriod(
+            vDate,
+            _selectedPeriod,
+            startDate: _startDate,
+            endDate: _endDate,
+          ))
+        return false;
+      if (_selectedBranch != 'All' &&
+          v.branchName != _selectedBranch &&
+          v.branchId != _selectedBranch)
+        return false;
       if (_selectedVehicle != 'All' && v.id != _selectedVehicle) return false;
-      if (_selectedVehicleStatus != 'All' && v.status.toLowerCase() != _selectedVehicleStatus.toLowerCase()) return false;
+      if (_selectedVehicleStatus != 'All' &&
+          v.status.toLowerCase() != _selectedVehicleStatus.toLowerCase())
+        return false;
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
-        if (!v.brand.toLowerCase().contains(q) && !v.model.toLowerCase().contains(q) && !v.plateNumber.toLowerCase().contains(q)) return false;
+        if (!v.brand.toLowerCase().contains(q) &&
+            !v.model.toLowerCase().contains(q) &&
+            !v.plateNumber.toLowerCase().contains(q))
+          return false;
       }
       return true;
     }).toList();
@@ -273,12 +366,25 @@ class _ReportsViewState extends State<ReportsView> {
   List<UserModel> _getFilteredCustomers() {
     return widget.users.where((u) => u.role == 'customer').where((u) {
       final uDate = _parseDateString(u.createdAt);
-      if (uDate != null && !_isDateInPeriod(uDate, _selectedPeriod, startDate: _startDate, endDate: _endDate)) return false;
+      if (uDate != null &&
+          !_isDateInPeriod(
+            uDate,
+            _selectedPeriod,
+            startDate: _startDate,
+            endDate: _endDate,
+          ))
+        return false;
       if (_selectedCustomer != 'All' && u.id != _selectedCustomer) return false;
-      if (_selectedMembershipLevel != 'All' && CompanySettingsProvider().determineLevel(u.rewardPoints) != _selectedMembershipLevel) return false;
+      if (_selectedMembershipLevel != 'All' &&
+          CompanySettingsProvider().determineLevel(u.rewardPoints) !=
+              _selectedMembershipLevel)
+        return false;
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
-        if (!u.fullName.toLowerCase().contains(q) && !u.email.toLowerCase().contains(q) && !u.phone.toLowerCase().contains(q)) return false;
+        if (!u.fullName.toLowerCase().contains(q) &&
+            !u.email.toLowerCase().contains(q) &&
+            !u.phone.toLowerCase().contains(q))
+          return false;
       }
       return true;
     }).toList();
@@ -287,19 +393,33 @@ class _ReportsViewState extends State<ReportsView> {
   List<MaintenanceJobModel> _getFilteredMaintenance() {
     return widget.maintenanceJobs.where((j) {
       final jDate = _parseDateString(j.startDate);
-      if (jDate != null && !_isDateInPeriod(jDate, _selectedPeriod, startDate: _startDate, endDate: _endDate)) return false;
+      if (jDate != null &&
+          !_isDateInPeriod(
+            jDate,
+            _selectedPeriod,
+            startDate: _startDate,
+            endDate: _endDate,
+          ))
+        return false;
       if (_selectedBranch != 'All') {
         final v = _getVehicleById(j.vehicleId);
-        if (v == null || (v.branchName != _selectedBranch && v.branchId != _selectedBranch)) return false;
+        if (v == null ||
+            (v.branchName != _selectedBranch && v.branchId != _selectedBranch))
+          return false;
       }
-      if (_selectedVehicle != 'All' && j.vehicleId != _selectedVehicle) return false;
+      if (_selectedVehicle != 'All' && j.vehicleId != _selectedVehicle)
+        return false;
       if (_selectedVehicleStatus != 'All') {
         final v = _getVehicleById(j.vehicleId);
-        if (v == null || v.status.toLowerCase() != _selectedVehicleStatus.toLowerCase()) return false;
+        if (v == null ||
+            v.status.toLowerCase() != _selectedVehicleStatus.toLowerCase())
+          return false;
       }
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
-        if (!j.title.toLowerCase().contains(q) && !j.vehicleName.toLowerCase().contains(q)) return false;
+        if (!j.title.toLowerCase().contains(q) &&
+            !j.vehicleName.toLowerCase().contains(q))
+          return false;
       }
       return true;
     }).toList();
@@ -307,16 +427,28 @@ class _ReportsViewState extends State<ReportsView> {
 
   List<ReviewModel> _getFilteredReviews() {
     return widget.reviews.where((r) {
-      if (!_isDateInPeriod(r.createdAt, _selectedPeriod, startDate: _startDate, endDate: _endDate)) return false;
+      if (!_isDateInPeriod(
+        r.createdAt,
+        _selectedPeriod,
+        startDate: _startDate,
+        endDate: _endDate,
+      ))
+        return false;
       if (_selectedBranch != 'All') {
         final v = _getVehicleById(r.vehicleId);
-        if (v == null || (v.branchName != _selectedBranch && v.branchId != _selectedBranch)) return false;
+        if (v == null ||
+            (v.branchName != _selectedBranch && v.branchId != _selectedBranch))
+          return false;
       }
-      if (_selectedVehicle != 'All' && r.vehicleId != _selectedVehicle) return false;
-      if (_selectedCustomer != 'All' && r.userId != _selectedCustomer) return false;
+      if (_selectedVehicle != 'All' && r.vehicleId != _selectedVehicle)
+        return false;
+      if (_selectedCustomer != 'All' && r.userId != _selectedCustomer)
+        return false;
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
-        if (!r.userName.toLowerCase().contains(q) && !r.comment.toLowerCase().contains(q)) return false;
+        if (!r.userName.toLowerCase().contains(q) &&
+            !r.comment.toLowerCase().contains(q))
+          return false;
       }
       return true;
     }).toList();
@@ -325,8 +457,16 @@ class _ReportsViewState extends State<ReportsView> {
   List<Map<String, dynamic>> _getFilteredRewardTransactions() {
     return widget.rewardTransactions.where((tx) {
       final txDate = _parseDateString(tx['createdAt'] ?? '');
-      if (txDate != null && !_isDateInPeriod(txDate, _selectedPeriod, startDate: _startDate, endDate: _endDate)) return false;
-      if (_selectedCustomer != 'All' && tx['userId'] != _selectedCustomer) return false;
+      if (txDate != null &&
+          !_isDateInPeriod(
+            txDate,
+            _selectedPeriod,
+            startDate: _startDate,
+            endDate: _endDate,
+          ))
+        return false;
+      if (_selectedCustomer != 'All' && tx['userId'] != _selectedCustomer)
+        return false;
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
         final reason = (tx['reason'] ?? '').toString().toLowerCase();
@@ -345,10 +485,28 @@ class _ReportsViewState extends State<ReportsView> {
     final filteredRewardTxs = _getFilteredRewardTransactions();
 
     int totalBookings = filteredBookings.length;
-    int completedBookings = filteredBookings.where((b) => b.status.toLowerCase() == 'completed' || b.isReturned).length;
-    int cancelledBookings = filteredBookings.where((b) => b.status.toLowerCase() == 'cancelled' || b.status.toLowerCase() == 'rejected').length;
-    int activeBookings = filteredBookings.where((b) => b.status.toLowerCase() == 'approved' || b.status.toLowerCase() == 'confirmed' || b.status.toLowerCase() == 'ongoing' || b.status.toLowerCase() == 'active').length;
-    int overdueBookings = filteredBookings.where((b) => b.status.toLowerCase() == 'overdue').length;
+    int completedBookings = filteredBookings
+        .where((b) => b.status.toLowerCase() == 'completed' || b.isReturned)
+        .length;
+    int cancelledBookings = filteredBookings
+        .where(
+          (b) =>
+              b.status.toLowerCase() == 'cancelled' ||
+              b.status.toLowerCase() == 'rejected',
+        )
+        .length;
+    int activeBookings = filteredBookings
+        .where(
+          (b) =>
+              b.status.toLowerCase() == 'approved' ||
+              b.status.toLowerCase() == 'confirmed' ||
+              b.status.toLowerCase() == 'ongoing' ||
+              b.status.toLowerCase() == 'active',
+        )
+        .length;
+    int overdueBookings = filteredBookings
+        .where((b) => b.status.toLowerCase() == 'overdue')
+        .length;
 
     double totalRevenue = 0.0;
     int completedPayments = 0;
@@ -368,7 +526,9 @@ class _ReportsViewState extends State<ReportsView> {
     for (var b in filteredBookings) {
       totalDuration += b.rentalDays;
     }
-    double avgDuration = totalBookings > 0 ? totalDuration / totalBookings : 0.0;
+    double avgDuration = totalBookings > 0
+        ? totalDuration / totalBookings
+        : 0.0;
 
     // Most Rented Vehicle
     String mostRentedVehicle = 'N/A';
@@ -377,7 +537,8 @@ class _ReportsViewState extends State<ReportsView> {
       for (var b in filteredBookings) {
         vehicleCounts[b.vehicleName] = (vehicleCounts[b.vehicleName] ?? 0) + 1;
       }
-      final sorted = vehicleCounts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+      final sorted = vehicleCounts.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
       mostRentedVehicle = sorted.first.key;
     }
 
@@ -388,7 +549,8 @@ class _ReportsViewState extends State<ReportsView> {
       for (var b in filteredBookings) {
         customerCounts[b.userName] = (customerCounts[b.userName] ?? 0) + 1;
       }
-      final sorted = customerCounts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+      final sorted = customerCounts.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
       mostActiveCustomer = sorted.first.key;
     }
 
@@ -398,7 +560,9 @@ class _ReportsViewState extends State<ReportsView> {
     for (var tx in filteredRewardTxs) {
       final pts = tx['points'] as int? ?? 0;
       final type = (tx['type'] ?? '').toString();
-      if (type == 'Earn' || type == 'Earned' || (type == 'Adjustment' && pts > 0)) {
+      if (type == 'Earn' ||
+          type == 'Earned' ||
+          (type == 'Adjustment' && pts > 0)) {
         rewardPointsIssued += pts.abs();
       }
     }
@@ -426,10 +590,16 @@ class _ReportsViewState extends State<ReportsView> {
     if (_selectedPeriod == 'This Month') {
       periodStr = DateFormat('MMMM_yyyy').format(DateTime.now());
     } else if (_selectedPeriod == 'Last Month') {
-      final prevMonth = DateTime(DateTime.now().year, DateTime.now().month - 1, 1);
+      final prevMonth = DateTime(
+        DateTime.now().year,
+        DateTime.now().month - 1,
+        1,
+      );
       periodStr = DateFormat('MMMM_yyyy').format(prevMonth);
     } else if (_selectedPeriod == 'Custom Date Range') {
-      final startStr = DateFormat('ddMMMyyyy').format(_startDate ?? DateTime.now());
+      final startStr = DateFormat(
+        'ddMMMyyyy',
+      ).format(_startDate ?? DateTime.now());
       final endStr = DateFormat('ddMMMyyyy').format(_endDate ?? DateTime.now());
       periodStr = '${startStr}_to_$endStr';
     }
@@ -444,10 +614,14 @@ class _ReportsViewState extends State<ReportsView> {
 
     final buffer = StringBuffer();
     // Write Headers
-    buffer.writeln(headers.map((h) => '"${h.replaceAll('"', '""')}"').join(','));
+    buffer.writeln(
+      headers.map((h) => '"${h.replaceAll('"', '""')}"').join(','),
+    );
     // Write Rows
     for (final row in tableData) {
-      buffer.writeln(row.map((cell) => '"${cell.replaceAll('"', '""')}"').join(','));
+      buffer.writeln(
+        row.map((cell) => '"${cell.replaceAll('"', '""')}"').join(','),
+      );
     }
 
     final bytes = utf8.encode(buffer.toString());
@@ -455,7 +629,10 @@ class _ReportsViewState extends State<ReportsView> {
     download_helper.downloadFile(Uint8List.fromList(bytes), fileName);
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$type report downloaded in CSV format!'), backgroundColor: Colors.green),
+      SnackBar(
+        content: Text('$type report downloaded in CSV format!'),
+        backgroundColor: Colors.green,
+      ),
     );
   }
 
@@ -472,14 +649,18 @@ class _ReportsViewState extends State<ReportsView> {
     sheet.appendRow(headers.map((h) => TextCellValue(h)).toList());
     // Data Rows
     for (final row in tableData) {
-      sheet.appendRow(row.map((cell) {
-        // Try parsing number
-        final numVal = double.tryParse(cell.replaceAll('RM', '').replaceAll(' ', '').trim());
-        if (numVal != null && !cell.contains(':') && !cell.contains('/')) {
-          return DoubleCellValue(numVal);
-        }
-        return TextCellValue(cell);
-      }).toList());
+      sheet.appendRow(
+        row.map((cell) {
+          // Try parsing number
+          final numVal = double.tryParse(
+            cell.replaceAll('RM', '').replaceAll(' ', '').trim(),
+          );
+          if (numVal != null && !cell.contains(':') && !cell.contains('/')) {
+            return DoubleCellValue(numVal);
+          }
+          return TextCellValue(cell);
+        }).toList(),
+      );
     }
 
     final fileBytes = excelObj.save();
@@ -487,7 +668,10 @@ class _ReportsViewState extends State<ReportsView> {
       final fileName = _getExportFileName(type, 'xlsx');
       download_helper.downloadFile(Uint8List.fromList(fileBytes), fileName);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$type report downloaded in Excel format!'), backgroundColor: Colors.green),
+        SnackBar(
+          content: Text('$type report downloaded in Excel format!'),
+          backgroundColor: Colors.green,
+        ),
       );
     }
   }
@@ -510,18 +694,44 @@ class _ReportsViewState extends State<ReportsView> {
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text('CARENT PLATFORM REPORT', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 20, color: pdf_lib.PdfColor.fromInt(0xFF1E3A8A))),
-                pw.Text('Date: ${DateFormat('dd MMM yyyy').format(DateTime.now())}', style: pw.TextStyle(fontSize: 10, color: pdf_lib.PdfColor.fromInt(0xFF6B7280))),
+                pw.Text(
+                  'CARENT PLATFORM REPORT',
+                  style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 20,
+                    color: pdf_lib.PdfColor.fromInt(0xFF1E3A8A),
+                  ),
+                ),
+                pw.Text(
+                  'Date: ${DateFormat('dd MMM yyyy').format(DateTime.now())}',
+                  style: pw.TextStyle(
+                    fontSize: 10,
+                    color: pdf_lib.PdfColor.fromInt(0xFF6B7280),
+                  ),
+                ),
               ],
             ),
             pw.SizedBox(height: 10),
             pw.Divider(),
             pw.SizedBox(height: 10),
-            
+
             // Subtitle & Filter Configuration
-            pw.Text('$type Analysis - Period: $_selectedPeriod', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: pdf_lib.PdfColor.fromInt(0xFF374151))),
+            pw.Text(
+              '$type Analysis - Period: $_selectedPeriod',
+              style: pw.TextStyle(
+                fontSize: 14,
+                fontWeight: pw.FontWeight.bold,
+                color: pdf_lib.PdfColor.fromInt(0xFF374151),
+              ),
+            ),
             pw.SizedBox(height: 5),
-            pw.Text('Filters Active: Branch ($_selectedBranch), Vehicle ($_selectedVehicle), Customer ($_selectedCustomer)', style: pw.TextStyle(fontSize: 8, color: pdf_lib.PdfColor.fromInt(0xFF6B7280))),
+            pw.Text(
+              'Filters Active: Branch ($_selectedBranch), Vehicle ($_selectedVehicle), Customer ($_selectedCustomer)',
+              style: pw.TextStyle(
+                fontSize: 8,
+                color: pdf_lib.PdfColor.fromInt(0xFF6B7280),
+              ),
+            ),
             pw.SizedBox(height: 15),
 
             // Aggregate Metrics Block
@@ -534,25 +744,56 @@ class _ReportsViewState extends State<ReportsView> {
               child: pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  pw.Text('Summary Aggregates', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: pdf_lib.PdfColor.fromInt(0xFF1F2937))),
+                  pw.Text(
+                    'Summary Aggregates',
+                    style: pw.TextStyle(
+                      fontSize: 11,
+                      fontWeight: pw.FontWeight.bold,
+                      color: pdf_lib.PdfColor.fromInt(0xFF1F2937),
+                    ),
+                  ),
                   pw.SizedBox(height: 6),
                   pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
-                      pw.Text('Total Bookings: ${kpis['totalBookings']}', style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text('Revenue: RM ${kpis['revenue'].toStringAsFixed(2)}', style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text('Active Rentals: ${kpis['activeBookings']}', style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text('Overdue Bookings: ${kpis['overdueBookings']}', style: const pw.TextStyle(fontSize: 8)),
+                      pw.Text(
+                        'Total Bookings: ${kpis['totalBookings']}',
+                        style: const pw.TextStyle(fontSize: 8),
+                      ),
+                      pw.Text(
+                        'Revenue: RM ${kpis['revenue'].toStringAsFixed(2)}',
+                        style: const pw.TextStyle(fontSize: 8),
+                      ),
+                      pw.Text(
+                        'Active Rentals: ${kpis['activeBookings']}',
+                        style: const pw.TextStyle(fontSize: 8),
+                      ),
+                      pw.Text(
+                        'Overdue Bookings: ${kpis['overdueBookings']}',
+                        style: const pw.TextStyle(fontSize: 8),
+                      ),
                     ],
                   ),
                   pw.SizedBox(height: 4),
                   pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
-                      pw.Text('Avg Duration: ${kpis['avgDuration'].toStringAsFixed(1)} Days', style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text('Most Active: ${kpis['mostActiveCustomer']}', style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text('Maintenance Jobs: ${kpis['maintenanceJobs']}', style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text('Rewards Issued: ${kpis['rewardPointsIssued']} Points', style: const pw.TextStyle(fontSize: 8)),
+                      pw.Text(
+                        'Avg Duration: ${kpis['avgDuration'].toStringAsFixed(1)} Days',
+                        style: const pw.TextStyle(fontSize: 8),
+                      ),
+                      pw.Text(
+                        'Most Active: ${kpis['mostActiveCustomer']}',
+                        style: const pw.TextStyle(fontSize: 8),
+                      ),
+                      pw.Text(
+                        'Maintenance Jobs: ${kpis['maintenanceJobs']}',
+                        style: const pw.TextStyle(fontSize: 8),
+                      ),
+                      pw.Text(
+                        'Rewards Issued: ${kpis['rewardPointsIssued']} Points',
+                        style: const pw.TextStyle(fontSize: 8),
+                      ),
                     ],
                   ),
                 ],
@@ -564,9 +805,18 @@ class _ReportsViewState extends State<ReportsView> {
             pw.TableHelper.fromTextArray(
               headers: headers,
               data: tableData,
-              border: pw.TableBorder.all(width: 0.5, color: pdf_lib.PdfColor.fromInt(0xFFE5E7EB)),
-              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: pdf_lib.PdfColors.white, fontSize: 8),
-              headerDecoration: pw.BoxDecoration(color: pdf_lib.PdfColor.fromInt(0xFF1E3A8A)),
+              border: pw.TableBorder.all(
+                width: 0.5,
+                color: pdf_lib.PdfColor.fromInt(0xFFE5E7EB),
+              ),
+              headerStyle: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                color: pdf_lib.PdfColors.white,
+                fontSize: 8,
+              ),
+              headerDecoration: pw.BoxDecoration(
+                color: pdf_lib.PdfColor.fromInt(0xFF1E3A8A),
+              ),
               cellAlignment: pw.Alignment.centerLeft,
               cellStyle: const pw.TextStyle(fontSize: 7),
               columnWidths: {
@@ -574,14 +824,20 @@ class _ReportsViewState extends State<ReportsView> {
                 1: const pw.FixedColumnWidth(100),
               },
             ),
-            
+
             // Footer
             pw.SizedBox(height: 30),
             pw.Divider(),
             pw.SizedBox(height: 5),
             pw.Align(
               alignment: pw.Alignment.centerRight,
-              child: pw.Text('Confidential Business Record | Page 1 of 1', style: pw.TextStyle(fontSize: 7, color: pdf_lib.PdfColor.fromInt(0xFF9CA3AF))),
+              child: pw.Text(
+                'Confidential Business Record | Page 1 of 1',
+                style: pw.TextStyle(
+                  fontSize: 7,
+                  color: pdf_lib.PdfColor.fromInt(0xFF9CA3AF),
+                ),
+              ),
             ),
           ];
         },
@@ -593,7 +849,10 @@ class _ReportsViewState extends State<ReportsView> {
     download_helper.downloadFile(fileBytes, fileName);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$type report downloaded in PDF format!'), backgroundColor: Colors.green),
+        SnackBar(
+          content: Text('$type report downloaded in PDF format!'),
+          backgroundColor: Colors.green,
+        ),
       );
     }
   }
@@ -602,19 +861,73 @@ class _ReportsViewState extends State<ReportsView> {
   List<String> _getReportHeaders(String type) {
     switch (type) {
       case 'Bookings':
-        return ['Booking ID', 'Vehicle', 'Customer', 'Pickup Date', 'Return Date', 'Total Price', 'Status'];
+        return [
+          'Booking ID',
+          'Vehicle',
+          'Customer',
+          'Pickup Date',
+          'Return Date',
+          'Total Price',
+          'Status',
+        ];
       case 'Payments':
-        return ['Payment ID', 'Booking ID', 'Amount', 'Method', 'Status', 'Transaction ID', 'Date'];
+        return [
+          'Payment ID',
+          'Booking ID',
+          'Amount',
+          'Method',
+          'Status',
+          'Transaction ID',
+          'Date',
+        ];
       case 'Revenue':
-        return ['Payment ID', 'Booking ID', 'Amount', 'Method', 'Status', 'Date'];
+        return [
+          'Payment ID',
+          'Booking ID',
+          'Amount',
+          'Method',
+          'Status',
+          'Date',
+        ];
       case 'Vehicles':
-        return ['Brand & Model', 'Plate Number', 'Category', 'Daily Rate', 'Mileage', 'Branch', 'Status'];
+        return [
+          'Brand & Model',
+          'Plate Number',
+          'Category',
+          'Daily Rate',
+          'Mileage',
+          'Branch',
+          'Status',
+        ];
       case 'Maintenance':
-        return ['Job Title', 'Vehicle', 'Cost', 'Start Date', 'End Date', 'Status'];
+        return [
+          'Job Title',
+          'Vehicle',
+          'Cost',
+          'Start Date',
+          'End Date',
+          'Status',
+        ];
       case 'Customers':
-        return ['Name', 'Email', 'Phone', 'Membership Level', 'Points', 'Verified', 'Active'];
+        return [
+          'Name',
+          'Email',
+          'Phone',
+          'Membership Level',
+          'Points',
+          'Verified',
+          'Active',
+        ];
       case 'Reward Points':
-        return ['User ID', 'Booking ID', 'Type', 'Points Change', 'Balance After', 'Reason', 'Date'];
+        return [
+          'User ID',
+          'Booking ID',
+          'Type',
+          'Points Change',
+          'Balance After',
+          'Reason',
+          'Date',
+        ];
       case 'Reviews':
         return ['Customer', 'Vehicle ID', 'Rating', 'Comment', 'Date'];
       case 'Open Rentals':
@@ -629,104 +942,156 @@ class _ReportsViewState extends State<ReportsView> {
   List<List<String>> _getReportTableData(String type) {
     switch (type) {
       case 'Bookings':
-        return _getFilteredBookings().map((b) => [
-          b.id.substring(0, min(8, b.id.length)),
-          b.vehicleName,
-          b.userName,
-          DateFormat('dd/MM/yyyy').format(b.pickUpDate),
-          b.isOpenRental ? 'Open Rental' : (b.returnDate != null ? DateFormat('dd/MM/yyyy').format(b.returnDate!) : 'N/A'),
-          'RM ${b.totalPrice.toStringAsFixed(2)}',
-          b.status.toUpperCase(),
-        ]).toList();
+        return _getFilteredBookings()
+            .map(
+              (b) => [
+                b.id.substring(0, min(8, b.id.length)),
+                b.vehicleName,
+                b.userName,
+                DateFormat('dd/MM/yyyy').format(b.pickUpDate),
+                b.isOpenRental
+                    ? 'Open Rental'
+                    : (b.returnDate != null
+                          ? DateFormat('dd/MM/yyyy').format(b.returnDate!)
+                          : 'N/A'),
+                'RM ${b.totalPrice.toStringAsFixed(2)}',
+                b.status.toUpperCase(),
+              ],
+            )
+            .toList();
       case 'Payments':
-        return _getFilteredPayments().map((p) => [
-          p.id.substring(0, min(8, p.id.length)),
-          p.bookingId.substring(0, min(8, p.bookingId.length)),
-          'RM ${p.amount.toStringAsFixed(2)}',
-          p.paymentMethod,
-          (p.paymentStatus ?? p.status).toUpperCase(),
-          p.transactionId ?? 'N/A',
-          DateFormat('dd/MM/yyyy').format(p.paymentDate),
-        ]).toList();
+        return _getFilteredPayments()
+            .map(
+              (p) => [
+                p.id.substring(0, min(8, p.id.length)),
+                p.bookingId.substring(0, min(8, p.bookingId.length)),
+                'RM ${p.amount.toStringAsFixed(2)}',
+                p.paymentMethod,
+                (p.paymentStatus ?? p.status).toUpperCase(),
+                p.transactionId ?? 'N/A',
+                DateFormat('dd/MM/yyyy').format(p.paymentDate),
+              ],
+            )
+            .toList();
       case 'Revenue':
-        return _getFilteredPayments().where((p) {
-          final s = (p.paymentStatus ?? p.status).toLowerCase();
-          return s == 'paid' || s == 'approved';
-        }).map((p) => [
-          p.id.substring(0, min(8, p.id.length)),
-          p.bookingId.substring(0, min(8, p.bookingId.length)),
-          'RM ${p.amount.toStringAsFixed(2)}',
-          p.paymentMethod,
-          (p.paymentStatus ?? p.status).toUpperCase(),
-          DateFormat('dd/MM/yyyy').format(p.paymentDate),
-        ]).toList();
+        return _getFilteredPayments()
+            .where((p) {
+              final s = (p.paymentStatus ?? p.status).toLowerCase();
+              return s == 'paid' || s == 'approved';
+            })
+            .map(
+              (p) => [
+                p.id.substring(0, min(8, p.id.length)),
+                p.bookingId.substring(0, min(8, p.bookingId.length)),
+                'RM ${p.amount.toStringAsFixed(2)}',
+                p.paymentMethod,
+                (p.paymentStatus ?? p.status).toUpperCase(),
+                DateFormat('dd/MM/yyyy').format(p.paymentDate),
+              ],
+            )
+            .toList();
       case 'Vehicles':
-        return _getFilteredVehicles().map((v) => [
-          '${v.brand} ${v.model}',
-          v.plateNumber,
-          v.category,
-          'RM ${v.pricePerDay.toStringAsFixed(2)}',
-          '${v.mileage} KM',
-          v.branchName.isEmpty ? 'Main Hub' : v.branchName,
-          v.status.toUpperCase(),
-        ]).toList();
+        return _getFilteredVehicles()
+            .map(
+              (v) => [
+                '${v.brand} ${v.model}',
+                v.plateNumber,
+                v.category,
+                'RM ${v.pricePerDay.toStringAsFixed(2)}',
+                '${v.mileage} KM',
+                v.branchName.isEmpty ? 'Main Hub' : v.branchName,
+                v.status.toUpperCase(),
+              ],
+            )
+            .toList();
       case 'Maintenance':
-        return _getFilteredMaintenance().map((j) => [
-          j.title,
-          j.vehicleName,
-          'RM ${j.cost.toStringAsFixed(2)}',
-          j.startDate,
-          j.endDate,
-          j.status.toUpperCase(),
-        ]).toList();
+        return _getFilteredMaintenance()
+            .map(
+              (j) => [
+                j.title,
+                j.vehicleName,
+                'RM ${j.cost.toStringAsFixed(2)}',
+                j.startDate,
+                j.endDate,
+                j.status.toUpperCase(),
+              ],
+            )
+            .toList();
       case 'Customers':
-        return _getFilteredCustomers().map((c) => [
-          c.fullName,
-          c.email,
-          c.phone.isEmpty ? 'N/A' : c.phone,
-          CompanySettingsProvider().determineLevel(c.rewardPoints),
-          '${c.rewardPoints} pts',
-          c.isVerified ? 'YES' : 'NO',
-          c.isActive ? 'YES' : 'NO',
-        ]).toList();
+        return _getFilteredCustomers()
+            .map(
+              (c) => [
+                c.fullName,
+                c.email,
+                c.phone.isEmpty ? 'N/A' : c.phone,
+                CompanySettingsProvider().determineLevel(c.rewardPoints),
+                '${c.rewardPoints} pts',
+                c.isVerified ? 'YES' : 'NO',
+                c.isActive ? 'YES' : 'NO',
+              ],
+            )
+            .toList();
       case 'Reward Points':
         return _getFilteredRewardTransactions().map((tx) {
           final uId = tx['userId']?.toString() ?? '';
           final user = _getUserById(uId);
           return <String>[
             user?.fullName ?? uId.substring(0, min(6, uId.length)),
-            (tx['bookingId'] ?? '').toString().substring(0, min(8, (tx['bookingId'] ?? '').toString().length)),
+            (tx['bookingId'] ?? '').toString().substring(
+              0,
+              min(8, (tx['bookingId'] ?? '').toString().length),
+            ),
             (tx['type'] ?? '').toString().toUpperCase(),
             '${tx['points'] ?? 0}',
             '${tx['balanceAfter'] ?? 0}',
             (tx['reason'] ?? tx['comment'] ?? 'Loyalty Action').toString(),
-            tx['createdAt'] != null ? DateFormat('dd/MM/yyyy').format(DateTime.parse(tx['createdAt'])) : 'N/A',
+            tx['createdAt'] != null
+                ? DateFormat(
+                    'dd/MM/yyyy',
+                  ).format(DateTime.parse(tx['createdAt']))
+                : 'N/A',
           ];
         }).toList();
       case 'Reviews':
-        return _getFilteredReviews().map((r) => [
-          r.userName,
-          r.vehicleId.substring(0, min(8, r.vehicleId.length)),
-          '${r.rating} ⭐',
-          r.comment,
-          DateFormat('dd/MM/yyyy').format(r.createdAt),
-        ]).toList();
+        return _getFilteredReviews()
+            .map(
+              (r) => [
+                r.userName,
+                r.vehicleId.substring(0, min(8, r.vehicleId.length)),
+                '${r.rating} ⭐',
+                r.comment,
+                DateFormat('dd/MM/yyyy').format(r.createdAt),
+              ],
+            )
+            .toList();
       case 'Open Rentals':
-        return _getFilteredBookings().where((b) => b.isOpenRental).map((b) => [
-          b.id.substring(0, min(8, b.id.length)),
-          b.vehicleName,
-          b.userName,
-          DateFormat('dd/MM/yyyy').format(b.pickUpDate),
-          b.status.toUpperCase(),
-        ]).toList();
+        return _getFilteredBookings()
+            .where((b) => b.isOpenRental)
+            .map(
+              (b) => [
+                b.id.substring(0, min(8, b.id.length)),
+                b.vehicleName,
+                b.userName,
+                DateFormat('dd/MM/yyyy').format(b.pickUpDate),
+                b.status.toUpperCase(),
+              ],
+            )
+            .toList();
       case 'Overdue Rentals':
-        return _getFilteredBookings().where((b) => b.status.toLowerCase() == 'overdue').map((b) => [
-          b.id.substring(0, min(8, b.id.length)),
-          b.vehicleName,
-          b.userName,
-          b.returnDate != null ? DateFormat('dd/MM/yyyy').format(b.returnDate!) : 'N/A',
-          b.status.toUpperCase(),
-        ]).toList();
+        return _getFilteredBookings()
+            .where((b) => b.status.toLowerCase() == 'overdue')
+            .map(
+              (b) => [
+                b.id.substring(0, min(8, b.id.length)),
+                b.vehicleName,
+                b.userName,
+                b.returnDate != null
+                    ? DateFormat('dd/MM/yyyy').format(b.returnDate!)
+                    : 'N/A',
+                b.status.toUpperCase(),
+              ],
+            )
+            .toList();
       default:
         return [];
     }
@@ -737,7 +1102,9 @@ class _ReportsViewState extends State<ReportsView> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final textPrimary = isDark
+        ? const Color(0xFFF8FAFC)
+        : AppColors.secondaryBlue;
     final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
     final borderColor = isDark ? const Color(0xFF334155) : Colors.grey.shade200;
 
@@ -757,85 +1124,184 @@ class _ReportsViewState extends State<ReportsView> {
           const SizedBox(height: 24),
 
           // Time period & Custom Range Selector
-          _buildTimeframeCard(cardColor, textPrimary, textSecondary, borderColor),
+          _buildTimeframeCard(
+            cardColor,
+            textPrimary,
+            textSecondary,
+            borderColor,
+          ),
           const SizedBox(height: 20),
 
           // Advanced Filter Accordion Panel
-          _buildAdvancedFiltersPanel(cardColor, textPrimary, textSecondary, borderColor),
+          _buildAdvancedFiltersPanel(
+            cardColor,
+            textPrimary,
+            textSecondary,
+            borderColor,
+          ),
           const SizedBox(height: 24),
 
           // 13 KPI Metric Summary Grid
-          _buildKPIGrid(kpis, isDesktop, isTablet, cardColor, textPrimary, textSecondary, borderColor),
+          _buildKPIGrid(
+            kpis,
+            isDesktop,
+            isTablet,
+            cardColor,
+            textPrimary,
+            textSecondary,
+            borderColor,
+          ),
           const SizedBox(height: 32),
 
           // Interactive Custom Charts Panel
-          _buildChartsSection(isDesktop, cardColor, textPrimary, textSecondary, borderColor),
+          _buildChartsSection(
+            isDesktop,
+            cardColor,
+            textPrimary,
+            textSecondary,
+            borderColor,
+          ),
           const SizedBox(height: 32),
 
           // Detailed Table Section
-          _buildDetailedTableSection(cardColor, textPrimary, textSecondary, borderColor),
+          _buildDetailedTableSection(
+            cardColor,
+            textPrimary,
+            textSecondary,
+            borderColor,
+          ),
         ],
       ),
     );
   }
 
   // ── UI Components Builders ──────────────────────────────────────────────────
-  Widget _buildHeaderRow(Color textPrimary, Color textSecondary, Color cardColor, Color borderColor) {
-    final hasActiveAIFilters = widget.initialPeriod != null || widget.initialType != null;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text('Operations Reports Center', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: textPrimary)),
-                  if (hasActiveAIFilters) ...[
-                    const SizedBox(width: 12),
-                    Chip(
-                      label: const Text('AI Synced', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
-                      backgroundColor: AppColors.primaryOrange,
-                      deleteIcon: const Icon(Icons.close, size: 12, color: Colors.white),
-                      onDeleted: _clearAIFilters,
-                    ),
-                  ],
-                ],
-              ),
-              Text('Generate operational analytics ledgers based on filters and custom date periods.', style: TextStyle(fontSize: 13, color: textSecondary)),
-            ],
-          ),
-        ),
-        Row(
+  Widget _buildHeaderRow(
+    Color textPrimary,
+    Color textSecondary,
+    Color cardColor,
+    Color borderColor,
+  ) {
+    final hasActiveAIFilters =
+        widget.initialPeriod != null || widget.initialType != null;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 760;
+
+        final headerTextBlock = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue[700], foregroundColor: Colors.white),
-              onPressed: _exportCSV,
-              icon: const Icon(Icons.file_download, size: 16),
-              label: const Text('CSV', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            Text(
+              'Operations Reports Center',
+              style: TextStyle(
+                fontSize: isNarrow ? 18 : 24,
+                fontWeight: FontWeight.w900,
+                color: textPrimary,
+              ),
+              softWrap: true,
             ),
-            const SizedBox(width: 8),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green[600], foregroundColor: Colors.white),
-              onPressed: _exportExcel,
-              icon: const Icon(Icons.table_view, size: 16),
-              label: const Text('Excel', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-            ),
-            const SizedBox(width: 8),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
-              onPressed: _exportPdf,
-              icon: const Icon(Icons.picture_as_pdf, size: 16),
-              label: const Text('PDF', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            if (hasActiveAIFilters) ...[
+              const SizedBox(height: 8),
+              Chip(
+                label: const Text(
+                  'AI Synced',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                backgroundColor: AppColors.primaryOrange,
+                deleteIcon: const Icon(
+                  Icons.close,
+                  size: 12,
+                  color: Colors.white,
+                ),
+                onDeleted: _clearAIFilters,
+              ),
+            ],
+            const SizedBox(height: 6),
+            Text(
+              'Generate operational analytics ledgers based on filters and custom date periods.',
+              style: TextStyle(fontSize: 13, color: textSecondary),
+              softWrap: true,
             ),
           ],
-        ),
-      ],
+        );
+
+        final exportButtons = Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          alignment: isNarrow ? WrapAlignment.start : WrapAlignment.end,
+          children: [
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue[700],
+                foregroundColor: Colors.white,
+              ),
+              onPressed: _exportCSV,
+              icon: const Icon(Icons.file_download, size: 16),
+              label: const Text(
+                'CSV',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            ),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green[600],
+                foregroundColor: Colors.white,
+              ),
+              onPressed: _exportExcel,
+              icon: const Icon(Icons.table_view, size: 16),
+              label: const Text(
+                'Excel',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            ),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: _exportPdf,
+              icon: const Icon(Icons.picture_as_pdf, size: 16),
+              label: const Text(
+                'PDF',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+
+        if (isNarrow) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              headerTextBlock,
+              const SizedBox(height: 14),
+              exportButtons,
+            ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: headerTextBlock),
+            const SizedBox(width: 16),
+            exportButtons,
+          ],
+        );
+      },
     );
   }
 
-  Widget _buildTimeframeCard(Color cardColor, Color textPrimary, Color textSecondary, Color borderColor) {
+  Widget _buildTimeframeCard(
+    Color cardColor,
+    Color textPrimary,
+    Color textSecondary,
+    Color borderColor,
+  ) {
     final isCustom = _selectedPeriod == 'Custom Date Range';
 
     return Container(
@@ -850,50 +1316,71 @@ class _ReportsViewState extends State<ReportsView> {
         children: [
           Row(
             children: [
-              Icon(Icons.calendar_month, color: AppColors.primaryOrange, size: 20),
+              Icon(
+                Icons.calendar_month,
+                color: AppColors.primaryOrange,
+                size: 20,
+              ),
               const SizedBox(width: 8),
-              Text('Report Period', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary)),
+              Text(
+                'Report Period',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: textPrimary,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: [
-              'Today',
-              'Yesterday',
-              'Last 7 Days',
-              'This Week',
-              'Last Week',
-              'This Month',
-              'Last Month',
-              'Last 3 Months',
-              'Last 6 Months',
-              'This Year',
-              'Last Year',
-              'Custom Date Range',
-            ].map((p) {
-              final isSel = _selectedPeriod == p;
-              return ChoiceChip(
-                label: Text(p, style: TextStyle(color: isSel ? Colors.white : textPrimary, fontSize: 11, fontWeight: FontWeight.bold)),
-                selected: isSel,
-                selectedColor: AppColors.primaryOrange,
-                backgroundColor: Colors.transparent,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  side: BorderSide(color: isSel ? Colors.transparent : borderColor),
-                ),
-                onSelected: (val) {
-                  if (val) {
-                    setState(() {
-                      _selectedPeriod = p;
-                      _currentPage = 1;
-                      _clearAIFilters();
-                    });
-                  }
-                },
-              );
-            }).toList(),
+            children:
+                [
+                  'Today',
+                  'Yesterday',
+                  'Last 7 Days',
+                  'This Week',
+                  'Last Week',
+                  'This Month',
+                  'Last Month',
+                  'Last 3 Months',
+                  'Last 6 Months',
+                  'This Year',
+                  'Last Year',
+                  'Custom Date Range',
+                ].map((p) {
+                  final isSel = _selectedPeriod == p;
+                  return ChoiceChip(
+                    label: Text(
+                      p,
+                      style: TextStyle(
+                        color: isSel ? Colors.white : textPrimary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    selected: isSel,
+                    selectedColor: AppColors.primaryOrange,
+                    backgroundColor: Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(
+                        color: isSel ? Colors.transparent : borderColor,
+                      ),
+                    ),
+                    onSelected: (val) {
+                      if (val) {
+                        setState(() {
+                          _selectedPeriod = p;
+                          _currentPage = 1;
+                          _clearAIFilters();
+                        });
+                      }
+                    },
+                  );
+                }).toList(),
           ),
           if (isCustom) ...[
             const SizedBox(height: 16),
@@ -918,7 +1405,11 @@ class _ReportsViewState extends State<ReportsView> {
                       }
                     },
                     icon: const Icon(Icons.date_range, size: 16),
-                    label: Text(_startDate == null ? 'Select Start Date' : DateFormat('dd MMM yyyy').format(_startDate!)),
+                    label: Text(
+                      _startDate == null
+                          ? 'Select Start Date'
+                          : DateFormat('dd MMM yyyy').format(_startDate!),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -939,7 +1430,11 @@ class _ReportsViewState extends State<ReportsView> {
                       }
                     },
                     icon: const Icon(Icons.date_range, size: 16),
-                    label: Text(_endDate == null ? 'Select End Date' : DateFormat('dd MMM yyyy').format(_endDate!)),
+                    label: Text(
+                      _endDate == null
+                          ? 'Select End Date'
+                          : DateFormat('dd MMM yyyy').format(_endDate!),
+                    ),
                   ),
                 ),
               ],
@@ -950,7 +1445,12 @@ class _ReportsViewState extends State<ReportsView> {
     );
   }
 
-  Widget _buildAdvancedFiltersPanel(Color cardColor, Color textPrimary, Color textSecondary, Color borderColor) {
+  Widget _buildAdvancedFiltersPanel(
+    Color cardColor,
+    Color textPrimary,
+    Color textSecondary,
+    Color borderColor,
+  ) {
     return Container(
       decoration: BoxDecoration(
         color: cardColor,
@@ -961,11 +1461,26 @@ class _ReportsViewState extends State<ReportsView> {
         children: [
           ListTile(
             leading: Icon(Icons.tune, color: AppColors.primaryOrange, size: 20),
-            title: Text('Advanced filters & segments', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textPrimary)),
-            subtitle: Text('Filter by Branch, Customer, Statuses, Vehicle properties', style: TextStyle(fontSize: 11, color: textSecondary)),
+            title: Text(
+              'Advanced filters & segments',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: textPrimary,
+              ),
+            ),
+            subtitle: Text(
+              'Filter by Branch, Customer, Statuses, Vehicle properties',
+              style: TextStyle(fontSize: 11, color: textSecondary),
+            ),
             trailing: IconButton(
-              icon: Icon(_showAdvancedFilters ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down),
-              onPressed: () => setState(() => _showAdvancedFilters = !_showAdvancedFilters),
+              icon: Icon(
+                _showAdvancedFilters
+                    ? Icons.keyboard_arrow_up
+                    : Icons.keyboard_arrow_down,
+              ),
+              onPressed: () =>
+                  setState(() => _showAdvancedFilters = !_showAdvancedFilters),
             ),
           ),
           if (_showAdvancedFilters) ...[
@@ -975,7 +1490,9 @@ class _ReportsViewState extends State<ReportsView> {
               child: Column(
                 children: [
                   GridView.count(
-                    crossAxisCount: MediaQuery.of(context).size.width > 900 ? 4 : 2,
+                    crossAxisCount: MediaQuery.of(context).size.width > 900
+                        ? 4
+                        : 2,
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     crossAxisSpacing: 16,
@@ -983,41 +1500,120 @@ class _ReportsViewState extends State<ReportsView> {
                     childAspectRatio: 2.8,
                     children: [
                       // Branch Dropdown
-                      _buildFilterDropdown('Branch Location', _selectedBranch, ['All', 'Kuala Lumpur', 'Main Hub', 'Kajang', 'PenangHub'], (val) {
-                        setState(() => _selectedBranch = val!);
-                      }, textPrimary, textSecondary),
+                      _buildFilterDropdown(
+                        'Branch Location',
+                        _selectedBranch,
+                        [
+                          'All',
+                          'Kuala Lumpur',
+                          'Main Hub',
+                          'Kajang',
+                          'PenangHub',
+                        ],
+                        (val) {
+                          setState(() => _selectedBranch = val!);
+                        },
+                        textPrimary,
+                        textSecondary,
+                      ),
                       // Vehicle Dropdown
-                      _buildFilterDropdown('Vehicle', _selectedVehicle, ['All', ...widget.vehicles.map((v) => v.id)], (val) {
-                        setState(() => _selectedVehicle = val!);
-                      }, textPrimary, textSecondary, itemLabelBuilder: (val) {
-                        if (val == 'All') return 'All Vehicles';
-                        final v = _getVehicleById(val);
-                        return v != null ? '${v.brand} ${v.model} (${v.plateNumber})' : val;
-                      }),
+                      _buildFilterDropdown(
+                        'Vehicle',
+                        _selectedVehicle,
+                        ['All', ...widget.vehicles.map((v) => v.id)],
+                        (val) {
+                          setState(() => _selectedVehicle = val!);
+                        },
+                        textPrimary,
+                        textSecondary,
+                        itemLabelBuilder: (val) {
+                          if (val == 'All') return 'All Vehicles';
+                          final v = _getVehicleById(val);
+                          return v != null
+                              ? '${v.brand} ${v.model} (${v.plateNumber})'
+                              : val;
+                        },
+                      ),
                       // Customer Dropdown
-                      _buildFilterDropdown('Customer', _selectedCustomer, ['All', ...widget.users.where((u) => u.role == 'customer').map((u) => u.id)], (val) {
-                        setState(() => _selectedCustomer = val!);
-                      }, textPrimary, textSecondary, itemLabelBuilder: (val) {
-                        if (val == 'All') return 'All Customers';
-                        final u = _getUserById(val);
-                        return u != null ? u.fullName : val;
-                      }),
+                      _buildFilterDropdown(
+                        'Customer',
+                        _selectedCustomer,
+                        [
+                          'All',
+                          ...widget.users
+                              .where((u) => u.role == 'customer')
+                              .map((u) => u.id),
+                        ],
+                        (val) {
+                          setState(() => _selectedCustomer = val!);
+                        },
+                        textPrimary,
+                        textSecondary,
+                        itemLabelBuilder: (val) {
+                          if (val == 'All') return 'All Customers';
+                          final u = _getUserById(val);
+                          return u != null ? u.fullName : val;
+                        },
+                      ),
                       // Booking Status
-                      _buildFilterDropdown('Booking Status', _selectedBookingStatus, ['All', 'Pending', 'Approved', 'Confirmed', 'Ongoing', 'Completed', 'Cancelled', 'Overdue'], (val) {
-                        setState(() => _selectedBookingStatus = val!);
-                      }, textPrimary, textSecondary),
+                      _buildFilterDropdown(
+                        'Booking Status',
+                        _selectedBookingStatus,
+                        [
+                          'All',
+                          'Pending',
+                          'Approved',
+                          'Confirmed',
+                          'Ongoing',
+                          'Completed',
+                          'Cancelled',
+                          'Overdue',
+                        ],
+                        (val) {
+                          setState(() => _selectedBookingStatus = val!);
+                        },
+                        textPrimary,
+                        textSecondary,
+                      ),
                       // Payment Status
-                      _buildFilterDropdown('Payment Status', _selectedPaymentStatus, ['All', 'Pending', 'Paid', 'Approved', 'Rejected'], (val) {
-                        setState(() => _selectedPaymentStatus = val!);
-                      }, textPrimary, textSecondary),
+                      _buildFilterDropdown(
+                        'Payment Status',
+                        _selectedPaymentStatus,
+                        ['All', 'Pending', 'Paid', 'Approved', 'Rejected'],
+                        (val) {
+                          setState(() => _selectedPaymentStatus = val!);
+                        },
+                        textPrimary,
+                        textSecondary,
+                      ),
                       // Vehicle Availability Status
-                      _buildFilterDropdown('Vehicle Status', _selectedVehicleStatus, ['All', 'Available', 'Booked', 'Maintenance', 'Inactive'], (val) {
-                        setState(() => _selectedVehicleStatus = val!);
-                      }, textPrimary, textSecondary),
+                      _buildFilterDropdown(
+                        'Vehicle Status',
+                        _selectedVehicleStatus,
+                        [
+                          'All',
+                          'Available',
+                          'Booked',
+                          'Maintenance',
+                          'Inactive',
+                        ],
+                        (val) {
+                          setState(() => _selectedVehicleStatus = val!);
+                        },
+                        textPrimary,
+                        textSecondary,
+                      ),
                       // Membership Levels
-                      _buildFilterDropdown('Membership Level', _selectedMembershipLevel, ['All', 'Bronze', 'Silver', 'Gold', 'Premium'], (val) {
-                        setState(() => _selectedMembershipLevel = val!);
-                      }, textPrimary, textSecondary),
+                      _buildFilterDropdown(
+                        'Membership Level',
+                        _selectedMembershipLevel,
+                        ['All', 'Bronze', 'Silver', 'Gold', 'Premium'],
+                        (val) {
+                          setState(() => _selectedMembershipLevel = val!);
+                        },
+                        textPrimary,
+                        textSecondary,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -1038,7 +1634,13 @@ class _ReportsViewState extends State<ReportsView> {
                             _currentPage = 1;
                           });
                         },
-                        child: const Text('Reset All Filters', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                        child: const Text(
+                          'Reset All Filters',
+                          style: TextStyle(
+                            color: Colors.redAccent,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -1051,11 +1653,26 @@ class _ReportsViewState extends State<ReportsView> {
     );
   }
 
-  Widget _buildFilterDropdown(String label, String value, List<String> items, ValueChanged<String?> onChanged, Color textPrimary, Color textSecondary, {String Function(String)? itemLabelBuilder}) {
+  Widget _buildFilterDropdown(
+    String label,
+    String value,
+    List<String> items,
+    ValueChanged<String?> onChanged,
+    Color textPrimary,
+    Color textSecondary, {
+    String Function(String)? itemLabelBuilder,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: textSecondary)),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: textSecondary,
+          ),
+        ),
         const SizedBox(height: 4),
         Expanded(
           child: DropdownButtonFormField<String>(
@@ -1081,7 +1698,15 @@ class _ReportsViewState extends State<ReportsView> {
     );
   }
 
-  Widget _buildKPIGrid(Map<String, dynamic> kpis, bool isDesktop, bool isTablet, Color cardColor, Color textPrimary, Color textSecondary, Color borderColor) {
+  Widget _buildKPIGrid(
+    Map<String, dynamic> kpis,
+    bool isDesktop,
+    bool isTablet,
+    Color cardColor,
+    Color textPrimary,
+    Color textSecondary,
+    Color borderColor,
+  ) {
     int crossAxisCount = 5;
     if (!isDesktop) {
       crossAxisCount = isTablet ? 3 : 2;
@@ -1095,31 +1720,163 @@ class _ReportsViewState extends State<ReportsView> {
       mainAxisSpacing: 16,
       childAspectRatio: 1.35,
       children: [
-        _buildMetricCard('Total Bookings', '${kpis['totalBookings']}', Icons.bookmark_added_rounded, Colors.purple, cardColor, textPrimary, textSecondary, borderColor),
-        _buildMetricCard('Completed Bookings', '${kpis['completedBookings']}', Icons.verified_rounded, Colors.green, cardColor, textPrimary, textSecondary, borderColor),
-        _buildMetricCard('Cancelled Bookings', '${kpis['cancelledBookings']}', Icons.cancel_outlined, Colors.red, cardColor, textPrimary, textSecondary, borderColor),
-        _buildMetricCard('Active Rentals', '${kpis['activeBookings']}', Icons.directions_car_rounded, Colors.blue, cardColor, textPrimary, textSecondary, borderColor),
-        _buildMetricCard('Total Revenue', 'RM ${kpis['revenue'].toStringAsFixed(2)}', Icons.payments_rounded, Colors.teal, cardColor, textPrimary, textSecondary, borderColor),
-        _buildMetricCard('Pending Payments', '${kpis['pendingPayments']}', Icons.hourglass_empty_rounded, Colors.orange, cardColor, textPrimary, textSecondary, borderColor),
-        _buildMetricCard('Cleared Payments', '${kpis['completedPayments']}', Icons.check_circle_rounded, Colors.greenAccent[700]!, cardColor, textPrimary, textSecondary, borderColor),
-        _buildMetricCard('Avg Duration', '${kpis['avgDuration'].toStringAsFixed(1)} Days', Icons.timelapse_rounded, Colors.indigo, cardColor, textPrimary, textSecondary, borderColor),
-        _buildMetricCard('Popular Vehicle', kpis['mostRentedVehicle'], Icons.stars_rounded, Colors.amber, cardColor, textPrimary, textSecondary, borderColor),
-        _buildMetricCard('Active Customer', kpis['mostActiveCustomer'], Icons.person_pin_rounded, Colors.cyan, cardColor, textPrimary, textSecondary, borderColor),
-        _buildMetricCard('Overdue Bookings', '${kpis['overdueBookings']}', Icons.alarm_on_rounded, Colors.pink, cardColor, textPrimary, textSecondary, borderColor),
-        _buildMetricCard('Maintenance Jobs', '${kpis['maintenanceJobs']}', Icons.build_circle_rounded, Colors.blueGrey, cardColor, textPrimary, textSecondary, borderColor),
-        _buildMetricCard('Reward Points Issued', '${kpis['rewardPointsIssued']} pts', Icons.military_tech_rounded, Colors.deepOrange, cardColor, textPrimary, textSecondary, borderColor),
+        _buildMetricCard(
+          'Total Bookings',
+          '${kpis['totalBookings']}',
+          Icons.bookmark_added_rounded,
+          Colors.purple,
+          cardColor,
+          textPrimary,
+          textSecondary,
+          borderColor,
+        ),
+        _buildMetricCard(
+          'Completed Bookings',
+          '${kpis['completedBookings']}',
+          Icons.verified_rounded,
+          Colors.green,
+          cardColor,
+          textPrimary,
+          textSecondary,
+          borderColor,
+        ),
+        _buildMetricCard(
+          'Cancelled Bookings',
+          '${kpis['cancelledBookings']}',
+          Icons.cancel_outlined,
+          Colors.red,
+          cardColor,
+          textPrimary,
+          textSecondary,
+          borderColor,
+        ),
+        _buildMetricCard(
+          'Active Rentals',
+          '${kpis['activeBookings']}',
+          Icons.directions_car_rounded,
+          Colors.blue,
+          cardColor,
+          textPrimary,
+          textSecondary,
+          borderColor,
+        ),
+        _buildMetricCard(
+          'Total Revenue',
+          'RM ${kpis['revenue'].toStringAsFixed(2)}',
+          Icons.payments_rounded,
+          Colors.teal,
+          cardColor,
+          textPrimary,
+          textSecondary,
+          borderColor,
+        ),
+        _buildMetricCard(
+          'Pending Payments',
+          '${kpis['pendingPayments']}',
+          Icons.hourglass_empty_rounded,
+          Colors.orange,
+          cardColor,
+          textPrimary,
+          textSecondary,
+          borderColor,
+        ),
+        _buildMetricCard(
+          'Cleared Payments',
+          '${kpis['completedPayments']}',
+          Icons.check_circle_rounded,
+          Colors.greenAccent[700]!,
+          cardColor,
+          textPrimary,
+          textSecondary,
+          borderColor,
+        ),
+        _buildMetricCard(
+          'Avg Duration',
+          '${kpis['avgDuration'].toStringAsFixed(1)} Days',
+          Icons.timelapse_rounded,
+          Colors.indigo,
+          cardColor,
+          textPrimary,
+          textSecondary,
+          borderColor,
+        ),
+        _buildMetricCard(
+          'Popular Vehicle',
+          kpis['mostRentedVehicle'],
+          Icons.stars_rounded,
+          Colors.amber,
+          cardColor,
+          textPrimary,
+          textSecondary,
+          borderColor,
+        ),
+        _buildMetricCard(
+          'Active Customer',
+          kpis['mostActiveCustomer'],
+          Icons.person_pin_rounded,
+          Colors.cyan,
+          cardColor,
+          textPrimary,
+          textSecondary,
+          borderColor,
+        ),
+        _buildMetricCard(
+          'Overdue Bookings',
+          '${kpis['overdueBookings']}',
+          Icons.alarm_on_rounded,
+          Colors.pink,
+          cardColor,
+          textPrimary,
+          textSecondary,
+          borderColor,
+        ),
+        _buildMetricCard(
+          'Maintenance Jobs',
+          '${kpis['maintenanceJobs']}',
+          Icons.build_circle_rounded,
+          Colors.blueGrey,
+          cardColor,
+          textPrimary,
+          textSecondary,
+          borderColor,
+        ),
+        _buildMetricCard(
+          'Reward Points Issued',
+          '${kpis['rewardPointsIssued']} pts',
+          Icons.military_tech_rounded,
+          Colors.deepOrange,
+          cardColor,
+          textPrimary,
+          textSecondary,
+          borderColor,
+        ),
       ],
     );
   }
 
-  Widget _buildMetricCard(String title, String value, IconData icon, Color color, Color cardColor, Color textPrimary, Color textSecondary, Color borderColor) {
+  Widget _buildMetricCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+    Color cardColor,
+    Color textPrimary,
+    Color textSecondary,
+    Color borderColor,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: borderColor),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 8, offset: const Offset(0, 4))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1128,48 +1885,115 @@ class _ReportsViewState extends State<ReportsView> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Flexible(child: Text(title, style: TextStyle(color: textSecondary, fontSize: 10, fontWeight: FontWeight.bold))),
+              Flexible(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: textSecondary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
               Icon(icon, color: color, size: 16),
             ],
           ),
-          Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: textPrimary), overflow: TextOverflow.ellipsis, maxLines: 2),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+              color: textPrimary,
+            ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 2,
+          ),
         ],
       ),
     );
   }
 
   // ── Charts Implementation ──────────────────────────────────────────────────
-  Widget _buildChartsSection(bool isDesktop, Color cardColor, Color textPrimary, Color textSecondary, Color borderColor) {
+  Widget _buildChartsSection(
+    bool isDesktop,
+    Color cardColor,
+    Color textPrimary,
+    Color textSecondary,
+    Color borderColor,
+  ) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isWide = constraints.maxWidth > 900;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Interactive Analytics & Visuals', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textPrimary)),
+            Text(
+              'Interactive Analytics & Visuals',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: textPrimary,
+              ),
+            ),
             const SizedBox(height: 16),
             if (isWide) ...[
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: _buildRevenueAndBookingsChartCard(cardColor, textPrimary, textSecondary, borderColor)),
+                  Expanded(
+                    child: _buildRevenueAndBookingsChartCard(
+                      cardColor,
+                      textPrimary,
+                      textSecondary,
+                      borderColor,
+                    ),
+                  ),
                   const SizedBox(width: 20),
-                  Expanded(child: _buildPaymentsAndVehicleUsageCard(cardColor, textPrimary, textSecondary, borderColor)),
+                  Expanded(
+                    child: _buildPaymentsAndVehicleUsageCard(
+                      cardColor,
+                      textPrimary,
+                      textSecondary,
+                      borderColor,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 20),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: _buildOverdueAndMaintenanceChartCard(cardColor, textPrimary, textSecondary, borderColor)),
+                  Expanded(
+                    child: _buildOverdueAndMaintenanceChartCard(
+                      cardColor,
+                      textPrimary,
+                      textSecondary,
+                      borderColor,
+                    ),
+                  ),
                 ],
               ),
             ] else ...[
-              _buildRevenueAndBookingsChartCard(cardColor, textPrimary, textSecondary, borderColor),
+              _buildRevenueAndBookingsChartCard(
+                cardColor,
+                textPrimary,
+                textSecondary,
+                borderColor,
+              ),
               const SizedBox(height: 20),
-              _buildPaymentsAndVehicleUsageCard(cardColor, textPrimary, textSecondary, borderColor),
+              _buildPaymentsAndVehicleUsageCard(
+                cardColor,
+                textPrimary,
+                textSecondary,
+                borderColor,
+              ),
               const SizedBox(height: 20),
-              _buildOverdueAndMaintenanceChartCard(cardColor, textPrimary, textSecondary, borderColor),
+              _buildOverdueAndMaintenanceChartCard(
+                cardColor,
+                textPrimary,
+                textSecondary,
+                borderColor,
+              ),
             ],
           ],
         );
@@ -1177,7 +2001,12 @@ class _ReportsViewState extends State<ReportsView> {
     );
   }
 
-  Widget _buildRevenueAndBookingsChartCard(Color cardColor, Color textPrimary, Color textSecondary, Color borderColor) {
+  Widget _buildRevenueAndBookingsChartCard(
+    Color cardColor,
+    Color textPrimary,
+    Color textSecondary,
+    Color borderColor,
+  ) {
     final filteredPayments = _getFilteredPayments().where((p) {
       final s = (p.paymentStatus ?? p.status).toLowerCase();
       return s == 'paid' || s == 'approved';
@@ -1191,7 +2020,10 @@ class _ReportsViewState extends State<ReportsView> {
     }
     final revEntries = revenueByDate.entries.toList();
     if (revEntries.length > 7) {
-      revEntries.removeRange(7, revEntries.length); // limit to 7 points for visual clarity
+      revEntries.removeRange(
+        7,
+        revEntries.length,
+      ); // limit to 7 points for visual clarity
     }
 
     final filteredBookings = _getFilteredBookings();
@@ -1207,13 +2039,27 @@ class _ReportsViewState extends State<ReportsView> {
 
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16), border: Border.all(color: borderColor)),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Revenue and Bookings Trends', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textPrimary)),
+          Text(
+            'Revenue and Bookings Trends',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: textPrimary,
+            ),
+          ),
           const SizedBox(height: 16),
-          Text('Approved Revenue Trend (Last 7 Active Days)', style: TextStyle(fontSize: 11, color: textSecondary)),
+          Text(
+            'Approved Revenue Trend (Last 7 Active Days)',
+            style: TextStyle(fontSize: 11, color: textSecondary),
+          ),
           const SizedBox(height: 10),
           Container(
             height: 140,
@@ -1224,23 +2070,41 @@ class _ReportsViewState extends State<ReportsView> {
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: revEntries.map((e) {
-                      final maxVal = revEntries.map((entry) => entry.value).reduce(max);
+                      final maxVal = revEntries
+                          .map((entry) => entry.value)
+                          .reduce(max);
                       final pct = maxVal > 0 ? e.value / maxVal : 0.0;
                       return Column(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          Text('RM ${e.value.toStringAsFixed(0)}', style: TextStyle(fontSize: 8, color: textPrimary, fontWeight: FontWeight.bold)),
+                          Text(
+                            'RM ${e.value.toStringAsFixed(0)}',
+                            style: TextStyle(
+                              fontSize: 8,
+                              color: textPrimary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                           const SizedBox(height: 4),
                           Container(
                             width: 24,
                             height: 80 * pct,
                             decoration: BoxDecoration(
-                              gradient: LinearGradient(colors: [Colors.green, Colors.teal[300]!], begin: Alignment.bottomCenter, end: Alignment.topCenter),
-                              borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                              gradient: LinearGradient(
+                                colors: [Colors.green, Colors.teal[300]!],
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.topCenter,
+                              ),
+                              borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(4),
+                              ),
                             ),
                           ),
                           const SizedBox(height: 6),
-                          Text(e.key, style: TextStyle(fontSize: 8, color: textSecondary)),
+                          Text(
+                            e.key,
+                            style: TextStyle(fontSize: 8, color: textSecondary),
+                          ),
                         ],
                       );
                     }).toList(),
@@ -1249,34 +2113,57 @@ class _ReportsViewState extends State<ReportsView> {
           const SizedBox(height: 20),
           const Divider(),
           const SizedBox(height: 16),
-          Text('Booking Volume Trend (Last 7 Active Days)', style: TextStyle(fontSize: 11, color: textSecondary)),
+          Text(
+            'Booking Volume Trend (Last 7 Active Days)',
+            style: TextStyle(fontSize: 11, color: textSecondary),
+          ),
           const SizedBox(height: 10),
           Container(
             height: 140,
             padding: const EdgeInsets.only(top: 10),
             child: bookingEntries.isEmpty
-                ? const Center(child: Text('No bookings records in this period'))
+                ? const Center(
+                    child: Text('No bookings records in this period'),
+                  )
                 : Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: bookingEntries.map((e) {
-                      final maxVal = bookingEntries.map((entry) => entry.value).reduce(max);
+                      final maxVal = bookingEntries
+                          .map((entry) => entry.value)
+                          .reduce(max);
                       final pct = maxVal > 0 ? e.value / maxVal : 0.0;
                       return Column(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          Text('${e.value}', style: TextStyle(fontSize: 8, color: textPrimary, fontWeight: FontWeight.bold)),
+                          Text(
+                            '${e.value}',
+                            style: TextStyle(
+                              fontSize: 8,
+                              color: textPrimary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                           const SizedBox(height: 4),
                           Container(
                             width: 24,
                             height: 80 * pct,
                             decoration: BoxDecoration(
-                              gradient: LinearGradient(colors: [Colors.purple, Colors.pink[300]!], begin: Alignment.bottomCenter, end: Alignment.topCenter),
-                              borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                              gradient: LinearGradient(
+                                colors: [Colors.purple, Colors.pink[300]!],
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.topCenter,
+                              ),
+                              borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(4),
+                              ),
                             ),
                           ),
                           const SizedBox(height: 6),
-                          Text(e.key, style: TextStyle(fontSize: 8, color: textSecondary)),
+                          Text(
+                            e.key,
+                            style: TextStyle(fontSize: 8, color: textSecondary),
+                          ),
                         ],
                       );
                     }).toList(),
@@ -1287,7 +2174,12 @@ class _ReportsViewState extends State<ReportsView> {
     );
   }
 
-  Widget _buildPaymentsAndVehicleUsageCard(Color cardColor, Color textPrimary, Color textSecondary, Color borderColor) {
+  Widget _buildPaymentsAndVehicleUsageCard(
+    Color cardColor,
+    Color textPrimary,
+    Color textSecondary,
+    Color borderColor,
+  ) {
     final filteredPayments = _getFilteredPayments();
     final Map<String, double> methodAmounts = {};
     for (var p in filteredPayments) {
@@ -1301,18 +2193,33 @@ class _ReportsViewState extends State<ReportsView> {
     for (var b in filteredBookings) {
       vehicleCounts[b.vehicleName] = (vehicleCounts[b.vehicleName] ?? 0) + 1;
     }
-    final usageEntries = vehicleCounts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final usageEntries = vehicleCounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
     final topUsage = usageEntries.take(4).toList();
 
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16), border: Border.all(color: borderColor)),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Payments & Vehicle Usage Metrics', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textPrimary)),
+          Text(
+            'Payments & Vehicle Usage Metrics',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: textPrimary,
+            ),
+          ),
           const SizedBox(height: 20),
-          Text('Payment Volume Distribution by Method', style: TextStyle(fontSize: 11, color: textSecondary)),
+          Text(
+            'Payment Volume Distribution by Method',
+            style: TextStyle(fontSize: 11, color: textSecondary),
+          ),
           const SizedBox(height: 12),
           SizedBox(
             height: 120,
@@ -1326,7 +2233,12 @@ class _ReportsViewState extends State<ReportsView> {
                         child: CustomPaint(
                           painter: DonutChartPainter(
                             values: methodEntries.map((e) => e.value).toList(),
-                            colors: const [Colors.amber, Colors.blue, Colors.teal, Colors.purple],
+                            colors: const [
+                              Colors.amber,
+                              Colors.blue,
+                              Colors.teal,
+                              Colors.purple,
+                            ],
                           ),
                         ),
                       ),
@@ -1337,32 +2249,57 @@ class _ReportsViewState extends State<ReportsView> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: List.generate(methodEntries.length, (idx) {
                             final e = methodEntries[idx];
-                            final colors = const [Colors.amber, Colors.blue, Colors.teal, Colors.purple];
+                            final colors = const [
+                              Colors.amber,
+                              Colors.blue,
+                              Colors.teal,
+                              Colors.purple,
+                            ];
                             return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 2.0),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 2.0,
+                              ),
                               child: Row(
                                 children: [
-                                  Container(width: 8, height: 8, color: colors[idx % colors.length]),
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    color: colors[idx % colors.length],
+                                  ),
                                   const SizedBox(width: 8),
-                                  Expanded(child: Text('${e.key}: RM ${e.value.toStringAsFixed(0)}', style: TextStyle(fontSize: 10, color: textPrimary), overflow: TextOverflow.ellipsis)),
+                                  Expanded(
+                                    child: Text(
+                                      '${e.key}: RM ${e.value.toStringAsFixed(0)}',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: textPrimary,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
                                 ],
                               ),
                             );
                           }),
                         ),
-                      )
+                      ),
                     ],
                   ),
           ),
           const SizedBox(height: 20),
           const Divider(),
           const SizedBox(height: 16),
-          Text('Top Active Rented Fleet Units', style: TextStyle(fontSize: 11, color: textSecondary)),
+          Text(
+            'Top Active Rented Fleet Units',
+            style: TextStyle(fontSize: 11, color: textSecondary),
+          ),
           const SizedBox(height: 10),
           Container(
             padding: const EdgeInsets.symmetric(vertical: 10),
             child: topUsage.isEmpty
-                ? const Center(child: Text('No active rental logs in this period'))
+                ? const Center(
+                    child: Text('No active rental logs in this period'),
+                  )
                 : Column(
                     children: topUsage.map((e) {
                       final maxVal = topUsage.first.value;
@@ -1371,7 +2308,17 @@ class _ReportsViewState extends State<ReportsView> {
                         padding: const EdgeInsets.symmetric(vertical: 6.0),
                         child: Row(
                           children: [
-                            SizedBox(width: 100, child: Text(e.key, style: TextStyle(fontSize: 10, color: textPrimary), overflow: TextOverflow.ellipsis)),
+                            SizedBox(
+                              width: 100,
+                              child: Text(
+                                e.key,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: textPrimary,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: ClipRRect(
@@ -1380,12 +2327,21 @@ class _ReportsViewState extends State<ReportsView> {
                                   value: pct,
                                   minHeight: 8,
                                   backgroundColor: borderColor,
-                                  valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryOrange),
+                                  valueColor:
+                                      const AlwaysStoppedAnimation<Color>(
+                                        AppColors.primaryOrange,
+                                      ),
                                 ),
                               ),
                             ),
                             const SizedBox(width: 8),
-                            Text('${e.value} times', style: TextStyle(fontSize: 10, color: textSecondary)),
+                            Text(
+                              '${e.value} times',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: textSecondary,
+                              ),
+                            ),
                           ],
                         ),
                       );
@@ -1397,126 +2353,241 @@ class _ReportsViewState extends State<ReportsView> {
     );
   }
 
-  Widget _buildOverdueAndMaintenanceChartCard(Color cardColor, Color textPrimary, Color textSecondary, Color borderColor) {
+  Widget _buildOverdueAndMaintenanceChartCard(
+    Color cardColor,
+    Color textPrimary,
+    Color textSecondary,
+    Color borderColor,
+  ) {
     final filteredBookings = _getFilteredBookings();
-    final overdueCount = filteredBookings.where((b) => b.status.toLowerCase() == 'overdue').length;
-    final onTimeCount = filteredBookings.where((b) => b.status.toLowerCase() == 'completed' || b.status.toLowerCase() == 'returned').length;
+    final overdueCount = filteredBookings
+        .where((b) => b.status.toLowerCase() == 'overdue')
+        .length;
+    final onTimeCount = filteredBookings
+        .where(
+          (b) =>
+              b.status.toLowerCase() == 'completed' ||
+              b.status.toLowerCase() == 'returned',
+        )
+        .length;
 
     final filteredMaintenance = _getFilteredMaintenance();
     double totalMaintCost = 0.0;
     final Map<String, double> maintCostsByVehicle = {};
     for (var j in filteredMaintenance) {
       totalMaintCost += j.cost;
-      maintCostsByVehicle[j.vehicleName] = (maintCostsByVehicle[j.vehicleName] ?? 0.0) + j.cost;
+      maintCostsByVehicle[j.vehicleName] =
+          (maintCostsByVehicle[j.vehicleName] ?? 0.0) + j.cost;
     }
-    final topMaint = maintCostsByVehicle.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final topMaint = maintCostsByVehicle.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
     final limitMaint = topMaint.take(4).toList();
 
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16), border: Border.all(color: borderColor)),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Overdue Reservations & Maintenance Cost Analytics', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textPrimary)),
+          Text(
+            'Overdue Reservations & Maintenance Cost Analytics',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: textPrimary,
+            ),
+          ),
           const SizedBox(height: 16),
           LayoutBuilder(
             builder: (context, constraints) {
               final isWide = constraints.maxWidth > 500;
-              final childWidget = [
-                Expanded(
-                  flex: isWide ? 1 : 0,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Overdue vs Completed Rentals Ratio', style: TextStyle(fontSize: 11, color: textSecondary)),
-                      const SizedBox(height: 12),
-                      Container(
-                        height: 110,
-                        padding: const EdgeInsets.only(top: 10),
-                        child: (overdueCount == 0 && onTimeCount == 0)
-                            ? const Center(child: Text('No relevant booking logs'))
-                            : Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                crossAxisAlignment: CrossAxisAlignment.end,
+              final totalOverdueAndOnTime = overdueCount + onTimeCount;
+              final overdueRatio = totalOverdueAndOnTime > 0
+                  ? overdueCount / totalOverdueAndOnTime
+                  : 0.0;
+              final onTimeRatio = totalOverdueAndOnTime > 0
+                  ? onTimeCount / totalOverdueAndOnTime
+                  : 0.0;
+
+              final overdueSection = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Overdue vs Completed Rentals Ratio',
+                    style: TextStyle(fontSize: 11, color: textSecondary),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    height: 130,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 8,
+                    ),
+                    child: (overdueCount == 0 && onTimeCount == 0)
+                        ? const Center(child: Text('No relevant booking logs'))
+                        : Column(
+                            children: [
+                              Expanded(
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceEvenly,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Column(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          '$overdueCount',
+                                          style: TextStyle(
+                                            fontSize: 9,
+                                            color: textPrimary,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Container(
+                                          width: 32,
+                                          height: max(4.0, overdueRatio * 70),
+                                          color: Colors.redAccent,
+                                        ),
+                                      ],
+                                    ),
+                                    Column(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          '$onTimeCount',
+                                          style: TextStyle(
+                                            fontSize: 9,
+                                            color: textPrimary,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Container(
+                                          width: 32,
+                                          height: max(4.0, onTimeRatio * 70),
+                                          color: Colors.green,
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              const Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceEvenly,
                                 children: [
-                                  Column(
-                                    mainAxisAlignment: MainAxisAlignment.end,
-                                    children: [
-                                      Text('$overdueCount', style: TextStyle(fontSize: 9, color: textPrimary, fontWeight: FontWeight.bold)),
-                                      const SizedBox(height: 4),
-                                      Container(
-                                        width: 32,
-                                        height: overdueCount + onTimeCount > 0 ? (overdueCount / (overdueCount + onTimeCount)) * 80 : 0.0,
-                                        color: Colors.redAccent,
-                                      ),
-                                      const SizedBox(height: 6),
-                                      const Text('Overdue', style: TextStyle(fontSize: 8, color: Colors.redAccent)),
-                                    ],
+                                  Text(
+                                    'Overdue',
+                                    style: TextStyle(
+                                      fontSize: 8,
+                                      color: Colors.redAccent,
+                                    ),
                                   ),
-                                  Column(
-                                    mainAxisAlignment: MainAxisAlignment.end,
-                                    children: [
-                                      Text('$onTimeCount', style: TextStyle(fontSize: 9, color: textPrimary, fontWeight: FontWeight.bold)),
-                                      const SizedBox(height: 4),
-                                      Container(
-                                        width: 32,
-                                        height: overdueCount + onTimeCount > 0 ? (onTimeCount / (overdueCount + onTimeCount)) * 80 : 0.0,
-                                        color: Colors.green,
-                                      ),
-                                      const SizedBox(height: 6),
-                                      const Text('Returned', style: TextStyle(fontSize: 8, color: Colors.green)),
-                                    ],
+                                  Text(
+                                    'Returned',
+                                    style: TextStyle(
+                                      fontSize: 8,
+                                      color: Colors.green,
+                                    ),
                                   ),
                                 ],
                               ),
-                      ),
-                    ],
+                            ],
+                          ),
                   ),
-                ),
-                if (!isWide) const SizedBox(height: 20),
-                Expanded(
-                  flex: isWide ? 1 : 0,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Fleet Maintenance Costs by Vehicle Unit (Total: RM ${totalMaintCost.toStringAsFixed(0)})', style: TextStyle(fontSize: 11, color: textSecondary)),
-                      const SizedBox(height: 10),
-                      limitMaint.isEmpty
-                          ? const Center(child: Text('No maintenance logs recorded'))
-                          : Column(
-                              children: limitMaint.map((e) {
-                                final maxVal = limitMaint.first.value;
-                                final pct = maxVal > 0 ? e.value / maxVal : 0.0;
-                                return Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 4.0),
-                                  child: Row(
-                                    children: [
-                                      SizedBox(width: 100, child: Text(e.key, style: TextStyle(fontSize: 10, color: textPrimary), overflow: TextOverflow.ellipsis)),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: ClipRRect(
-                                          borderRadius: BorderRadius.circular(4),
-                                          child: LinearProgressIndicator(
-                                            value: pct,
-                                            minHeight: 8,
-                                            backgroundColor: borderColor,
-                                            valueColor: const AlwaysStoppedAnimation<Color>(Colors.redAccent),
-                                          ),
-                                        ),
+                ],
+              );
+
+              final maintenanceSection = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Fleet Maintenance Costs by Vehicle Unit (Total: RM ${totalMaintCost.toStringAsFixed(0)})',
+                    style: TextStyle(fontSize: 11, color: textSecondary),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 10),
+                  limitMaint.isEmpty
+                      ? const Center(
+                          child: Text('No maintenance logs recorded'),
+                        )
+                      : Column(
+                          children: limitMaint.map((e) {
+                            final maxVal = limitMaint.first.value;
+                            final pct = maxVal > 0 ? e.value / maxVal : 0.0;
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 4.0,
+                              ),
+                              child: Row(
+                                children: [
+                                  SizedBox(
+                                    width: 96,
+                                    child: Text(
+                                      e.key,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: textPrimary,
                                       ),
-                                      const SizedBox(width: 8),
-                                      Text('RM ${e.value.toStringAsFixed(0)}', style: TextStyle(fontSize: 10, color: textSecondary)),
-                                    ],
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
-                                );
-                              }).toList(),
-                            ),
-                    ],
-                  ),
-                ),
-              ];
-              return isWide ? Row(crossAxisAlignment: CrossAxisAlignment.start, children: childWidget) : Column(children: childWidget);
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(4),
+                                      child: LinearProgressIndicator(
+                                        value: pct,
+                                        minHeight: 8,
+                                        backgroundColor: borderColor,
+                                        valueColor:
+                                            const AlwaysStoppedAnimation<Color>(
+                                              Colors.redAccent,
+                                            ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'RM ${e.value.toStringAsFixed(0)}',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                ],
+              );
+
+              return isWide
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: overdueSection),
+                        const SizedBox(width: 16),
+                        Expanded(child: maintenanceSection),
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        overdueSection,
+                        const SizedBox(height: 20),
+                        maintenanceSection,
+                      ],
+                    );
             },
           ),
         ],
@@ -1524,7 +2595,12 @@ class _ReportsViewState extends State<ReportsView> {
     );
   }
 
-  Widget _buildDetailedTableSection(Color cardColor, Color textPrimary, Color textSecondary, Color borderColor) {
+  Widget _buildDetailedTableSection(
+    Color cardColor,
+    Color textPrimary,
+    Color textSecondary,
+    Color borderColor,
+  ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final type = _selectedReportType;
     final List<String> headers = _getReportHeaders(type);
@@ -1535,7 +2611,9 @@ class _ReportsViewState extends State<ReportsView> {
     final int totalPages = (totalRecords / _rowsPerPage).ceil();
     final int startIdx = (_currentPage - 1) * _rowsPerPage;
     final int endIdx = min(startIdx + _rowsPerPage, totalRecords);
-    final paginatedData = totalRecords > 0 ? tableData.sublist(startIdx, endIdx) : [];
+    final paginatedData = totalRecords > 0
+        ? tableData.sublist(startIdx, endIdx)
+        : [];
 
     return Container(
       decoration: BoxDecoration(
@@ -1560,19 +2638,31 @@ class _ReportsViewState extends State<ReportsView> {
                   value: _selectedReportType,
                   dropdownColor: cardColor,
                   underline: const SizedBox(),
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
-                  items: [
-                    'Bookings',
-                    'Payments',
-                    'Revenue',
-                    'Vehicles',
-                    'Maintenance',
-                    'Customers',
-                    'Reward Points',
-                    'Reviews',
-                    'Open Rentals',
-                    'Overdue Rentals',
-                  ].map((t) => DropdownMenuItem(value: t, child: Text('$t Ledger'))).toList(),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: textPrimary,
+                  ),
+                  items:
+                      [
+                            'Bookings',
+                            'Payments',
+                            'Revenue',
+                            'Vehicles',
+                            'Maintenance',
+                            'Customers',
+                            'Reward Points',
+                            'Reviews',
+                            'Open Rentals',
+                            'Overdue Rentals',
+                          ]
+                          .map(
+                            (t) => DropdownMenuItem(
+                              value: t,
+                              child: Text('$t Ledger'),
+                            ),
+                          )
+                          .toList(),
                   onChanged: (val) {
                     if (val != null) {
                       setState(() {
@@ -1584,25 +2674,40 @@ class _ReportsViewState extends State<ReportsView> {
                   },
                 ),
                 // Table Search
-                SizedBox(
-                  width: 300,
-                  height: 36,
-                  child: TextField(
-                    style: TextStyle(color: textPrimary, fontSize: 13),
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.search, size: 16),
-                      hintText: 'Search records...',
-                      hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.6), fontSize: 13),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                    onChanged: (val) {
-                      setState(() {
-                        _searchQuery = val.trim();
-                        _currentPage = 1;
-                      });
-                    },
-                  ),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final searchWidth = constraints.maxWidth < 420
+                        ? constraints.maxWidth
+                        : 300.0;
+                    return SizedBox(
+                      width: searchWidth,
+                      height: 36,
+                      child: TextField(
+                        style: TextStyle(color: textPrimary, fontSize: 13),
+                        decoration: InputDecoration(
+                          prefixIcon: const Icon(Icons.search, size: 16),
+                          hintText: 'Search records...',
+                          hintStyle: TextStyle(
+                            color: textSecondary.withValues(alpha: 0.6),
+                            fontSize: 13,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 0,
+                            horizontal: 10,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        onChanged: (val) {
+                          setState(() {
+                            _searchQuery = val.trim();
+                            _currentPage = 1;
+                          });
+                        },
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
@@ -1616,9 +2721,19 @@ class _ReportsViewState extends State<ReportsView> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.folder_open_rounded, size: 48, color: textSecondary),
+                    Icon(
+                      Icons.folder_open_rounded,
+                      size: 48,
+                      color: textSecondary,
+                    ),
                     const SizedBox(height: 12),
-                    Text('No operational records found matching the active filters', style: TextStyle(color: textSecondary, fontWeight: FontWeight.bold)),
+                    Text(
+                      'No operational records found matching the active filters',
+                      style: TextStyle(
+                        color: textSecondary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1627,37 +2742,96 @@ class _ReportsViewState extends State<ReportsView> {
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: DataTable(
-                headingRowColor: WidgetStateProperty.all(isDark ? const Color(0xFF1B2436) : Colors.grey[50]),
-                columns: headers.map<DataColumn>((h) => DataColumn(label: Text(h, style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary)))).toList().cast<DataColumn>(),
-                rows: paginatedData.map<DataRow>((row) {
-                  return DataRow(
-                    cells: row.map<DataCell>((cell) => DataCell(Text(cell, style: TextStyle(color: textPrimary, fontSize: 12)))).toList().cast<DataCell>(),
-                  );
-                }).toList().cast<DataRow>(),
+                headingRowColor: WidgetStateProperty.all(
+                  isDark ? const Color(0xFF1B2436) : Colors.grey[50],
+                ),
+                columns: headers
+                    .map<DataColumn>(
+                      (h) => DataColumn(
+                        label: Text(
+                          h,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: textPrimary,
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList()
+                    .cast<DataColumn>(),
+                rows: paginatedData
+                    .map<DataRow>((row) {
+                      return DataRow(
+                        cells: row
+                            .map<DataCell>(
+                              (cell) => DataCell(
+                                Text(
+                                  cell,
+                                  style: TextStyle(
+                                    color: textPrimary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList()
+                            .cast<DataCell>(),
+                      );
+                    })
+                    .toList()
+                    .cast<DataRow>(),
               ),
             ),
             const Divider(height: 1),
             // Pagination Bar
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Showing ${startIdx + 1} to $endIdx of $totalRecords records', style: TextStyle(fontSize: 12, color: textSecondary)),
-                  Row(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final isNarrow = constraints.maxWidth < 560;
+                  final recordsText = Text(
+                    'Showing ${startIdx + 1} to $endIdx of $totalRecords records',
+                    style: TextStyle(fontSize: 12, color: textSecondary),
+                  );
+
+                  final pager = Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
                         icon: const Icon(Icons.arrow_back_ios, size: 14),
-                        onPressed: _currentPage > 1 ? () => setState(() => _currentPage--) : null,
+                        onPressed: _currentPage > 1
+                            ? () => setState(() => _currentPage--)
+                            : null,
                       ),
-                      Text('Page $_currentPage of ${max(1, totalPages)}', style: TextStyle(fontSize: 12, color: textPrimary, fontWeight: FontWeight.bold)),
+                      Text(
+                        'Page $_currentPage of ${max(1, totalPages)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: textPrimary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       IconButton(
                         icon: const Icon(Icons.arrow_forward_ios, size: 14),
-                        onPressed: _currentPage < totalPages ? () => setState(() => _currentPage++) : null,
+                        onPressed: _currentPage < totalPages
+                            ? () => setState(() => _currentPage++)
+                            : null,
                       ),
                     ],
-                  ),
-                ],
+                  );
+
+                  if (isNarrow) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [recordsText, const SizedBox(height: 8), pager],
+                    );
+                  }
+
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [recordsText, pager],
+                  );
+                },
               ),
             ),
           ],

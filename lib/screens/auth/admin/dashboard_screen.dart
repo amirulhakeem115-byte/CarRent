@@ -346,27 +346,27 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         .child('reviews')
         .onValue
         .listen((event) {
-      if (mounted) {
-        final List<ReviewModel> reviews = [];
-        if (event.snapshot.exists && event.snapshot.value != null) {
-          try {
-            final data = event.snapshot.value;
-            if (data is Map) {
-              data.forEach((key, value) {
-                if (value is Map) {
-                  reviews.add(ReviewModel.fromMap(key.toString(), value));
+          if (mounted) {
+            final List<ReviewModel> reviews = [];
+            if (event.snapshot.exists && event.snapshot.value != null) {
+              try {
+                final data = event.snapshot.value;
+                if (data is Map) {
+                  data.forEach((key, value) {
+                    if (value is Map) {
+                      reviews.add(ReviewModel.fromMap(key.toString(), value));
+                    }
+                  });
                 }
-              });
+              } catch (e) {
+                debugPrint('Error parsing reviews: $e');
+              }
             }
-          } catch (e) {
-            debugPrint('Error parsing reviews: $e');
+            setState(() {
+              _reviews = reviews;
+            });
           }
-        }
-        setState(() {
-          _reviews = reviews;
         });
-      }
-    });
 
     _rewardsSubscription?.cancel();
     _rewardsSubscription = FirebaseDatabase.instance
@@ -374,44 +374,44 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         .child('reward_transactions')
         .onValue
         .listen((event) {
-      if (mounted) {
-        final List<Map<String, dynamic>> txs = [];
-        if (event.snapshot.exists && event.snapshot.value != null) {
-          try {
-            final rawVal = event.snapshot.value;
-            if (rawVal is Map) {
-              rawVal.forEach((userKey, userTxsValue) {
-                if (userTxsValue is Map) {
-                  userTxsValue.forEach((txKey, txValue) {
-                    if (txValue is Map) {
-                      final tx = Map<String, dynamic>.from(txValue);
-                      tx['id'] = txKey.toString();
-                      tx['userId'] = userKey.toString();
-                      txs.add(tx);
+          if (mounted) {
+            final List<Map<String, dynamic>> txs = [];
+            if (event.snapshot.exists && event.snapshot.value != null) {
+              try {
+                final rawVal = event.snapshot.value;
+                if (rawVal is Map) {
+                  rawVal.forEach((userKey, userTxsValue) {
+                    if (userTxsValue is Map) {
+                      userTxsValue.forEach((txKey, txValue) {
+                        if (txValue is Map) {
+                          final tx = Map<String, dynamic>.from(txValue);
+                          tx['id'] = txKey.toString();
+                          tx['userId'] = userKey.toString();
+                          txs.add(tx);
+                        }
+                      });
+                    } else if (userTxsValue is List) {
+                      for (int i = 0; i < userTxsValue.length; i++) {
+                        final txValue = userTxsValue[i];
+                        if (txValue is Map) {
+                          final tx = Map<String, dynamic>.from(txValue);
+                          tx['id'] = i.toString();
+                          tx['userId'] = userKey.toString();
+                          txs.add(tx);
+                        }
+                      }
                     }
                   });
-                } else if (userTxsValue is List) {
-                  for (int i = 0; i < userTxsValue.length; i++) {
-                    final txValue = userTxsValue[i];
-                    if (txValue is Map) {
-                      final tx = Map<String, dynamic>.from(txValue);
-                      tx['id'] = i.toString();
-                      tx['userId'] = userKey.toString();
-                      txs.add(tx);
-                    }
-                  }
                 }
-              });
+              } catch (e) {
+                debugPrint('Error parsing reward transactions: $e');
+              }
             }
-          } catch (e) {
-            debugPrint('Error parsing reward transactions: $e');
+            setState(() {
+              _rewardTransactions = txs;
+            });
           }
-        }
-        setState(() {
-          _rewardTransactions = txs;
         });
-      }
-    });
   }
 
   @override
@@ -459,7 +459,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         aiService.clearLastIntent();
       } else if (intent is ReportIntent) {
         _activeTab = 'Reports';
-        _aiFilteredPeriod = intent.parameters['timeframe'] ?? intent.parameters['period'];
+        _aiFilteredPeriod =
+            intent.parameters['timeframe'] ?? intent.parameters['period'];
         _aiFilteredType = intent.parameters['type'];
         aiService.clearLastIntent();
       } else if (intent is SupportIntent) {
@@ -629,45 +630,64 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       key: _scaffoldKey,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
-      body: Row(
-        children: [
-          if (isDesktop) _buildSidebar(context),
-          Expanded(
-            child: _loading
-                ? const Center(
-                    child: LoadingWidget(
-                      message: 'Syncing dashboard with Firebase...',
-                    ),
-                  )
-                : _error != null
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.error_outline,
-                          size: 64,
-                          color: Colors.redAccent,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _error!,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+      body: SafeArea(
+        top: true,
+        bottom: false,
+        child: Row(
+          children: [
+            if (isDesktop) _buildSidebar(context),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final double maxWidth = isDesktop
+                      ? 1650
+                      : constraints.maxWidth;
+                  final Widget content = _loading
+                      ? const Center(
+                          child: LoadingWidget(
+                            message: 'Syncing dashboard with Firebase...',
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _loadDashboardData,
-                          child: const Text('Retry'),
-                        ),
-                      ],
+                        )
+                      : _error != null
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.error_outline,
+                                size: 64,
+                                color: Colors.redAccent,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                _error!,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: _loadDashboardData,
+                                child: const Text('Retry'),
+                              ),
+                            ],
+                          ),
+                        )
+                      : _buildActiveBody(isDesktop);
+
+                  return Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: maxWidth),
+                      child: content,
                     ),
-                  )
-                : _buildActiveBody(isDesktop),
-          ),
-        ],
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
       floatingActionButton: _activeTab == 'AI Assistant'
           ? null
@@ -1061,31 +1081,76 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        _activeTab == 'Dashboard'
-                            ? 'Dashboard Overview'
-                            : _activeTab,
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          color: isDark
-                              ? const Color(0xFFF8FAFC)
-                              : AppColors.secondaryBlue,
+                      if (isDesktop)
+                        Text(
+                          _activeTab == 'Dashboard'
+                              ? 'Dashboard Overview'
+                              : _activeTab,
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            color: isDark
+                                ? const Color(0xFFF8FAFC)
+                                : AppColors.secondaryBlue,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        )
+                      else
+                        SizedBox(
+                          width: double.infinity,
+                          child: FittedBox(
+                            alignment: Alignment.centerLeft,
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              _activeTab == 'Dashboard'
+                                  ? 'Dashboard Overview'
+                                  : _activeTab,
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w900,
+                                color: isDark
+                                    ? const Color(0xFFF8FAFC)
+                                    : AppColors.secondaryBlue,
+                              ),
+                              maxLines: 1,
+                            ),
+                          ),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        _activeTab == 'Dashboard'
-                            ? 'Welcome back, ${_adminUser?.fullName ?? "Administrator"} 👋'
-                            : '${context.watch<CompanySettingsProvider>().companyName} Platform Management',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isDark ? const Color(0xFFCBD5E1) : Colors.grey,
+                      if (isDesktop)
+                        Text(
+                          _activeTab == 'Dashboard'
+                              ? 'Welcome back, ${_adminUser?.fullName ?? "Administrator"} 👋'
+                              : '${context.watch<CompanySettingsProvider>().companyName} Platform Management',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark
+                                ? const Color(0xFFCBD5E1)
+                                : Colors.grey,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        )
+                      else
+                        SizedBox(
+                          width: double.infinity,
+                          child: FittedBox(
+                            alignment: Alignment.centerLeft,
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              _activeTab == 'Dashboard'
+                                  ? 'Welcome back, ${_adminUser?.fullName ?? "Administrator"} 👋'
+                                  : '${context.watch<CompanySettingsProvider>().companyName} Platform Management',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark
+                                    ? const Color(0xFFCBD5E1)
+                                    : Colors.grey,
+                              ),
+                              maxLines: 1,
+                            ),
+                          ),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
                     ],
                   ),
                 ),
@@ -1185,7 +1250,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                     MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
-                                    'Notifications ($dropdownUnread)',
+                                    dropdownUnread > 0
+                                        ? 'Notifications ($dropdownUnread)'
+                                        : 'Notifications',
                                     style: TextStyle(
                                       fontWeight: FontWeight.w900,
                                       fontSize: 15,
@@ -1200,7 +1267,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                       onPressed: () async {
                                         Navigator.pop(context);
                                         await _notificationService
-                                            .markAllAsRead(currentUser.uid);
+                                            .markAllAsRead(
+                                              currentUser.uid,
+                                              includeAdminShared: true,
+                                            );
                                       },
                                       style: TextButton.styleFrom(
                                         padding: EdgeInsets.zero,
@@ -3347,7 +3417,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
     double pricePerDay = 100.0;
     try {
-      pricePerDay = _vehicles.firstWhere((v) => v.id == booking.vehicleId).pricePerDay;
+      pricePerDay = _vehicles
+          .firstWhere((v) => v.id == booking.vehicleId)
+          .pricePerDay;
     } catch (_) {}
     final overdue = BookingService.getOverdueDetails(booking, pricePerDay);
 
@@ -3385,16 +3457,32 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     'Return Date',
                     booking.isOpenRental
                         ? 'Open Rental'
-                        : (booking.returnDate != null ? DateFormat('dd MMM yyyy, hh:mm a').format(booking.returnDate!) : ""),
+                        : (booking.returnDate != null
+                              ? DateFormat(
+                                  'dd MMM yyyy, hh:mm a',
+                                ).format(booking.returnDate!)
+                              : ""),
                   ),
                   _buildDetailDialogRow(
                     'Total Paid Price',
                     'RM ${booking.totalPrice.toStringAsFixed(2)}',
                   ),
                   if (overdue['isOverdue'] == true) ...[
-                    _buildDetailDialogRow('⚠️ Overdue Duration', '${overdue['days']} days, ${overdue['hours']} hours', valueColor: Colors.redAccent),
-                    _buildDetailDialogRow('⚠️ Late Fees Accrued', 'RM ${overdue['charges'].toStringAsFixed(2)}', valueColor: Colors.redAccent),
-                    _buildDetailDialogRow('⚠️ Current Total', 'RM ${(booking.totalPrice + overdue['charges']).toStringAsFixed(2)}', valueColor: Colors.redAccent),
+                    _buildDetailDialogRow(
+                      '⚠️ Overdue Duration',
+                      '${overdue['days']} days, ${overdue['hours']} hours',
+                      valueColor: Colors.redAccent,
+                    ),
+                    _buildDetailDialogRow(
+                      '⚠️ Late Fees Accrued',
+                      'RM ${overdue['charges'].toStringAsFixed(2)}',
+                      valueColor: Colors.redAccent,
+                    ),
+                    _buildDetailDialogRow(
+                      '⚠️ Current Total',
+                      'RM ${(booking.totalPrice + overdue['charges']).toStringAsFixed(2)}',
+                      valueColor: Colors.redAccent,
+                    ),
                   ],
                   _buildDetailDialogRow(
                     'Deposit Amount',
@@ -3487,11 +3575,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  Widget _buildDetailDialogRow(String label, String value, {Color? valueColor}) {
+  Widget _buildDetailDialogRow(
+    String label,
+    String value, {
+    Color? valueColor,
+  }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textPrimary = valueColor ?? (isDark
-        ? const Color(0xFFF8FAFC)
-        : AppColors.secondaryBlue);
+    final textPrimary =
+        valueColor ??
+        (isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue);
     final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
 
     return Padding(

@@ -11,7 +11,9 @@ import 'user_role_cache.dart';
 import 'company_settings_provider.dart';
 
 class PaymentService {
-  final DatabaseReference _db = FirebaseDatabase.instance.ref().child('payments');
+  final DatabaseReference _db = FirebaseDatabase.instance.ref().child(
+    'payments',
+  );
   final NotificationService _notificationService = NotificationService();
 
   Future<void> createPayment(PaymentModel payment) async {
@@ -20,9 +22,10 @@ class PaymentService {
       final paymentData = payment.toMap();
       paymentData['id'] = newRef.key!;
 
-      final isApproved = payment.paymentStatus == 'Approved' || 
-          payment.status == 'paid' || 
-          payment.status == 'Approved' || 
+      final isApproved =
+          payment.paymentStatus == 'Approved' ||
+          payment.status == 'paid' ||
+          payment.status == 'Approved' ||
           payment.paymentStatus == 'Paid';
 
       if (isApproved) {
@@ -43,7 +46,9 @@ class PaymentService {
             paymentId: newRef.key!,
           );
         } catch (rewardErr) {
-          debugPrint('Error auto-awarding reward points on payment creation: $rewardErr');
+          debugPrint(
+            'Error auto-awarding reward points on payment creation: $rewardErr',
+          );
         }
       }
 
@@ -51,7 +56,11 @@ class PaymentService {
       String customerName = 'Customer';
       String vehicleName = 'Vehicle';
       try {
-        final bSnap = await FirebaseDatabase.instance.ref().child('bookings').child(payment.bookingId).get();
+        final bSnap = await FirebaseDatabase.instance
+            .ref()
+            .child('bookings')
+            .child(payment.bookingId)
+            .get();
         if (bSnap.exists) {
           final bData = bSnap.value as Map;
           customerName = bData['userName'] ?? 'Customer';
@@ -66,7 +75,8 @@ class PaymentService {
         await _notificationService.createNotification(
           userId: payment.userId,
           title: 'Payment Approved',
-          message: 'Your payment of RM ${payment.amount.toStringAsFixed(2)} has been approved successfully.',
+          message:
+              'Your payment of RM ${payment.amount.toStringAsFixed(2)} has been approved successfully.',
           type: 'payment',
           icon: '💳',
           color: '0xFF10B981',
@@ -77,7 +87,8 @@ class PaymentService {
         // Notify admins of auto-approved payment
         await _notificationService.notifyAllAdmins(
           title: 'Payment Approved Automatically',
-          message: 'Customer: $customerName\nVehicle: $vehicleName\nAmount: RM ${payment.amount.toStringAsFixed(2)}',
+          message:
+              'Customer: $customerName\nVehicle: $vehicleName\nAmount: RM ${payment.amount.toStringAsFixed(2)}',
           type: 'payment',
           icon: '💳',
           color: '0xFF10B981',
@@ -89,7 +100,8 @@ class PaymentService {
         await _notificationService.createNotification(
           userId: payment.userId,
           title: 'Payment Pending Review',
-          message: 'Your payment of RM ${payment.amount.toStringAsFixed(2)} has been submitted and is awaiting admin verification.',
+          message:
+              'Your payment of RM ${payment.amount.toStringAsFixed(2)} has been submitted and is awaiting admin verification.',
           type: 'payment',
           icon: '🕐',
           color: '0xFFF59E0B',
@@ -100,7 +112,8 @@ class PaymentService {
         // Notify admins of new payment requiring verification
         await _notificationService.notifyAllAdmins(
           title: 'New Payment — Action Required',
-          message: 'Customer: $customerName\nVehicle: $vehicleName\nAmount: RM ${payment.amount.toStringAsFixed(2)}\nPlease verify and approve.',
+          message:
+              'Customer: $customerName\nVehicle: $vehicleName\nAmount: RM ${payment.amount.toStringAsFixed(2)}\nPlease verify and approve.',
           type: 'payment',
           icon: '💳',
           color: '0xFFF59E0B',
@@ -121,23 +134,37 @@ class PaymentService {
 
     final currentRole = await UserRoleCache.getRole(currentUid);
     debugPrint('[PaymentService] [getPayments] Accessing path: payments');
-    debugPrint('[PaymentService] [getPayments] Current UID: $currentUid, Current Role: $currentRole');
+    debugPrint(
+      '[PaymentService] [getPayments] Current UID: $currentUid, Current Role: $currentRole',
+    );
 
     try {
       final DataSnapshot snapshot;
       if (currentRole == 'admin') {
         snapshot = await _db.get().timeout(const Duration(seconds: 10));
       } else {
-        snapshot = await _db.orderByChild('userId').equalTo(currentUid).get().timeout(const Duration(seconds: 10));
+        snapshot = await _db
+            .orderByChild('userId')
+            .equalTo(currentUid)
+            .get()
+            .timeout(const Duration(seconds: 10));
       }
 
       if (snapshot.exists) {
-        final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
+        final Map<dynamic, dynamic> data =
+            snapshot.value as Map<dynamic, dynamic>;
         data.forEach((key, value) {
-          payments.add(PaymentModel.fromMap(key.toString(), value as Map<dynamic, dynamic>));
+          payments.add(
+            PaymentModel.fromMap(
+              key.toString(),
+              value as Map<dynamic, dynamic>,
+            ),
+          );
         });
       }
-      debugPrint('[PaymentService] [getPayments] Payments count loaded: ${payments.length}');
+      debugPrint(
+        '[PaymentService] [getPayments] Payments count loaded: ${payments.length}',
+      );
     } catch (e) {
       debugPrint('[PaymentService] [getPayments] Error getting payments: $e');
       rethrow;
@@ -156,34 +183,46 @@ class PaymentService {
     final controller = StreamController<List<PaymentModel>>.broadcast();
     StreamSubscription? sub;
 
-    UserRoleCache.getRole(currentUid).then((currentRole) {
-      if (controller.isClosed) return;
-      debugPrint('[PaymentService] getPaymentsStream — uid: $currentUid, role: $currentRole');
+    UserRoleCache.getRole(currentUid)
+        .then((currentRole) {
+          if (controller.isClosed) return;
+          debugPrint(
+            '[PaymentService] getPaymentsStream — uid: $currentUid, role: $currentRole',
+          );
 
-      final Query query =
-          currentRole == 'admin' ? _db : _db.orderByChild('userId').equalTo(currentUid);
+          final Query query = currentRole == 'admin'
+              ? _db
+              : _db.orderByChild('userId').equalTo(currentUid);
 
-      sub = query.onValue.listen((event) {
-        if (controller.isClosed) return;
-        List<PaymentModel> payments = [];
-        if (event.snapshot.exists) {
-          final Map<dynamic, dynamic> data =
-              event.snapshot.value as Map<dynamic, dynamic>;
-          data.forEach((key, value) {
-            payments.add(
-                PaymentModel.fromMap(key.toString(), value as Map<dynamic, dynamic>));
-          });
-        }
-        payments.sort((a, b) => b.paymentDate.compareTo(a.paymentDate));
-        controller.add(payments);
-      }, onError: (e) {
-        debugPrint('[PaymentService] getPaymentsStream error: $e');
-        if (!controller.isClosed) controller.add([]);
-      });
-    }).catchError((e) {
-      debugPrint('[PaymentService] getPaymentsStream role fetch error: $e');
-      if (!controller.isClosed) controller.add([]);
-    });
+          sub = query.onValue.listen(
+            (event) {
+              if (controller.isClosed) return;
+              List<PaymentModel> payments = [];
+              if (event.snapshot.exists) {
+                final Map<dynamic, dynamic> data =
+                    event.snapshot.value as Map<dynamic, dynamic>;
+                data.forEach((key, value) {
+                  payments.add(
+                    PaymentModel.fromMap(
+                      key.toString(),
+                      value as Map<dynamic, dynamic>,
+                    ),
+                  );
+                });
+              }
+              payments.sort((a, b) => b.paymentDate.compareTo(a.paymentDate));
+              controller.add(payments);
+            },
+            onError: (e) {
+              debugPrint('[PaymentService] getPaymentsStream error: $e');
+              if (!controller.isClosed) controller.add([]);
+            },
+          );
+        })
+        .catchError((e) {
+          debugPrint('[PaymentService] getPaymentsStream role fetch error: $e');
+          if (!controller.isClosed) controller.add([]);
+        });
 
     controller.onCancel = () => sub?.cancel();
     return controller.stream;
@@ -192,28 +231,68 @@ class PaymentService {
   Future<List<PaymentModel>> getUserPayments(String userId) async {
     List<PaymentModel> payments = [];
     try {
-      final snapshot = await _db.orderByChild('userId').equalTo(userId).get().timeout(const Duration(seconds: 10));
+      final snapshot = await _db
+          .orderByChild('userId')
+          .equalTo(userId)
+          .get()
+          .timeout(const Duration(seconds: 10));
       if (snapshot.exists) {
-        final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
+        final Map<dynamic, dynamic> data =
+            snapshot.value as Map<dynamic, dynamic>;
         data.forEach((key, value) {
-          payments.add(PaymentModel.fromMap(key.toString(), value as Map<dynamic, dynamic>));
+          payments.add(
+            PaymentModel.fromMap(
+              key.toString(),
+              value as Map<dynamic, dynamic>,
+            ),
+          );
         });
       }
     } catch (e) {
-      debugPrint('Error getting user payments: $e');
-      rethrow;
+      debugPrint('Error getting user payments with filtered query: $e');
+
+      // Fallback: some Realtime Database rule/query combinations reject
+      // orderBy/equalTo requests even when simple reads are allowed.
+      // Try reading the payments node and filtering client-side.
+      try {
+        final fallbackSnapshot = await _db.get().timeout(
+          const Duration(seconds: 10),
+        );
+        if (fallbackSnapshot.exists) {
+          final Map<dynamic, dynamic> data =
+              fallbackSnapshot.value as Map<dynamic, dynamic>;
+          data.forEach((key, value) {
+            final row = Map<dynamic, dynamic>.from(value as Map);
+            if (row['userId']?.toString() == userId) {
+              payments.add(PaymentModel.fromMap(key.toString(), row));
+            }
+          });
+        }
+      } catch (fallbackError) {
+        debugPrint('Fallback payment load also failed: $fallbackError');
+        rethrow;
+      }
     }
     payments.sort((a, b) => b.paymentDate.compareTo(a.paymentDate));
     return payments;
   }
 
-  Future<void> updatePaymentStatus(String paymentId, String status, String userId, {String reason = '', String? verifiedBy}) async {
+  Future<void> updatePaymentStatus(
+    String paymentId,
+    String status,
+    String userId, {
+    String reason = '',
+    String? verifiedBy,
+  }) async {
     try {
       final isApproved = status == 'paid' || status == 'Approved';
       final dbPaymentStatus = isApproved ? 'Approved' : 'Rejected';
 
       // Check if reward points have already been awarded for this payment
-      final paySnap = await _db.child(paymentId).get().timeout(const Duration(seconds: 5));
+      final paySnap = await _db
+          .child(paymentId)
+          .get()
+          .timeout(const Duration(seconds: 5));
       bool alreadyAwarded = false;
       double paymentAmount = 0.0;
       String bookingId = '';
@@ -224,14 +303,17 @@ class PaymentService {
         bookingId = payData['bookingId'] ?? '';
       }
 
-      await _db.child(paymentId).update({
-        'status': dbPaymentStatus,
-        'paymentStatus': dbPaymentStatus,
-        'verifiedAt': DateTime.now().toIso8601String(),
-        'verifiedBy': verifiedBy ?? 'admin',
-        'rejectionReason': isApproved ? '' : reason,
-        'rewardPointsAwarded': isApproved ? true : alreadyAwarded,
-      }).timeout(const Duration(seconds: 10));
+      await _db
+          .child(paymentId)
+          .update({
+            'status': dbPaymentStatus,
+            'paymentStatus': dbPaymentStatus,
+            'verifiedAt': DateTime.now().toIso8601String(),
+            'verifiedBy': verifiedBy ?? 'admin',
+            'rejectionReason': isApproved ? '' : reason,
+            'rewardPointsAwarded': isApproved ? true : alreadyAwarded,
+          })
+          .timeout(const Duration(seconds: 10));
 
       // Award points automatically if newly approved and not already awarded
       if (isApproved && !alreadyAwarded) {
@@ -243,17 +325,27 @@ class PaymentService {
             paymentId: paymentId,
           );
         } catch (rewardErr) {
-          debugPrint('Error auto-awarding reward points on payment status update: $rewardErr');
+          debugPrint(
+            'Error auto-awarding reward points on payment status update: $rewardErr',
+          );
         }
       }
 
       // Get payment record to extract booking ID and update booking automatically
-      final freshPaySnap = await _db.child(paymentId).get().timeout(const Duration(seconds: 5));
+      final freshPaySnap = await _db
+          .child(paymentId)
+          .get()
+          .timeout(const Duration(seconds: 5));
       if (freshPaySnap.exists) {
         final payData = freshPaySnap.value as Map<dynamic, dynamic>;
         final bookingId = payData['bookingId'] as String?;
         if (bookingId != null && bookingId.isNotEmpty) {
-          final bookingSnap = await FirebaseDatabase.instance.ref().child('bookings').child(bookingId).get().timeout(const Duration(seconds: 5));
+          final bookingSnap = await FirebaseDatabase.instance
+              .ref()
+              .child('bookings')
+              .child(bookingId)
+              .get()
+              .timeout(const Duration(seconds: 5));
           if (bookingSnap.exists) {
             final bookingData = bookingSnap.value as Map<dynamic, dynamic>;
             final vehicleId = bookingData['vehicleId'] as String?;
@@ -261,48 +353,88 @@ class PaymentService {
             if (vehicleId != null && vehicleName != null) {
               final bookingService = BookingService();
               final currentBookingStatus = bookingData['status'] as String?;
-              final bool isFinalPaymentFlow = currentBookingStatus == 'Awaiting Final Payment';
+              final bool isFinalPaymentFlow =
+                  currentBookingStatus == 'Awaiting Final Payment';
 
               if (isApproved) {
                 if (isFinalPaymentFlow) {
                   // Final payment approved -> Complete booking, make vehicle available
-                  await bookingService.updateBookingStatus(bookingId, 'completed', userId, vehicleId, vehicleName);
+                  await bookingService.updateBookingStatus(
+                    bookingId,
+                    'completed',
+                    userId,
+                    vehicleId,
+                    vehicleName,
+                  );
                   try {
-                    await FirebaseDatabase.instance.ref().child('vehicles').child(vehicleId).update({'status': 'Available'});
+                    await FirebaseDatabase.instance
+                        .ref()
+                        .child('vehicles')
+                        .child(vehicleId)
+                        .update({'status': 'Available'});
                   } catch (vErr) {
-                    debugPrint('Error updating vehicle to Available on final payment clearance: $vErr');
+                    debugPrint(
+                      'Error updating vehicle to Available on final payment clearance: $vErr',
+                    );
                   }
-                  
+
                   // Award reward points automatically if enabled
-                  final rewardsEnabled = CompanySettingsProvider().getField('rewardsEnabled', defaultValue: true) as bool;
+                  final rewardsEnabled =
+                      CompanySettingsProvider().getField(
+                            'rewardsEnabled',
+                            defaultValue: true,
+                          )
+                          as bool;
                   if (rewardsEnabled) {
                     try {
-                      await RewardPointsService().awardPointsForBooking(bookingId);
+                      await RewardPointsService().awardPointsForBooking(
+                        bookingId,
+                      );
                     } catch (rewardErr) {
-                      debugPrint('Error awarding reward points on final invoice clearance: $rewardErr');
+                      debugPrint(
+                        'Error awarding reward points on final invoice clearance: $rewardErr',
+                      );
                     }
                   }
 
                   // Trigger automatic receipt check
                   try {
-                    await ReceiptService().triggerAutomaticReceiptCheck(bookingId);
+                    await ReceiptService().triggerAutomaticReceiptCheck(
+                      bookingId,
+                    );
                   } catch (receiptErr) {
-                    debugPrint('Error generating receipt on final invoice clearance: $receiptErr');
+                    debugPrint(
+                      'Error generating receipt on final invoice clearance: $receiptErr',
+                    );
                   }
                 } else {
                   // Upfront payment approved -> Confirm booking
-                  await bookingService.updateBookingStatus(bookingId, 'Confirmed', userId, vehicleId, vehicleName);
+                  await bookingService.updateBookingStatus(
+                    bookingId,
+                    'Confirmed',
+                    userId,
+                    vehicleId,
+                    vehicleName,
+                  );
                   // Deduct redeemed reward points if any
                   try {
-                    await RewardPointsService().deductPointsForBooking(bookingId);
+                    await RewardPointsService().deductPointsForBooking(
+                      bookingId,
+                    );
                   } catch (rewardErr) {
-                    debugPrint('[PaymentService] Warning: reward points deduction failed: $rewardErr');
+                    debugPrint(
+                      '[PaymentService] Warning: reward points deduction failed: $rewardErr',
+                    );
                   }
                   // Trigger automatic receipt check & storage creation
                   try {
-                    await ReceiptService().triggerAutomaticReceiptCheck(bookingId);
+                    await ReceiptService().triggerAutomaticReceiptCheck(
+                      bookingId,
+                    );
                   } catch (receiptErr) {
-                    debugPrint('[PaymentService] Warning: receipt check failed: $receiptErr');
+                    debugPrint(
+                      '[PaymentService] Warning: receipt check failed: $receiptErr',
+                    );
                   }
                 }
               } else {
@@ -310,7 +442,13 @@ class PaymentService {
                   // Keep status as Awaiting Final Payment
                   // Nothing extra to do, status remains 'Awaiting Final Payment'
                 } else {
-                  await bookingService.updateBookingStatus(bookingId, 'Pending Payment', userId, vehicleId, vehicleName);
+                  await bookingService.updateBookingStatus(
+                    bookingId,
+                    'Pending Payment',
+                    userId,
+                    vehicleId,
+                    vehicleName,
+                  );
                 }
               }
             }
@@ -321,7 +459,12 @@ class PaymentService {
       // Retrieve customer name if possible
       String customerName = 'Customer';
       try {
-        final uSnap = await FirebaseDatabase.instance.ref().child('users').child(userId).child('fullName').get();
+        final uSnap = await FirebaseDatabase.instance
+            .ref()
+            .child('users')
+            .child(userId)
+            .child('fullName')
+            .get();
         if (uSnap.exists) {
           customerName = uSnap.value.toString();
         }
@@ -331,8 +474,8 @@ class PaymentService {
       await _notificationService.createNotification(
         userId: userId,
         title: isApproved ? 'Payment Approved' : 'Payment Rejected',
-        message: isApproved 
-            ? 'Your payment has been approved.' 
+        message: isApproved
+            ? 'Your payment has been approved.'
             : 'Your payment was rejected. Reason: $reason',
         type: 'payment',
         icon: '💳',
@@ -359,17 +502,25 @@ class PaymentService {
     }
   }
 
-  Future<void> refundPayment(String paymentId, String userId, double amount) async {
+  Future<void> refundPayment(
+    String paymentId,
+    String userId,
+    double amount,
+  ) async {
     try {
-      await _db.child(paymentId).update({
-        'status': 'refunded',
-        'refundDate': DateTime.now().toIso8601String(),
-      }).timeout(const Duration(seconds: 10));
+      await _db
+          .child(paymentId)
+          .update({
+            'status': 'refunded',
+            'refundDate': DateTime.now().toIso8601String(),
+          })
+          .timeout(const Duration(seconds: 10));
 
       await _notificationService.createNotification(
         userId: userId,
         title: 'Refund Processed',
-        message: 'A refund of RM ${amount.toStringAsFixed(2)} has been issued to your account.',
+        message:
+            'A refund of RM ${amount.toStringAsFixed(2)} has been issued to your account.',
         type: 'payment',
         icon: '💳',
         color: '0xFF3B82F6',

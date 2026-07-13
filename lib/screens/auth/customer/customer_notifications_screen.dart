@@ -15,12 +15,15 @@ class CustomerNotificationsScreen extends StatefulWidget {
   const CustomerNotificationsScreen({super.key});
 
   @override
-  State<CustomerNotificationsScreen> createState() => _CustomerNotificationsScreenState();
+  State<CustomerNotificationsScreen> createState() =>
+      _CustomerNotificationsScreenState();
 }
 
-class _CustomerNotificationsScreenState extends State<CustomerNotificationsScreen> {
+class _CustomerNotificationsScreenState
+    extends State<CustomerNotificationsScreen> {
   final NotificationService _notificationService = NotificationService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  static const int _notificationsLoadLimit = 120;
 
   String _searchQuery = '';
   String _selectedType = 'All';
@@ -32,23 +35,43 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
     'payment',
     'support',
     'reward',
-    'general'
+    'general',
   ];
 
   bool get _isDark => Theme.of(context).brightness == Brightness.dark;
-  Color get _textColor => _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
-  Color get _subColor => _isDark ? const Color(0xFFCBD5E1) : AppColors.lightText;
-  Color get _borderColor => _isDark ? const Color(0xFF334155) : AppColors.borderGray;
+  Color get _textColor =>
+      _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+  Color get _subColor =>
+      _isDark ? const Color(0xFFCBD5E1) : AppColors.lightText;
+  Color get _borderColor =>
+      _isDark ? const Color(0xFF334155) : AppColors.borderGray;
 
   Stream<List<NotificationModel>>? _notificationsStream;
+
+  Future<void> _reloadNotifications({bool forceTokenRefresh = false}) async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return;
+
+    if (forceTokenRefresh) {
+      try {
+        await currentUser.getIdToken(true);
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _notificationsStream = _notificationService.getNotificationsStream(
+        currentUser.uid,
+        limit: _notificationsLoadLimit,
+        includeAdminNotifications: false,
+      );
+    });
+  }
 
   @override
   void initState() {
     super.initState();
-    final currentUser = _auth.currentUser;
-    if (currentUser != null) {
-      _notificationsStream = _notificationService.getNotificationsStream(currentUser.uid);
-    }
+    _reloadNotifications();
   }
 
   @override
@@ -77,7 +100,7 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
         actions: [
           IconButton(
             icon: Icon(Icons.refresh, color: _textColor),
-            onPressed: () => setState(() {}),
+            onPressed: () => _reloadNotifications(forceTokenRefresh: true),
           ),
         ],
       ),
@@ -85,14 +108,60 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
         stream: _notificationsStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: LoadingWidget(message: 'Syncing notifications...'));
+            return const Center(
+              child: LoadingWidget(message: 'Syncing notifications...'),
+            );
           }
 
           if (snapshot.hasError) {
+            final raw = snapshot.error.toString();
+            final isPermission = raw.toLowerCase().contains(
+              'permission-denied',
+            );
             return Center(
-              child: Text(
-                'Failed to load notifications: ${snapshot.error}',
-                style: const TextStyle(color: Colors.redAccent),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.error_outline_rounded,
+                      color: Colors.redAccent,
+                      size: 42,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      isPermission
+                          ? 'Notifications access is currently denied by backend rules.'
+                          : 'Failed to load notifications.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.redAccent,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      isPermission
+                          ? 'Tap retry after refreshing session. If it persists, Firebase rules must allow your user to read notifications.'
+                          : raw,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: _subColor, fontSize: 12),
+                    ),
+                    const SizedBox(height: 14),
+                    ElevatedButton.icon(
+                      onPressed: () =>
+                          _reloadNotifications(forceTokenRefresh: true),
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('Retry'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryOrange,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
           }
@@ -101,12 +170,15 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
           final filteredNotifs = allNotifs.where((n) {
             // 1. Search filter
             final q = _searchQuery.toLowerCase().trim();
-            final matchesSearch = q.isEmpty ||
+            final matchesSearch =
+                q.isEmpty ||
                 n.title.toLowerCase().contains(q) ||
                 n.message.toLowerCase().contains(q);
 
             // 2. Category filter
-            final matchesType = _selectedType == 'All' || n.type.toLowerCase() == _selectedType.toLowerCase();
+            final matchesType =
+                _selectedType == 'All' ||
+                n.type.toLowerCase() == _selectedType.toLowerCase();
 
             // 3. Status filter
             bool matchesStatus = true;
@@ -128,15 +200,24 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
 
               // Summary status text row
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 8,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       'Showing ${filteredNotifs.length} alerts ($unreadCount unread)',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: _textColor),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        color: _textColor,
+                      ),
                     ),
-                    if (_searchQuery.isNotEmpty || _selectedType != 'All' || _selectedStatus != 'All')
+                    if (_searchQuery.isNotEmpty ||
+                        _selectedType != 'All' ||
+                        _selectedStatus != 'All')
                       TextButton(
                         onPressed: () {
                           setState(() {
@@ -145,7 +226,13 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
                             _selectedStatus = 'All';
                           });
                         },
-                        child: const Text('Reset Filters', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryOrange)),
+                        child: const Text(
+                          'Reset Filters',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primaryOrange,
+                          ),
+                        ),
                       ),
                   ],
                 ),
@@ -156,9 +243,13 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
                 child: filteredNotifs.isEmpty
                     ? _buildEmptyState()
                     : ListView.separated(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 8,
+                        ),
                         itemCount: filteredNotifs.length,
-                        separatorBuilder: (context, index) => const SizedBox(height: 12),
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: 12),
                         itemBuilder: (context, index) {
                           final notif = filteredNotifs[index];
                           return _buildNotificationCard(notif, currentUser.uid);
@@ -196,7 +287,10 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
             style: TextStyle(color: _textColor, fontSize: 13),
             decoration: InputDecoration(
               hintText: 'Search notifications...',
-              hintStyle: TextStyle(color: _isDark ? Colors.white30 : Colors.grey, fontSize: 13),
+              hintStyle: TextStyle(
+                color: _isDark ? Colors.white30 : Colors.grey,
+                fontSize: 13,
+              ),
               prefixIcon: Icon(Icons.search, size: 20, color: _subColor),
               contentPadding: const EdgeInsets.symmetric(vertical: 8),
               border: OutlineInputBorder(
@@ -222,13 +316,19 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
                   decoration: InputDecoration(
                     labelText: 'Category',
                     labelStyle: TextStyle(color: _subColor, fontSize: 12),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
                     border: const OutlineInputBorder(),
                   ),
                   items: _typesList.map((t) {
                     return DropdownMenuItem(
                       value: t,
-                      child: Text(t.substring(0, 1).toUpperCase() + t.substring(1), style: const TextStyle(fontSize: 12)),
+                      child: Text(
+                        t.substring(0, 1).toUpperCase() + t.substring(1),
+                        style: const TextStyle(fontSize: 12),
+                      ),
                     );
                   }).toList(),
                   onChanged: (val) {
@@ -245,13 +345,25 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
                   decoration: InputDecoration(
                     labelText: 'Status',
                     labelStyle: TextStyle(color: _subColor, fontSize: 12),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
                     border: const OutlineInputBorder(),
                   ),
                   items: const [
-                    DropdownMenuItem(value: 'All', child: Text('All Status', style: TextStyle(fontSize: 12))),
-                    DropdownMenuItem(value: 'Unread', child: Text('Unread', style: TextStyle(fontSize: 12))),
-                    DropdownMenuItem(value: 'Read', child: Text('Read', style: TextStyle(fontSize: 12))),
+                    DropdownMenuItem(
+                      value: 'All',
+                      child: Text('All Status', style: TextStyle(fontSize: 12)),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Unread',
+                      child: Text('Unread', style: TextStyle(fontSize: 12)),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Read',
+                      child: Text('Read', style: TextStyle(fontSize: 12)),
+                    ),
                   ],
                   onChanged: (val) {
                     if (val != null) setState(() => _selectedStatus = val);
@@ -271,8 +383,19 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
                   onPressed: () async {
                     await _notificationService.markAllAsRead(userId);
                   },
-                  icon: const Icon(Icons.done_all, size: 14, color: AppColors.primaryOrange),
-                  label: const Text('Mark All Read', style: TextStyle(color: AppColors.primaryOrange, fontWeight: FontWeight.bold, fontSize: 11)),
+                  icon: const Icon(
+                    Icons.done_all,
+                    size: 14,
+                    color: AppColors.primaryOrange,
+                  ),
+                  label: const Text(
+                    'Mark All Read',
+                    style: TextStyle(
+                      color: AppColors.primaryOrange,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
+                  ),
                 ),
               const SizedBox(width: 12),
               if (allNotifs.any((n) => n.isRead))
@@ -280,8 +403,19 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
                   onPressed: () async {
                     await _notificationService.clearReadNotifications(userId);
                   },
-                  icon: const Icon(Icons.delete_sweep_outlined, size: 14, color: Colors.redAccent),
-                  label: const Text('Clear Read', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 11)),
+                  icon: const Icon(
+                    Icons.delete_sweep_outlined,
+                    size: 14,
+                    color: Colors.redAccent,
+                  ),
+                  label: const Text(
+                    'Clear Read',
+                    style: TextStyle(
+                      color: Colors.redAccent,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -295,7 +429,11 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.notifications_off_outlined, size: 64, color: _isDark ? const Color(0xFF334155) : Colors.grey[300]),
+          Icon(
+            Icons.notifications_off_outlined,
+            size: 64,
+            color: _isDark ? const Color(0xFF334155) : Colors.grey[300],
+          ),
           const SizedBox(height: 16),
           Text(
             'No matching notifications',
@@ -337,28 +475,34 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
           ],
         ),
         child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
+          ),
           leading: CircleAvatar(
             radius: 20,
             backgroundColor: parsedColor.withValues(alpha: 0.1),
             child: Text(notif.icon, style: const TextStyle(fontSize: 16)),
           ),
-          title: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Text(
-                  notif.title,
-                  style: TextStyle(
-                    fontWeight: notif.isRead ? FontWeight.bold : FontWeight.w900,
-                    fontSize: 13,
-                    color: _textColor,
-                  ),
+              Text(
+                notif.title,
+                style: TextStyle(
+                  fontWeight: notif.isRead ? FontWeight.bold : FontWeight.w900,
+                  fontSize: 13,
+                  color: _textColor,
                 ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
+              const SizedBox(height: 2),
               Text(
                 formattedDate,
                 style: TextStyle(fontSize: 9, color: _subColor),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -374,86 +518,176 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
                     height: 1.3,
                     color: notif.isRead ? _subColor : _textColor,
                   ),
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 if (notif.type == 'pickup_reminder_customer') ...[
                   const SizedBox(height: 8),
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.start,
                     children: [
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primaryOrange,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
                         ),
-                        onPressed: () => _showBookingDetails(context, notif.relatedId),
-                        child: const Text('View Booking', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                        onPressed: () =>
+                            _showBookingDetails(context, notif.relatedId),
+                        child: const Text(
+                          'View Booking',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
-                      const SizedBox(width: 8),
                       OutlinedButton(
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.teal,
                           side: const BorderSide(color: Colors.teal),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
                         ),
                         onPressed: () => _sendOnMyWayStatus(notif.relatedId),
-                        child: const Text("I'm On My Way", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                        child: const Text(
+                          "I'm On My Way",
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ],
                 if (notif.type == 'return_reminder_customer') ...[
                   const SizedBox(height: 8),
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.start,
                     children: [
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.teal,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
                         ),
                         onPressed: () => _sendOnMyWayStatus(notif.relatedId),
-                        child: const Text("I'm On My Way", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                        child: const Text(
+                          "I'm On My Way",
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
-                      const SizedBox(width: 8),
                       OutlinedButton(
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.primaryOrange,
-                          side: const BorderSide(color: AppColors.primaryOrange),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                          side: const BorderSide(
+                            color: AppColors.primaryOrange,
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
                         ),
                         onPressed: () => _showExtendRentalGuidance(),
-                        child: const Text("Extend Rental", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                        child: const Text(
+                          "Extend Rental",
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ],
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        notif.isRead
+                            ? Icons.mark_as_unread_outlined
+                            : Icons.mark_chat_read_outlined,
+                        color: _subColor,
+                        size: 16,
+                      ),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 28,
+                        minHeight: 28,
+                      ),
+                      visualDensity: VisualDensity.compact,
+                      splashRadius: 16,
+                      onPressed: () async {
+                        await _notificationService.toggleReadStatus(
+                          userId,
+                          notif.id,
+                          !notif.isRead,
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: Icon(
+                        Icons.delete_outline_rounded,
+                        color: _subColor,
+                        size: 16,
+                      ),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 28,
+                        minHeight: 28,
+                      ),
+                      visualDensity: VisualDensity.compact,
+                      splashRadius: 16,
+                      onPressed: () async {
+                        await _notificationService.deleteNotification(
+                          userId,
+                          notif.id,
+                        );
+                      },
+                    ),
+                  ],
+                ),
               ],
             ),
-          ),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                icon: Icon(
-                  notif.isRead ? Icons.mark_as_unread_outlined : Icons.mark_chat_read_outlined,
-                  color: _subColor,
-                  size: 16,
-                ),
-                onPressed: () async {
-                  await _notificationService.toggleReadStatus(userId, notif.id, !notif.isRead);
-                },
-              ),
-              IconButton(
-                icon: Icon(Icons.delete_outline_rounded, color: _subColor, size: 16),
-                onPressed: () async {
-                  await _notificationService.deleteNotification(userId, notif.id);
-                },
-              ),
-            ],
           ),
           onTap: () => _handleNotificationTap(notif, userId),
         ),
@@ -461,7 +695,10 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
     );
   }
 
-  Future<void> _handleNotificationTap(NotificationModel notif, String userId) async {
+  Future<void> _handleNotificationTap(
+    NotificationModel notif,
+    String userId,
+  ) async {
     // 1. Mark as read immediately
     if (!notif.isRead) {
       await _notificationService.markAsRead(userId, notif.id);
@@ -470,7 +707,7 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
     if (!mounted) return;
 
     final typeLower = notif.type.toLowerCase();
-    
+
     // 2. Perform redirection
     if (typeLower == 'booking' && notif.relatedId.isNotEmpty) {
       _showBookingDetails(context, notif.relatedId);
@@ -495,71 +732,132 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
     }
   }
 
-  Future<void> _showBookingDetails(BuildContext context, String bookingId) async {
+  // ✅ UPDATED: Fixed _showBookingDetails method
+  Future<void> _showBookingDetails(
+    BuildContext context,
+    String bookingId,
+  ) async {
+    // Show loading indicator
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator(color: AppColors.primaryOrange)),
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: AppColors.primaryOrange),
+      ),
     );
 
     try {
-      final snap = await FirebaseDatabase.instance.ref().child('bookings').child(bookingId).get();
-      // Fetch payments
-      final paySnap = await FirebaseDatabase.instance.ref().child('payments').orderByChild('bookingId').equalTo(bookingId).get();
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        if (context.mounted) Navigator.pop(context);
+        return;
+      }
+
+      // 1. Get booking details
+      final snap = await FirebaseDatabase.instance
+          .ref()
+          .child('bookings')
+          .child(bookingId)
+          .get();
+
+      if (!snap.exists || snap.value == null) {
+        if (context.mounted) {
+          Navigator.pop(context); // Close loading
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Booking record no longer exists.')),
+          );
+        }
+        return;
+      }
+
+      final booking = BookingModel.fromMap(
+        bookingId,
+        snap.value as Map<dynamic, dynamic>,
+      );
+
+      // 2. Check if booking is paid - SAFER APPROACH
       bool isPaid = false;
-      if (paySnap.exists && paySnap.value != null) {
-        final Map pMap = paySnap.value as Map;
-        for (var pValue in pMap.values) {
-          if (pValue is Map) {
-            final pStatus = (pValue['paymentStatus'] ?? pValue['status'] ?? '').toString().toLowerCase();
-            if (pStatus == 'approved' || pStatus == 'paid') {
-              isPaid = true;
-              break;
+
+      // Query payments by bookingId
+      try {
+        final paySnap = await FirebaseDatabase.instance
+            .ref()
+            .child('payments')
+            .orderByChild('bookingId')
+            .equalTo(bookingId)
+            .get();
+
+        if (paySnap.exists && paySnap.value != null) {
+          final Map pMap = paySnap.value as Map;
+          for (var pValue in pMap.values) {
+            if (pValue is Map) {
+              final pStatus =
+                  (pValue['paymentStatus'] ?? pValue['status'] ?? '')
+                      .toString()
+                      .toLowerCase();
+              if (pStatus == 'approved' || pStatus == 'paid') {
+                isPaid = true;
+                break;
+              }
             }
           }
         }
+      } catch (e) {
+        debugPrint('Could not query payments: $e');
       }
 
-      if (context.mounted) Navigator.pop(context); // Close loading indicator
-
-      if (snap.exists && snap.value != null) {
-        final booking = BookingModel.fromMap(bookingId, snap.value as Map<dynamic, dynamic>);
-        if (context.mounted) {
-          _showBookingDetailsDialog(context, booking, isPaid: isPaid);
-        }
-      } else {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Booking record details no longer exist.')),
-          );
-        }
+      if (context.mounted) {
+        Navigator.pop(context); // Close loading
+        _showBookingDetailsDialog(context, booking, isPaid: isPaid);
       }
     } catch (e) {
-      if (context.mounted) Navigator.pop(context); // Safety pop
+      if (context.mounted) {
+        Navigator.pop(context); // Close loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading booking details: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
       debugPrint('Error fetching booking details: $e');
     }
   }
 
-  Future<void> _showPaymentDetails(BuildContext context, String paymentId) async {
+  Future<void> _showPaymentDetails(
+    BuildContext context,
+    String paymentId,
+  ) async {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator(color: AppColors.primaryOrange)),
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: AppColors.primaryOrange),
+      ),
     );
 
     try {
-      final snap = await FirebaseDatabase.instance.ref().child('payments').child(paymentId).get();
+      final snap = await FirebaseDatabase.instance
+          .ref()
+          .child('payments')
+          .child(paymentId)
+          .get();
       if (context.mounted) Navigator.pop(context); // Close loading indicator
 
       if (snap.exists && snap.value != null) {
-        final payment = PaymentModel.fromMap(paymentId, snap.value as Map<dynamic, dynamic>);
+        final payment = PaymentModel.fromMap(
+          paymentId,
+          snap.value as Map<dynamic, dynamic>,
+        );
         if (context.mounted) {
           _showPaymentDetailsDialog(context, payment);
         }
       } else {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Payment transaction details no longer exist.')),
+            const SnackBar(
+              content: Text('Payment transaction details no longer exist.'),
+            ),
           );
         }
       }
@@ -569,13 +867,19 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
     }
   }
 
-  void _showBookingDetailsDialog(BuildContext context, BookingModel booking, {bool isPaid = false}) {
+  void _showBookingDetailsDialog(
+    BuildContext context,
+    BookingModel booking, {
+    bool isPaid = false,
+  }) {
     final dateFormat = DateFormat('dd MMM yyyy');
     showModalBottomSheet(
       context: context,
       backgroundColor: _isDark ? const Color(0xFF1E293B) : Colors.white,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (context) {
         return Padding(
           padding: EdgeInsets.only(
@@ -591,36 +895,71 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Booking Specification', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _textColor)),
+                  Text(
+                    'Booking Specification',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: _textColor,
+                    ),
+                  ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.primaryOrange.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text(booking.status.toUpperCase(), style: const TextStyle(color: AppColors.primaryOrange, fontSize: 10, fontWeight: FontWeight.bold)),
+                    child: Text(
+                      booking.status.toUpperCase(),
+                      style: const TextStyle(
+                        color: AppColors.primaryOrange,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 20),
               _buildDetailRow('Reservation Ref ID', booking.id),
               _buildDetailRow('Vehicle Name', booking.vehicleName),
-              _buildDetailRow('Rental Days', booking.isOpenRental ? 'Open Ended' : '${booking.rentalDays} days'),
+              _buildDetailRow(
+                'Rental Days',
+                booking.isOpenRental
+                    ? 'Open Ended'
+                    : '${booking.rentalDays} days',
+              ),
               _buildDetailRow(
                 'Rental Duration',
                 booking.isOpenRental
                     ? '${dateFormat.format(booking.pickUpDate)} to OPEN RENTAL'
                     : '${dateFormat.format(booking.pickUpDate)} to ${booking.returnDate != null ? dateFormat.format(booking.returnDate!) : ""}',
               ),
-              _buildDetailRow('Security Deposit', 'RM ${booking.depositAmount.toStringAsFixed(2)}'),
-              _buildDetailRow('Total Price Paid', 'RM ${booking.totalPrice.toStringAsFixed(2)}'),
+              _buildDetailRow(
+                'Security Deposit',
+                'RM ${booking.depositAmount.toStringAsFixed(2)}',
+              ),
+              _buildDetailRow(
+                'Total Price Paid',
+                'RM ${booking.totalPrice.toStringAsFixed(2)}',
+              ),
               if (booking.notes != null && booking.notes!.isNotEmpty)
                 _buildDetailRow('Remarks', booking.notes!),
               if (isPaid) ...[
                 const SizedBox(height: 16),
                 Divider(color: _borderColor),
                 const SizedBox(height: 12),
-                Text('Receipt Documents', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _textColor)),
+                Text(
+                  'Receipt Documents',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: _textColor,
+                  ),
+                ),
                 const SizedBox(height: 10),
                 Row(
                   children: [
@@ -629,7 +968,9 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primaryOrange,
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           elevation: 0,
                         ),
@@ -638,16 +979,26 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
                           ReceiptService().viewReceipt(context, booking.id);
                         },
                         icon: const Icon(Icons.visibility, size: 14),
-                        label: const Text('View', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        label: const Text(
+                          'View',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: _isDark ? const Color(0xFF0F172A) : AppColors.secondaryBlue,
+                          backgroundColor: _isDark
+                              ? const Color(0xFF0F172A)
+                              : AppColors.secondaryBlue,
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           elevation: 0,
                         ),
@@ -656,7 +1007,13 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
                           ReceiptService().downloadReceipt(context, booking.id);
                         },
                         icon: const Icon(Icons.download, size: 14),
-                        label: const Text('Download', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        label: const Text(
+                          'Download',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -669,11 +1026,16 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryOrange,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Close Details', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    'Close Details',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
             ],
@@ -689,7 +1051,9 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
       context: context,
       backgroundColor: _isDark ? const Color(0xFF1E293B) : Colors.white,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (context) {
         return Padding(
           padding: EdgeInsets.only(
@@ -705,27 +1069,58 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Payment Transaction', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _textColor)),
+                  Text(
+                    'Payment Transaction',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: _textColor,
+                    ),
+                  ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.green.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text((payment.paymentStatus ?? payment.status).toUpperCase(), style: const TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
+                    child: Text(
+                      (payment.paymentStatus ?? payment.status).toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.green,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 20),
               _buildDetailRow('Transaction ID', payment.id),
               _buildDetailRow('Booking Ref ID', payment.bookingId),
-              _buildDetailRow('Paid Amount', 'RM ${payment.amount.toStringAsFixed(2)}'),
-              _buildDetailRow('Method Type', payment.paymentMethod.toUpperCase()),
-              _buildDetailRow('Lodged At', dateFormat.format(payment.paymentDate)),
+              _buildDetailRow(
+                'Paid Amount',
+                'RM ${payment.amount.toStringAsFixed(2)}',
+              ),
+              _buildDetailRow(
+                'Method Type',
+                payment.paymentMethod.toUpperCase(),
+              ),
+              _buildDetailRow(
+                'Lodged At',
+                dateFormat.format(payment.paymentDate),
+              ),
               if (payment.transactionId != null)
                 _buildDetailRow('Reference Ref', payment.transactionId!),
-              if (payment.rejectionReason != null && payment.rejectionReason!.isNotEmpty)
-                _buildDetailRow('Rejection Reason', payment.rejectionReason!, isItalic: true),
+              if (payment.rejectionReason != null &&
+                  payment.rejectionReason!.isNotEmpty)
+                _buildDetailRow(
+                  'Rejection Reason',
+                  payment.rejectionReason!,
+                  isItalic: true,
+                ),
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
@@ -733,11 +1128,16 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryOrange,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Close details', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    'Close details',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
             ],
@@ -755,7 +1155,14 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
         children: [
           Expanded(
             flex: 4,
-            child: Text(label, style: TextStyle(color: _subColor, fontSize: 12, fontWeight: FontWeight.w500)),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: _subColor,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
           Expanded(
             flex: 6,
@@ -776,17 +1183,23 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
 
   Future<void> _sendOnMyWayStatus(String bookingId) async {
     try {
-      await FirebaseDatabase.instance.ref().child('bookings').child(bookingId).update({'customerStatus': 'on_my_way'});
+      await FirebaseDatabase.instance
+          .ref()
+          .child('bookings')
+          .child(bookingId)
+          .update({'customerStatus': 'on_my_way'});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Status sent to admin: You are on your way!")),
+          const SnackBar(
+            content: Text("Status sent to admin: You are on your way!"),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Failed to send status: $e")),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Failed to send status: $e")));
       }
     }
   }
@@ -798,17 +1211,35 @@ class _CustomerNotificationsScreenState extends State<CustomerNotificationsScree
         final isDark = Theme.of(context).brightness == Brightness.dark;
         return AlertDialog(
           backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text("Extend Active Rental", style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white : AppColors.secondaryBlue)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            "Extend Active Rental",
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : AppColors.secondaryBlue,
+            ),
+          ),
           content: Text(
             "To request a rental contract extension, please contact CARENT Corporate Support directly at +60 3-2274 1234 or visit the nearest branch center.",
-            style: TextStyle(color: isDark ? const Color(0xFFCBD5E1) : Colors.black87),
+            style: TextStyle(
+              color: isDark ? const Color(0xFFCBD5E1) : Colors.black87,
+            ),
           ),
           actions: [
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryOrange),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryOrange,
+              ),
               onPressed: () => Navigator.pop(context),
-              child: const Text("OK", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              child: const Text(
+                "OK",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ],
         );

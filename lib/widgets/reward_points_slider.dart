@@ -93,12 +93,18 @@ class _RewardPointsSliderState extends State<RewardPointsSlider> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
-    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
-    final textSecondary = isDark ? const Color(0xFF94A3B8) : AppColors.lightText;
-    
+    final borderColor = isDark
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
+    final textPrimary = isDark
+        ? const Color(0xFFF8FAFC)
+        : AppColors.secondaryBlue;
+    final textSecondary = isDark
+        ? const Color(0xFF94A3B8)
+        : AppColors.lightText;
+
     final discount = _selectedValue * 0.10;
-    
+
     // Remaining / New balance calculation
     int targetBalance = widget.availablePoints;
     if (widget.isAdmin) {
@@ -123,27 +129,32 @@ class _RewardPointsSliderState extends State<RewardPointsSlider> {
             color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
-          )
+          ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Header showing Available Balance / Limit
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final bool isNarrow = constraints.maxWidth < 340;
+
+              final leftInfo = Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     widget.isAdmin
-                        ? (widget.isDeductMode ? 'Deduct Points' : 'Credit Points')
+                        ? (widget.isDeductMode
+                              ? 'Deduct Points'
+                              : 'Credit Points')
                         : 'Redeem Points',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: widget.isDeductMode ? Colors.redAccent : AppColors.primaryOrange,
+                      color: widget.isDeductMode
+                          ? Colors.redAccent
+                          : AppColors.primaryOrange,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -158,8 +169,9 @@ class _RewardPointsSliderState extends State<RewardPointsSlider> {
                     ),
                   ),
                 ],
-              ),
-              Container(
+              );
+
+              final limitBadge = Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
@@ -167,15 +179,31 @@ class _RewardPointsSliderState extends State<RewardPointsSlider> {
                   border: Border.all(color: borderColor),
                 ),
                 child: Text(
-                  'Max Limit: ${widget.maxPointsLimit}',
+                  'Limit: ${widget.maxPointsLimit}',
                   style: TextStyle(
                     fontSize: 9,
                     fontWeight: FontWeight.bold,
                     color: textSecondary,
                   ),
                 ),
-              ),
-            ],
+              );
+
+              if (isNarrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [leftInfo, const SizedBox(height: 8), limitBadge],
+                );
+              }
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(child: leftInfo),
+                  const SizedBox(width: 8),
+                  limitBadge,
+                ],
+              );
+            },
           ),
           const SizedBox(height: 16),
 
@@ -184,7 +212,9 @@ class _RewardPointsSliderState extends State<RewardPointsSlider> {
             children: [
               // Minus Step Button
               IconButton(
-                onPressed: _maxVal > 0 && _selectedValue > 0 ? () => _adjustBy(-1) : null,
+                onPressed: _maxVal > 0 && _selectedValue > 0
+                    ? () => _adjustBy(-1)
+                    : null,
                 icon: const Icon(Icons.remove_circle_outline),
                 color: AppColors.primaryOrange,
                 disabledColor: textSecondary.withValues(alpha: 0.3),
@@ -197,13 +227,27 @@ class _RewardPointsSliderState extends State<RewardPointsSlider> {
               Expanded(
                 child: SliderTheme(
                   data: SliderTheme.of(context).copyWith(
-                    activeTrackColor: widget.isDeductMode ? Colors.redAccent : AppColors.primaryOrange,
-                    inactiveTrackColor: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                    thumbColor: widget.isDeductMode ? Colors.redAccent : AppColors.primaryOrange,
-                    overlayColor: (widget.isDeductMode ? Colors.redAccent : AppColors.primaryOrange).withValues(alpha: 0.15),
+                    activeTrackColor: widget.isDeductMode
+                        ? Colors.redAccent
+                        : AppColors.primaryOrange,
+                    inactiveTrackColor: isDark
+                        ? const Color(0xFF334155)
+                        : const Color(0xFFE2E8F0),
+                    thumbColor: widget.isDeductMode
+                        ? Colors.redAccent
+                        : AppColors.primaryOrange,
+                    overlayColor:
+                        (widget.isDeductMode
+                                ? Colors.redAccent
+                                : AppColors.primaryOrange)
+                            .withValues(alpha: 0.15),
                     trackHeight: 4,
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
-                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 18),
+                    thumbShape: const RoundSliderThumbShape(
+                      enabledThumbRadius: 8,
+                    ),
+                    overlayShape: const RoundSliderOverlayShape(
+                      overlayRadius: 18,
+                    ),
                   ),
                   child: Slider(
                     min: 0,
@@ -220,7 +264,9 @@ class _RewardPointsSliderState extends State<RewardPointsSlider> {
               ),
               // Plus Step Button
               IconButton(
-                onPressed: _maxVal > 0 && _selectedValue < _maxVal ? () => _adjustBy(1) : null,
+                onPressed: _maxVal > 0 && _selectedValue < _maxVal
+                    ? () => _adjustBy(1)
+                    : null,
                 icon: const Icon(Icons.add_circle_outline),
                 color: AppColors.primaryOrange,
                 disabledColor: textSecondary.withValues(alpha: 0.3),
@@ -247,7 +293,9 @@ class _RewardPointsSliderState extends State<RewardPointsSlider> {
                 _buildPreviewItem(
                   'Points Selected',
                   '$_selectedValue',
-                  widget.isDeductMode ? Colors.redAccent : AppColors.primaryOrange,
+                  widget.isDeductMode
+                      ? Colors.redAccent
+                      : AppColors.primaryOrange,
                   isDark,
                 ),
                 if (!widget.isAdmin)
@@ -278,8 +326,18 @@ class _RewardPointsSliderState extends State<RewardPointsSlider> {
                 _buildQuickChip('+50', () => _adjustBy(50), isDark),
                 _buildQuickChip('+100', () => _adjustBy(100), isDark),
                 _buildQuickChip('+250', () => _adjustBy(250), isDark),
-                _buildQuickChip('Max', () => _updateValue(_maxVal), isDark, highlight: true),
-                _buildQuickChip('Reset', () => _updateValue(0), isDark, isReset: true),
+                _buildQuickChip(
+                  'Max',
+                  () => _updateValue(_maxVal),
+                  isDark,
+                  highlight: true,
+                ),
+                _buildQuickChip(
+                  'Reset',
+                  () => _updateValue(0),
+                  isDark,
+                  isReset: true,
+                ),
               ],
             ),
           ),
@@ -289,7 +347,9 @@ class _RewardPointsSliderState extends State<RewardPointsSlider> {
             const SizedBox(height: 16),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: widget.isDeductMode ? Colors.redAccent : AppColors.primaryOrange,
+                backgroundColor: widget.isDeductMode
+                    ? Colors.redAccent
+                    : AppColors.primaryOrange,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -314,7 +374,12 @@ class _RewardPointsSliderState extends State<RewardPointsSlider> {
     );
   }
 
-  Widget _buildPreviewItem(String label, String value, Color valueColor, bool isDark) {
+  Widget _buildPreviewItem(
+    String label,
+    String value,
+    Color valueColor,
+    bool isDark,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -339,17 +404,26 @@ class _RewardPointsSliderState extends State<RewardPointsSlider> {
     );
   }
 
-  Widget _buildQuickChip(String label, VoidCallback onTap, bool isDark,
-      {bool highlight = false, bool isReset = false}) {
+  Widget _buildQuickChip(
+    String label,
+    VoidCallback onTap,
+    bool isDark, {
+    bool highlight = false,
+    bool isReset = false,
+  }) {
     Color labelColor = isDark ? Colors.white70 : Colors.black87;
     Color bgColor = isDark ? const Color(0xFF1E293B) : Colors.grey[200]!;
-    
+
     if (highlight) {
       labelColor = Colors.white;
-      bgColor = widget.isDeductMode ? Colors.redAccent : AppColors.primaryOrange;
+      bgColor = widget.isDeductMode
+          ? Colors.redAccent
+          : AppColors.primaryOrange;
     } else if (isReset) {
       labelColor = isDark ? const Color(0xFFEF4444) : Colors.red;
-      bgColor = isDark ? const Color(0xFFEF4444).withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1);
+      bgColor = isDark
+          ? const Color(0xFFEF4444).withValues(alpha: 0.1)
+          : Colors.red.withValues(alpha: 0.1);
     }
 
     return Padding(
@@ -367,7 +441,9 @@ class _RewardPointsSliderState extends State<RewardPointsSlider> {
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
-                color: _maxVal > 0 || isReset ? labelColor : labelColor.withValues(alpha: 0.3),
+                color: _maxVal > 0 || isReset
+                    ? labelColor
+                    : labelColor.withValues(alpha: 0.3),
               ),
             ),
           ),

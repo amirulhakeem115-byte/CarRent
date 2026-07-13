@@ -1,16 +1,12 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'dart:ui' show ImageFilter;
 import 'package:provider/provider.dart';
-import 'package:firebase_database/firebase_database.dart';
-import '../models/review_model.dart';
 import '../constants/colors.dart';
 import '../services/auth_service.dart';
 import '../services/database_service.dart';
 import '../services/branch_service.dart';
 import '../services/vehicle_service.dart';
 import '../services/company_settings_provider.dart';
-import '../services/user_session.dart';
 import '../models/user_model.dart';
 import '../models/vehicle_model.dart';
 import '../models/branch_model.dart';
@@ -31,6 +27,20 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  // AI Generated Car Images - Multiple reliable sources
+  static const String _aiCarImage1 =
+      'https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&q=80&w=800&h=500';
+
+  static const String _aiCarImage2 =
+      'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=800&h=500';
+
+  static const String _aiCarImage3 =
+      'https://images.unsplash.com/photo-1614200187524-dc4b892acf16?auto=format&fit=crop&q=80&w=800&h=500';
+
+  // Using a reliable high-quality car image with transparent-like background
+  static const String _aiCarImageUrl =
+      'https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&q=80&w=800&h=500';
+
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
   final BranchService _branchService = BranchService();
@@ -211,7 +221,6 @@ class _HomeScreenState extends State<HomeScreen> {
               .getUser(currentUser.uid)
               .timeout(const Duration(seconds: 4));
           if (_user != null && mounted) {
-            UserSession().forceSetRole(_user!.role);
             if (_user!.role == 'admin') {
               Navigator.pushReplacement(
                 context,
@@ -256,8 +265,18 @@ class _HomeScreenState extends State<HomeScreen> {
         debugPrint('Error getting vehicles: $vehicleErr.');
         _vehicles = [];
       }
+
+      // Set initial branch selection
+      if (_branches.isNotEmpty && _selectedPickupBranch == null) {
+        _selectedPickupBranch = _branches.first;
+      }
     } catch (e) {
       debugPrint('Unexpected error loading home data: $e');
+      if (mounted) {
+        setState(
+          () => _error = 'Failed to load data. Please check your connection.',
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -377,17 +396,6 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         NavHoverLink(text: 'Home', onTap: () => _scrollToSection(_homeKey)),
         NavHoverLink(
-          text: 'Fleet',
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const VehicleListScreen(),
-              ),
-            );
-          },
-        ),
-        NavHoverLink(
           text: 'About Us',
           onTap: () => _scrollToSection(_aboutKey),
         ),
@@ -396,6 +404,91 @@ class _HomeScreenState extends State<HomeScreen> {
           onTap: () => _scrollToSection(_contactKey),
         ),
       ],
+    );
+  }
+
+  void _navigateToDashboardOrLogin() {
+    if (_user != null) {
+      if (_user!.role == 'admin') {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const AdminDashboardScreen()),
+        );
+      } else {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const CustomerResponsiveShell(),
+          ),
+        );
+      }
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => LoginScreen(onLoggedIn: () {})),
+      ).then((_) => _loadData());
+    }
+  }
+
+  Widget _buildMobileEndDrawer() {
+    return Drawer(
+      child: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          children: [
+            ListTile(
+              leading: const Icon(Icons.home_outlined),
+              title: const Text('Home'),
+              onTap: () {
+                Navigator.pop(context);
+                _scrollToSection(_homeKey);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.info_outline),
+              title: const Text('About Us'),
+              onTap: () {
+                Navigator.pop(context);
+                _scrollToSection(_aboutKey);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.mail_outline),
+              title: const Text('Contact Us'),
+              onTap: () {
+                Navigator.pop(context);
+                _scrollToSection(_contactKey);
+              },
+            ),
+            const Divider(height: 24),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _navigateToDashboardOrLogin();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.secondaryBlue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  _user != null ? 'MY DASHBOARD' : 'LOGIN / REGISTER',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -416,6 +509,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
+      endDrawer: isDesktop ? null : _buildMobileEndDrawer(),
       appBar: PreferredSize(
         preferredSize: Size.fromHeight(isDesktop ? 80 : 124),
         child: ClipRRect(
@@ -471,84 +565,65 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                           ),
-                          if (isDesktop) _buildHeaderNavigation(),
-                          ElevatedButton(
-                            onPressed: () {
-                              if (_user != null) {
-                                if (_user!.role == 'admin') {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const AdminDashboardScreen(),
+                          if (isDesktop) ...[
+                            _buildHeaderNavigation(),
+                            ElevatedButton(
+                              onPressed: _navigateToDashboardOrLogin,
+                              style: ButtonStyle(
+                                backgroundColor:
+                                    WidgetStateProperty.resolveWith<Color?>((
+                                      Set<WidgetState> states,
+                                    ) {
+                                      if (states.contains(
+                                        WidgetState.hovered,
+                                      )) {
+                                        return AppColors.primaryOrange;
+                                      }
+                                      return AppColors.secondaryBlue;
+                                    }),
+                                foregroundColor: WidgetStateProperty.all<Color>(
+                                  Colors.white,
+                                ),
+                                padding:
+                                    WidgetStateProperty.all<EdgeInsetsGeometry>(
+                                      const EdgeInsets.symmetric(
+                                        horizontal: 24,
+                                        vertical: 18,
+                                      ),
                                     ),
-                                  );
-                                } else {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const CustomerResponsiveShell(),
-                                    ),
-                                  );
-                                }
-                              } else {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        LoginScreen(onLoggedIn: () {}),
+                                shape: WidgetStateProperty.all<OutlinedBorder>(
+                                  RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
                                   ),
-                                ).then((_) => _loadData());
-                              }
-                            },
-                            style: ButtonStyle(
-                              backgroundColor:
-                                  WidgetStateProperty.resolveWith<Color?>((
-                                    Set<WidgetState> states,
-                                  ) {
-                                    if (states.contains(WidgetState.hovered)) {
-                                      return AppColors.primaryOrange;
-                                    }
-                                    return AppColors.secondaryBlue;
-                                  }),
-                              foregroundColor: WidgetStateProperty.all<Color>(
-                                Colors.white,
+                                ),
+                                elevation: WidgetStateProperty.all<double>(0),
                               ),
-                              padding:
-                                  WidgetStateProperty.all<EdgeInsetsGeometry>(
-                                    EdgeInsets.symmetric(
-                                      horizontal: isDesktop ? 24 : 16,
-                                      vertical: isDesktop ? 18 : 12,
-                                    ),
-                                  ),
-                              shape: WidgetStateProperty.all<OutlinedBorder>(
-                                RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
+                              child: Text(
+                                _user != null
+                                    ? 'MY DASHBOARD'
+                                    : 'LOGIN / REGISTER',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
                                 ),
                               ),
-                              elevation: WidgetStateProperty.all<double>(0),
                             ),
-                            child: Text(
-                              _user != null
-                                  ? 'MY DASHBOARD'
-                                  : 'LOGIN / REGISTER',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.5,
+                          ] else
+                            Builder(
+                              builder: (context) => IconButton(
+                                onPressed: () =>
+                                    Scaffold.of(context).openEndDrawer(),
+                                icon: const Icon(
+                                  Icons.menu_rounded,
+                                  color: AppColors.secondaryBlue,
+                                  size: 28,
+                                ),
+                                tooltip: 'Menu',
                               ),
                             ),
-                          ),
                         ],
                       ),
-                      if (!isDesktop) ...[
-                        const SizedBox(height: 12),
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: _buildHeaderNavigation(),
-                        ),
-                      ],
                     ],
                   ),
                 ),
@@ -640,21 +715,89 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildCarImage(bool isDesktop) {
+    final double height = isDesktop ? 420 : 220;
+    final double iconSize = isDesktop ? 140 : 100;
+
+    return Container(
+      height: height,
+      alignment: Alignment.center,
+      child: Image.network(
+        _aiCarImageUrl,
+        height: height,
+        fit: BoxFit.contain,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return SizedBox(
+            height: height,
+            child: Center(
+              child: CircularProgressIndicator(
+                color: AppColors.primaryOrange,
+                value: loadingProgress.expectedTotalBytes != null
+                    ? loadingProgress.cumulativeBytesLoaded /
+                          loadingProgress.expectedTotalBytes!
+                    : null,
+              ),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          // Try fallback image
+          return Image.network(
+            'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=800&h=500',
+            height: height,
+            fit: BoxFit.contain,
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return SizedBox(
+                height: height,
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.primaryOrange,
+                    value: loadingProgress.expectedTotalBytes != null
+                        ? loadingProgress.cumulativeBytesLoaded /
+                              loadingProgress.expectedTotalBytes!
+                        : null,
+                  ),
+                ),
+              );
+            },
+            errorBuilder: (context, error, stackTrace) {
+              // Ultimate fallback - icon
+              return Icon(
+                Icons.directions_car,
+                color: Colors.white.withValues(alpha: 0.8),
+                size: iconSize,
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildHeroSection(bool isDesktop) {
     return Container(
       key: _homeKey,
       padding: EdgeInsets.symmetric(
         horizontal: isDesktop ? 80 : 20,
-        vertical: isDesktop ? 100 : 40,
+        vertical: isDesktop ? 80 : 40,
       ),
-      decoration: const BoxDecoration(
-        color: AppColors.secondaryBlue,
-        image: DecorationImage(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.secondaryBlue,
+            AppColors.secondaryBlue.withValues(alpha: 0.9),
+          ],
+        ),
+        image: const DecorationImage(
           image: NetworkImage(
             'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=1200',
           ),
           fit: BoxFit.cover,
-          opacity: 0.12,
+          opacity: 0.10,
         ),
       ),
       child: Flex(
@@ -666,11 +809,12 @@ class _HomeScreenState extends State<HomeScreen> {
             flex: isDesktop ? 1 : 0,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 8,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isDesktop ? 14 : 10,
+                    vertical: isDesktop ? 8 : 5,
                   ),
                   decoration: BoxDecoration(
                     color: AppColors.primaryOrange.withValues(alpha: 0.15),
@@ -679,56 +823,48 @@ class _HomeScreenState extends State<HomeScreen> {
                       color: AppColors.primaryOrange.withValues(alpha: 0.4),
                     ),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
                         Icons.star,
                         color: AppColors.primaryOrange,
-                        size: 14,
+                        size: isDesktop ? 14 : 10,
                       ),
-                      SizedBox(width: 6),
+                      SizedBox(width: isDesktop ? 6 : 4),
                       Text(
                         'MALAYSIA\'S #1 PREMIUM FLEET',
                         style: TextStyle(
                           color: AppColors.primaryOrange,
                           fontWeight: FontWeight.bold,
-                          fontSize: 10,
-                          letterSpacing: 1.5,
+                          fontSize: isDesktop ? 10 : 8,
+                          letterSpacing: isDesktop ? 1.5 : 1.0,
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 28),
-                RichText(
-                  text: const TextSpan(
-                    style: TextStyle(
-                      fontSize: 56,
-                      fontWeight: FontWeight.w900,
-                      height: 1.15,
-                      letterSpacing: -1,
-                      color: Colors.white,
-                    ),
-                    children: [
-                      TextSpan(text: 'Drive First.\n'),
-                      TextSpan(
-                        text: 'Pay Later.',
-                        style: TextStyle(color: AppColors.primaryOrange),
-                      ),
-                    ],
+                SizedBox(height: isDesktop ? 28 : 16),
+                Text(
+                  'Drive First.\nPay Later.',
+                  style: TextStyle(
+                    fontSize: isDesktop ? 52 : 28,
+                    fontWeight: FontWeight.w900,
+                    height: 1.15,
+                    letterSpacing: isDesktop ? -1 : -0.5,
+                    color: Colors.white,
                   ),
                 ),
-                const SizedBox(height: 20),
+                SizedBox(height: isDesktop ? 20 : 12),
                 Text(
                   'Redefining mobility in Malaysia. Experience premium logistics, transparent payment schedules, and verified safety with Avis & Hertz standards.',
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: isDesktop ? 16 : 13,
                     color: Colors.white.withValues(alpha: 0.75),
-                    height: 1.6,
+                    height: isDesktop ? 1.6 : 1.5,
                   ),
                 ),
-                const SizedBox(height: 40),
+                SizedBox(height: isDesktop ? 40 : 24),
                 Flex(
                   direction: isDesktop ? Axis.horizontal : Axis.vertical,
                   crossAxisAlignment: isDesktop
@@ -805,282 +941,17 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
                 ),
-                if (!isDesktop) const SizedBox(height: 40),
+                if (!isDesktop) const SizedBox(height: 30),
               ],
             ),
           ),
           if (isDesktop) const SizedBox(width: 60),
-          // Right: Booking Form Card
+          // Right: Car Image (AI generated)
           Expanded(
             flex: isDesktop ? 1 : 0,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(24),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                child: Container(
-                  padding: const EdgeInsets.all(32),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.92),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.3),
-                      width: 1.5,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
-                        blurRadius: 30,
-                        offset: const Offset(0, 15),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const Text(
-                        'Book Your Ride',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.secondaryBlue,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Premium cars. Instant confirmation.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      // Pickup Branch
-                      const Text(
-                        'PICKUP LOCATION',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.secondaryBlue,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey[200]!),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.01),
-                              blurRadius: 5,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<BranchModel>(
-                            value: _selectedPickupBranch,
-                            hint: const Text(
-                              '--please select--',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.lightText,
-                                fontSize: 13,
-                              ),
-                            ),
-                            dropdownColor: Colors.white,
-                            isExpanded: true,
-                            borderRadius: BorderRadius.circular(16),
-                            icon: const Icon(
-                              Icons.location_on_outlined,
-                              color: AppColors.primaryOrange,
-                            ),
-                            items: _buildBranchDropdownItems(),
-                            onChanged: (val) =>
-                                setState(() => _selectedPickupBranch = val),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      // Date selection
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'PICKUP DATE',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.secondaryBlue,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                InkWell(
-                                  onTap: () => _selectDate(context, true),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 14,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: Colors.grey[200]!,
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withValues(
-                                            alpha: 0.01,
-                                          ),
-                                          blurRadius: 5,
-                                          offset: const Offset(0, 2),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.calendar_today,
-                                          size: 14,
-                                          color: AppColors.primaryOrange,
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: Text(
-                                            _pickupDate == null
-                                                ? 'Select Date'
-                                                : '${_pickupDate!.day}/${_pickupDate!.month}/${_pickupDate!.year}',
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.bold,
-                                              color: AppColors.secondaryBlue,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'RETURN DATE',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.secondaryBlue,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                InkWell(
-                                  onTap: () => _selectDate(context, false),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 14,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: Colors.grey[200]!,
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withValues(
-                                            alpha: 0.01,
-                                          ),
-                                          blurRadius: 5,
-                                          offset: const Offset(0, 2),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.calendar_today,
-                                          size: 14,
-                                          color: AppColors.primaryOrange,
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: Text(
-                                            _returnDate == null
-                                                ? 'Select Date'
-                                                : '${_returnDate!.day}/${_returnDate!.month}/${_returnDate!.year}',
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.bold,
-                                              color: AppColors.secondaryBlue,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        height: 52,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primaryOrange,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            elevation: 2,
-                            shadowColor: AppColors.primaryOrange.withValues(
-                              alpha: 0.4,
-                            ),
-                          ),
-                          onPressed: _searchCars,
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.search, size: 18),
-                              SizedBox(width: 8),
-                              Text(
-                                'SEARCH CARS',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 13,
-                                  letterSpacing: 1.0,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+            child: Align(
+              alignment: isDesktop ? Alignment.centerRight : Alignment.center,
+              child: _buildCarImage(isDesktop),
             ),
           ),
         ],
@@ -1232,11 +1103,11 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'Explore Our Premium Fleet',
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 36,
+              fontSize: isDesktop ? 36 : 28,
               fontWeight: FontWeight.w900,
               color: AppColors.secondaryBlue,
               letterSpacing: -0.5,
@@ -1320,11 +1191,11 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'Flexible Rental Solutions',
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 36,
+              fontSize: isDesktop ? 36 : 28,
               fontWeight: FontWeight.w900,
               color: AppColors.secondaryBlue,
               letterSpacing: -0.5,
@@ -1441,10 +1312,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                const Text(
+                Text(
                   'Providing Premium Journeys since 2026',
                   style: TextStyle(
-                    fontSize: 36,
+                    fontSize: isDesktop ? 36 : 28,
                     fontWeight: FontWeight.w900,
                     color: AppColors.secondaryBlue,
                     letterSpacing: -0.5,
@@ -1452,7 +1323,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  'At ${CompanySettingsProvider().companyName}, we build a seamless platform designed to redefine vehicle mobility. Whether it is an airport transfer, long-term business leasing, or weekend getaway fleets, we supply top-tier vehicles under clean, transparent terms.',
+                  'At ${Provider.of<CompanySettingsProvider>(context).companyName}, we build a seamless platform designed to redefine vehicle mobility. Whether it is an airport transfer, long-term business leasing, or weekend getaway fleets, we supply top-tier vehicles under clean, transparent terms.',
                   style: const TextStyle(
                     fontSize: 15,
                     color: AppColors.lightText,
@@ -1577,11 +1448,11 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'What Our Customers Say',
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 36,
+              fontSize: isDesktop ? 36 : 28,
               fontWeight: FontWeight.w900,
               color: AppColors.secondaryBlue,
               letterSpacing: -0.5,
@@ -1596,7 +1467,7 @@ class _HomeScreenState extends State<HomeScreen> {
               _buildReviewCard(
                 'Amirul A.',
                 'Kuala Lumpur',
-                'Superb service! The Proton X50 was in pristine condition, and the rental process was smooth. Highly recommend ${CompanySettingsProvider().companyName} for their professional fleet!',
+                'Superb service! The Proton X50 was in pristine condition, and the rental process was smooth. Highly recommend ${Provider.of<CompanySettingsProvider>(context).companyName} for their professional fleet!',
                 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=120',
               ),
               _buildReviewCard(
@@ -1721,11 +1592,11 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'Frequently Asked Questions',
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 36,
+              fontSize: isDesktop ? 36 : 28,
               fontWeight: FontWeight.w900,
               color: AppColors.secondaryBlue,
               letterSpacing: -0.5,
@@ -1801,7 +1672,34 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildContactSection(bool isDesktop) {
-    final newsletterController = TextEditingController();
+    InputDecoration contactInputDecoration({
+      required String label,
+      required String hint,
+      required IconData icon,
+    }) {
+      return InputDecoration(
+        labelText: label,
+        hintText: hint,
+        prefixIcon: Icon(icon),
+        filled: true,
+        fillColor: AppColors.lightGray,
+        labelStyle: const TextStyle(color: Colors.black87),
+        hintStyle: TextStyle(color: Colors.black.withValues(alpha: 0.6)),
+        prefixIconColor: Colors.black54,
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.12)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(
+            color: AppColors.secondaryBlue,
+            width: 1.4,
+          ),
+        ),
+      );
+    }
+
     return Container(
       key: _contactKey,
       color: Colors.white,
@@ -1816,7 +1714,7 @@ class _HomeScreenState extends State<HomeScreen> {
             direction: isDesktop ? Axis.horizontal : Axis.vertical,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Left side: Contact Info + Newsletter
+              // Left side: Contact Info
               Expanded(
                 flex: isDesktop ? 4 : 0,
                 child: Column(
@@ -1832,10 +1730,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    const Text(
+                    Text(
                       'Let\'s Start a Conversation',
                       style: TextStyle(
-                        fontSize: 36,
+                        fontSize: isDesktop ? 36 : 28,
                         fontWeight: FontWeight.w900,
                         color: AppColors.secondaryBlue,
                         letterSpacing: -0.5,
@@ -1843,7 +1741,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 20),
                     const Text(
-                      'Have queries about corporate leases, custom drop-off branches, or DuitNow deposit approvals? Contact our support staff or subscribe to receive our weekly seasonal updates and promotional codes.',
+                      'Have queries about corporate leases, custom drop-off branches, or DuitNow deposit approvals? Contact our support staff for assistance.',
                       style: TextStyle(
                         color: AppColors.lightText,
                         fontSize: 15,
@@ -1867,73 +1765,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     _buildContactInfoItem(
                       Icons.mail_outline_rounded,
                       'Corporate Email Desk',
-                      CompanySettingsProvider().companyEmail,
-                    ),
-                    const SizedBox(height: 48),
-                    // Newsletter Block
-                    const Text(
-                      'SUBSCRIBE TO NEWSLETTER',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.secondaryBlue,
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: newsletterController,
-                            decoration: InputDecoration(
-                              labelText: 'Your Email Address',
-                              hintText: 'Enter your email',
-                              filled: true,
-                              fillColor: AppColors.lightGray,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide.none,
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 16,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        ElevatedButton(
-                          onPressed: () {
-                            if (newsletterController.text.trim().isNotEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Thank you for subscribing to ${CompanySettingsProvider().companyName}!',
-                                  ),
-                                  backgroundColor: Colors.green,
-                                ),
-                              );
-                              newsletterController.clear();
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.secondaryBlue,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 18,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Text(
-                            'Subscribe',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ],
+                      Provider.of<CompanySettingsProvider>(
+                        context,
+                      ).companyEmail,
                     ),
                   ],
                 ),
@@ -1975,10 +1809,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(height: 20),
                         TextFormField(
                           controller: _contactNameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Full Name',
-                            hintText: 'Enter your name',
-                            prefixIcon: Icon(Icons.person_outline),
+                          style: const TextStyle(color: Colors.black),
+                          cursorColor: Colors.black,
+                          decoration: contactInputDecoration(
+                            label: 'Full Name',
+                            hint: 'Enter your name',
+                            icon: Icons.person_outline,
                           ),
                           validator: (val) => val == null || val.trim().isEmpty
                               ? 'Name is required'
@@ -1987,28 +1823,30 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _contactEmailController,
-                          decoration: const InputDecoration(
-                            labelText: 'Email Address',
-                            hintText: 'Enter your email',
-                            prefixIcon: Icon(Icons.email_outlined),
+                          style: const TextStyle(color: Colors.black),
+                          cursorColor: Colors.black,
+                          decoration: contactInputDecoration(
+                            label: 'Email Address',
+                            hint: 'Enter your email',
+                            icon: Icons.email_outlined,
                           ),
                           validator: (val) {
-                            if (val == null || val.trim().isEmpty) {
+                            if (val == null || val.trim().isEmpty)
                               return 'Email is required';
-                            }
-                            if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val)) {
+                            if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val))
                               return 'Enter a valid email';
-                            }
                             return null;
                           },
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _contactSubjectController,
-                          decoration: const InputDecoration(
-                            labelText: 'Subject',
-                            hintText: 'What is this regarding?',
-                            prefixIcon: Icon(Icons.subject_outlined),
+                          style: const TextStyle(color: Colors.black),
+                          cursorColor: Colors.black,
+                          decoration: contactInputDecoration(
+                            label: 'Subject',
+                            hint: 'What is this regarding?',
+                            icon: Icons.subject_outlined,
                           ),
                           validator: (val) => val == null || val.trim().isEmpty
                               ? 'Subject is required'
@@ -2018,10 +1856,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         TextFormField(
                           controller: _contactMessageController,
                           maxLines: 4,
-                          decoration: const InputDecoration(
-                            labelText: 'Message',
-                            hintText: 'How can we help you?',
-                            prefixIcon: Icon(Icons.message_outlined),
+                          style: const TextStyle(color: Colors.black),
+                          cursorColor: Colors.black,
+                          decoration: contactInputDecoration(
+                            label: 'Message',
+                            hint: 'How can we help you?',
+                            icon: Icons.message_outlined,
                           ),
                           validator: (val) => val == null || val.trim().isEmpty
                               ? 'Message cannot be empty'
@@ -2157,7 +1997,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              CompanySettingsProvider().companyName,
+                              Provider.of<CompanySettingsProvider>(
+                                context,
+                              ).companyName,
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 18,
@@ -2169,7 +2011,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(height: 20),
                         Text(
-                          CompanySettingsProvider().companyDescription,
+                          Provider.of<CompanySettingsProvider>(
+                            context,
+                          ).companyDescription,
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.6),
                             fontSize: 13,
@@ -2237,7 +2081,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${CompanySettingsProvider().companyName} HQ',
+                        '${Provider.of<CompanySettingsProvider>(context).companyName} HQ',
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -2247,7 +2091,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 20),
                       Text(
-                        CompanySettingsProvider().companyAddress,
+                        Provider.of<CompanySettingsProvider>(
+                          context,
+                        ).companyAddress,
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.6),
                           fontSize: 13,
@@ -2255,14 +2101,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'Phone: ${CompanySettingsProvider().companyPhone}',
+                        'Phone: ${Provider.of<CompanySettingsProvider>(context).companyPhone}',
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.6),
                           fontSize: 13,
                         ),
                       ),
                       Text(
-                        'Email: ${CompanySettingsProvider().companyEmail}',
+                        'Email: ${Provider.of<CompanySettingsProvider>(context).companyEmail}',
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.6),
                           fontSize: 13,
@@ -2283,7 +2129,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     : CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '© 2026 ${CompanySettingsProvider().companyName}. All rights reserved.',
+                    '© 2026 ${Provider.of<CompanySettingsProvider>(context).companyName}. All rights reserved.',
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.4),
                       fontSize: 12,
@@ -2452,58 +2298,6 @@ class VehicleHoverCard extends StatefulWidget {
 
 class _VehicleHoverCardState extends State<VehicleHoverCard> {
   bool _isHovered = false;
-
-  StreamSubscription<DatabaseEvent>? _reviewsSubscription;
-  List<ReviewModel> _reviews = [];
-  double _avgRating = 0.0;
-
-  @override
-  void initState() {
-    super.initState();
-    _subscribeToReviews();
-  }
-
-  @override
-  void dispose() {
-    _reviewsSubscription?.cancel();
-    super.dispose();
-  }
-
-  void _subscribeToReviews() {
-    _reviewsSubscription?.cancel();
-    _reviewsSubscription = FirebaseDatabase.instance
-        .ref()
-        .child('reviews')
-        .orderByChild('vehicleId')
-        .equalTo(widget.vehicle.id)
-        .onValue
-        .listen((event) {
-          if (mounted) {
-            final List<ReviewModel> reviews = [];
-            double sum = 0.0;
-            if (event.snapshot.exists && event.snapshot.value != null) {
-              final Map<dynamic, dynamic> data =
-                  event.snapshot.value as Map<dynamic, dynamic>;
-              data.forEach((key, value) {
-                try {
-                  final r = ReviewModel.fromMap(
-                    key.toString(),
-                    value as Map<dynamic, dynamic>,
-                  );
-                  reviews.add(r);
-                  sum += r.rating;
-                } catch (e) {
-                  debugPrint('Error parsing review on landing: $e');
-                }
-              });
-            }
-            setState(() {
-              _reviews = reviews;
-              _avgRating = reviews.isEmpty ? 0.0 : sum / reviews.length;
-            });
-          }
-        });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -2751,33 +2545,6 @@ class _VehicleHoverCardState extends State<VehicleHoverCard> {
                       fontSize: 18,
                       color: AppColors.secondaryBlue,
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.star_rounded,
-                        color: Colors.amber,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _avgRating > 0 ? _avgRating.toStringAsFixed(1) : '4.8',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                          color: AppColors.secondaryBlue,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '(${_reviews.length} reviews)',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
                   ),
                   const SizedBox(height: 6),
                   Row(

@@ -21,8 +21,12 @@ import '../../../services/payment_service.dart';
 import '../../../services/vehicle_service.dart';
 import '../../../services/review_service.dart';
 import '../../../services/theme_provider.dart';
-import '../../../services/receipt_upload_web.dart' as receipt_upload;
-import '../../../services/file_download_web.dart' as download_helper;
+import '../../../services/receipt_upload_helper.dart'
+    if (dart.library.html) '../../../services/receipt_upload_web.dart'
+    as receipt_upload;
+import '../../../services/file_download_helper.dart'
+    if (dart.library.html) '../../../services/file_download_web.dart'
+    as download_helper;
 
 import '../login_screen.dart';
 import 'reward_history_screen.dart';
@@ -53,7 +57,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   XFile? _idImageFile;
   XFile? _licenseImageFile;
   final TextEditingController _idNumberController = TextEditingController();
-  final TextEditingController _licenseNumberController = TextEditingController();
+  final TextEditingController _licenseNumberController =
+      TextEditingController();
   bool _uploadingId = false;
   bool _uploadingLicense = false;
   String _selectedIdType = 'National ID';
@@ -85,39 +90,82 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _loading = true;
       _error = null;
     });
-    try {
-      final currentUser = _authService.currentUser;
-      if (currentUser != null) {
-        _user = await _databaseService.getUser(currentUser.uid);
-        _bookings = await BookingService().getUserBookings(currentUser.uid);
-        _payments = await PaymentService().getUserPayments(currentUser.uid);
-        _vehicles = await VehicleService().getVehicles();
+    final currentUser = _authService.currentUser;
+    if (currentUser == null) {
+      if (mounted) {
+        setState(() {
+          _error = 'You are not logged in. Please sign in again.';
+          _loading = false;
+        });
+      }
+      return;
+    }
 
+    try {
+      // Critical data: profile identity should determine if the page can render.
+      _user = await _databaseService.getUser(currentUser.uid);
+      if (_user == null) {
+        throw Exception('User profile not found');
+      }
+
+      _idNumberController.text = _user!.idNumber;
+      _selectedIdType = _user!.idType.isNotEmpty
+          ? _user!.idType
+          : 'National ID';
+      _licenseNumberController.text = _user!.licenseNumber ?? '';
+      _selectedLicenseClass = _user!.licenseClass.isNotEmpty
+          ? _user!.licenseClass
+          : 'Class D';
+
+      if (_user!.licenseExpiry.isNotEmpty) {
+        try {
+          _licenseExpiryDate = DateFormat(
+            'dd / MM / yyyy',
+          ).parse(_user!.licenseExpiry);
+        } catch (_) {
+          try {
+            _licenseExpiryDate = DateFormat(
+              'yyyy-MM-dd',
+            ).parse(_user!.licenseExpiry);
+          } catch (_) {}
+        }
+      }
+
+      // Optional data: failures here should not block opening profile page.
+      try {
+        _bookings = await BookingService().getUserBookings(currentUser.uid);
+      } catch (e) {
+        _bookings = [];
+        debugPrint('Profile optional load failed (bookings): $e');
+      }
+
+      try {
+        _payments = await PaymentService().getUserPayments(currentUser.uid);
+      } catch (e) {
+        _payments = [];
+        debugPrint('Profile optional load failed (payments): $e');
+      }
+
+      try {
+        _vehicles = await VehicleService().getVehicles();
+      } catch (e) {
+        _vehicles = [];
+        debugPrint('Profile optional load failed (vehicles): $e');
+      }
+
+      try {
         final qrSettings = await _databaseService.getQrPaymentSettings();
         if (qrSettings != null) {
           _bankName = qrSettings['bankName']?.toString();
           _bankLogoUrl = qrSettings['bankLogoUrl']?.toString();
           _accountNumber = qrSettings['accountNumber']?.toString();
           _accountName = qrSettings['accountName']?.toString();
-          _qrCodeUrl = qrSettings['qrCode']?.toString() ?? qrSettings['qrCodeUrl']?.toString();
+          _qrCodeUrl =
+              qrSettings['qrCode']?.toString() ??
+              qrSettings['qrCodeUrl']?.toString();
         }
-
-        if (_user != null) {
-          _idNumberController.text = _user!.idNumber;
-          _selectedIdType = _user!.idType.isNotEmpty ? _user!.idType : 'National ID';
-          _licenseNumberController.text = _user!.licenseNumber ?? '';
-          _selectedLicenseClass = _user!.licenseClass.isNotEmpty ? _user!.licenseClass : 'Class D';
-
-          if (_user!.licenseExpiry.isNotEmpty) {
-            try {
-              _licenseExpiryDate = DateFormat('dd / MM / yyyy').parse(_user!.licenseExpiry);
-            } catch (_) {
-              try {
-                _licenseExpiryDate = DateFormat('yyyy-MM-dd').parse(_user!.licenseExpiry);
-              } catch (_) {}
-            }
-          }
-        }
+      } catch (e) {
+        debugPrint('Profile optional load failed (qr settings): $e');
       }
     } catch (e) {
       debugPrint('Error loading profile: $e');
@@ -674,6 +722,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       (route) => false,
     );
   }
+
   @override
   Widget build(BuildContext context) {
     final themeProvider = context.watch<ThemeProvider>();
@@ -1223,6 +1272,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             // Left rounded vehicle image
                                             Container(
@@ -1254,6 +1305,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                       color: AppColors
                                                           .secondaryBlue,
                                                     ),
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
                                                   ),
                                                   const SizedBox(height: 2),
                                                   Text(
@@ -1264,6 +1318,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                       fontWeight:
                                                           FontWeight.bold,
                                                     ),
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
                                                   ),
                                                   const SizedBox(height: 4),
                                                   Row(
@@ -1274,14 +1331,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                         color: Colors.grey,
                                                       ),
                                                       const SizedBox(width: 4),
-                                                      Text(
-                                                        booking.isOpenRental
-                                                            ? '${dateFormat.format(booking.pickUpDate)} - Open Rental'
-                                                            : '${dateFormat.format(booking.pickUpDate)} - ${booking.returnDate != null ? dateFormat.format(booking.returnDate!) : ""}',
-                                                        style: TextStyle(
-                                                          color:
-                                                              Colors.grey[600],
-                                                          fontSize: 10,
+                                                      Expanded(
+                                                        child: Text(
+                                                          booking.isOpenRental
+                                                              ? '${dateFormat.format(booking.pickUpDate)} - Open Rental'
+                                                              : '${dateFormat.format(booking.pickUpDate)} - ${booking.returnDate != null ? dateFormat.format(booking.returnDate!) : ""}',
+                                                          style: TextStyle(
+                                                            color: Colors
+                                                                .grey[600],
+                                                            fontSize: 10,
+                                                          ),
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
                                                         ),
                                                       ),
                                                     ],
@@ -1311,25 +1373,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                               ),
                                             ),
                                             // Right status badge
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                    vertical: 4,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: statusColor.withValues(
-                                                  alpha: 0.1,
-                                                ),
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
+                                            const SizedBox(width: 8),
+                                            ConstrainedBox(
+                                              constraints: const BoxConstraints(
+                                                maxWidth: 92,
                                               ),
-                                              child: Text(
-                                                booking.status.toUpperCase(),
-                                                style: TextStyle(
-                                                  color: statusColor,
-                                                  fontSize: 9,
-                                                  fontWeight: FontWeight.bold,
+                                              child: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                alignment:
+                                                    Alignment.centerRight,
+                                                child: Container(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 8,
+                                                        vertical: 4,
+                                                      ),
+                                                  decoration: BoxDecoration(
+                                                    color: statusColor
+                                                        .withValues(alpha: 0.1),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          6,
+                                                        ),
+                                                  ),
+                                                  child: Text(
+                                                    booking.status
+                                                        .toUpperCase(),
+                                                    style: TextStyle(
+                                                      color: statusColor,
+                                                      fontSize: 9,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
                                                 ),
                                               ),
                                             ),
@@ -1337,11 +1413,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         ),
                                         if (payment != null) ...[
                                           const Divider(height: 16),
-                                          Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Row(
+                                          LayoutBuilder(
+                                            builder: (context, constraints) {
+                                              final bool isNarrow =
+                                                  constraints.maxWidth < 360;
+
+                                              final statusRow = Row(
+                                                mainAxisSize: MainAxisSize.min,
                                                 children: [
                                                   const Text(
                                                     'Payment Status: ',
@@ -1354,15 +1432,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                   ),
                                                   _buildPaymentBadge(payment),
                                                 ],
-                                              ),
-                                              Row(
-                                                mainAxisSize: MainAxisSize.min,
+                                              );
+
+                                              final actionsWrap = Wrap(
+                                                spacing: 8,
+                                                runSpacing: 4,
+                                                alignment: WrapAlignment.end,
                                                 children: [
                                                   if (payment.receiptImage !=
                                                           null &&
                                                       payment
                                                           .receiptImage!
-                                                          .isNotEmpty) ...[
+                                                          .isNotEmpty)
                                                     TextButton.icon(
                                                       onPressed: () =>
                                                           _openReceiptLightbox(
@@ -1396,8 +1477,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                                 .shrinkWrap,
                                                       ),
                                                     ),
-                                                    const SizedBox(width: 8),
-                                                  ],
                                                   if (payment.paymentStatus ==
                                                       'Rejected')
                                                     TextButton.icon(
@@ -1472,8 +1551,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                       ),
                                                     ),
                                                 ],
-                                              ),
-                                            ],
+                                              );
+
+                                              if (isNarrow) {
+                                                return Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    statusRow,
+                                                    const SizedBox(height: 6),
+                                                    Align(
+                                                      alignment:
+                                                          Alignment.centerRight,
+                                                      child: actionsWrap,
+                                                    ),
+                                                  ],
+                                                );
+                                              }
+
+                                              return Row(
+                                                children: [
+                                                  Expanded(child: statusRow),
+                                                  actionsWrap,
+                                                ],
+                                              );
+                                            },
                                           ),
                                           if (payment.paymentStatus ==
                                                   'Rejected' &&
@@ -3100,7 +3202,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         benefits = [
           'Open Rental access (no upfront payment!)',
           '1.5x Reward Points earning multiplier',
-          'Priority booking approval & support'
+          'Priority booking approval & support',
         ];
         break;
       case 'Gold':
@@ -3110,7 +3212,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         benefits = [
           'Priority booking approval',
           'Exclusive promotions',
-          'Dynamic discount points redemptions'
+          'Dynamic discount points redemptions',
         ];
         break;
       case 'Silver':
@@ -3119,17 +3221,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         levelIcon = Icons.verified_user_rounded;
         benefits = [
           'Dynamic discount points redemptions',
-          'Priority customer support channels'
+          'Priority customer support channels',
         ];
         break;
       default: // Standard
         levelColor = const Color(0xFF94A3B8);
         gradientColors = [const Color(0xFF374151), const Color(0xFF1F2937)];
         levelIcon = Icons.emoji_events_outlined;
-        benefits = [
-          'Standard points earning',
-          'Standard booking approval'
-        ];
+        benefits = ['Standard points earning', 'Standard booking approval'];
     }
 
     final int pct = (status.progress * 100).toInt();
@@ -3189,7 +3288,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ],
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(20),
@@ -3229,8 +3331,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      status.currentLevel == 'Premium' 
-                          ? 'Maximum Membership Level Reached.' 
+                      status.currentLevel == 'Premium'
+                          ? 'Maximum Membership Level Reached.'
                           : '${status.pointsNeededForNext} more points to unlock ${status.nextLevel}.',
                       style: const TextStyle(
                         color: Colors.white70,
@@ -3253,7 +3355,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(10),
                   child: LinearProgressIndicator(
-                    value: status.currentLevel == 'Premium' ? 1.0 : status.progress,
+                    value: status.currentLevel == 'Premium'
+                        ? 1.0
+                        : status.progress,
                     backgroundColor: Colors.white.withValues(alpha: 0.15),
                     valueColor: AlwaysStoppedAnimation<Color>(levelColor),
                     minHeight: 8,
@@ -3270,24 +3374,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                ...benefits.map((b) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Row(
-                    children: [
-                      Icon(Icons.check_circle_outline, color: levelColor, size: 12),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          b,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
+                ...benefits.map(
+                  (b) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.check_circle_outline,
+                          color: levelColor,
+                          size: 12,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            b,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                )),
+                ),
                 const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
@@ -3295,7 +3405,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     TextButton.icon(
                       style: TextButton.styleFrom(
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
                         backgroundColor: Colors.white.withValues(alpha: 0.1),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(30),

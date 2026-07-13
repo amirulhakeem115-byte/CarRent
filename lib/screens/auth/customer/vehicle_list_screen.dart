@@ -1,7 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:firebase_database/firebase_database.dart';
-import '../../../models/review_model.dart';
 import '../../../services/vehicle_service.dart';
 import '../../../services/branch_service.dart';
 import '../../../models/vehicle_model.dart';
@@ -10,6 +8,7 @@ import '../../../constants/colors.dart';
 import 'vehicle_details_screen.dart';
 import 'customer_responsive_shell.dart';
 import '../../../widgets/app_image.dart';
+import '../../home_screen.dart';
 
 class VehicleListScreen extends StatefulWidget {
   const VehicleListScreen({super.key});
@@ -46,15 +45,12 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
   bool _isGridView = true;
 
   StreamSubscription<List<VehicleModel>>? _vehiclesSubscription;
-  StreamSubscription<DatabaseEvent>? _allReviewsSubscription;
-  Map<String, List<ReviewModel>> _vehicleReviewsCache = {};
 
   @override
   void initState() {
     super.initState();
     _loadData();
     _subscribeToVehicles();
-    _subscribeToReviews();
     _searchController.addListener(() {
       if (mounted) {
         setState(() {
@@ -107,7 +103,6 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
   void dispose() {
     _searchController.dispose();
     _vehiclesSubscription?.cancel();
-    _allReviewsSubscription?.cancel();
     super.dispose();
   }
 
@@ -122,37 +117,6 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
     return count;
   }
 
-  void _subscribeToReviews() {
-    _allReviewsSubscription?.cancel();
-    _allReviewsSubscription = FirebaseDatabase.instance
-        .ref()
-        .child('reviews')
-        .onValue
-        .listen((event) {
-          if (mounted) {
-            final Map<String, List<ReviewModel>> cache = {};
-            if (event.snapshot.exists && event.snapshot.value != null) {
-              final Map<dynamic, dynamic> data =
-                  event.snapshot.value as Map<dynamic, dynamic>;
-              data.forEach((key, value) {
-                try {
-                  final r = ReviewModel.fromMap(
-                    key.toString(),
-                    value as Map<dynamic, dynamic>,
-                  );
-                  cache.putIfAbsent(r.vehicleId, () => []).add(r);
-                } catch (e) {
-                  debugPrint('Error parsing review in search cache: $e');
-                }
-              });
-            }
-            setState(() {
-              _vehicleReviewsCache = cache;
-            });
-          }
-        });
-  }
-
   void _resetFilters() {
     setState(() {
       _searchController.clear();
@@ -163,6 +127,14 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
       _priceBudget = 1000.0;
       _sortBy = 'recommended';
     });
+  }
+
+  void _goToLandingPage() {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const HomeScreen()),
+      (route) => false,
+    );
   }
 
   @override
@@ -1071,14 +1043,6 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
   }
 
   Widget _buildGridCard(VehicleModel vehicle) {
-    final vehicleReviews = _vehicleReviewsCache[vehicle.id] ?? [];
-    final reviewsCount = vehicleReviews.length;
-    double avgRating = 0.0;
-    if (vehicleReviews.isNotEmpty) {
-      avgRating =
-          vehicleReviews.map((r) => r.rating).reduce((a, b) => a + b) /
-          vehicleReviews.length;
-    }
     final bool isAvailable = vehicle.status.toLowerCase() == 'available';
     final Color statusColor = isAvailable
         ? const Color(0xFF10B981)
@@ -1219,30 +1183,6 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                           ),
                         ],
                       ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.star_rounded,
-                      color: Colors.amber,
-                      size: 14,
-                    ),
-                    const SizedBox(width: 2),
-                    Text(
-                      avgRating > 0 ? avgRating.toStringAsFixed(1) : '4.8',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 11,
-                        color: _textColor,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '($reviewsCount)',
-                      style: TextStyle(fontSize: 10, color: _subColor),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 4),
@@ -1413,14 +1353,6 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
   }
 
   Widget _buildListCard(VehicleModel vehicle) {
-    final vehicleReviews = _vehicleReviewsCache[vehicle.id] ?? [];
-    final reviewsCount = vehicleReviews.length;
-    double avgRating = 0.0;
-    if (vehicleReviews.isNotEmpty) {
-      avgRating =
-          vehicleReviews.map((r) => r.rating).reduce((a, b) => a + b) /
-          vehicleReviews.length;
-    }
     final bool isAvailable = vehicle.status.toLowerCase() == 'available';
     final Color statusColor = isAvailable
         ? const Color(0xFF10B981)
@@ -1538,35 +1470,6 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                                 fontSize: 15,
                                 color: _textColor,
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.star_rounded,
-                                  color: Colors.amber,
-                                  size: 14,
-                                ),
-                                const SizedBox(width: 2),
-                                Text(
-                                  avgRating > 0
-                                      ? avgRating.toStringAsFixed(1)
-                                      : '4.8',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 11,
-                                    color: _textColor,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '($reviewsCount)',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: _subColor,
-                                  ),
-                                ),
-                              ],
                             ),
                             const SizedBox(height: 4),
                             Row(

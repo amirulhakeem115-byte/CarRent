@@ -19,9 +19,12 @@ class HistoryScreen extends StatefulWidget {
 class _HistoryScreenState extends State<HistoryScreen>
     with SingleTickerProviderStateMixin {
   bool get _isDark => Theme.of(context).brightness == Brightness.dark;
-  Color get _textColor => _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
-  Color get _subColor => _isDark ? const Color(0xFFCBD5E1) : AppColors.lightText;
-  Color get _borderColor => _isDark ? const Color(0xFF334155) : AppColors.borderGray;
+  Color get _textColor =>
+      _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+  Color get _subColor =>
+      _isDark ? const Color(0xFFCBD5E1) : AppColors.lightText;
+  Color get _borderColor =>
+      _isDark ? const Color(0xFF334155) : AppColors.borderGray;
 
   final AuthService _authService = AuthService();
   final BookingService _bookingService = BookingService();
@@ -33,6 +36,7 @@ class _HistoryScreenState extends State<HistoryScreen>
   List<PaymentModel> _payments = [];
   bool _loading = true;
   String? _error;
+  String? _paymentsError;
 
   @override
   void initState() {
@@ -52,36 +56,121 @@ class _HistoryScreenState extends State<HistoryScreen>
     setState(() {
       _loading = true;
       _error = null;
+      _paymentsError = null;
     });
     try {
       final uid = _authService.currentUser?.uid;
       if (uid == null) throw Exception('Not logged in');
-      final results = await Future.wait([
-        _bookingService.getUserBookings(uid),
-        _paymentService.getUserPayments(uid),
-      ]).timeout(const Duration(seconds: 15));
+
+      List<BookingModel> allUserBookings = [];
+      List<PaymentModel> payments = [];
+      String? bookingsError;
+      String? paymentsError;
+
+      try {
+        allUserBookings = await _bookingService
+            .getUserBookings(uid)
+            .timeout(const Duration(seconds: 15));
+      } catch (e) {
+        bookingsError = _formatLoadErrorMessage(e);
+      }
+
+      try {
+        payments = await _paymentService
+            .getUserPayments(uid)
+            .timeout(const Duration(seconds: 15));
+      } catch (e) {
+        paymentsError = _formatLoadErrorMessage(e);
+      }
+
       if (mounted) {
         setState(() {
-          final allUserBookings = results[0] as List<BookingModel>;
           _bookings = allUserBookings
-              .where((b) =>
-                  b.status == 'Completed' ||
-                  b.status == 'Cancelled' ||
-                  b.status == 'cancelled')
+              .where(
+                (b) =>
+                    b.status == 'Completed' ||
+                    b.status == 'Cancelled' ||
+                    b.status == 'cancelled',
+              )
               .toList();
           _allUserBookings = allUserBookings;
-          _payments = results[1] as List<PaymentModel>;
+          _payments = payments;
+          _paymentsError = paymentsError;
+
+          if (bookingsError != null && allUserBookings.isEmpty) {
+            _error = bookingsError;
+          }
+
           _loading = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = _formatLoadErrorMessage(e);
           _loading = false;
         });
       }
     }
+  }
+
+  String _formatLoadErrorMessage(Object error) {
+    final message = error.toString();
+    final normalized = message.toLowerCase();
+
+    if (normalized.contains('permission denied')) {
+      return 'Access denied by Firebase rules for this data. Please ensure you are logged in with the correct account and that Realtime Database rules allow this user to read payment history.';
+    }
+
+    if (normalized.contains('not logged in')) {
+      return 'You are not logged in. Please sign in again and retry.';
+    }
+
+    if (normalized.contains('timeout')) {
+      return 'Request timed out. Please check your connection and try again.';
+    }
+
+    // Avoid rendering large native stack traces in UI.
+    final firstLine = message.split('\n').first.trim();
+    if (firstLine.isEmpty) {
+      return 'Unable to load history data. Please try again.';
+    }
+    return firstLine;
+  }
+
+  Widget _buildLoadErrorView(String message) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 44, color: Colors.red),
+              const SizedBox(height: 12),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.red, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _loadData,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryOrange,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Color _statusColor(String status) {
@@ -128,7 +217,9 @@ class _HistoryScreenState extends State<HistoryScreen>
     showModalBottomSheet(
       context: context,
       backgroundColor: _isDark ? const Color(0xFF1E293B) : Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (context) {
         return Container(
           padding: const EdgeInsets.all(24),
@@ -138,7 +229,11 @@ class _HistoryScreenState extends State<HistoryScreen>
             children: [
               Text(
                 'Receipt Options',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _textColor),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: _textColor,
+                ),
               ),
               const SizedBox(height: 6),
               Text(
@@ -148,15 +243,32 @@ class _HistoryScreenState extends State<HistoryScreen>
               const SizedBox(height: 16),
               ListTile(
                 leading: Icon(Icons.visibility, color: _textColor),
-                title: Text('View Receipt', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: _textColor)),
+                title: Text(
+                  'View Receipt',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: _textColor,
+                  ),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   ReceiptService().viewReceipt(context, booking.id);
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.download, color: AppColors.primaryOrange),
-                title: Text('Download PDF', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: _textColor)),
+                leading: const Icon(
+                  Icons.download,
+                  color: AppColors.primaryOrange,
+                ),
+                title: Text(
+                  'Download PDF',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: _textColor,
+                  ),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   ReceiptService().downloadReceipt(context, booking.id);
@@ -184,24 +296,27 @@ class _HistoryScreenState extends State<HistoryScreen>
         final b = _bookings[index];
         final int days;
         if (b.isOpenRental) {
-          if (b.actualReturnTimestamp != null && b.actualPickupTimestamp != null) {
-            final diff = b.actualReturnTimestamp!.difference(b.actualPickupTimestamp!);
+          if (b.actualReturnTimestamp != null &&
+              b.actualPickupTimestamp != null) {
+            final diff = b.actualReturnTimestamp!.difference(
+              b.actualPickupTimestamp!,
+            );
             final d = (diff.inHours / 24.0).ceil();
             days = d <= 0 ? 1 : d;
           } else {
             days = 1;
           }
         } else {
-          days = b.returnDate != null ? b.returnDate!.difference(b.pickUpDate).inDays : 0;
+          days = b.returnDate != null
+              ? b.returnDate!.difference(b.pickUpDate).inDays
+              : 0;
         }
         return Container(
           margin: const EdgeInsets.only(bottom: 14),
           decoration: BoxDecoration(
             color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: _borderColor,
-            ),
+            border: Border.all(color: _borderColor),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.05),
@@ -221,7 +336,9 @@ class _HistoryScreenState extends State<HistoryScreen>
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: _isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
+                        color: _isDark
+                            ? const Color(0xFF0F172A)
+                            : AppColors.lightGray,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
@@ -246,10 +363,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                           const SizedBox(height: 2),
                           Text(
                             'Booking #${b.id.substring(0, 8).toUpperCase()}',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: _subColor,
-                            ),
+                            style: TextStyle(fontSize: 11, color: _subColor),
                           ),
                         ],
                       ),
@@ -273,7 +387,13 @@ class _HistoryScreenState extends State<HistoryScreen>
                       child: _infoTile(
                         Icons.event_rounded,
                         'Return',
-                        b.isOpenRental ? 'Open Rental' : (b.returnDate != null ? DateFormat('dd MMM yyyy').format(b.returnDate!) : ""),
+                        b.isOpenRental
+                            ? 'Open Rental'
+                            : (b.returnDate != null
+                                  ? DateFormat(
+                                      'dd MMM yyyy',
+                                    ).format(b.returnDate!)
+                                  : ""),
                       ),
                     ),
                     Expanded(
@@ -312,24 +432,49 @@ class _HistoryScreenState extends State<HistoryScreen>
                     ),
                     Builder(
                       builder: (context) {
-                        final paymentList = _payments.where((p) => p.bookingId == b.id).toList();
-                        final payment = paymentList.isNotEmpty ? paymentList.first : null;
-                        final isPaid = b.status.toLowerCase() == 'completed' || 
-                            (payment != null && (
-                                payment.paymentStatus?.toLowerCase() == 'approved' || 
-                                payment.status.toLowerCase() == 'approved' || 
-                                payment.paymentStatus?.toLowerCase() == 'paid' || 
-                                payment.status.toLowerCase() == 'paid'
-                            ));
+                        final paymentList = _payments
+                            .where((p) => p.bookingId == b.id)
+                            .toList();
+                        final payment = paymentList.isNotEmpty
+                            ? paymentList.first
+                            : null;
+                        final isPaid =
+                            b.status.toLowerCase() == 'completed' ||
+                            (payment != null &&
+                                (payment.paymentStatus?.toLowerCase() ==
+                                        'approved' ||
+                                    payment.status.toLowerCase() ==
+                                        'approved' ||
+                                    payment.paymentStatus?.toLowerCase() ==
+                                        'paid' ||
+                                    payment.status.toLowerCase() == 'paid'));
                         if (isPaid) {
                           return OutlinedButton.icon(
                             onPressed: () => _showReceiptOptions(b),
-                            icon: const Icon(Icons.receipt_long_rounded, size: 12, color: AppColors.primaryOrange),
-                            label: const Text('Receipt', style: TextStyle(color: AppColors.primaryOrange, fontSize: 11, fontWeight: FontWeight.bold)),
+                            icon: const Icon(
+                              Icons.receipt_long_rounded,
+                              size: 12,
+                              color: AppColors.primaryOrange,
+                            ),
+                            label: const Text(
+                              'Receipt',
+                              style: TextStyle(
+                                color: AppColors.primaryOrange,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                             style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: AppColors.primaryOrange),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              side: const BorderSide(
+                                color: AppColors.primaryOrange,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
                             ),
                           );
                         }
@@ -353,7 +498,8 @@ class _HistoryScreenState extends State<HistoryScreen>
       );
       return;
     }
-    final isPdf = payment.receiptImage!.toLowerCase().contains('.pdf') ||
+    final isPdf =
+        payment.receiptImage!.toLowerCase().contains('.pdf') ||
         payment.receiptImage!.startsWith('data:application/pdf');
 
     showDialog(
@@ -367,7 +513,10 @@ class _HistoryScreenState extends State<HistoryScreen>
               AppBar(
                 backgroundColor: Colors.black54,
                 elevation: 0,
-                title: Text(isPdf ? 'PDF Receipt' : 'Receipt Image', style: const TextStyle(color: Colors.white)),
+                title: Text(
+                  isPdf ? 'PDF Receipt' : 'Receipt Image',
+                  style: const TextStyle(color: Colors.white),
+                ),
                 leading: IconButton(
                   icon: const Icon(Icons.close, color: Colors.white),
                   onPressed: () => Navigator.pop(context),
@@ -381,9 +530,16 @@ class _HistoryScreenState extends State<HistoryScreen>
                       ? Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.picture_as_pdf, color: Colors.redAccent, size: 80),
+                            const Icon(
+                              Icons.picture_as_pdf,
+                              color: Colors.redAccent,
+                              size: 80,
+                            ),
                             const SizedBox(height: 16),
-                            const Text('PDF Receipt Document Uploaded', style: TextStyle(color: Colors.white)),
+                            const Text(
+                              'PDF Receipt Document Uploaded',
+                              style: TextStyle(color: Colors.white),
+                            ),
                           ],
                         )
                       : InteractiveViewer(
@@ -402,6 +558,14 @@ class _HistoryScreenState extends State<HistoryScreen>
   }
 
   Widget _buildPaymentsList() {
+    if (_paymentsError != null && _payments.isEmpty) {
+      return _buildEmptyState(
+        icon: Icons.lock_outline_rounded,
+        title: 'Unable to Load Payments',
+        subtitle: _paymentsError!,
+      );
+    }
+
     if (_payments.isEmpty) {
       return _buildEmptyState(
         icon: Icons.receipt_long_rounded,
@@ -420,18 +584,20 @@ class _HistoryScreenState extends State<HistoryScreen>
         final statusStr = p.paymentStatus ?? p.status;
         final booking = bookingMap[p.bookingId];
         final vehicleName = booking?.vehicleName ?? 'Vehicle';
-        final paymentTimeStr = p.paymentTime ?? DateFormat('HH:mm:ss').format(p.paymentDate);
+        final paymentTimeStr =
+            p.paymentTime ?? DateFormat('HH:mm:ss').format(p.paymentDate);
 
-        final isPdf = p.receiptImage != null && (p.receiptImage!.toLowerCase().contains('.pdf') || p.receiptImage!.startsWith('data:application/pdf'));
+        final isPdf =
+            p.receiptImage != null &&
+            (p.receiptImage!.toLowerCase().contains('.pdf') ||
+                p.receiptImage!.startsWith('data:application/pdf'));
 
         return Container(
           margin: const EdgeInsets.only(bottom: 14),
           decoration: BoxDecoration(
             color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: _borderColor,
-            ),
+            border: Border.all(color: _borderColor),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.05),
@@ -476,10 +642,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                           const SizedBox(height: 2),
                           Text(
                             'Booking Reference: #${p.bookingId.substring(0, p.bookingId.length > 8 ? 8 : p.bookingId.length).toUpperCase()}',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: _subColor,
-                            ),
+                            style: TextStyle(fontSize: 11, color: _subColor),
                           ),
                         ],
                       ),
@@ -538,16 +701,30 @@ class _HistoryScreenState extends State<HistoryScreen>
                           decoration: BoxDecoration(
                             border: Border.all(color: _borderColor),
                             borderRadius: BorderRadius.circular(12),
-                            color: _isDark ? const Color(0xFF0F172A) : Colors.grey[50],
+                            color: _isDark
+                                ? const Color(0xFF0F172A)
+                                : Colors.grey[50],
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(10),
                             child: isPdf
-                                ? const Center(child: Icon(Icons.picture_as_pdf, color: Colors.redAccent, size: 28))
+                                ? const Center(
+                                    child: Icon(
+                                      Icons.picture_as_pdf,
+                                      color: Colors.redAccent,
+                                      size: 28,
+                                    ),
+                                  )
                                 : Image.memory(
-                                    base64Decode(p.receiptImage!.split(',').last),
+                                    base64Decode(
+                                      p.receiptImage!.split(',').last,
+                                    ),
                                     fit: BoxFit.cover,
-                                    errorBuilder: (ctx, err, stack) => const Icon(Icons.receipt_long, size: 24),
+                                    errorBuilder: (ctx, err, stack) =>
+                                        const Icon(
+                                          Icons.receipt_long,
+                                          size: 24,
+                                        ),
                                   ),
                           ),
                         ),
@@ -584,12 +761,30 @@ class _HistoryScreenState extends State<HistoryScreen>
                     if (p.receiptImage != null && p.receiptImage!.isNotEmpty)
                       OutlinedButton.icon(
                         onPressed: () => _openReceiptLightbox(p),
-                        icon: const Icon(Icons.receipt_rounded, size: 12, color: AppColors.primaryOrange),
-                        label: const Text('View Uploaded Receipt', style: TextStyle(color: AppColors.primaryOrange, fontSize: 11, fontWeight: FontWeight.bold)),
+                        icon: const Icon(
+                          Icons.receipt_rounded,
+                          size: 12,
+                          color: AppColors.primaryOrange,
+                        ),
+                        label: const Text(
+                          'View Uploaded Receipt',
+                          style: TextStyle(
+                            color: AppColors.primaryOrange,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                         style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: AppColors.primaryOrange),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          side: const BorderSide(
+                            color: AppColors.primaryOrange,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                         ),
                       ),
                   ],
@@ -604,13 +799,16 @@ class _HistoryScreenState extends State<HistoryScreen>
                         color: const Color(0xFFEF4444).withValues(alpha: 0.06),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                            color:
-                                const Color(0xFFEF4444).withValues(alpha: 0.2)),
+                          color: const Color(0xFFEF4444).withValues(alpha: 0.2),
+                        ),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.info_outline,
-                              size: 14, color: Color(0xFFEF4444)),
+                          const Icon(
+                            Icons.info_outline,
+                            size: 14,
+                            color: Color(0xFFEF4444),
+                          ),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
@@ -641,10 +839,7 @@ class _HistoryScreenState extends State<HistoryScreen>
           children: [
             Icon(icon, size: 12, color: _subColor),
             const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(fontSize: 10, color: _subColor),
-            ),
+            Text(label, style: TextStyle(fontSize: 10, color: _subColor)),
           ],
         ),
         const SizedBox(height: 3),
@@ -660,10 +855,11 @@ class _HistoryScreenState extends State<HistoryScreen>
     );
   }
 
-  Widget _buildEmptyState(
-      {required IconData icon,
-      required String title,
-      required String subtitle}) {
+  Widget _buildEmptyState({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(40),
@@ -676,7 +872,11 @@ class _HistoryScreenState extends State<HistoryScreen>
                 color: _isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, size: 48, color: _isDark ? const Color(0xFF334155) : AppColors.borderGray),
+              child: Icon(
+                icon,
+                size: 48,
+                color: _isDark ? const Color(0xFF334155) : AppColors.borderGray,
+              ),
             ),
             const SizedBox(height: 20),
             Text(
@@ -691,10 +891,7 @@ class _HistoryScreenState extends State<HistoryScreen>
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 13,
-                color: _subColor,
-              ),
+              style: TextStyle(fontSize: 13, color: _subColor),
             ),
           ],
         ),
@@ -714,10 +911,14 @@ class _HistoryScreenState extends State<HistoryScreen>
             unselectedLabelColor: _subColor,
             indicatorColor: AppColors.primaryOrange,
             indicatorWeight: 3,
-            labelStyle:
-                const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-            unselectedLabelStyle:
-                const TextStyle(fontWeight: FontWeight.normal, fontSize: 13),
+            labelStyle: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+            ),
+            unselectedLabelStyle: const TextStyle(
+              fontWeight: FontWeight.normal,
+              fontSize: 13,
+            ),
             tabs: [
               Tab(
                 child: Row(
@@ -730,7 +931,9 @@ class _HistoryScreenState extends State<HistoryScreen>
                       const SizedBox(width: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.primaryOrange,
                           borderRadius: BorderRadius.circular(10),
@@ -759,7 +962,9 @@ class _HistoryScreenState extends State<HistoryScreen>
                       const SizedBox(width: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.primaryOrange,
                           borderRadius: BorderRadius.circular(10),
@@ -789,37 +994,11 @@ class _HistoryScreenState extends State<HistoryScreen>
                   ),
                 )
               : _error != null
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.error_outline,
-                              size: 40, color: Colors.red),
-                          const SizedBox(height: 12),
-                          Text(_error!,
-                              style: const TextStyle(
-                                  color: Colors.red, fontSize: 13)),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: _loadData,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primaryOrange,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
-                            ),
-                            child: const Text('Retry'),
-                          ),
-                        ],
-                      ),
-                    )
-                  : TabBarView(
-                      controller: _tabController,
-                      children: [
-                        _buildBookingsList(),
-                        _buildPaymentsList(),
-                      ],
-                    ),
+              ? _buildLoadErrorView(_error!)
+              : TabBarView(
+                  controller: _tabController,
+                  children: [_buildBookingsList(), _buildPaymentsList()],
+                ),
         ),
       ],
     );

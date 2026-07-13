@@ -1125,13 +1125,14 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.vehicle != null;
+    final isDarkDialog = Theme.of(context).brightness == Brightness.dark;
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       title: Text(
         isEdit ? 'Edit Vehicle Spec' : 'Add New Vehicle',
-        style: const TextStyle(
+        style: TextStyle(
           fontWeight: FontWeight.bold,
-          color: AppColors.secondaryBlue,
+          color: isDarkDialog ? Colors.white : Colors.black,
         ),
       ),
       content: Container(

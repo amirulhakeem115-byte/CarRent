@@ -43,12 +43,10 @@
     },
 
     "notifications": {
-      ".read": "auth != null",
-      ".write": "auth != null",
       ".indexOn": ["userId", "relatedId", "type"],
       "$notificationId": {
-        ".read": "auth != null",
-        ".write": "auth != null"
+        ".read": "auth != null && (data.child('userId').val() == auth.uid || (data.child('userId').val() == 'admin' && root.child('users').child(auth.uid).child('role').val() == 'admin'))",
+        ".write": "auth != null && (( !data.exists() && (newData.child('userId').val() == auth.uid || newData.child('userId').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'admin')) || (data.exists() && (data.child('userId').val() == auth.uid || root.child('users').child(auth.uid).child('role').val() == 'admin')))"
       }
     },
 
@@ -68,8 +66,11 @@
     },
 
     "support_tickets": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".indexOn": ["customerId", "status", "lastReplyAt"],
+      "$ticketId": {
+        ".read": "auth != null && (data.child('customerId').val() == auth.uid || root.child('users').child(auth.uid).child('role').val() == 'admin')",
+        ".write": "auth != null && ((!data.exists() && newData.child('customerId').val() == auth.uid) || data.child('customerId').val() == auth.uid || root.child('users').child(auth.uid).child('role').val() == 'admin')"
+      }
     },
 
     "support_messages": {

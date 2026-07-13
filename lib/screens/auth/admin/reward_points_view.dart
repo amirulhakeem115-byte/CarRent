@@ -83,7 +83,15 @@ class _RewardPointsViewState extends State<RewardPointsView>
 
         return StatefulBuilder(
           builder: (context, setDialogState) {
+            final dialogWidth = MediaQuery.of(context).size.width < 420
+                ? MediaQuery.of(context).size.width * 0.86
+                : 420.0;
+
             return AlertDialog(
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 24,
+              ),
               backgroundColor: dialogBg,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
@@ -96,21 +104,24 @@ class _RewardPointsViewState extends State<RewardPointsView>
                 ),
               ),
               content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Current Balance: ${customer.rewardPoints} Points',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primaryOrange,
+                child: SizedBox(
+                  width: dialogWidth,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Current Balance: ${customer.rewardPoints} Points',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primaryOrange,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ChoiceChip(
+                      const SizedBox(height: 16),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final bool isNarrow = constraints.maxWidth < 360;
+
+                          final addChip = ChoiceChip(
                             label: const Center(child: Text('Add Points')),
                             selected: isAdding,
                             selectedColor: Colors.blue.withValues(alpha: 0.15),
@@ -126,11 +137,9 @@ class _RewardPointsViewState extends State<RewardPointsView>
                                 pointsController.text = '0';
                               });
                             },
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ChoiceChip(
+                          );
+
+                          final deductChip = ChoiceChip(
                             label: const Center(child: Text('Deduct Points')),
                             selected: !isAdding,
                             selectedColor: Colors.redAccent.withValues(
@@ -148,40 +157,56 @@ class _RewardPointsViewState extends State<RewardPointsView>
                                 pointsController.text = '0';
                               });
                             },
+                          );
+
+                          final double chipWidth = isNarrow
+                              ? constraints.maxWidth
+                              : (constraints.maxWidth - 12) / 2;
+
+                          return Wrap(
+                            spacing: 12,
+                            runSpacing: 10,
+                            children: [
+                              SizedBox(width: chipWidth, child: addChip),
+                              SizedBox(width: chipWidth, child: deductChip),
+                            ],
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      RewardPointsSlider(
+                        initialValue: selectedPoints,
+                        availablePoints: customer.rewardPoints,
+                        maxPointsLimit: CompanySettingsProvider().getField(
+                          'maxRewardPointsLimit',
+                          defaultValue: 1000,
+                        ),
+                        isAdmin: true,
+                        isDeductMode: !isAdding,
+                        showConfirmButton: false,
+                        onChanged: (val) {
+                          setDialogState(() {
+                            selectedPoints = val;
+                            pointsController.text = val.toString();
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: reasonController,
+                        maxLines: 2,
+                        style: TextStyle(color: textPrimary),
+                        decoration: InputDecoration(
+                          labelText: 'Reason for Adjustment',
+                          labelStyle: TextStyle(color: textSecondary),
+                          hintText: 'e.g. Loyalty program bonus, correction...',
+                          hintStyle: TextStyle(
+                            color: textSecondary.withValues(alpha: 0.7),
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    RewardPointsSlider(
-                      initialValue: selectedPoints,
-                      availablePoints: customer.rewardPoints,
-                      maxPointsLimit: CompanySettingsProvider().getField('maxRewardPointsLimit', defaultValue: 1000),
-                      isAdmin: true,
-                      isDeductMode: !isAdding,
-                      showConfirmButton: false,
-                      onChanged: (val) {
-                        setDialogState(() {
-                          selectedPoints = val;
-                          pointsController.text = val.toString();
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: reasonController,
-                      maxLines: 2,
-                      style: TextStyle(color: textPrimary),
-                      decoration: InputDecoration(
-                        labelText: 'Reason for Adjustment',
-                        labelStyle: TextStyle(color: textSecondary),
-                        hintText: 'e.g. Loyalty program bonus, correction...',
-                        hintStyle: TextStyle(
-                          color: textSecondary.withValues(alpha: 0.7),
-                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               actions: [
@@ -613,80 +638,82 @@ class _RewardPointsViewState extends State<RewardPointsView>
                                     ],
                                   ),
                                   const SizedBox(height: 12),
-                                  Wrap(
-                                    spacing: 12,
-                                    runSpacing: 8,
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      Wrap(
-                                        spacing: 8,
-                                        runSpacing: 4,
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 12,
-                                              vertical: 8,
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 8,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primaryOrange
+                                              .withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(
+                                              Icons.stars_rounded,
+                                              color: AppColors.primaryOrange,
+                                              size: 14,
                                             ),
-                                            decoration: BoxDecoration(
-                                              color: AppColors.primaryOrange
-                                                  .withValues(alpha: 0.15),
-                                              borderRadius: BorderRadius.circular(
-                                                8,
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              '${customer.rewardPoints} Points',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: AppColors.primaryOrange,
+                                                fontSize: 12,
                                               ),
                                             ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                const Icon(
-                                                  Icons.stars_rounded,
-                                                  color: AppColors.primaryOrange,
-                                                  size: 14,
-                                                ),
-                                                const SizedBox(width: 6),
-                                                Text(
-                                                  '${customer.rewardPoints} Points',
-                                                  style: const TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                    color: AppColors.primaryOrange,
-                                                    fontSize: 12,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
                                           _buildMembershipBadge(
                                             CompanySettingsProvider()
-                                                .determineLevel(customer.rewardPoints),
+                                                .determineLevel(
+                                                  customer.rewardPoints,
+                                                ),
                                             isDark,
                                           ),
-                                        ],
-                                      ),
-                                      OutlinedButton.icon(
-                                        style: OutlinedButton.styleFrom(
-                                          side: BorderSide(
-                                            color: textSecondary,
-                                          ),
-                                          foregroundColor: textPrimary,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              8,
+                                          const SizedBox(width: 8),
+                                          OutlinedButton.icon(
+                                            style: OutlinedButton.styleFrom(
+                                              side: BorderSide(
+                                                color: textSecondary,
+                                              ),
+                                              foregroundColor: textPrimary,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
                                             ),
+                                            icon: Icon(
+                                              Icons.edit_note,
+                                              size: 14,
+                                              color: textPrimary,
+                                            ),
+                                            label: Text(
+                                              'Adjust',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: textPrimary,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            onPressed: () =>
+                                                _showAdjustmentDialog(customer),
                                           ),
-                                        ),
-                                        icon: Icon(
-                                          Icons.edit_note,
-                                          size: 14,
-                                          color: textPrimary,
-                                        ),
-                                        label: Text(
-                                          'Adjust',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: textPrimary,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        onPressed: () =>
-                                            _showAdjustmentDialog(customer),
+                                        ],
                                       ),
                                     ],
                                   ),
@@ -751,16 +778,16 @@ class _RewardPointsViewState extends State<RewardPointsView>
                                             decoration: BoxDecoration(
                                               color: AppColors.primaryOrange
                                                   .withValues(alpha: 0.15),
-                                              borderRadius: BorderRadius.circular(
-                                                8,
-                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
                                             ),
                                             child: Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
                                                 const Icon(
                                                   Icons.stars_rounded,
-                                                  color: AppColors.primaryOrange,
+                                                  color:
+                                                      AppColors.primaryOrange,
                                                   size: 14,
                                                 ),
                                                 const SizedBox(width: 6),
@@ -768,7 +795,8 @@ class _RewardPointsViewState extends State<RewardPointsView>
                                                   '${customer.rewardPoints} Points',
                                                   style: const TextStyle(
                                                     fontWeight: FontWeight.bold,
-                                                    color: AppColors.primaryOrange,
+                                                    color:
+                                                        AppColors.primaryOrange,
                                                     fontSize: 12,
                                                   ),
                                                 ),
@@ -777,7 +805,9 @@ class _RewardPointsViewState extends State<RewardPointsView>
                                           ),
                                           _buildMembershipBadge(
                                             CompanySettingsProvider()
-                                                .determineLevel(customer.rewardPoints),
+                                                .determineLevel(
+                                                  customer.rewardPoints,
+                                                ),
                                             isDark,
                                           ),
                                         ],

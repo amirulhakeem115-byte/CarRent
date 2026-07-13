@@ -461,66 +461,154 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
                                             color: textSecondary,
                                           ),
                                         ),
-                                        if (notif.type == 'pickup_reminder_admin') ...[
+                                        if (notif.type ==
+                                            'pickup_reminder_admin') ...[
                                           const SizedBox(height: 8),
                                           Row(
                                             children: [
                                               ElevatedButton(
                                                 style: ElevatedButton.styleFrom(
-                                                  backgroundColor: AppColors.primaryOrange,
+                                                  backgroundColor:
+                                                      AppColors.primaryOrange,
                                                   foregroundColor: Colors.white,
-                                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 12,
+                                                        vertical: 6,
+                                                      ),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          6,
+                                                        ),
+                                                  ),
                                                 ),
                                                 onPressed: () {
-                                                  if (notif.actionRoute.isNotEmpty && notif.actionRoute != 'Dashboard') {
-                                                    widget.onNavigateTab(notif.actionRoute, notif.relatedId);
+                                                  if (notif
+                                                          .actionRoute
+                                                          .isNotEmpty &&
+                                                      notif.actionRoute !=
+                                                          'Dashboard') {
+                                                    widget.onNavigateTab(
+                                                      notif.actionRoute,
+                                                      notif.relatedId,
+                                                    );
                                                   }
                                                 },
-                                                child: const Text('View Booking', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                                child: const Text(
+                                                  'View Booking',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
                                               ),
                                               const SizedBox(width: 8),
                                               OutlinedButton(
                                                 style: OutlinedButton.styleFrom(
                                                   foregroundColor: Colors.teal,
-                                                  side: const BorderSide(color: Colors.teal),
-                                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                                  side: const BorderSide(
+                                                    color: Colors.teal,
+                                                  ),
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 12,
+                                                        vertical: 6,
+                                                      ),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          6,
+                                                        ),
+                                                  ),
                                                 ),
-                                                onPressed: () => _confirmCustomerPickup(notif.relatedId),
-                                                child: const Text("Customer Picked Up", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                                onPressed: () =>
+                                                    _confirmCustomerPickup(
+                                                      notif.relatedId,
+                                                    ),
+                                                child: const Text(
+                                                  "Customer Picked Up",
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
                                               ),
                                             ],
                                           ),
                                         ],
-                                        if (notif.type == 'return_reminder_admin') ...[
+                                        if (notif.type ==
+                                            'return_reminder_admin') ...[
                                           const SizedBox(height: 8),
                                           Row(
                                             children: [
                                               ElevatedButton(
                                                 style: ElevatedButton.styleFrom(
-                                                  backgroundColor: AppColors.primaryOrange,
+                                                  backgroundColor:
+                                                      AppColors.primaryOrange,
                                                   foregroundColor: Colors.white,
-                                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 12,
+                                                        vertical: 6,
+                                                      ),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          6,
+                                                        ),
+                                                  ),
                                                 ),
                                                 onPressed: () {
-                                                  if (notif.actionRoute.isNotEmpty && notif.actionRoute != 'Dashboard') {
-                                                    widget.onNavigateTab(notif.actionRoute, notif.relatedId);
+                                                  if (notif
+                                                          .actionRoute
+                                                          .isNotEmpty &&
+                                                      notif.actionRoute !=
+                                                          'Dashboard') {
+                                                    widget.onNavigateTab(
+                                                      notif.actionRoute,
+                                                      notif.relatedId,
+                                                    );
                                                   }
                                                 },
-                                                child: const Text('View Booking', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                                child: const Text(
+                                                  'View Booking',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
                                               ),
                                               const SizedBox(width: 8),
                                               OutlinedButton(
                                                 style: OutlinedButton.styleFrom(
                                                   foregroundColor: Colors.teal,
-                                                  side: const BorderSide(color: Colors.teal),
-                                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                                  side: const BorderSide(
+                                                    color: Colors.teal,
+                                                  ),
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 12,
+                                                        vertical: 6,
+                                                      ),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          6,
+                                                        ),
+                                                  ),
                                                 ),
-                                                onPressed: () => _confirmVehicleReturn(notif.relatedId),
-                                                child: const Text("Vehicle Returned", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                                onPressed: () =>
+                                                    _confirmVehicleReturn(
+                                                      notif.relatedId,
+                                                    ),
+                                                child: const Text(
+                                                  "Vehicle Returned",
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
                                               ),
                                             ],
                                           ),
@@ -617,7 +705,8 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
                                       subtitle: Padding(
                                         padding: const EdgeInsets.only(top: 6),
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
                                               notif.message,
@@ -627,66 +716,162 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
                                                 color: textSecondary,
                                               ),
                                             ),
-                                            if (notif.type == 'pickup_reminder_admin') ...[
+                                            if (notif.type ==
+                                                'pickup_reminder_admin') ...[
                                               const SizedBox(height: 8),
                                               Row(
                                                 children: [
                                                   ElevatedButton(
                                                     style: ElevatedButton.styleFrom(
-                                                      backgroundColor: AppColors.primaryOrange,
-                                                      foregroundColor: Colors.white,
-                                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                                      backgroundColor: AppColors
+                                                          .primaryOrange,
+                                                      foregroundColor:
+                                                          Colors.white,
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 12,
+                                                            vertical: 6,
+                                                          ),
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              6,
+                                                            ),
+                                                      ),
                                                     ),
                                                     onPressed: () {
-                                                      if (notif.actionRoute.isNotEmpty && notif.actionRoute != 'Dashboard') {
-                                                        widget.onNavigateTab(notif.actionRoute, notif.relatedId);
+                                                      if (notif
+                                                              .actionRoute
+                                                              .isNotEmpty &&
+                                                          notif.actionRoute !=
+                                                              'Dashboard') {
+                                                        widget.onNavigateTab(
+                                                          notif.actionRoute,
+                                                          notif.relatedId,
+                                                        );
                                                       }
                                                     },
-                                                    child: const Text('View Booking', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                                    child: const Text(
+                                                      'View Booking',
+                                                      style: TextStyle(
+                                                        fontSize: 10,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
                                                   ),
                                                   const SizedBox(width: 8),
                                                   OutlinedButton(
                                                     style: OutlinedButton.styleFrom(
-                                                      foregroundColor: Colors.teal,
-                                                      side: const BorderSide(color: Colors.teal),
-                                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                                      foregroundColor:
+                                                          Colors.teal,
+                                                      side: const BorderSide(
+                                                        color: Colors.teal,
+                                                      ),
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 12,
+                                                            vertical: 6,
+                                                          ),
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              6,
+                                                            ),
+                                                      ),
                                                     ),
-                                                    onPressed: () => _confirmCustomerPickup(notif.relatedId),
-                                                    child: const Text("Customer Picked Up", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                                    onPressed: () =>
+                                                        _confirmCustomerPickup(
+                                                          notif.relatedId,
+                                                        ),
+                                                    child: const Text(
+                                                      "Customer Picked Up",
+                                                      style: TextStyle(
+                                                        fontSize: 10,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
                                                   ),
                                                 ],
                                               ),
                                             ],
-                                            if (notif.type == 'return_reminder_admin') ...[
+                                            if (notif.type ==
+                                                'return_reminder_admin') ...[
                                               const SizedBox(height: 8),
                                               Row(
                                                 children: [
                                                   ElevatedButton(
                                                     style: ElevatedButton.styleFrom(
-                                                      backgroundColor: AppColors.primaryOrange,
-                                                      foregroundColor: Colors.white,
-                                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                                      backgroundColor: AppColors
+                                                          .primaryOrange,
+                                                      foregroundColor:
+                                                          Colors.white,
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 12,
+                                                            vertical: 6,
+                                                          ),
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              6,
+                                                            ),
+                                                      ),
                                                     ),
                                                     onPressed: () {
-                                                      if (notif.actionRoute.isNotEmpty && notif.actionRoute != 'Dashboard') {
-                                                        widget.onNavigateTab(notif.actionRoute, notif.relatedId);
+                                                      if (notif
+                                                              .actionRoute
+                                                              .isNotEmpty &&
+                                                          notif.actionRoute !=
+                                                              'Dashboard') {
+                                                        widget.onNavigateTab(
+                                                          notif.actionRoute,
+                                                          notif.relatedId,
+                                                        );
                                                       }
                                                     },
-                                                    child: const Text('View Booking', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                                    child: const Text(
+                                                      'View Booking',
+                                                      style: TextStyle(
+                                                        fontSize: 10,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
                                                   ),
                                                   const SizedBox(width: 8),
                                                   OutlinedButton(
                                                     style: OutlinedButton.styleFrom(
-                                                      foregroundColor: Colors.teal,
-                                                      side: const BorderSide(color: Colors.teal),
-                                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                                      foregroundColor:
+                                                          Colors.teal,
+                                                      side: const BorderSide(
+                                                        color: Colors.teal,
+                                                      ),
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 12,
+                                                            vertical: 6,
+                                                          ),
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              6,
+                                                            ),
+                                                      ),
                                                     ),
-                                                    onPressed: () => _confirmVehicleReturn(notif.relatedId),
-                                                    child: const Text("Vehicle Returned", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                                    onPressed: () =>
+                                                        _confirmVehicleReturn(
+                                                          notif.relatedId,
+                                                        ),
+                                                    child: const Text(
+                                                      "Vehicle Returned",
+                                                      style: TextStyle(
+                                                        fontSize: 10,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
                                                   ),
                                                 ],
                                               ),
@@ -770,8 +955,10 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
-            onPressed: () async =>
-                await _notificationService.markAllAsRead(userId),
+            onPressed: () async => await _notificationService.markAllAsRead(
+              userId,
+              includeAdminShared: true,
+            ),
             icon: const Icon(Icons.done_all, size: 16),
             label: const Text(
               'Mark All Read',

@@ -16,7 +16,10 @@ import 'typing_indicator.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Shows the unified AI Chat panel as a modal overlay.
-Future<dynamic> showAIChatModal(BuildContext context, {String? initialMessage}) async {
+Future<dynamic> showAIChatModal(
+  BuildContext context, {
+  String? initialMessage,
+}) async {
   final double width = MediaQuery.of(context).size.width;
   final bool isDesktop = width > 900;
 
@@ -35,12 +38,19 @@ Future<dynamic> showAIChatModal(BuildContext context, {String? initialMessage}) 
             child: Material(
               color: Colors.transparent,
               child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(1.0, 0.0),
-                  end: Offset.zero,
-                ).animate(CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic)),
+                position:
+                    Tween<Offset>(
+                      begin: const Offset(1.0, 0.0),
+                      end: Offset.zero,
+                    ).animate(
+                      CurvedAnimation(
+                        parent: anim1,
+                        curve: Curves.easeOutCubic,
+                      ),
+                    ),
                 child: SizedBox(
-                  width: 680, // Extended width to support premium session sidebar
+                  width:
+                      680, // Extended width to support premium session sidebar
                   height: 640,
                   child: AIChatPanel(
                     onClose: () => Navigator.of(ctx).pop(),
@@ -59,6 +69,7 @@ Future<dynamic> showAIChatModal(BuildContext context, {String? initialMessage}) 
       isScrollControlled: true,
       isDismissible: true,
       backgroundColor: Colors.transparent,
+      useSafeArea: true,
       useRootNavigator: true,
       builder: (ctx) {
         final double screenHeight = MediaQuery.of(ctx).size.height;
@@ -95,7 +106,7 @@ class _AIChatPanelState extends State<AIChatPanel>
   final FocusNode _focusNode = FocusNode();
   final ReceiptService _receiptService = ReceiptService();
   late final AnimationController _fadeController;
-  
+
   bool _showSidebar = false; // toggles history sidebar drawer on mobile
 
   @override
@@ -156,18 +167,20 @@ class _AIChatPanelState extends State<AIChatPanel>
           Navigator.of(context).pop({
             'action': 'pay',
             'bookingId': bookingId,
-            'method': response.parameters['method']?.toString() ?? 'FPX Online Banking',
+            'method':
+                response.parameters['method']?.toString() ??
+                'FPX Online Banking',
           });
           return;
         }
       }
 
-      if (action == 'search_vehicles' || 
-          action == 'view_bookings' || 
-          action == 'view_history' || 
-          action == 'open_profile' || 
-          action == 'contact_support' || 
-          action == 'show_branches' || 
+      if (action == 'search_vehicles' ||
+          action == 'view_bookings' ||
+          action == 'view_history' ||
+          action == 'open_profile' ||
+          action == 'contact_support' ||
+          action == 'show_branches' ||
           action == 'show_rewards' ||
           action == 'open_pending_bookings') {
         if (mounted) {
@@ -176,17 +189,27 @@ class _AIChatPanelState extends State<AIChatPanel>
         }
       } else if (action == 'open_payment_page') {
         try {
-          final bookingSnap = await FirebaseDatabase.instance.ref().child('bookings').child(bookingId).get();
+          final bookingSnap = await FirebaseDatabase.instance
+              .ref()
+              .child('bookings')
+              .child(bookingId)
+              .get();
           if (bookingSnap.exists) {
             final bData = Map<dynamic, dynamic>.from(bookingSnap.value as Map);
             final booking = BookingModel.fromMap(bookingId, bData);
-            
+
             final vId = bData['vehicleId'] as String;
-            final vehicleSnap = await FirebaseDatabase.instance.ref().child('vehicles').child(vId).get();
+            final vehicleSnap = await FirebaseDatabase.instance
+                .ref()
+                .child('vehicles')
+                .child(vId)
+                .get();
             if (vehicleSnap.exists) {
-              final vData = Map<dynamic, dynamic>.from(vehicleSnap.value as Map);
+              final vData = Map<dynamic, dynamic>.from(
+                vehicleSnap.value as Map,
+              );
               final vehicle = VehicleModel.fromMap(vId, vData);
-              
+
               if (mounted) {
                 Navigator.push(
                   context,
@@ -211,7 +234,10 @@ class _AIChatPanelState extends State<AIChatPanel>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final double width = MediaQuery.of(context).size.width;
-    final bool showPermanentSidebar = width > 600; // side-by-side on wide screens
+    final bool showPermanentSidebar =
+        width > 600; // side-by-side on wide screens
+    final bool showSidebarOverlay = !showPermanentSidebar && _showSidebar;
+    final double mobileSidebarWidth = width * 0.82;
 
     final radius = widget.onClose != null
         ? const BorderRadius.only(
@@ -238,35 +264,93 @@ class _AIChatPanelState extends State<AIChatPanel>
                   ]
                 : null,
           ),
-          child: Row(
+          child: Stack(
             children: [
-              // 1. Pinned Chats & History sidebar (collapsible/responsive)
-              if (showPermanentSidebar || _showSidebar)
-                Container(
-                  width: 220,
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
-                    border: Border(
-                      right: BorderSide(
-                        color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+              Row(
+                children: [
+                  // 1. Pinned Chats & History sidebar (desktop/tablet split mode)
+                  if (showPermanentSidebar)
+                    Container(
+                      width: 220,
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFF1E293B)
+                            : const Color(0xFFF8FAFC),
+                        border: Border(
+                          right: BorderSide(
+                            color: isDark
+                                ? const Color(0xFF334155)
+                                : const Color(0xFFE2E8F0),
+                          ),
+                        ),
+                      ),
+                      child: _buildSidebar(isDark),
+                    ),
+
+                  // 2. Chat Pane
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.max,
+                      children: [
+                        _buildHeader(isDark, showPermanentSidebar),
+                        Expanded(child: _buildBody(isDark)),
+                        _buildQuickChips(isDark),
+                        _buildInputBar(isDark),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              // 3. Mobile overlay sidebar (prevents width squeezing overflow)
+              if (showSidebarOverlay) ...[
+                Positioned.fill(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _showSidebar = false;
+                      });
+                    },
+                    child: Container(
+                      color: Colors.black.withValues(alpha: 0.35),
+                    ),
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: SizedBox(
+                    width: mobileSidebarWidth.clamp(240.0, 320.0),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? const Color(0xFF1E293B)
+                              : const Color(0xFFF8FAFC),
+                          border: Border(
+                            right: BorderSide(
+                              color: isDark
+                                  ? const Color(0xFF334155)
+                                  : const Color(0xFFE2E8F0),
+                            ),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.2),
+                              blurRadius: 16,
+                              offset: const Offset(2, 0),
+                            ),
+                          ],
+                        ),
+                        child: SafeArea(
+                          bottom: false,
+                          child: _buildSidebar(isDark),
+                        ),
                       ),
                     ),
                   ),
-                  child: _buildSidebar(isDark),
                 ),
-              
-              // 2. Chat Pane
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.max,
-                  children: [
-                    _buildHeader(isDark, showPermanentSidebar),
-                    Expanded(child: _buildBody(isDark)),
-                    _buildQuickChips(isDark),
-                    _buildInputBar(isDark),
-                  ],
-                ),
-              ),
+              ],
             ],
           ),
         ),
@@ -290,12 +374,17 @@ class _AIChatPanelState extends State<AIChatPanel>
               backgroundColor: AppColors.primaryOrange,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               elevation: 0,
               minimumSize: const Size(double.infinity, 44),
             ),
             icon: const Icon(Icons.add_rounded, size: 18),
-            label: const Text('New Chat', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            label: const Text(
+              'New Chat',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            ),
             onPressed: () {
               context.read<AIService>().createNewSession();
               setState(() {
@@ -306,13 +395,19 @@ class _AIChatPanelState extends State<AIChatPanel>
         ),
         // Search Input
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12).copyWith(bottom: 10),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 12,
+          ).copyWith(bottom: 10),
           child: Container(
             height: 36,
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+              border: Border.all(
+                color: isDark
+                    ? const Color(0xFF334155)
+                    : const Color(0xFFE2E8F0),
+              ),
             ),
             child: TextField(
               onChanged: (val) {
@@ -322,7 +417,11 @@ class _AIChatPanelState extends State<AIChatPanel>
               decoration: const InputDecoration(
                 hintText: 'Search chats...',
                 hintStyle: TextStyle(fontSize: 12, color: Colors.grey),
-                prefixIcon: Icon(Icons.search_rounded, size: 16, color: Colors.grey),
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  size: 16,
+                  color: Colors.grey,
+                ),
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.only(bottom: 10),
               ),
@@ -337,7 +436,10 @@ class _AIChatPanelState extends State<AIChatPanel>
               final sessions = ai.filteredSessions;
               if (sessions.isEmpty) {
                 return const Center(
-                  child: Text('No chats found', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                  child: Text(
+                    'No chats found',
+                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
                 );
               }
               return ListView.builder(
@@ -356,12 +458,16 @@ class _AIChatPanelState extends State<AIChatPanel>
     );
   }
 
-  Widget _buildSessionItem(ConversationSession session, bool isActive, bool isDark) {
+  Widget _buildSessionItem(
+    ConversationSession session,
+    bool isActive,
+    bool isDark,
+  ) {
     final textCol = isDark ? Colors.white : AppColors.secondaryBlue;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: isActive 
+        color: isActive
             ? (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9))
             : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
@@ -380,7 +486,9 @@ class _AIChatPanelState extends State<AIChatPanel>
           ),
         ),
         leading: Icon(
-          session.isPinned ? Icons.push_pin_rounded : Icons.chat_bubble_outline_rounded,
+          session.isPinned
+              ? Icons.push_pin_rounded
+              : Icons.chat_bubble_outline_rounded,
           size: 14,
           color: session.isPinned ? AppColors.primaryOrange : Colors.grey,
         ),
@@ -389,19 +497,27 @@ class _AIChatPanelState extends State<AIChatPanel>
           children: [
             IconButton(
               icon: Icon(
-                session.isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined, 
-                size: 12, 
-                color: Colors.grey
+                session.isPinned
+                    ? Icons.push_pin_rounded
+                    : Icons.push_pin_outlined,
+                size: 12,
+                color: Colors.grey,
               ),
-              onPressed: () => context.read<AIService>().togglePinSession(session.id),
+              onPressed: () =>
+                  context.read<AIService>().togglePinSession(session.id),
               splashRadius: 12,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
             ),
             const SizedBox(width: 6),
             IconButton(
-              icon: const Icon(Icons.delete_outline_rounded, size: 12, color: Colors.grey),
-              onPressed: () => context.read<AIService>().deleteSession(session.id),
+              icon: const Icon(
+                Icons.delete_outline_rounded,
+                size: 12,
+                color: Colors.grey,
+              ),
+              onPressed: () =>
+                  context.read<AIService>().deleteSession(session.id),
               splashRadius: 12,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
@@ -426,10 +542,18 @@ class _AIChatPanelState extends State<AIChatPanel>
     return Consumer<AIService>(
       builder: (context, ai, _) {
         final isAdmin = ai.isAdmin;
-        final headerBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC);
-        final borderCol = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+        final headerBg = isDark
+            ? const Color(0xFF1E293B)
+            : const Color(0xFFF8FAFC);
+        final borderCol = isDark
+            ? const Color(0xFF334155)
+            : const Color(0xFFE2E8F0);
         final textPrimary = isDark ? Colors.white : AppColors.secondaryBlue;
-        final textSecondary = isDark ? const Color(0xFF64748B) : AppColors.lightText;
+        final textSecondary = isDark
+            ? const Color(0xFF64748B)
+            : AppColors.lightText;
+        final isNarrowMobile =
+            !showPermanentSidebar && MediaQuery.of(context).size.width < 390;
 
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -453,7 +577,7 @@ class _AIChatPanelState extends State<AIChatPanel>
                 ),
                 const SizedBox(width: 6),
               ],
-              
+
               // AI avatar
               Container(
                 width: 36,
@@ -486,24 +610,35 @@ class _AIChatPanelState extends State<AIChatPanel>
                   children: [
                     Row(
                       children: [
-                        Text(
-                          'CARENT AI Operator',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.1,
-                            color: textPrimary,
+                        Expanded(
+                          child: Text(
+                            'CARENT AI Operator',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: isNarrowMobile ? 12.5 : 14,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.1,
+                              color: textPrimary,
+                            ),
                           ),
                         ),
                         if (isAdmin) ...[
                           const SizedBox(width: 6),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
-                              color: AppColors.primaryOrange.withValues(alpha: 0.15),
+                              color: AppColors.primaryOrange.withValues(
+                                alpha: 0.15,
+                              ),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: AppColors.primaryOrange.withValues(alpha: 0.4),
+                                color: AppColors.primaryOrange.withValues(
+                                  alpha: 0.4,
+                                ),
                               ),
                             ),
                             child: const Text(
@@ -531,7 +666,11 @@ class _AIChatPanelState extends State<AIChatPanel>
                         ),
                         const SizedBox(width: 5),
                         Text(
-                          'Connected · Live Data Feed',
+                          isNarrowMobile
+                              ? 'Connected'
+                              : 'Connected · Live Data Feed',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(fontSize: 10, color: textSecondary),
                         ),
                       ],
@@ -543,7 +682,11 @@ class _AIChatPanelState extends State<AIChatPanel>
               Tooltip(
                 message: 'Clear conversation',
                 child: IconButton(
-                  icon: Icon(Icons.refresh_rounded, size: 18, color: textSecondary),
+                  icon: Icon(
+                    Icons.refresh_rounded,
+                    size: 18,
+                    color: textSecondary,
+                  ),
                   onPressed: () => context.read<AIService>().clearHistory(),
                   splashRadius: 18,
                 ),
@@ -553,7 +696,11 @@ class _AIChatPanelState extends State<AIChatPanel>
                 Tooltip(
                   message: 'Close',
                   child: IconButton(
-                    icon: Icon(Icons.close_rounded, size: 18, color: textSecondary),
+                    icon: Icon(
+                      Icons.close_rounded,
+                      size: 18,
+                      color: textSecondary,
+                    ),
                     onPressed: widget.onClose,
                     splashRadius: 18,
                   ),
@@ -601,9 +748,13 @@ class _AIChatPanelState extends State<AIChatPanel>
 
   // Welcome Screen with popular action cards in a Grid
   Widget _buildWelcomeGrid(bool isDark, AIService ai) {
-    final borderCol = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final borderCol = isDark
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
     final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final textSecondary = isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569);
+    final textSecondary = isDark
+        ? const Color(0xFFCBD5E1)
+        : const Color(0xFF475569);
     final labelCol = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
     final welcome = ai.messages.isNotEmpty ? ai.messages.first : null;
@@ -643,7 +794,9 @@ class _AIChatPanelState extends State<AIChatPanel>
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(
-                      ai.isAdmin ? Icons.psychology_rounded : Icons.smart_toy_rounded,
+                      ai.isAdmin
+                          ? Icons.psychology_rounded
+                          : Icons.smart_toy_rounded,
                       color: Colors.white,
                       size: 18,
                     ),
@@ -705,7 +858,12 @@ class _AIChatPanelState extends State<AIChatPanel>
     );
   }
 
-  Widget _buildGridCard(AIQuickCommand cmd, Color cardBg, Color borderCol, bool isDark) {
+  Widget _buildGridCard(
+    AIQuickCommand cmd,
+    Color cardBg,
+    Color borderCol,
+    bool isDark,
+  ) {
     return Material(
       color: cardBg,
       borderRadius: BorderRadius.circular(14),
@@ -740,7 +898,9 @@ class _AIChatPanelState extends State<AIChatPanel>
                   style: TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w700,
-                    color: isDark ? const Color(0xFFCBD5E1) : AppColors.secondaryBlue,
+                    color: isDark
+                        ? const Color(0xFFCBD5E1)
+                        : AppColors.secondaryBlue,
                   ),
                 ),
               ),
@@ -764,7 +924,11 @@ class _AIChatPanelState extends State<AIChatPanel>
               color: AppColors.primaryOrange.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.smart_toy_rounded, size: 14, color: AppColors.primaryOrange),
+            child: const Icon(
+              Icons.smart_toy_rounded,
+              size: 14,
+              color: AppColors.primaryOrange,
+            ),
           ),
           const SizedBox(width: 8),
           const TypingIndicator(dotSize: 5.0),
@@ -778,7 +942,9 @@ class _AIChatPanelState extends State<AIChatPanel>
   // ─────────────────────────────────────────────────────────────────────────
 
   Widget _buildQuickChips(bool isDark) {
-    final borderCol = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final borderCol = isDark
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
     final chipBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC);
     final stripBg = isDark ? const Color(0xFF172033) : const Color(0xFFF1F5F9);
 
@@ -803,7 +969,10 @@ class _AIChatPanelState extends State<AIChatPanel>
                     onTap: () => _sendMessage(cmd.query),
                     borderRadius: BorderRadius.circular(20),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 11,
+                        vertical: 5,
+                      ),
                       decoration: BoxDecoration(
                         color: chipBg,
                         borderRadius: BorderRadius.circular(20),
@@ -815,11 +984,15 @@ class _AIChatPanelState extends State<AIChatPanel>
                           Icon(cmd.icon, color: cmd.color, size: 11),
                           const SizedBox(width: 5),
                           Text(
-                            cmd.label.substring(2), // Strip the icon emoji prefix
+                            cmd.label.substring(
+                              2,
+                            ), // Strip the icon emoji prefix
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: isDark ? const Color(0xFFCBD5E1) : AppColors.secondaryBlue,
+                              color: isDark
+                                  ? const Color(0xFFCBD5E1)
+                                  : AppColors.secondaryBlue,
                             ),
                           ),
                         ],
@@ -840,7 +1013,9 @@ class _AIChatPanelState extends State<AIChatPanel>
   // ─────────────────────────────────────────────────────────────────────────
 
   Widget _buildInputBar(bool isDark) {
-    final borderCol = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final borderCol = isDark
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
     final inputBg = isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9);
     final barBg = isDark ? const Color(0xFF1E293B) : Colors.white;
     final textCol = isDark ? Colors.white : AppColors.secondaryBlue;
@@ -866,7 +1041,10 @@ class _AIChatPanelState extends State<AIChatPanel>
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: borderCol),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 2,
+                ),
                 child: KeyboardListener(
                   focusNode: FocusNode(),
                   onKeyEvent: (event) {
@@ -882,7 +1060,11 @@ class _AIChatPanelState extends State<AIChatPanel>
                     maxLines: null,
                     keyboardType: TextInputType.multiline,
                     textInputAction: TextInputAction.newline,
-                    style: TextStyle(fontSize: 13, height: 1.45, color: textCol),
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.45,
+                      color: textCol,
+                    ),
                     decoration: InputDecoration(
                       hintText: 'Ask me anything...',
                       hintStyle: TextStyle(fontSize: 13, color: hintCol),
@@ -910,19 +1092,26 @@ class _AIChatPanelState extends State<AIChatPanel>
                     decoration: BoxDecoration(
                       gradient: canSend
                           ? const LinearGradient(
-                              colors: [AppColors.primaryOrange, Color(0xFFEA580C)],
+                              colors: [
+                                AppColors.primaryOrange,
+                                Color(0xFFEA580C),
+                              ],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             )
                           : null,
                       color: canSend
                           ? null
-                          : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                          : (isDark
+                                ? const Color(0xFF334155)
+                                : const Color(0xFFE2E8F0)),
                       shape: BoxShape.circle,
                       boxShadow: canSend
                           ? [
                               BoxShadow(
-                                color: AppColors.primaryOrange.withValues(alpha: 0.35),
+                                color: AppColors.primaryOrange.withValues(
+                                  alpha: 0.35,
+                                ),
                                 blurRadius: 8,
                                 offset: const Offset(0, 2),
                               ),
@@ -930,10 +1119,14 @@ class _AIChatPanelState extends State<AIChatPanel>
                           : null,
                     ),
                     child: Icon(
-                      ai.isLoading ? Icons.hourglass_empty_rounded : Icons.arrow_upward_rounded,
+                      ai.isLoading
+                          ? Icons.hourglass_empty_rounded
+                          : Icons.arrow_upward_rounded,
                       color: canSend
                           ? Colors.white
-                          : (isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
+                          : (isDark
+                                ? const Color(0xFF475569)
+                                : const Color(0xFFCBD5E1)),
                       size: 18,
                     ),
                   ),

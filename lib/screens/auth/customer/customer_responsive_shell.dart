@@ -377,9 +377,9 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
   //       );
   //     },
   //   );
-  // 
+  //
   //   if (shouldLogout != true || !mounted) return;
-  // 
+  //
   //   final nav = Navigator.of(context);
   //   await _authService.logout();
   //   if (!mounted) return;
@@ -463,6 +463,7 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
     final double width = MediaQuery.of(context).size.width;
     final bool isDesktop = width > 950;
     final bool showMobileBottomNav = !isDesktop;
+    final bool isCompactMobile = showMobileBottomNav && width < 380;
     final unreadCount = _notifications.where((n) => !n.isRead).length;
 
     // Mapping for Bottom Navigation Items (matches indices: 0, 1, 2, 5)
@@ -503,14 +504,18 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      _getScreenTitle(),
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Colors.white
-                            : AppColors.secondaryBlue,
+                    Expanded(
+                      child: Text(
+                        _getScreenTitle(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: isCompactMobile ? 14 : 16,
+                          fontWeight: FontWeight.w900,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white
+                              : AppColors.secondaryBlue,
+                        ),
                       ),
                     ),
                   ],
@@ -524,24 +529,41 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
               )
             : null,
         drawer: showMobileBottomNav ? _buildDrawer() : null,
-        body: Row(
-          children: [
-            if (isDesktop) _buildSidebar(),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (isDesktop) _buildHeader(unreadCount),
-                  Expanded(
-                    child: Container(
-                      color: Theme.of(context).scaffoldBackgroundColor,
-                      child: _getActiveScreen(),
+        body: SafeArea(
+          top: true,
+          bottom: false,
+          child: Row(
+            children: [
+              if (isDesktop) _buildSidebar(),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (isDesktop) _buildHeader(unreadCount),
+                    Expanded(
+                      child: Container(
+                        color: Theme.of(context).scaffoldBackgroundColor,
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final double maxWidth = isDesktop
+                                ? 1500
+                                : constraints.maxWidth;
+                            return Align(
+                              alignment: Alignment.topCenter,
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(maxWidth: maxWidth),
+                                child: _getActiveScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         bottomNavigationBar: showMobileBottomNav && _customBody == null
             ? Container(
@@ -644,7 +666,9 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
           },
           isOpen: false,
         ),
-        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+        floatingActionButtonLocation: _currentIndex == 3
+            ? FloatingActionButtonLocation.startFloat
+            : FloatingActionButtonLocation.endFloat,
       ),
     );
   }

@@ -90,391 +90,396 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: _textColor),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
       body: SingleChildScrollView(
         child: Column(
           children: [
-          // Hero Header
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            child: Column(
-              children: [
-                Text(
-                  '\nContact Support',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    color: _textColor,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Our team is here to help you get back on the road. Reach out via any of the channels below and we\'ll assist you immediately.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 15, color: _subColor, height: 1.5),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 48),
-
-          // Two contact cards (Phone + Email) — centered
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: isDesktop ? 60.0 : 20.0),
-            child: Center(
-              child: Wrap(
-                alignment: WrapAlignment.center,
-                spacing: 24,
-                runSpacing: 24,
+            // Hero Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Column(
                 children: [
-                  _buildContactCard(
-                    icon: Icons.phone_in_talk_outlined,
-                    title: 'Phone',
-                    description: 'Available 24/7 for urgent rental assistance.',
-                    actionText: phone,
+                  Text(
+                    'Contact Support',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w900,
+                      color: _textColor,
+                      letterSpacing: -0.5,
+                    ),
                   ),
-                  _buildContactCard(
-                    icon: Icons.email_outlined,
-                    title: 'Email',
-                    description: 'Get a response within 2 business hours.',
-                    actionText: email,
+                  const SizedBox(height: 12),
+                  Text(
+                    'Our team is here to help you get back on the road. Reach out via any of the channels below and we\'ll assist you immediately.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: _subColor,
+                      height: 1.5,
+                    ),
                   ),
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 60),
+            const SizedBox(height: 28),
 
-          // Send Us a Message form
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: isDesktop ? 60.0 : 20.0),
-            child: Container(
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: Theme.of(context).cardColor,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: _borderColor),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.02),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+            // Two contact cards (Phone + Email) — centered
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: isDesktop ? 60.0 : 20.0,
               ),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+              child: Center(
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 24,
+                  runSpacing: 24,
                   children: [
-                    Text(
-                      'Send Us a Message',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: _textColor,
-                      ),
+                    _buildContactCard(
+                      icon: Icons.phone_in_talk_outlined,
+                      title: 'Phone',
+                      description:
+                          'Available 24/7 for urgent rental assistance.',
+                      actionText: phone,
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Have a question or feedback? Drop us a line and we\'ll get back to you as soon as possible.',
-                      style: TextStyle(color: _subColor, fontSize: 14),
+                    _buildContactCard(
+                      icon: Icons.email_outlined,
+                      title: 'Email',
+                      description: 'Get a response within 2 business hours.',
+                      actionText: email,
                     ),
-                    const SizedBox(height: 24),
-                    TextFormField(
-                      controller: _nameController,
-                      style: TextStyle(color: _textColor),
-                      decoration: InputDecoration(
-                        labelText: 'Full Name',
-                        labelStyle: TextStyle(color: _subColor),
-                        hintText: 'Enter your name',
-                        hintStyle: TextStyle(
-                          color: _isDark ? Colors.white30 : Colors.grey,
-                        ),
-                        prefixIcon: Icon(
-                          Icons.person_outline,
-                          color: _subColor,
-                        ),
-                        enabledBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: _borderColor),
-                        ),
-                      ),
-                      validator: (val) => val == null || val.trim().isEmpty
-                          ? 'Name is required'
-                          : null,
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 60),
+
+            // Send Us a Message form
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: isDesktop ? 60.0 : 20.0,
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(32),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).cardColor,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: _borderColor),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.02),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
                     ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _emailController,
-                      style: TextStyle(color: _textColor),
-                      decoration: InputDecoration(
-                        labelText: 'Email Address',
-                        labelStyle: TextStyle(color: _subColor),
-                        hintText: 'Enter your email',
-                        hintStyle: TextStyle(
-                          color: _isDark ? Colors.white30 : Colors.grey,
-                        ),
-                        prefixIcon: Icon(
-                          Icons.email_outlined,
-                          color: _subColor,
-                        ),
-                        enabledBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: _borderColor),
+                  ],
+                ),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'Send Us a Message',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: _textColor,
                         ),
                       ),
-                      validator: (val) {
-                        if (val == null || val.trim().isEmpty) {
-                          return 'Email is required';
-                        }
-                        if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val)) {
-                          return 'Enter a valid email';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _subjectController,
-                      style: TextStyle(color: _textColor),
-                      decoration: InputDecoration(
-                        labelText: 'Subject',
-                        labelStyle: TextStyle(color: _subColor),
-                        hintText: 'What is this regarding?',
-                        hintStyle: TextStyle(
-                          color: _isDark ? Colors.white30 : Colors.grey,
-                        ),
-                        prefixIcon: Icon(
-                          Icons.subject_outlined,
-                          color: _subColor,
-                        ),
-                        enabledBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: _borderColor),
-                        ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Have a question or feedback? Drop us a line and we\'ll get back to you as soon as possible.',
+                        style: TextStyle(color: _subColor, fontSize: 14),
                       ),
-                      validator: (val) => val == null || val.trim().isEmpty
-                          ? 'Subject is required'
-                          : null,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _messageController,
-                      maxLines: 4,
-                      style: TextStyle(color: _textColor),
-                      decoration: InputDecoration(
-                        labelText: 'Message',
-                        labelStyle: TextStyle(color: _subColor),
-                        hintText: 'How can we help you?',
-                        hintStyle: TextStyle(
-                          color: _isDark ? Colors.white30 : Colors.grey,
-                        ),
-                        prefixIcon: Icon(
-                          Icons.message_outlined,
-                          color: _subColor,
-                        ),
-                        enabledBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: _borderColor),
-                        ),
-                      ),
-                      validator: (val) => val == null || val.trim().isEmpty
-                          ? 'Message cannot be empty'
-                          : null,
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      height: 50,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primaryOrange,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                      const SizedBox(height: 24),
+                      TextFormField(
+                        controller: _nameController,
+                        style: TextStyle(color: _textColor),
+                        decoration: InputDecoration(
+                          labelText: 'Full Name',
+                          labelStyle: TextStyle(color: _subColor),
+                          hintText: 'Enter your name',
+                          hintStyle: TextStyle(
+                            color: _isDark ? Colors.white30 : Colors.grey,
+                          ),
+                          prefixIcon: Icon(
+                            Icons.person_outline,
+                            color: _subColor,
+                          ),
+                          enabledBorder: UnderlineInputBorder(
+                            borderSide: BorderSide(color: _borderColor),
                           ),
                         ),
-                        onPressed: _submitting ? null : _submitForm,
-                        child: _submitting
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text(
-                                'SEND MESSAGE',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 1,
-                                ),
-                              ),
+                        validator: (val) => val == null || val.trim().isEmpty
+                            ? 'Name is required'
+                            : null,
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 60),
-
-          // My Support Tickets
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: isDesktop ? 60.0 : 20.0),
-            child: _buildMyTicketsSection(),
-          ),
-          const SizedBox(height: 60),
-
-          // Headquarters block — live from Firebase
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: isDesktop ? 60.0 : 20.0),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Theme.of(context).cardColor,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: _borderColor),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.02),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _emailController,
+                        style: TextStyle(color: _textColor),
+                        decoration: InputDecoration(
+                          labelText: 'Email Address',
+                          labelStyle: TextStyle(color: _subColor),
+                          hintText: 'Enter your email',
+                          hintStyle: TextStyle(
+                            color: _isDark ? Colors.white30 : Colors.grey,
+                          ),
+                          prefixIcon: Icon(
+                            Icons.email_outlined,
+                            color: _subColor,
+                          ),
+                          enabledBorder: UnderlineInputBorder(
+                            borderSide: BorderSide(color: _borderColor),
+                          ),
+                        ),
+                        validator: (val) {
+                          if (val == null || val.trim().isEmpty) {
+                            return 'Email is required';
+                          }
+                          if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val)) {
+                            return 'Enter a valid email';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _subjectController,
+                        style: TextStyle(color: _textColor),
+                        decoration: InputDecoration(
+                          labelText: 'Subject',
+                          labelStyle: TextStyle(color: _subColor),
+                          hintText: 'What is this regarding?',
+                          hintStyle: TextStyle(
+                            color: _isDark ? Colors.white30 : Colors.grey,
+                          ),
+                          prefixIcon: Icon(
+                            Icons.subject_outlined,
+                            color: _subColor,
+                          ),
+                          enabledBorder: UnderlineInputBorder(
+                            borderSide: BorderSide(color: _borderColor),
+                          ),
+                        ),
+                        validator: (val) => val == null || val.trim().isEmpty
+                            ? 'Subject is required'
+                            : null,
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _messageController,
+                        maxLines: 4,
+                        style: TextStyle(color: _textColor),
+                        decoration: InputDecoration(
+                          labelText: 'Message',
+                          labelStyle: TextStyle(color: _subColor),
+                          hintText: 'How can we help you?',
+                          hintStyle: TextStyle(
+                            color: _isDark ? Colors.white30 : Colors.grey,
+                          ),
+                          prefixIcon: Icon(
+                            Icons.message_outlined,
+                            color: _subColor,
+                          ),
+                          enabledBorder: UnderlineInputBorder(
+                            borderSide: BorderSide(color: _borderColor),
+                          ),
+                        ),
+                        validator: (val) => val == null || val.trim().isEmpty
+                            ? 'Message cannot be empty'
+                            : null,
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        height: 50,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryOrange,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: _submitting ? null : _submitForm,
+                          child: _submitting
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text(
+                                  'SEND MESSAGE',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 1,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Flex(
-                  direction: isDesktop ? Axis.horizontal : Axis.vertical,
-                  children: [
-                    // Address details — live from Firebase
-                    Expanded(
-                      flex: isDesktop ? 1 : 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(40),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Headquarters',
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                color: _textColor,
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Icon(
-                                  Icons.location_on_outlined,
-                                  color: AppColors.primaryOrange,
-                                  size: 24,
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Text(
-                                    address,
-                                    style: TextStyle(
-                                      color: _subColor,
-                                      height: 1.5,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 20),
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.access_time,
-                                  color: AppColors.primaryOrange,
-                                  size: 24,
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Text(
-                                    hours,
-                                    style: TextStyle(
-                                      color: _subColor,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    // Decorative map visual
-                    Expanded(
-                      flex: isDesktop ? 1 : 0,
-                      child: Container(
-                        height: isDesktop ? 260 : 200,
-                        color: _isDark
-                            ? const Color(0xFF1E293B)
-                            : const Color(0xFFE2E8F0),
-                        child: Stack(
-                          children: [
-                            Positioned.fill(
-                              child: Opacity(
-                                opacity: 0.15,
-                                child: Image.network(
-                                  'https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=800',
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                            ),
-                            Center(
-                              child: Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: _isDark
-                                      ? const Color(0xFF0F172A)
-                                      : Colors.white,
-                                  shape: BoxShape.circle,
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      color: Colors.black26,
-                                      blurRadius: 8,
-                                      offset: Offset(0, 3),
-                                    ),
-                                  ],
-                                ),
-                                child: const Icon(
-                                  Icons.directions_car_filled_rounded,
-                                  color: AppColors.primaryOrange,
-                                  size: 36,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 80),
+            const SizedBox(height: 60),
 
-          // Footer
-          _buildFooter(isDesktop),
-        ],
+            // My Support Tickets
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: isDesktop ? 60.0 : 20.0,
+              ),
+              child: _buildMyTicketsSection(),
+            ),
+            const SizedBox(height: 60),
+
+            // Headquarters block — live from Firebase
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: isDesktop ? 60.0 : 20.0,
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).cardColor,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: _borderColor),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.02),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Flex(
+                    direction: isDesktop ? Axis.horizontal : Axis.vertical,
+                    children: [
+                      // Address details — live from Firebase
+                      Expanded(
+                        flex: isDesktop ? 1 : 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(40),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Headquarters',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: _textColor,
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(
+                                    Icons.location_on_outlined,
+                                    color: AppColors.primaryOrange,
+                                    size: 24,
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Text(
+                                      address,
+                                      style: TextStyle(
+                                        color: _subColor,
+                                        height: 1.5,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 20),
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.access_time,
+                                    color: AppColors.primaryOrange,
+                                    size: 24,
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Text(
+                                      hours,
+                                      style: TextStyle(
+                                        color: _subColor,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // Decorative map visual
+                      Expanded(
+                        flex: isDesktop ? 1 : 0,
+                        child: Container(
+                          height: isDesktop ? 260 : 200,
+                          color: _isDark
+                              ? const Color(0xFF1E293B)
+                              : const Color(0xFFE2E8F0),
+                          child: Stack(
+                            children: [
+                              Positioned.fill(
+                                child: Opacity(
+                                  opacity: 0.15,
+                                  child: Image.network(
+                                    'https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=800',
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              ),
+                              Center(
+                                child: Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: _isDark
+                                        ? const Color(0xFF0F172A)
+                                        : Colors.white,
+                                    shape: BoxShape.circle,
+                                    boxShadow: const [
+                                      BoxShadow(
+                                        color: Colors.black26,
+                                        blurRadius: 8,
+                                        offset: Offset(0, 3),
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(
+                                    Icons.directions_car_filled_rounded,
+                                    color: AppColors.primaryOrange,
+                                    size: 36,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 80),
+
+            // Footer
+            _buildFooter(isDesktop),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildContactCard({
     required IconData icon,
@@ -541,10 +546,18 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
           );
         }
         if (snapshot.hasError) {
+          final raw = snapshot.error.toString();
+          final isPermission = raw.toLowerCase().contains('permission-denied');
           return Center(
-            child: Text(
-              'Error loading tickets: ${snapshot.error}',
-              style: const TextStyle(color: Colors.red),
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Text(
+                isPermission
+                    ? 'Support tickets access is currently denied by backend rules. Please retry after session refresh.'
+                    : 'Error loading tickets: $raw',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.red),
+              ),
             ),
           );
         }
@@ -724,7 +737,9 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                 ),
               ),
               StreamBuilder<List<Map<String, dynamic>>>(
-                stream: _databaseService.getTicketsStream(),
+                stream: _databaseService.getTicketsStream(
+                  customerId: FirebaseAuth.instance.currentUser?.uid,
+                ),
                 builder: (context, snap) {
                   String status = ticket['status'] ?? 'Open';
                   if (snap.hasData) {
@@ -988,18 +1003,30 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                 ],
               ),
               if (!isDesktop) const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _buildFooterLink('Privacy Policy'),
-                  const SizedBox(width: 16),
-                  _buildFooterLink('Terms of Service'),
-                  const SizedBox(width: 16),
-                  _buildFooterLink('Fleet Management'),
-                  const SizedBox(width: 16),
-                  _buildFooterLink('Contact Us'),
-                ],
-              ),
+              isDesktop
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _buildFooterLink('Privacy Policy'),
+                        const SizedBox(width: 16),
+                        _buildFooterLink('Terms of Service'),
+                        const SizedBox(width: 16),
+                        _buildFooterLink('Fleet Management'),
+                        const SizedBox(width: 16),
+                        _buildFooterLink('Contact Us'),
+                      ],
+                    )
+                  : Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 16,
+                      runSpacing: 8,
+                      children: [
+                        _buildFooterLink('Privacy Policy'),
+                        _buildFooterLink('Terms of Service'),
+                        _buildFooterLink('Fleet Management'),
+                        _buildFooterLink('Contact Us'),
+                      ],
+                    ),
             ],
           ),
         ],

@@ -137,21 +137,26 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
     showDialog(
       context: context,
       builder: (context) {
+        final isDarkDialog = Theme.of(context).brightness == Brightness.dark;
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 24,
+              ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(24),
               ),
               title: Text(
                 isEdit ? 'Edit Maintenance Record' : 'Schedule Maintenance',
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: AppColors.secondaryBlue,
+                  color: isDarkDialog ? Colors.white : Colors.black,
                 ),
               ),
               content: Container(
-                width: MediaQuery.of(context).size.width * 0.9,
+                width: double.maxFinite,
                 constraints: const BoxConstraints(maxWidth: 500),
                 child: SingleChildScrollView(
                   child: Column(
@@ -159,6 +164,7 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                     children: [
                       DropdownButtonFormField<VehicleModel>(
                         initialValue: selectedVehicle,
+                        isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Select Vehicle',
                         ),
@@ -167,6 +173,7 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                             value: v,
                             child: Text(
                               '${v.brand} ${v.model} (${v.plateNumber})',
+                              maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                           );
