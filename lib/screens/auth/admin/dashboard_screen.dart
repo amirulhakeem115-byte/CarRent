@@ -101,6 +101,52 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   final Set<String> _playedNotificationIds = {};
   bool _notificationsInitialized = false;
 
+  void _markAdminNotificationLocallyRead(String notificationId) {
+    setState(() {
+      _adminNotifications = _adminNotifications.map((n) {
+        if (n.id != notificationId || n.isRead) {
+          return n;
+        }
+        return NotificationModel(
+          id: n.id,
+          userId: n.userId,
+          title: n.title,
+          message: n.message,
+          type: n.type,
+          isRead: true,
+          createdAt: n.createdAt,
+          icon: n.icon,
+          color: n.color,
+          relatedId: n.relatedId,
+          actionRoute: n.actionRoute,
+        );
+      }).toList();
+    });
+  }
+
+  void _markAllAdminNotificationsLocallyRead() {
+    setState(() {
+      _adminNotifications = _adminNotifications.map((n) {
+        if (n.isRead) {
+          return n;
+        }
+        return NotificationModel(
+          id: n.id,
+          userId: n.userId,
+          title: n.title,
+          message: n.message,
+          type: n.type,
+          isRead: true,
+          createdAt: n.createdAt,
+          icon: n.icon,
+          color: n.color,
+          relatedId: n.relatedId,
+          actionRoute: n.actionRoute,
+        );
+      }).toList();
+    });
+  }
+
   // Real-time admin state and tracking properties
   UserModel? _adminUser;
   int _activeBookingsCount = 0;
@@ -1266,6 +1312,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                     TextButton(
                                       onPressed: () async {
                                         Navigator.pop(context);
+                                        _markAllAdminNotificationsLocallyRead();
                                         await _notificationService
                                             .markAllAsRead(
                                               currentUser.uid,
@@ -1353,6 +1400,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                           context,
                                         ); // Close dropdown
                                         if (!notif.isRead) {
+                                          _markAdminNotificationLocallyRead(
+                                            notif.id,
+                                          );
                                           await _notificationService.markAsRead(
                                             notif.userId,
                                             notif.id,
@@ -1608,36 +1658,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   }
                 },
                 itemBuilder: (context) => [
-                  PopupMenuItem(
-                    value: 'profile',
-                    child: Row(
-                      children: [
-                        const Icon(Icons.person_outline, size: 18),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _adminUser?.fullName ?? 'Admin User',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              ),
-                            ),
-                            Text(
-                              _adminUser?.email ?? 'admin@gmail.com',
-                              style: const TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuDivider(),
                   const PopupMenuItem(
                     value: 'profile',
                     child: Row(

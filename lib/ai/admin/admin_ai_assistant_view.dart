@@ -30,6 +30,9 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
   double _totalRevenue = 0.0;
   bool _statsLoaded = false;
 
+  bool _isNarrowScreen(BuildContext context) =>
+      MediaQuery.of(context).size.width < 420;
+
   /// Quick command chips shown above the input bar for the admin
   static const List<_QuickCommand> _quickCommands = [
     _QuickCommand("📊 Dashboard", "Show dashboard summary"),
@@ -126,9 +129,15 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
     final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final borderCol = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
-    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
-    final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final borderCol = isDark
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
+    final textPrimary = isDark
+        ? const Color(0xFFF8FAFC)
+        : AppColors.secondaryBlue;
+    final textSecondary = isDark
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
 
     return Container(
       color: bg,
@@ -138,12 +147,16 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
           _buildHeader(isDark, cardBg, borderCol, textPrimary, textSecondary),
 
           // ── Stats strip ─────────────────────────────────────────────────────
-          _buildStatsStrip(isDark, cardBg, borderCol, textPrimary, textSecondary),
+          _buildStatsStrip(
+            isDark,
+            cardBg,
+            borderCol,
+            textPrimary,
+            textSecondary,
+          ),
 
           // ── Chat Messages ───────────────────────────────────────────────────
-          Expanded(
-            child: _buildMessageList(isDark, bg),
-          ),
+          Expanded(child: _buildMessageList(isDark, bg)),
 
           // ── Quick command chips ─────────────────────────────────────────────
           _buildQuickChips(isDark, cardBg, borderCol),
@@ -159,9 +172,21 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
   // HEADER
   // ─────────────────────────────────────────────────────────────────────────────
 
-  Widget _buildHeader(bool isDark, Color cardBg, Color borderCol, Color textPrimary, Color textSecondary) {
+  Widget _buildHeader(
+    bool isDark,
+    Color cardBg,
+    Color borderCol,
+    Color textPrimary,
+    Color textSecondary,
+  ) {
+    final isNarrow = _isNarrowScreen(context);
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
+      padding: EdgeInsets.fromLTRB(
+        isNarrow ? 16 : 24,
+        20,
+        isNarrow ? 16 : 24,
+        20,
+      ),
       decoration: BoxDecoration(
         color: cardBg,
         border: Border(bottom: BorderSide(color: borderCol)),
@@ -192,7 +217,11 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
                     ),
                   ],
                 ),
-                child: const Icon(Icons.psychology_rounded, color: Colors.white, size: 26),
+                child: const Icon(
+                  Icons.psychology_rounded,
+                  color: Colors.white,
+                  size: 26,
+                ),
               );
             },
           ),
@@ -222,9 +251,16 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
                       ),
                     ),
                     const SizedBox(width: 6),
-                    Text(
-                      'Live System Access · Local AI Engine',
-                      style: TextStyle(fontSize: 11, color: textSecondary),
+                    Expanded(
+                      child: Text(
+                        'Live System Access · Local AI Engine',
+                        style: TextStyle(
+                          fontSize: isNarrow ? 10 : 11,
+                          color: textSecondary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
@@ -237,7 +273,11 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
               message: 'Clear conversation',
               child: IconButton(
                 onPressed: ai.clearHistory,
-                icon: Icon(Icons.refresh_rounded, color: textSecondary, size: 20),
+                icon: Icon(
+                  Icons.refresh_rounded,
+                  color: textSecondary,
+                  size: 20,
+                ),
                 splashRadius: 20,
               ),
             ),
@@ -251,67 +291,104 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
   // STATS STRIP
   // ─────────────────────────────────────────────────────────────────────────────
 
-  Widget _buildStatsStrip(bool isDark, Color cardBg, Color borderCol, Color textPrimary, Color textSecondary) {
+  Widget _buildStatsStrip(
+    bool isDark,
+    Color cardBg,
+    Color borderCol,
+    Color textPrimary,
+    Color textSecondary,
+  ) {
+    final isNarrow = _isNarrowScreen(context);
+
+    final statsChildren = [
+      _buildStatChip(
+        Icons.calendar_today_rounded,
+        _statsLoaded ? '$_totalBookings' : '...',
+        'Bookings',
+        const Color(0xFF3B82F6),
+        isDark,
+      ),
+      const SizedBox(width: 10),
+      _buildStatChip(
+        Icons.directions_car_filled_rounded,
+        _statsLoaded ? '$_totalVehicles' : '...',
+        'Vehicles',
+        const Color(0xFF22C55E),
+        isDark,
+      ),
+      const SizedBox(width: 10),
+      _buildStatChip(
+        Icons.attach_money_rounded,
+        _statsLoaded
+            ? 'RM ${(_totalRevenue / 1000).toStringAsFixed(1)}k'
+            : '...',
+        'Revenue',
+        AppColors.primaryOrange,
+        isDark,
+      ),
+      const SizedBox(width: 10),
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: AppColors.primaryOrange.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: AppColors.primaryOrange.withValues(alpha: 0.3),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.security_rounded,
+              size: 12,
+              color: AppColors.primaryOrange,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              'Admin Mode',
+              style: TextStyle(
+                fontSize: isNarrow ? 9 : 10,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primaryOrange,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ];
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      padding: EdgeInsets.symmetric(
+        horizontal: isNarrow ? 12 : 24,
+        vertical: 12,
+      ),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF172033) : const Color(0xFFF1F5F9),
         border: Border(bottom: BorderSide(color: borderCol)),
       ),
-      child: Row(
-        children: [
-          _buildStatChip(
-            Icons.calendar_today_rounded,
-            _statsLoaded ? '$_totalBookings' : '...',
-            'Bookings',
-            const Color(0xFF3B82F6),
-            isDark,
-          ),
-          const SizedBox(width: 12),
-          _buildStatChip(
-            Icons.directions_car_filled_rounded,
-            _statsLoaded ? '$_totalVehicles' : '...',
-            'Vehicles',
-            const Color(0xFF22C55E),
-            isDark,
-          ),
-          const SizedBox(width: 12),
-          _buildStatChip(
-            Icons.attach_money_rounded,
-            _statsLoaded ? 'RM ${(_totalRevenue / 1000).toStringAsFixed(1)}k' : '...',
-            'Revenue',
-            AppColors.primaryOrange,
-            isDark,
-          ),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: AppColors.primaryOrange.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.primaryOrange.withValues(alpha: 0.3)),
-            ),
-            child: const Row(
+      child: isNarrow
+          ? SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(children: statsChildren),
+            )
+          : Row(
               children: [
-                Icon(Icons.security_rounded, size: 12, color: AppColors.primaryOrange),
-                SizedBox(width: 4),
-                Text(
-                  'Admin Mode',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primaryOrange,
-                  ),
-                ),
+                ...statsChildren.take(5),
+                const Spacer(),
+                statsChildren.last,
               ],
             ),
-          ),
-        ],
-      ),
     );
   }
 
-  Widget _buildStatChip(IconData icon, String value, String label, Color color, bool isDark) {
+  Widget _buildStatChip(
+    IconData icon,
+    String value,
+    String label,
+    Color color,
+    bool isDark,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -391,10 +468,16 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: AppColors.primaryOrange.withValues(alpha: 0.15),
+                              color: AppColors.primaryOrange.withValues(
+                                alpha: 0.15,
+                              ),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Icon(Icons.waving_hand_rounded, color: AppColors.primaryOrange, size: 20),
+                            child: const Icon(
+                              Icons.waving_hand_rounded,
+                              color: AppColors.primaryOrange,
+                              size: 20,
+                            ),
                           ),
                           const SizedBox(width: 12),
                           const Expanded(
@@ -415,7 +498,9 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
                         style: TextStyle(
                           fontSize: 12,
                           height: 1.5,
-                          color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                          color: isDark
+                              ? const Color(0xFFCBD5E1)
+                              : const Color(0xFF475569),
                         ),
                       ),
                     ],
@@ -430,7 +515,9 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    color: isDark
+                        ? const Color(0xFF94A3B8)
+                        : const Color(0xFF64748B),
                     letterSpacing: 0.5,
                   ),
                 ),
@@ -443,16 +530,25 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
                       onTap: () => _sendMessage(cmd.query),
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                          color: isDark
+                              ? const Color(0xFF1E293B)
+                              : Colors.white,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                            color: isDark
+                                ? const Color(0xFF334155)
+                                : const Color(0xFFE2E8F0),
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.05),
+                              color: Colors.black.withValues(
+                                alpha: isDark ? 0.15 : 0.05,
+                              ),
                               blurRadius: 6,
                               offset: const Offset(0, 2),
                             ),
@@ -463,7 +559,9 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: isDark ? const Color(0xFFCBD5E1) : AppColors.secondaryBlue,
+                            color: isDark
+                                ? const Color(0xFFCBD5E1)
+                                : AppColors.secondaryBlue,
                           ),
                         ),
                       ),
@@ -483,7 +581,10 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
           itemBuilder: (context, index) {
             if (index == messages.length) {
               return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 20),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 6,
+                  horizontal: 20,
+                ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -494,7 +595,11 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
                         color: AppColors.primaryOrange.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(9),
                       ),
-                      child: const Icon(Icons.psychology_rounded, size: 15, color: AppColors.primaryOrange),
+                      child: const Icon(
+                        Icons.psychology_rounded,
+                        size: 15,
+                        color: AppColors.primaryOrange,
+                      ),
                     ),
                     const SizedBox(width: 10),
                     const TypingIndicator(dotSize: 5.5),
@@ -530,12 +635,17 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
                 onTap: () => _sendMessage(cmd.query),
                 borderRadius: BorderRadius.circular(20),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: isDark ? const Color(0xFF1E293B) : Colors.white,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                      color: isDark
+                          ? const Color(0xFF334155)
+                          : const Color(0xFFE2E8F0),
                     ),
                   ),
                   child: Text(
@@ -543,7 +653,9 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: isDark ? const Color(0xFFCBD5E1) : AppColors.secondaryBlue,
+                      color: isDark
+                          ? const Color(0xFFCBD5E1)
+                          : AppColors.secondaryBlue,
                     ),
                   ),
                 ),
@@ -559,7 +671,13 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
   // INPUT BAR
   // ─────────────────────────────────────────────────────────────────────────────
 
-  Widget _buildInputBar(bool isDark, Color cardBg, Color borderCol, Color textPrimary, Color textSecondary) {
+  Widget _buildInputBar(
+    bool isDark,
+    Color cardBg,
+    Color borderCol,
+    Color textPrimary,
+    Color textSecondary,
+  ) {
     return SafeArea(
       top: false,
       child: Container(
@@ -575,11 +693,16 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
               child: Container(
                 constraints: const BoxConstraints(maxHeight: 130),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                  color: isDark
+                      ? const Color(0xFF0F172A)
+                      : const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(22),
                   border: Border.all(color: borderCol),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 2,
+                ),
                 child: KeyboardListener(
                   focusNode: FocusNode(),
                   onKeyEvent: (event) {
@@ -601,10 +724,13 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
                       color: textPrimary,
                     ),
                     decoration: InputDecoration(
-                      hintText: 'Ask about bookings, revenue, fleet, reports...',
+                      hintText:
+                          'Ask about bookings, revenue, fleet, reports...',
                       hintStyle: TextStyle(
                         fontSize: 12.5,
-                        color: isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8),
+                        color: isDark
+                            ? const Color(0xFF475569)
+                            : const Color(0xFF94A3B8),
                       ),
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
@@ -629,17 +755,26 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
                     decoration: BoxDecoration(
                       gradient: canSend
                           ? const LinearGradient(
-                              colors: [AppColors.primaryOrange, Color(0xFFEA580C)],
+                              colors: [
+                                AppColors.primaryOrange,
+                                Color(0xFFEA580C),
+                              ],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             )
                           : null,
-                      color: canSend ? null : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                      color: canSend
+                          ? null
+                          : (isDark
+                                ? const Color(0xFF334155)
+                                : const Color(0xFFE2E8F0)),
                       shape: BoxShape.circle,
                       boxShadow: canSend
                           ? [
                               BoxShadow(
-                                color: AppColors.primaryOrange.withValues(alpha: 0.4),
+                                color: AppColors.primaryOrange.withValues(
+                                  alpha: 0.4,
+                                ),
                                 blurRadius: 12,
                                 offset: const Offset(0, 3),
                               ),
@@ -647,8 +782,14 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
                           : null,
                     ),
                     child: Icon(
-                      ai.isLoading ? Icons.hourglass_empty_rounded : Icons.arrow_upward_rounded,
-                      color: canSend ? Colors.white : (isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
+                      ai.isLoading
+                          ? Icons.hourglass_empty_rounded
+                          : Icons.arrow_upward_rounded,
+                      color: canSend
+                          ? Colors.white
+                          : (isDark
+                                ? const Color(0xFF475569)
+                                : const Color(0xFFCBD5E1)),
                       size: 20,
                     ),
                   ),

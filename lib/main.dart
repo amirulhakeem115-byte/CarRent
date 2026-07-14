@@ -83,6 +83,21 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: '$companyName System',
+      builder: (context, child) {
+        final media = MediaQuery.of(context);
+        final isMobile = media.size.shortestSide < 600;
+        if (!isMobile) {
+          return child ?? const SizedBox.shrink();
+        }
+
+        final currentScale = media.textScaler.scale(1.0);
+        final clampedScale = currentScale.clamp(0.9, 1.0);
+
+        return MediaQuery(
+          data: media.copyWith(textScaler: TextScaler.linear(clampedScale)),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       themeMode: themeProvider.themeMode,
       theme: ThemeData(
         useMaterial3: true,

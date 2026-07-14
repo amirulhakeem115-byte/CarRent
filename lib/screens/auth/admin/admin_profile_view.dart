@@ -675,7 +675,7 @@ class _AdminProfileViewState extends State<AdminProfileView> {
                               const SizedBox(height: 4),
                               Text(
                                 themeProvider.themeMode == ThemeMode.system
-                                    ? 'System Default'
+                                    ? 'System'
                                     : themeProvider.themeMode == ThemeMode.light
                                     ? 'Light Mode'
                                     : 'Dark Mode',
@@ -691,7 +691,9 @@ class _AdminProfileViewState extends State<AdminProfileView> {
                           ),
                         ),
                         DropdownButton<ThemeMode>(
-                          value: themeProvider.themeMode,
+                          value: themeProvider.themeMode == ThemeMode.dark
+                              ? ThemeMode.dark
+                              : ThemeMode.light,
                           onChanged: (mode) {
                             if (mode != null) {
                               themeProvider.setThemeMode(mode);
@@ -707,10 +709,6 @@ class _AdminProfileViewState extends State<AdminProfileView> {
                             fontWeight: FontWeight.bold,
                           ),
                           items: const [
-                            DropdownMenuItem(
-                              value: ThemeMode.system,
-                              child: Text('System'),
-                            ),
                             DropdownMenuItem(
                               value: ThemeMode.light,
                               child: Text('Light'),

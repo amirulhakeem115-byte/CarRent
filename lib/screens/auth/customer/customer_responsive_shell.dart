@@ -66,6 +66,52 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
   StreamSubscription<DatabaseEvent>? _userProfileSubscription;
   final Set<String> _playedNotificationIds = {};
 
+  void _markNotificationLocallyRead(String notificationId) {
+    setState(() {
+      _notifications = _notifications.map((n) {
+        if (n.id != notificationId || n.isRead) {
+          return n;
+        }
+        return NotificationModel(
+          id: n.id,
+          userId: n.userId,
+          title: n.title,
+          message: n.message,
+          type: n.type,
+          isRead: true,
+          createdAt: n.createdAt,
+          icon: n.icon,
+          color: n.color,
+          relatedId: n.relatedId,
+          actionRoute: n.actionRoute,
+        );
+      }).toList();
+    });
+  }
+
+  void _markAllNotificationsLocallyRead() {
+    setState(() {
+      _notifications = _notifications.map((n) {
+        if (n.isRead) {
+          return n;
+        }
+        return NotificationModel(
+          id: n.id,
+          userId: n.userId,
+          title: n.title,
+          message: n.message,
+          type: n.type,
+          isRead: true,
+          createdAt: n.createdAt,
+          icon: n.icon,
+          color: n.color,
+          relatedId: n.relatedId,
+          actionRoute: n.actionRoute,
+        );
+      }).toList();
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -316,6 +362,7 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                 onPressed: () async {
                   ScaffoldMessenger.of(context).hideCurrentSnackBar();
                   if (!notif.isRead) {
+                    _markNotificationLocallyRead(notif.id);
                     await _notificationService.markAsRead(
                       notif.userId,
                       notif.id,
@@ -701,7 +748,9 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Notifications ($unreadCount)',
+                          unreadCount > 0
+                              ? 'Notifications ($unreadCount)'
+                              : 'Notifications',
                           style: const TextStyle(
                             fontWeight: FontWeight.w900,
                             fontSize: 14,
@@ -713,6 +762,7 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                           TextButton(
                             onPressed: () async {
                               Navigator.pop(context);
+                              _markAllNotificationsLocallyRead();
                               await _notificationService.markAllAsRead(
                                 _user!.id,
                               );
@@ -769,6 +819,7 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                             onTap: () async {
                               Navigator.pop(context);
                               if (!notif.isRead) {
+                                _markNotificationLocallyRead(notif.id);
                                 await _notificationService.markAsRead(
                                   notif.userId,
                                   notif.id,

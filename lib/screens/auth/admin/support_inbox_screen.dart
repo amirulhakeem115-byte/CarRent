@@ -137,15 +137,20 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                     borderRadius: BorderRadius.circular(24),
                   ),
                   title: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Support Ticket Specs',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.secondaryBlue,
+                      const Expanded(
+                        child: Text(
+                          'Support Ticket Specs',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.secondaryBlue,
+                          ),
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 10,
@@ -159,7 +164,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                           status.toUpperCase(),
                           style: TextStyle(
                             color: statusColor,
-                            fontSize: 10,
+                            fontSize: 9,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -192,6 +197,8 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                             fontSize: 13,
                             color: AppColors.secondaryBlue,
                           ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         Text(
                           'Subject: $subject',
@@ -200,6 +207,8 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                             fontSize: 13,
                             color: AppColors.primaryOrange,
                           ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         const Divider(height: 20),
 
@@ -357,8 +366,10 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                         const Divider(height: 24),
 
                         // Status transitions dropdown
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          spacing: 12,
+                          runSpacing: 8,
                           children: [
                             const Text(
                               'Modify Ticket Status:',

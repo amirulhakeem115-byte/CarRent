@@ -365,8 +365,7 @@ class _VehiclesViewState extends State<VehiclesView> {
                           controller: _searchController,
                           style: TextStyle(color: textPrimary),
                           decoration: InputDecoration(
-                            hintText:
-                                'Search by make, model, or plate number...',
+                            hintText: 'Search by make/ model/ plate number',
                             hintStyle: TextStyle(
                               color: textSecondary.withValues(alpha: 0.7),
                             ),
@@ -404,7 +403,7 @@ class _VehiclesViewState extends State<VehiclesView> {
                         controller: _searchController,
                         style: TextStyle(color: textPrimary),
                         decoration: InputDecoration(
-                          hintText: 'Search by make, model, or plate number...',
+                          hintText: 'Search by make/ model/ plate number',
                           hintStyle: TextStyle(
                             color: textSecondary.withValues(alpha: 0.7),
                           ),

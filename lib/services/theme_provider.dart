@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ThemeProvider extends ChangeNotifier {
-  ThemeMode _themeMode = ThemeMode.system;
+  ThemeMode _themeMode = ThemeMode.light;
 
   ThemeMode get themeMode => _themeMode;
 
@@ -22,7 +22,8 @@ class ThemeProvider extends ChangeNotifier {
         } else if (themeStr == 'dark') {
           _themeMode = ThemeMode.dark;
         } else {
-          _themeMode = ThemeMode.system;
+          // Keep light as app default even when legacy/system value exists.
+          _themeMode = ThemeMode.light;
         }
         notifyListeners();
       }
