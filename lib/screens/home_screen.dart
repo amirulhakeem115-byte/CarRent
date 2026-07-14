@@ -28,19 +28,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // AI Generated Car Images - Multiple reliable sources
-  static const String _aiCarImage1 =
-      'https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&q=80&w=800&h=500';
 
-  static const String _aiCarImage2 =
-      'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=800&h=500';
-
-  static const String _aiCarImage3 =
-      'https://images.unsplash.com/photo-1614200187524-dc4b892acf16?auto=format&fit=crop&q=80&w=800&h=500';
-
-  // Using a reliable high-quality car image with transparent-like background
-  static const String _aiCarImageUrl =
-      'https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&q=80&w=800&h=500';
 
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
@@ -50,8 +38,6 @@ class _HomeScreenState extends State<HomeScreen> {
   UserModel? _user;
   List<BranchModel> _branches = [];
   BranchModel? _selectedPickupBranch;
-  DateTime? _pickupDate;
-  DateTime? _returnDate;
   List<VehicleModel> _vehicles = [];
   bool _loading = true;
   String? _error;
@@ -285,53 +271,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _selectDate(BuildContext context, bool isPickup) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now().add(const Duration(days: 1)),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 90)),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: AppColors.primaryOrange,
-              onPrimary: Colors.white,
-              onSurface: AppColors.secondaryBlue,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null) {
-      setState(() {
-        if (isPickup) {
-          _pickupDate = picked;
-          if (_returnDate != null && _returnDate!.isBefore(_pickupDate!)) {
-            _returnDate = null;
-          }
-        } else {
-          _returnDate = picked;
-        }
-      });
-    }
-  }
 
-  void _searchCars() {
-    if (_selectedPickupBranch == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a pickup branch location.'),
-        ),
-      );
-      return;
-    }
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const VehicleListScreen()),
-    );
-  }
 
   Future<void> _submitContactForm() async {
     if (!_contactFormKey.currentState!.validate()) return;
@@ -373,23 +313,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  List<DropdownMenuItem<BranchModel>> _buildBranchDropdownItems() {
-    return [
-      const DropdownMenuItem<BranchModel>(
-        value: null,
-        child: _BranchDropdownItem(
-          label: '--Please select--',
-          isPlaceholder: true,
-        ),
-      ),
-      ..._branches.map((branch) {
-        return DropdownMenuItem<BranchModel>(
-          value: branch,
-          child: _BranchDropdownItem(label: branch.name),
-        );
-      }),
-    ];
-  }
+
 
   Widget _buildHeaderNavigation() {
     return Row(
@@ -718,61 +642,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildCarImage(bool isDesktop) {
     final double height = isDesktop ? 420 : 220;
-    final double iconSize = isDesktop ? 140 : 100;
 
     return Container(
       height: height,
       alignment: Alignment.center,
-      child: Image.network(
-        _aiCarImageUrl,
+      child: Image.asset(
+        'assets/honda_city_transparent.png',
         height: height,
         fit: BoxFit.contain,
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return SizedBox(
-            height: height,
-            child: Center(
-              child: CircularProgressIndicator(
-                color: AppColors.primaryOrange,
-                value: loadingProgress.expectedTotalBytes != null
-                    ? loadingProgress.cumulativeBytesLoaded /
-                          loadingProgress.expectedTotalBytes!
-                    : null,
-              ),
-            ),
-          );
-        },
-        errorBuilder: (context, error, stackTrace) {
-          // Try fallback image
-          return Image.network(
-            'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=800&h=500',
-            height: height,
-            fit: BoxFit.contain,
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return SizedBox(
-                height: height,
-                child: Center(
-                  child: CircularProgressIndicator(
-                    color: AppColors.primaryOrange,
-                    value: loadingProgress.expectedTotalBytes != null
-                        ? loadingProgress.cumulativeBytesLoaded /
-                              loadingProgress.expectedTotalBytes!
-                        : null,
-                  ),
-                ),
-              );
-            },
-            errorBuilder: (context, error, stackTrace) {
-              // Ultimate fallback - icon
-              return Icon(
-                Icons.directions_car,
-                color: Colors.white.withValues(alpha: 0.8),
-                size: iconSize,
-              );
-            },
-          );
-        },
       ),
     );
   }
@@ -1762,10 +1639,12 @@ class _HomeScreenState extends State<HomeScreen> {
                             icon: Icons.email_outlined,
                           ),
                           validator: (val) {
-                            if (val == null || val.trim().isEmpty)
+                            if (val == null || val.trim().isEmpty) {
                               return 'Email is required';
-                            if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val))
+                            }
+                            if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val)) {
                               return 'Enter a valid email';
+                            }
                             return null;
                           },
                         ),

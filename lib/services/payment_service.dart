@@ -55,6 +55,8 @@ class PaymentService {
       // Fetch booking details to include customer name and vehicle name
       String customerName = 'Customer';
       String vehicleName = 'Vehicle';
+      String? currentBookingStatus;
+      String? vehicleId;
       try {
         final bSnap = await FirebaseDatabase.instance
             .ref()
@@ -65,9 +67,53 @@ class PaymentService {
           final bData = bSnap.value as Map;
           customerName = bData['userName'] ?? 'Customer';
           vehicleName = bData['vehicleName'] ?? 'Vehicle';
+          currentBookingStatus = bData['status'] as String?;
+          vehicleId = bData['vehicleId'] as String?;
         }
       } catch (e) {
         debugPrint('Error getting booking info for payment notification: $e');
+      }
+
+      if (isApproved && currentBookingStatus == 'Awaiting Final Payment' && vehicleId != null) {
+        try {
+          final bookingService = BookingService();
+          await bookingService.updateBookingStatus(
+            payment.bookingId,
+            'completed',
+            payment.userId,
+            vehicleId,
+            vehicleName,
+          );
+          
+          try {
+            await FirebaseDatabase.instance
+                .ref()
+                .child('vehicles')
+                .child(vehicleId)
+                .update({'status': 'Available'});
+          } catch (vErr) {
+            debugPrint('Error updating vehicle to Available on final payment creation: $vErr');
+          }
+
+          // Award reward points automatically if enabled
+          final rewardsEnabled = CompanySettingsProvider().getField('rewardsEnabled', defaultValue: true) as bool;
+          if (rewardsEnabled) {
+            try {
+              await RewardPointsService().awardPointsForBooking(payment.bookingId);
+            } catch (rewardErr) {
+              debugPrint('Error awarding reward points on final invoice clearance: $rewardErr');
+            }
+          }
+
+          // Trigger automatic receipt check
+          try {
+            await ReceiptService().triggerAutomaticReceiptCheck(payment.bookingId);
+          } catch (receiptErr) {
+            debugPrint('Error generating receipt on final invoice clearance: $receiptErr');
+          }
+        } catch (e) {
+          debugPrint('Error processing final payment booking update: $e');
+        }
       }
 
       if (isApproved) {

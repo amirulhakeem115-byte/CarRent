@@ -116,172 +116,186 @@ class BookingConfirmationScreen extends StatelessWidget {
                             // Main contents
                             Padding(
                               padding: const EdgeInsets.all(28.0),
-                              child: Flex(
-                                direction: isDesktop ? Axis.horizontal : Axis.vertical,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // LEFT PANEL - Vehicle info
-                                  Expanded(
-                                    flex: isDesktop ? 5 : 0,
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        // Vehicle Image
-                                        ClipRRect(
-                                          borderRadius: BorderRadius.circular(16),
-                                          child: vehicle.mainImage.isNotEmpty
-                                              ? AppImage(
-                                                  imageSrc: vehicle.mainImage,
-                                                  height: 180,
-                                                  width: double.infinity,
-                                                  fit: BoxFit.cover,
-                                                  placeholder: Container(
-                                                    height: 180,
-                                                    color: isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
-                                                    child: const Icon(Icons.car_rental, size: 60, color: Colors.grey),
-                                                  ),
-                                                )
-                                              : Container(
-                                                  height: 180,
-                                                  width: double.infinity,
-                                                  color: isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
-                                                  child: const Icon(Icons.directions_car, size: 80, color: Colors.grey),
-                                                ),
-                                        ),
-                                        const SizedBox(height: 20),
-                                        Text(
-                                          '${vehicle.brand} ${vehicle.model}',
-                                          style: TextStyle(
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.w900,
-                                            color: textPrimary,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Row(
-                                          children: [
-                                            const Icon(Icons.tag_rounded, size: 14, color: AppColors.primaryOrange),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              vehicle.plateNumber.toUpperCase(),
-                                              style: TextStyle(
-                                                color: textSecondary,
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 13,
-                                                letterSpacing: 0.5,
+                              child: () {
+                                final leftPanel = Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Vehicle Image
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(16),
+                                      child: vehicle.mainImage.isNotEmpty
+                                          ? AppImage(
+                                              imageSrc: vehicle.mainImage,
+                                              height: 180,
+                                              width: double.infinity,
+                                              fit: BoxFit.cover,
+                                              placeholder: Container(
+                                                height: 180,
+                                                color: isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
+                                                child: const Icon(Icons.car_rental, size: 60, color: Colors.grey),
                                               ),
+                                            )
+                                          : Container(
+                                              height: 180,
+                                              width: double.infinity,
+                                              color: isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
+                                              child: const Icon(Icons.directions_car, size: 80, color: Colors.grey),
                                             ),
-                                            const SizedBox(width: 16),
-                                            const Icon(Icons.color_lens_outlined, size: 14, color: Colors.grey),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              vehicle.color,
-                                              style: TextStyle(color: textSecondary, fontSize: 13),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 16),
-                                        const Divider(color: Colors.white10),
-                                        const SizedBox(height: 16),
-                                        _infoBlock(Icons.my_location, 'Pick Up & Return Hub', vehicle.branchName.isNotEmpty ? vehicle.branchName : 'HQ Central Branch', isDark),
-                                      ],
                                     ),
-                                  ),
-                                  if (isDesktop) ...[
-                                    const SizedBox(width: 40),
-                                    Container(width: 1, height: 320, color: isDark ? const Color(0xFF334155) : AppColors.borderGray),
-                                    const SizedBox(width: 40),
-                                  ] else ...[
-                                    const SizedBox(height: 24),
-                                    const Divider(),
-                                    const SizedBox(height: 24),
-                                  ],
-                                  // RIGHT PANEL - Booking & Payment Info
-                                  Expanded(
-                                    flex: isDesktop ? 6 : 0,
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                    const SizedBox(height: 20),
+                                    Text(
+                                      '${vehicle.brand} ${vehicle.model}',
+                                      style: TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w900,
+                                        color: textPrimary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
                                       children: [
+                                        const Icon(Icons.tag_rounded, size: 14, color: AppColors.primaryOrange),
+                                        const SizedBox(width: 4),
                                         Text(
-                                          'RESERVATION DETAILS',
+                                          vehicle.plateNumber.toUpperCase(),
                                           style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
                                             color: textSecondary,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
                                             letterSpacing: 0.5,
                                           ),
                                         ),
-                                        const SizedBox(height: 16),
-                                        _detailRow('Booking Reference', booking.id.toUpperCase(), isDark, isCode: true),
-                                        _detailRow('Status', booking.status, isDark, highlightValue: true),
-                                        _detailRow('Check-in Date', dateTimeFormat.format(booking.pickUpDate), isDark),
-                                        _detailRow('Check-out Date', booking.isOpenRental ? 'Open Rental' : (booking.returnDate != null ? dateTimeFormat.format(booking.returnDate!) : ""), isDark),
-                                        _detailRow('Rental Duration', '$days Day${days == 1 ? '' : 's'}', isDark),
-                                        const SizedBox(height: 16),
-                                        const Divider(color: Colors.white10),
-                                        const SizedBox(height: 16),
+                                        const SizedBox(width: 16),
+                                        const Icon(Icons.color_lens_outlined, size: 14, color: Colors.grey),
+                                        const SizedBox(width: 4),
                                         Text(
-                                          'PAYMENT SUMMARY',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: textSecondary,
-                                            letterSpacing: 0.5,
-                                          ),
+                                          vehicle.color,
+                                          style: TextStyle(color: textSecondary, fontSize: 13),
                                         ),
-                                        const SizedBox(height: 16),
-                                        _detailRow('Payment Method', paymentMethod, isDark),
-                                        _detailRow('Points Redeemed', '${booking.pointsRedeemed} Points', isDark, isPoints: booking.pointsRedeemed > 0),
-                                        _detailRow('Total Rent Price', 'RM ${booking.totalPrice.toStringAsFixed(2)}', isDark, isPrice: true),
-                                        if (booking.depositAmount > 0)
-                                          _detailRow('Deposit Paid', 'RM ${booking.depositAmount.toStringAsFixed(2)}', isDark, highlightValue: true),
                                       ],
                                     ),
-                                  ),
-                                ],
-                              ),
+                                    const SizedBox(height: 16),
+                                    const Divider(color: Colors.white10),
+                                    const SizedBox(height: 16),
+                                    _infoBlock(Icons.my_location, 'Pick Up & Return Hub', vehicle.branchName.isNotEmpty ? vehicle.branchName : 'HQ Central Branch', isDark),
+                                  ],
+                                );
+
+                                final rightPanel = Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'RESERVATION DETAILS',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: textSecondary,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    _detailRow('Booking Reference', booking.id.toUpperCase(), isDark, isCode: true),
+                                    _detailRow('Status', booking.status, isDark, highlightValue: true),
+                                    _detailRow('Check-in Date', dateTimeFormat.format(booking.pickUpDate), isDark),
+                                    _detailRow('Check-out Date', booking.isOpenRental ? 'Open Rental' : (booking.returnDate != null ? dateTimeFormat.format(booking.returnDate!) : ""), isDark),
+                                    _detailRow('Rental Duration', '$days Day${days == 1 ? '' : 's'}', isDark),
+                                    const SizedBox(height: 16),
+                                    const Divider(color: Colors.white10),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      'PAYMENT SUMMARY',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: textSecondary,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    _detailRow('Payment Method', paymentMethod, isDark),
+                                    _detailRow('Points Redeemed', '${booking.pointsRedeemed} Points', isDark, isPoints: booking.pointsRedeemed > 0),
+                                    _detailRow('Total Rent Price', 'RM ${booking.totalPrice.toStringAsFixed(2)}', isDark, isPrice: true),
+                                    if (booking.depositAmount > 0)
+                                      _detailRow('Deposit Paid', 'RM ${booking.depositAmount.toStringAsFixed(2)}', isDark, highlightValue: true),
+                                  ],
+                                );
+
+                                return Flex(
+                                  direction: isDesktop ? Axis.horizontal : Axis.vertical,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    isDesktop
+                                        ? Expanded(
+                                            flex: 5,
+                                            child: leftPanel,
+                                          )
+                                        : leftPanel,
+                                    if (isDesktop) ...[
+                                      const SizedBox(width: 40),
+                                      Container(width: 1, height: 320, color: isDark ? const Color(0xFF334155) : AppColors.borderGray),
+                                      const SizedBox(width: 40),
+                                    ] else ...[
+                                      const SizedBox(height: 24),
+                                      const Divider(),
+                                      const SizedBox(height: 24),
+                                    ],
+                                    isDesktop
+                                        ? Expanded(
+                                            flex: 6,
+                                            child: rightPanel,
+                                          )
+                                        : rightPanel,
+                                  ],
+                                );
+                              }(),
                             ),
                             // Action Panel at bottom of details card
                             Container(
                               color: isDark ? const Color(0xFF0F172A) : AppColors.lightGray.withValues(alpha: 0.5),
                               padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-                              child: Flex(
-                                direction: isDesktop ? Axis.horizontal : Axis.vertical,
-                                children: [
-                                  const Icon(Icons.stars_rounded, color: Colors.amber, size: 24),
-                                  const SizedBox(width: 12, height: 8),
-                                  Expanded(
-                                    child: RichText(
-                                      textAlign: isDesktop ? TextAlign.start : TextAlign.center,
-                                      text: TextSpan(
-                                        style: TextStyle(color: isDark ? const Color(0xFFCBD5E1) : AppColors.secondaryBlue, fontSize: 13, height: 1.4),
-                                        children: [
-                                          const TextSpan(text: 'Congratulations! You earned '),
-                                          TextSpan(
-                                            text: '$pointsEarned loyalty points',
-                                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
-                                          ),
-                                          const TextSpan(text: ' from this reservation transaction.'),
-                                        ],
+                              child: () {
+                                final textWidget = RichText(
+                                  textAlign: isDesktop ? TextAlign.start : TextAlign.center,
+                                  text: TextSpan(
+                                    style: TextStyle(color: isDark ? const Color(0xFFCBD5E1) : AppColors.secondaryBlue, fontSize: 13, height: 1.4),
+                                    children: [
+                                      const TextSpan(text: 'Congratulations! You earned '),
+                                      TextSpan(
+                                        text: '$pointsEarned loyalty points',
+                                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
                                       ),
-                                    ),
+                                      const TextSpan(text: ' from this reservation transaction.'),
+                                    ],
                                   ),
-                                  if (!isDesktop) const SizedBox(height: 16),
-                                  OutlinedButton.icon(
-                                    style: OutlinedButton.styleFrom(
-                                      side: const BorderSide(color: AppColors.primaryOrange),
-                                      foregroundColor: AppColors.primaryOrange,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                );
+
+                                return Flex(
+                                  direction: isDesktop ? Axis.horizontal : Axis.vertical,
+                                  children: [
+                                    const Icon(Icons.stars_rounded, color: Colors.amber, size: 24),
+                                    const SizedBox(width: 12, height: 8),
+                                    isDesktop
+                                        ? Expanded(
+                                            child: textWidget,
+                                          )
+                                        : textWidget,
+                                    if (!isDesktop) const SizedBox(height: 16),
+                                    OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        side: const BorderSide(color: AppColors.primaryOrange),
+                                        foregroundColor: AppColors.primaryOrange,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                      ),
+                                      onPressed: () {
+                                        ReceiptService().viewReceipt(context, booking.id);
+                                      },
+                                      icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                                      label: const Text('Digital Invoice', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                                     ),
-                                    onPressed: () {
-                                      ReceiptService().viewReceipt(context, booking.id);
-                                    },
-                                    icon: const Icon(Icons.receipt_long_outlined, size: 18),
-                                    label: const Text('Digital Invoice', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                  ),
-                                ],
-                              ),
+                                  ],
+                                );
+                              }(),
                             ),
                           ],
                         ),
@@ -290,8 +304,10 @@ class BookingConfirmationScreen extends StatelessWidget {
                     const SizedBox(height: 32),
 
                     // ACTION BUTTONS
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 16,
+                      runSpacing: 12,
                       children: [
                         ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
@@ -311,7 +327,6 @@ class BookingConfirmationScreen extends StatelessWidget {
                           icon: const Icon(Icons.home_outlined),
                           label: const Text('Return Home', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                         ),
-                        const SizedBox(width: 16),
                         OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
                             side: BorderSide(color: textPrimary),
@@ -488,15 +503,14 @@ class BookingConfirmationScreen extends StatelessWidget {
                 ],
               ),
               if (!isDesktop) const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 16,
+                runSpacing: 8,
                 children: [
                   _buildFooterLink('Privacy Policy'),
-                  const SizedBox(width: 16),
                   _buildFooterLink('Terms of Service'),
-                  const SizedBox(width: 16),
                   _buildFooterLink('Fleet Management'),
-                  const SizedBox(width: 16),
                   _buildFooterLink('Contact Us'),
                 ],
               ),

@@ -44,6 +44,7 @@
 
     "notifications": {
       ".indexOn": ["userId", "relatedId", "type"],
+      ".read": "auth != null && query.orderByChild == 'userId' && (query.equalTo == auth.uid || (query.equalTo == 'admin' && root.child('users').child(auth.uid).child('role').val() == 'admin'))",
       "$notificationId": {
         ".read": "auth != null && (data.child('userId').val() == auth.uid || (data.child('userId').val() == 'admin' && root.child('users').child(auth.uid).child('role').val() == 'admin'))",
         ".write": "auth != null && (( !data.exists() && (newData.child('userId').val() == auth.uid || newData.child('userId').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'admin')) || (data.exists() && (data.child('userId').val() == auth.uid || root.child('users').child(auth.uid).child('role').val() == 'admin')))"

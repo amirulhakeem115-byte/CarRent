@@ -119,7 +119,7 @@ class IntentEngine {
     double confidence = 0.0;
     final Map<String, dynamic> params = {};
 
-    final bookingKeywords = ['booking', 'bookings', 'rentals', 'rental', 'reservation', 'reservations', 'book', 'rent', 'need a vehicle', 'rent a car', 'need a car'];
+    final bookingKeywords = ['booking', 'bookings', 'rentals', 'rental', 'reservation', 'reservations', 'book', 'rent', 'need a vehicle', 'rent a car', 'need a car', 'renew', 'extend', 'return', 'status'];
     bool hasBookingKeyword = false;
     for (final kw in bookingKeywords) {
       if (text.contains(kw)) {
@@ -135,6 +135,15 @@ class IntentEngine {
       if (text.contains('cancel') || text.contains('cancellation') || text.contains('terminate')) {
         confidence = 0.95;
         params['action'] = 'cancel_booking';
+      } else if (text.contains('renew') || text.contains('extend') || text.contains('extension')) {
+        confidence = 0.95;
+        params['action'] = 'renew_booking';
+      } else if (text.contains('return') || text.contains('give back')) {
+        confidence = 0.95;
+        params['action'] = 'return_vehicle';
+      } else if (text.contains('status') || text.contains('check')) {
+        confidence = 0.95;
+        params['action'] = 'check_booking_status';
       } else if (text.contains('overdue')) {
         confidence = 0.95;
         params['action'] = 'admin_overdue_bookings';
@@ -156,6 +165,15 @@ class IntentEngine {
       if (text.contains('cancel') && (text.contains('my car') || text.contains('my ride'))) {
         confidence = 0.80;
         params['action'] = 'cancel_booking';
+      } else if (text.contains('renew') || text.contains('extend')) {
+        confidence = 0.85;
+        params['action'] = 'renew_booking';
+      } else if (text.contains('return') && (text.contains('car') || text.contains('vehicle') || text.contains('my') || text.contains('vios') || text.contains('civic') || text.contains('saga') || text.contains('alza') || text.contains('myvi') || text.contains('city'))) {
+        confidence = 0.85;
+        params['action'] = 'return_vehicle';
+      } else if (text.contains('status') && (text.contains('booking') || text.contains('reservation') || text.contains('my'))) {
+        confidence = 0.85;
+        params['action'] = 'check_booking_status';
       } else if (text.contains('overdue')) {
         confidence = 0.90;
         params['action'] = 'admin_overdue_bookings';
@@ -267,10 +285,13 @@ class IntentEngine {
     double confidence = 0.0;
     final Map<String, dynamic> params = {};
 
-    final branchKeywords = ['branch', 'branches', 'location', 'locations', 'hubs', 'where are you', 'map', 'rental hubs', 'office', 'offices'];
+    final branchKeywords = ['branch', 'branches', 'location', 'locations', 'hubs', 'where are you', 'map', 'rental hubs', 'office', 'offices', 'policy', 'policies', 'rules', 'rule', 'open rental'];
     for (final kw in branchKeywords) {
       if (text.contains(kw)) {
         confidence = 0.90;
+        if (kw.contains('policy') || kw.contains('policies') || kw.contains('rules') || kw.contains('rule') || kw.contains('open rental')) {
+          params['action'] = 'explain_policy';
+        }
         break;
       }
     }
@@ -346,7 +367,7 @@ class IntentEngine {
     double confidence = 0.0;
     final Map<String, dynamic> params = {};
 
-    final paymentKeywords = ['payment', 'payments', 'revenue', 'sales', 'ledger', 'pay', 'transaction', 'transactions', 'earnings', 'statement', 'owe', 'due', 'outstanding', 'how much do i'];
+    final paymentKeywords = ['payment', 'payments', 'revenue', 'sales', 'ledger', 'pay', 'transaction', 'transactions', 'earnings', 'statement', 'owe', 'due', 'outstanding', 'how much do i', 'invoice', 'invoices'];
     bool hasKeyword = false;
     for (final kw in paymentKeywords) {
       if (text.contains(kw)) {
@@ -359,7 +380,14 @@ class IntentEngine {
       confidence = 0.70;
       if (text.contains('owe') || text.contains('due') || text.contains('outstanding') || text.contains('how much')) {
         confidence = 0.95;
-        params['action'] = 'check_debts';
+        if (text.contains('pay') || text.contains('clear') || text.contains('settle')) {
+          params['action'] = 'pay_outstanding_invoice';
+        } else {
+          params['action'] = 'check_debts';
+        }
+      } else if (text.contains('pay') && (text.contains('booking') || text.contains('invoice') || text.contains('bill'))) {
+        confidence = 0.95;
+        params['action'] = 'pay_outstanding_invoice';
       } else if (text.contains('revenue') || text.contains('sales') || text.contains('earnings')) {
         confidence = 0.95;
         params['action'] = 'admin_revenue_today';

@@ -335,47 +335,64 @@ class LocalAIProvider implements AIProvider {
     }
 
     // Intercept payment triggers
-    if (cleanedText.startsWith('pay booking #') || cleanedText.startsWith('choose payment method for booking #')) {
-      final bId = text.split('#').last.trim();
+    final isPaymentTrigger = cleanedText.startsWith('pay booking') || 
+                            cleanedText.startsWith('choose payment method for booking') || 
+                            (intent is PaymentIntent && customParams['action'] == 'pay_outstanding_invoice');
+
+    if (isPaymentTrigger) {
+      List<BookingModel> bookings = [];
       try {
-        final bSnap = await FirebaseDatabase.instance.ref().child('bookings').child(bId).get();
-        if (bSnap.exists) {
-          final bData = Map<dynamic, dynamic>.from(bSnap.value as Map);
-          final vehicleName = bData['vehicleName'] ?? 'Vehicle';
-          final totalPrice = double.tryParse(bData['totalPrice']?.toString() ?? '') ?? 0.0;
-          final depositAmount = double.tryParse(bData['depositAmount']?.toString() ?? '') ?? 0.0;
-          
-          session.reset();
-          session.paymentBookingId = bId;
-          session.paymentUploadStep = 0;
-          
-          customParams['bookingId'] = bId;
-          customParams['options'] = ['Cash at Counter', 'FPX Online Banking', 'DuitNow QR'];
-          
-          return AIResponse(
-            message: "Please choose a payment method for booking **$vehicleName** (Ref: `#${bId.substring(0, 5).toUpperCase()}`):\n\n"
-                "• **Total Amount**: RM ${totalPrice.toStringAsFixed(2)}\n"
-                "• **Deposit Required**: RM ${depositAmount.toStringAsFixed(2)}",
-            intent: intent,
-            confidence: 1.0,
-            action: 'prompt_payment_method',
-            parameters: customParams,
-          );
-        }
-      } catch (e) {
+        bookings = await BookingService().getUserBookings(uid);
+      } catch (_) {}
+
+      final unpaid = bookings.where((b) {
+        final s = b.status.toLowerCase();
+        return s == 'waiting for payment' || s == 'pending payment' || s == 'awaiting final payment';
+      }).toList();
+
+      if (unpaid.isEmpty) {
         return AIResponse(
-          message: "Failed to load booking details: $e",
+          message: "You do not have any bookings with outstanding invoices to pay right now.",
           intent: intent,
           confidence: 1.0,
           action: 'error',
-          parameters: customParams,
+          parameters: const {},
         );
       }
+
+      final target = _findBookingForAction(text, unpaid);
+      if (target == null) {
+        final listStr = unpaid.map((b) => "• **${b.vehicleName}** (Ref: `#${b.id.substring(0, 5).toUpperCase()}`, Status: **${b.status}**, Owed: RM ${(b.isOpenRental && b.status.toLowerCase() == 'awaiting final payment' ? b.finalAmount : b.totalPrice).toStringAsFixed(2)})").join('\n');
+        final List<String> opt = unpaid.map((b) => "Choose payment method for booking #${b.id}").toList();
+        opt.add('Back to Dashboard');
+        return AIResponse(
+          message: "Please specify which outstanding booking you want to pay:\n\n$listStr\n\nOr click one of the options below:",
+          intent: intent,
+          confidence: 1.0,
+          action: 'pay_outstanding_invoice',
+          parameters: {'options': opt},
+        );
+      }
+
+      final bId = target.id;
+      final vehicleName = target.vehicleName;
+      final totalPrice = target.isOpenRental && target.status.toLowerCase() == 'awaiting final payment' ? target.finalAmount : target.totalPrice;
+      final depositAmount = target.status.toLowerCase() == 'awaiting final payment' ? totalPrice : target.depositAmount;
+
+      session.reset();
+      session.paymentBookingId = bId;
+      session.paymentUploadStep = 0;
+
+      customParams['bookingId'] = bId;
+      customParams['options'] = ['Cash at Counter', 'FPX Online Banking', 'DuitNow QR'];
+
       return AIResponse(
-        message: "Booking `#${bId.substring(0, 5).toUpperCase()}` was not found.",
+        message: "Please choose a payment method for booking **$vehicleName** (Ref: `#${bId.substring(0, 5).toUpperCase()}`):\n\n"
+            "• **Total Amount**: RM ${totalPrice.toStringAsFixed(2)}\n"
+            "• **Payment Due**: RM ${depositAmount.toStringAsFixed(2)}",
         intent: intent,
         confidence: 1.0,
-        action: 'error',
+        action: 'prompt_payment_method',
         parameters: customParams,
       );
     }
@@ -424,6 +441,81 @@ class LocalAIProvider implements AIProvider {
           parameters: customParams,
         );
       }
+    }
+
+    // Check Booking Status Intercept
+    if (intent is BookingIntent && (customParams['action'] == 'check_booking_status' || cleanedText.contains('status'))) {
+      List<BookingModel> bookings = [];
+      try {
+        bookings = await BookingService().getUserBookings(uid);
+      } catch (_) {}
+
+      if (bookings.isEmpty) {
+        return AIResponse(
+          message: "I couldn't find any bookings on your customer account in Firebase.",
+          intent: intent,
+          confidence: 1.0,
+          action: 'error',
+          parameters: const {},
+        );
+      }
+
+      final target = _findBookingForAction(text, bookings);
+      if (target != null) {
+        final pickupStr = DateFormat('dd MMM yyyy hh:mm a').format(target.pickUpDate);
+        final returnStr = target.returnDate != null ? DateFormat('dd MMM yyyy hh:mm a').format(target.returnDate!) : "Open Rental";
+        return AIResponse(
+          message: "📅 **Booking Status Details** (Ref: `#${target.id.substring(0, 5).toUpperCase()}`):\n\n"
+                 "• **Vehicle**: ${target.vehicleName}\n"
+                 "• **Status**: **${target.status.toUpperCase()}**\n"
+                 "• **Pick-up**: $pickupStr\n"
+                 "• **Return**: $returnStr\n"
+                 "• **Total Cost**: RM ${target.totalPrice.toStringAsFixed(2)}\n"
+                 "• **Deposit Paid**: RM ${target.depositAmount.toStringAsFixed(2)}",
+          intent: intent,
+          confidence: 1.0,
+          action: 'check_booking_status',
+          parameters: const {
+            'options': ['My Bookings', 'Back to Dashboard']
+          },
+        );
+      }
+    }
+
+    // Explain Rental Policy / Open Rental Intercept
+    if (intent is BranchIntent && customParams['action'] == 'explain_policy') {
+      if (cleanedText.contains('open rental')) {
+        return AIResponse(
+          message: "🚙 **Open Rental Policy** 🚙\n\n"
+              "Open Rental is an exclusive feature available for **Premium Members** (requires **1000+ reward points**).\n\n"
+              "• **No Fixed Return Date**: You can start your rental without selecting a return date upfront.\n"
+              "• **No Upfront Rental Payment**: You do not pay the rental cost at checkout. Only the security deposit (if applicable) is processed.\n"
+              "• **Pay Upon Return**: Once you request a return, the daily/weekly rate is calculated based on your exact usage duration, and a final invoice is generated for you to clear.\n\n"
+              "Complete bookings and clear payments to increase your reward points tier and unlock Open Rental!",
+          intent: intent,
+          confidence: 1.0,
+          action: 'explain_open_rental',
+          parameters: const {
+            'options': ['🎁 Check Reward Points', '🚗 Book a Car', 'Back to Dashboard']
+          },
+        );
+      }
+      return AIResponse(
+        message: "📄 **Carent Rental Policies & Terms** 📄\n\n"
+            "Here is an overview of our standard rental policy:\n\n"
+            "1. **Driver Requirements**: Drivers must be between **21 and 65 years old** and hold a valid, non-probationary **Driving License**.\n"
+            "2. **Documentation**: A copy of your Driving License and Identity Card/Passport must be uploaded to your profile for verification before pickup.\n"
+            "3. **Fuel Policy**: **Full-to-Full**. The vehicle is delivered with a full tank of fuel, and must be returned with a full tank to avoid refueling service fees.\n"
+            "4. **Security Deposit**: A 30% security deposit (minimum RM 150) is required during checkout to confirm your reservation.\n"
+            "5. **Late Returns**: A 1-hour grace period is allowed. Beyond this, a late return fee of RM20.00 per hour will accumulate.\n\n"
+            "Select one of the topics below to learn more, or view our FAQs!",
+        intent: intent,
+        confidence: 1.0,
+        action: 'explain_rental_policy',
+        parameters: const {
+          'options': ['🚙 Explain Open Rental', '❓ View FAQs', 'Back to Dashboard']
+        },
+      );
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -482,7 +574,7 @@ class LocalAIProvider implements AIProvider {
     // ─────────────────────────────────────────────────────────────────────────
     //  3. Support Ticket Operator Flow
     // ─────────────────────────────────────────────────────────────────────────
-    if (cleanedText.contains('create support') || (intent is SupportIntent && cleanedText.contains('ticket') && cleanedText.contains('create'))) {
+    if (cleanedText.contains('create support') || cleanedText.contains('contact support') || cleanedText == 'support' || cleanedText == 'help' || (intent is SupportIntent && cleanedText.contains('ticket') && cleanedText.contains('create'))) {
       session.reset();
       session.supportStep = 101;
       return AIResponse(
@@ -518,17 +610,52 @@ class LocalAIProvider implements AIProvider {
       final bId = text.split('#').last.trim();
       final res = await _triggerCancelBookingConfirmation(bId, session, customParams);
       return AIResponse(message: res, intent: intent, confidence: 1.0, action: 'cancel_booking', parameters: customParams);
-    } else if (cleanedText.contains('extend booking') || (intent is BookingIntent && cleanedText.contains('extend'))) {
+    } else if (cleanedText.contains('extend booking') || cleanedText.contains('renew booking') || (intent is BookingIntent && (customParams['action'] == 'renew_booking' || customParams['action'] == 'extend_booking'))) {
       session.reset();
+      List<BookingModel> bookings = [];
+      try {
+        bookings = await BookingService().getUserBookings(uid);
+      } catch (_) {}
+      final active = bookings.where((b) => b.status.toLowerCase() == 'confirmed' || b.status.toLowerCase() == 'active' || b.status.toLowerCase() == 'ongoing').toList();
+
+      if (active.isEmpty) {
+        customParams['options'] = ['🚗 Book a Car', 'Back to Dashboard'];
+        return AIResponse(
+          message: "You have no active or confirmed bookings that can be extended.",
+          intent: intent,
+          confidence: 1.0,
+          action: 'error',
+          parameters: customParams,
+        );
+      }
+
+      final target = _findBookingForAction(text, active);
+      if (target != null) {
+        session.activeExtendBookingId = target.id;
+        session.extensionStep = 202;
+        customParams['request_date'] = 'return';
+        return AIResponse(
+          message: "Booking selected: **#${target.id.substring(0, 5).toUpperCase()}** (${target.vehicleName}).\n\n"
+              "Please select a **New Return Date** using the calendar picker below:",
+          intent: intent,
+          confidence: 1.0,
+          action: 'extend_flow',
+          parameters: customParams,
+        );
+      }
+
       session.extensionStep = 201;
       final res = await _listExtendBookings(uid, customParams);
-      return AIResponse(message: res, intent: intent, confidence: 1.0, action: 'extend_booking', parameters: customParams);
+      return AIResponse(message: res, intent: intent, confidence: 1.0, action: 'extend_flow', parameters: customParams);
     } else if (session.extensionStep > 0) {
       final res = await _processBookingExtensionFlow(text, session, customParams);
       return AIResponse(message: res, intent: intent, confidence: 1.0, action: 'extend_flow', parameters: customParams);
-    } else if (cleanedText.contains('return my vehicle') || cleanedText.contains('return my car') || cleanedText.contains('return vehicle') || (intent is BookingIntent && cleanedText.contains('return'))) {
-      final bookings = await BookingService().getBookings();
-      final myActive = bookings.where((b) => b.userId == uid && (b.status == 'ongoing' || b.status.toLowerCase() == 'active' || b.status.toLowerCase() == 'overdue')).toList();
+    } else if (cleanedText.contains('return my vehicle') || cleanedText.contains('return my car') || cleanedText.contains('return vehicle') || (intent is BookingIntent && (customParams['action'] == 'return_vehicle' || cleanedText.contains('return')))) {
+      List<BookingModel> bookings = [];
+      try {
+        bookings = await BookingService().getUserBookings(uid);
+      } catch (_) {}
+      final myActive = bookings.where((b) => b.status == 'ongoing' || b.status.toLowerCase() == 'active' || b.status.toLowerCase() == 'overdue').toList();
       if (myActive.isEmpty) {
         return AIResponse(
           message: "You do not have any active bookings that can be returned at the moment.",
@@ -539,7 +666,20 @@ class LocalAIProvider implements AIProvider {
         );
       }
       
-      final target = myActive.first;
+      final target = _findBookingForAction(text, myActive);
+      if (target == null) {
+        final listStr = myActive.map((b) => "• **${b.vehicleName}** (Ref: `#${b.id.substring(0, 5).toUpperCase()}`)").join('\n');
+        final List<String> opt = myActive.map((b) => "Return vehicle #${b.id}").toList();
+        opt.add('Back to Dashboard');
+        return AIResponse(
+          message: "Please select which vehicle you want to return:\n\n$listStr",
+          intent: intent,
+          confidence: 1.0,
+          action: 'return_vehicle',
+          parameters: {'options': opt},
+        );
+      }
+      
       await BookingService().requestReturn(target.id);
       customParams['options'] = ['My Bookings', 'Back to Dashboard'];
       return AIResponse(
@@ -555,7 +695,42 @@ class LocalAIProvider implements AIProvider {
     // ─────────────────────────────────────────────────────────────────────────
     //  5. Vehicle Comparison Operator
     // ─────────────────────────────────────────────────────────────────────────
-    if (cleanedText.contains('compare vehicle') || cleanedText.contains('compare car')) {
+    // Direct Vehicle Comparison Intercept
+    bool isComparisonTrigger = cleanedText.contains('compare');
+    if (isComparisonTrigger) {
+      List<VehicleModel> vehicles = [];
+      try {
+        vehicles = await VehicleService().getVehicles();
+      } catch (_) {}
+
+      final matches = <VehicleModel>[];
+      for (final v in vehicles) {
+        final brandModel = '${v.brand} ${v.model}'.toLowerCase();
+        final modelOnly = v.model.toLowerCase();
+        if (cleanedText.contains(brandModel) || cleanedText.contains(modelOnly)) {
+          if (!matches.any((vm) => vm.id == v.id)) {
+            matches.add(v);
+          }
+        }
+      }
+
+      if (matches.length >= 2) {
+        session.reset();
+        final v1 = matches[0];
+        final v2 = matches[1];
+        final comparisonTable = _generateComparisonTable(v1, v2);
+        customParams['options'] = ['🚗 Book ${v1.brand} ${v1.model}', '🚗 Book ${v2.brand} ${v2.model}', 'Back to Dashboard'];
+        return AIResponse(
+          message: comparisonTable,
+          intent: intent,
+          confidence: 1.0,
+          action: 'compare_success',
+          parameters: customParams,
+        );
+      }
+    }
+
+    if (cleanedText.contains('compare vehicle') || cleanedText.contains('compare car') || (intent is VehicleSearchIntent && cleanedText.contains('compare'))) {
       session.reset();
       session.compareStep = 301;
       final res = await _listCompareVehicles(1, customParams);
@@ -744,10 +919,10 @@ class LocalAIProvider implements AIProvider {
         session.faqCategory = 'Support';
         params['options'] = ['How can I contact support?', 'Back to FAQ Categories'];
         return "Here are popular questions regarding **Contact Support**:";
-      } else if (textLower.contains('polic')) {
+      } else if (textLower.contains('polic') || textLower.contains('open rental')) {
         session.faqStep = 2;
         session.faqCategory = 'Policies';
-        params['options'] = ['What is the fuel policy?', 'What is the late return fee?', 'Back to FAQ Categories'];
+        params['options'] = ['What is the fuel policy?', 'What is the late return fee?', 'What is Open Rental?', 'Back to FAQ Categories'];
         return "Here are popular questions regarding **our Rental Policies**:";
       }
       
@@ -781,6 +956,8 @@ class LocalAIProvider implements AIProvider {
         return "Our fuel policy is **Full-to-Full**. The vehicle is delivered with a full tank of fuel, and must be returned with a full tank to avoid refueling fees.";
       } else if (textLower.contains('late return fee')) {
         return "Late returns have a grace period of 1 hour. Beyond that, a late return fee of RM50 per hour will apply.";
+      } else if (textLower.contains('open rental')) {
+        return "Open Rental is an exclusive feature for Premium Members (requires 1000+ reward points) allowing them to book a car without a fixed return date upfront, with billing calculated dynamically upon return and paid via the final invoice.";
       }
     }
 
@@ -1219,8 +1396,8 @@ class LocalAIProvider implements AIProvider {
         };
         params['comparison'] = compMap;
         params['options'] = ['Book ${c1.brand} ${c1.model}', 'Book ${c2.brand} ${c2.model}', 'Cancel'];
-        return "⚖️ **Vehicle Comparison Result**\n"
-            "Comparison metrics are rendered in the layout card below:";
+        final table = _generateComparisonTable(c1, c2);
+        return "$table\n\nTo book either of these, click one of the options below:";
       }
       return "Comparison failed: One of the selected models is no longer available.";
     }
@@ -2384,7 +2561,9 @@ class LocalAIProvider implements AIProvider {
     if (intent is BranchIntent) {
       List<dynamic> branches = [];
       try { branches = await BranchService().getBranches(); } catch (_) {}
-      return "Opening rental branches directory. Loaded **${branches.length}** branches from Firebase.";
+      if (branches.isEmpty) return "We have our main branch located in Kuala Lumpur.";
+      final listStr = branches.map((b) => "• **${b.name} Branch**: ${b.address} (${b.phone})").join('\n');
+      return "📍 **Our Rental Branches**:\n\n$listStr\n\nYou can view them on the map view by selecting the Branches screen.";
     }
 
     if (intent is ProfileIntent) {
@@ -3062,6 +3241,51 @@ class LocalAIProvider implements AIProvider {
     return 'unknown';
   }
 
+  BookingModel? _findBookingForAction(String text, List<BookingModel> bookings) {
+    final lower = text.toLowerCase();
+    
+    // 1. Try extracting by booking ID prefix or exact match
+    final words = text.replaceAll('#', ' ').split(RegExp(r'\s+'));
+    for (final word in words) {
+      final cleanWord = word.trim().toLowerCase();
+      if (cleanWord.length >= 5) {
+        for (final b in bookings) {
+          if (b.id.toLowerCase().startsWith(cleanWord) || b.id.toLowerCase() == cleanWord) {
+            return b;
+          }
+        }
+      }
+    }
+    
+    // 2. Try extracting by vehicle name
+    for (final b in bookings) {
+      if (lower.contains(b.vehicleName.toLowerCase())) {
+        return b;
+      }
+    }
+    
+    // 3. Fallback: if there is only one booking in the list, return it
+    if (bookings.length == 1) {
+      return bookings.first;
+    }
+    
+    return null;
+  }
+
+  String _generateComparisonTable(VehicleModel v1, VehicleModel v2) {
+    return "⚖️ **Vehicle Comparison: ${v1.brand} ${v1.model} vs ${v2.brand} ${v2.model}**\n\n"
+        "| Feature | ${v1.brand} ${v1.model} | ${v2.brand} ${v2.model} |\n"
+        "| :--- | :--- | :--- |\n"
+        "| **Category** | ${v1.category} | ${v2.category} |\n"
+        "| **Daily Rate** | RM ${v1.pricePerDay.toStringAsFixed(2)} | RM ${v2.pricePerDay.toStringAsFixed(2)} |\n"
+        "| **Transmission** | ${v1.transmission} | ${v2.transmission} |\n"
+        "| **Seats** | ${v1.seats} Seats | ${v2.seats} Seats |\n"
+        "| **Fuel Type** | ${v1.fuelType} | ${v2.fuelType} |\n"
+        "| **Engine Spec** | ${v1.engine} | ${v2.engine} |\n"
+        "| **Branch Location** | ${v1.branchName.isEmpty ? 'Kuala Lumpur' : v1.branchName} | ${v2.branchName.isEmpty ? 'Kuala Lumpur' : v2.branchName} |\n"
+        "| **Availability** | ${v1.status} | ${v2.status} |";
+  }
+
   Map<String, dynamic> _extractEntities(String text, List<VehicleModel> vehicles) {
     final lower = text.toLowerCase();
     VehicleModel? matchedVehicle;
@@ -3069,14 +3293,27 @@ class LocalAIProvider implements AIProvider {
     String? matchedTransmission;
     double? matchedBudget;
 
-    // 1. Match exact brand + model or model
+    // 1. Match exact brand + model or model (prioritize available vehicles)
     for (final v in vehicles) {
+      if (v.status.toLowerCase() != 'available') continue;
       final brandModel = '${v.brand} ${v.model}'.toLowerCase();
       final modelOnly = v.model.toLowerCase();
       
       if (lower.contains(brandModel) || lower.contains(modelOnly)) {
         matchedVehicle = v;
         break;
+      }
+    }
+    // Fallback to matching any vehicle if no available one matched
+    if (matchedVehicle == null) {
+      for (final v in vehicles) {
+        final brandModel = '${v.brand} ${v.model}'.toLowerCase();
+        final modelOnly = v.model.toLowerCase();
+        
+        if (lower.contains(brandModel) || lower.contains(modelOnly)) {
+          matchedVehicle = v;
+          break;
+        }
       }
     }
 

@@ -220,33 +220,40 @@ class _ReportsViewState extends State<ReportsView> {
         _selectedPeriod,
         startDate: _startDate,
         endDate: _endDate,
-      ))
+      )) {
         return false;
+      }
       if (_selectedBranch != 'All') {
         final v = _getVehicleById(b.vehicleId);
         if (v == null ||
-            (v.branchName != _selectedBranch && v.branchId != _selectedBranch))
+            (v.branchName != _selectedBranch && v.branchId != _selectedBranch)) {
           return false;
+        }
       }
-      if (_selectedVehicle != 'All' && b.vehicleId != _selectedVehicle)
+      if (_selectedVehicle != 'All' && b.vehicleId != _selectedVehicle) {
         return false;
-      if (_selectedCustomer != 'All' && b.userId != _selectedCustomer)
+      }
+      if (_selectedCustomer != 'All' && b.userId != _selectedCustomer) {
         return false;
+      }
       if (_selectedBookingStatus != 'All' &&
-          b.status.toLowerCase() != _selectedBookingStatus.toLowerCase())
+          b.status.toLowerCase() != _selectedBookingStatus.toLowerCase()) {
         return false;
+      }
       if (_selectedVehicleStatus != 'All') {
         final v = _getVehicleById(b.vehicleId);
         if (v == null ||
-            v.status.toLowerCase() != _selectedVehicleStatus.toLowerCase())
+            v.status.toLowerCase() != _selectedVehicleStatus.toLowerCase()) {
           return false;
+        }
       }
       if (_selectedMembershipLevel != 'All') {
         final u = _getUserById(b.userId);
         if (u == null ||
             CompanySettingsProvider().determineLevel(u.rewardPoints) !=
-                _selectedMembershipLevel)
+                _selectedMembershipLevel) {
           return false;
+        }
       }
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
@@ -267,8 +274,9 @@ class _ReportsViewState extends State<ReportsView> {
         _selectedPeriod,
         startDate: _startDate,
         endDate: _endDate,
-      ))
+      )) {
         return false;
+      }
       final b = widget.bookings.firstWhere(
         (bk) => bk.id == p.bookingId,
         orElse: () => BookingModel(
@@ -290,19 +298,23 @@ class _ReportsViewState extends State<ReportsView> {
           final v = _getVehicleById(b.vehicleId);
           if (v == null ||
               (v.branchName != _selectedBranch &&
-                  v.branchId != _selectedBranch))
+                  v.branchId != _selectedBranch)) {
             return false;
+          }
         }
-        if (_selectedVehicle != 'All' && b.vehicleId != _selectedVehicle)
+        if (_selectedVehicle != 'All' && b.vehicleId != _selectedVehicle) {
           return false;
+        }
         if (_selectedBookingStatus != 'All' &&
-            b.status.toLowerCase() != _selectedBookingStatus.toLowerCase())
+            b.status.toLowerCase() != _selectedBookingStatus.toLowerCase()) {
           return false;
+        }
         if (_selectedVehicleStatus != 'All') {
           final v = _getVehicleById(b.vehicleId);
           if (v == null ||
-              v.status.toLowerCase() != _selectedVehicleStatus.toLowerCase())
+              v.status.toLowerCase() != _selectedVehicleStatus.toLowerCase()) {
             return false;
+          }
         }
       } else if (_selectedBranch != 'All' ||
           _selectedVehicle != 'All' ||
@@ -310,24 +322,28 @@ class _ReportsViewState extends State<ReportsView> {
           _selectedVehicleStatus != 'All') {
         return false;
       }
-      if (_selectedCustomer != 'All' && p.userId != _selectedCustomer)
+      if (_selectedCustomer != 'All' && p.userId != _selectedCustomer) {
         return false;
+      }
       final status = (p.paymentStatus ?? p.status).toLowerCase();
       if (_selectedPaymentStatus != 'All' &&
-          status != _selectedPaymentStatus.toLowerCase())
+          status != _selectedPaymentStatus.toLowerCase()) {
         return false;
+      }
       if (_selectedMembershipLevel != 'All') {
         final u = _getUserById(p.userId);
         if (u == null ||
             CompanySettingsProvider().determineLevel(u.rewardPoints) !=
-                _selectedMembershipLevel)
+                _selectedMembershipLevel) {
           return false;
+        }
       }
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
         if (!p.id.toLowerCase().contains(q) &&
-            !p.bookingId.toLowerCase().contains(q))
+            !p.bookingId.toLowerCase().contains(q)) {
           return false;
+        }
       }
       return true;
     }).toList();
@@ -342,22 +358,26 @@ class _ReportsViewState extends State<ReportsView> {
             _selectedPeriod,
             startDate: _startDate,
             endDate: _endDate,
-          ))
+          )) {
         return false;
+      }
       if (_selectedBranch != 'All' &&
           v.branchName != _selectedBranch &&
-          v.branchId != _selectedBranch)
+          v.branchId != _selectedBranch) {
         return false;
+      }
       if (_selectedVehicle != 'All' && v.id != _selectedVehicle) return false;
       if (_selectedVehicleStatus != 'All' &&
-          v.status.toLowerCase() != _selectedVehicleStatus.toLowerCase())
+          v.status.toLowerCase() != _selectedVehicleStatus.toLowerCase()) {
         return false;
+      }
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
         if (!v.brand.toLowerCase().contains(q) &&
             !v.model.toLowerCase().contains(q) &&
-            !v.plateNumber.toLowerCase().contains(q))
+            !v.plateNumber.toLowerCase().contains(q)) {
           return false;
+        }
       }
       return true;
     }).toList();
@@ -372,19 +392,22 @@ class _ReportsViewState extends State<ReportsView> {
             _selectedPeriod,
             startDate: _startDate,
             endDate: _endDate,
-          ))
+          )) {
         return false;
+      }
       if (_selectedCustomer != 'All' && u.id != _selectedCustomer) return false;
       if (_selectedMembershipLevel != 'All' &&
           CompanySettingsProvider().determineLevel(u.rewardPoints) !=
-              _selectedMembershipLevel)
+              _selectedMembershipLevel) {
         return false;
+      }
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
         if (!u.fullName.toLowerCase().contains(q) &&
             !u.email.toLowerCase().contains(q) &&
-            !u.phone.toLowerCase().contains(q))
+            !u.phone.toLowerCase().contains(q)) {
           return false;
+        }
       }
       return true;
     }).toList();
@@ -399,27 +422,32 @@ class _ReportsViewState extends State<ReportsView> {
             _selectedPeriod,
             startDate: _startDate,
             endDate: _endDate,
-          ))
+          )) {
         return false;
+      }
       if (_selectedBranch != 'All') {
         final v = _getVehicleById(j.vehicleId);
         if (v == null ||
-            (v.branchName != _selectedBranch && v.branchId != _selectedBranch))
+            (v.branchName != _selectedBranch && v.branchId != _selectedBranch)) {
           return false;
+        }
       }
-      if (_selectedVehicle != 'All' && j.vehicleId != _selectedVehicle)
+      if (_selectedVehicle != 'All' && j.vehicleId != _selectedVehicle) {
         return false;
+      }
       if (_selectedVehicleStatus != 'All') {
         final v = _getVehicleById(j.vehicleId);
         if (v == null ||
-            v.status.toLowerCase() != _selectedVehicleStatus.toLowerCase())
+            v.status.toLowerCase() != _selectedVehicleStatus.toLowerCase()) {
           return false;
+        }
       }
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
         if (!j.title.toLowerCase().contains(q) &&
-            !j.vehicleName.toLowerCase().contains(q))
+            !j.vehicleName.toLowerCase().contains(q)) {
           return false;
+        }
       }
       return true;
     }).toList();
@@ -432,23 +460,28 @@ class _ReportsViewState extends State<ReportsView> {
         _selectedPeriod,
         startDate: _startDate,
         endDate: _endDate,
-      ))
+      )) {
         return false;
+      }
       if (_selectedBranch != 'All') {
         final v = _getVehicleById(r.vehicleId);
         if (v == null ||
-            (v.branchName != _selectedBranch && v.branchId != _selectedBranch))
+            (v.branchName != _selectedBranch && v.branchId != _selectedBranch)) {
           return false;
+        }
       }
-      if (_selectedVehicle != 'All' && r.vehicleId != _selectedVehicle)
+      if (_selectedVehicle != 'All' && r.vehicleId != _selectedVehicle) {
         return false;
-      if (_selectedCustomer != 'All' && r.userId != _selectedCustomer)
+      }
+      if (_selectedCustomer != 'All' && r.userId != _selectedCustomer) {
         return false;
+      }
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
         if (!r.userName.toLowerCase().contains(q) &&
-            !r.comment.toLowerCase().contains(q))
+            !r.comment.toLowerCase().contains(q)) {
           return false;
+        }
       }
       return true;
     }).toList();
@@ -463,10 +496,12 @@ class _ReportsViewState extends State<ReportsView> {
             _selectedPeriod,
             startDate: _startDate,
             endDate: _endDate,
-          ))
+          )) {
         return false;
-      if (_selectedCustomer != 'All' && tx['userId'] != _selectedCustomer)
+      }
+      if (_selectedCustomer != 'All' && tx['userId'] != _selectedCustomer) {
         return false;
+      }
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
         final reason = (tx['reason'] ?? '').toString().toLowerCase();

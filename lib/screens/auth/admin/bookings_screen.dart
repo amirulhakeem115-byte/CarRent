@@ -309,6 +309,7 @@ class _BookingsViewState extends State<BookingsView> {
                         ),
                       ],
                       if (booking.status.toLowerCase() == 'return requested' ||
+                          booking.status.toLowerCase() == 'awaiting return inspection' ||
                           booking.status == 'ongoing' ||
                           booking.status.toLowerCase() == 'active' ||
                           booking.status.toLowerCase() == 'overdue') ...[
@@ -321,7 +322,11 @@ class _BookingsViewState extends State<BookingsView> {
                             Navigator.pop(context);
                             _showReturnInspectionDialog(booking);
                           },
-                          child: const Text('Inspect & Complete Return'),
+                          child: Text(
+                            booking.isOpenRental
+                                ? 'Complete Return Inspection'
+                                : 'Inspect & Complete Return',
+                          ),
                         ),
                       ],
                       if (booking.status != 'cancelled' &&
@@ -965,6 +970,7 @@ class _BookingsViewState extends State<BookingsView> {
                       onPressed: () => _showBookingDetails(b),
                     ),
                     if (bStat == 'return requested' ||
+                        bStat == 'awaiting return inspection' ||
                         bStat == 'active' ||
                         bStat == 'ongoing' ||
                         bStat == 'overdue') ...[
@@ -983,9 +989,11 @@ class _BookingsViewState extends State<BookingsView> {
                         ),
                         onPressed: () => _showReturnInspectionDialog(b),
                         icon: const Icon(Icons.check_circle_outline, size: 12),
-                        label: const Text(
-                          'Inspect & Complete',
-                          style: TextStyle(
+                        label: Text(
+                          b.isOpenRental
+                              ? 'Complete Return Inspection'
+                              : 'Inspect & Complete',
+                          style: const TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                           ),
@@ -1095,6 +1103,7 @@ class _BookingsViewState extends State<BookingsView> {
                 onTap: () => _showBookingDetails(b),
               ),
               if (bStat == 'return requested' ||
+                  bStat == 'awaiting return inspection' ||
                   bStat == 'active' ||
                   bStat == 'ongoing' ||
                   bStat == 'overdue')
@@ -1117,9 +1126,11 @@ class _BookingsViewState extends State<BookingsView> {
                       ),
                       onPressed: () => _showReturnInspectionDialog(b),
                       icon: const Icon(Icons.check_circle_outline, size: 14),
-                      label: const Text(
-                        'Inspect & Complete',
-                        style: TextStyle(
+                      label: Text(
+                        b.isOpenRental
+                            ? 'Complete Return Inspection'
+                            : 'Inspect & Complete',
+                        style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
@@ -1214,7 +1225,7 @@ class _BookingsViewState extends State<BookingsView> {
         backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
-          'Return Vehicle Inspection',
+          booking.isOpenRental ? 'Return Car Inspection' : 'Return Vehicle Inspection',
           style: TextStyle(fontWeight: FontWeight.bold, color: textColor),
         ),
         content: StatefulBuilder(
@@ -1324,9 +1335,11 @@ class _BookingsViewState extends State<BookingsView> {
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(
-              'Complete Return',
-              style: TextStyle(fontWeight: FontWeight.bold),
+            child: Text(
+              booking.isOpenRental
+                  ? 'Complete Return Inspection'
+                  : 'Complete Return',
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -1370,9 +1383,11 @@ class _BookingsViewState extends State<BookingsView> {
         _loadBookings();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
+            SnackBar(
               content: Text(
-                'Vehicle returned and booking completed successfully.',
+                booking.isOpenRental
+                    ? 'Return inspection completed. Awaiting final payment.'
+                    : 'Vehicle returned and booking completed successfully.',
               ),
               backgroundColor: Colors.green,
             ),

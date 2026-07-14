@@ -21,6 +21,7 @@ import '../../../services/receipt_upload_helper.dart'
     if (dart.library.html) '../../../services/receipt_upload_web.dart'
     as receipt_upload;
 import '../../../services/company_settings_provider.dart';
+import '../../../services/receipt_service.dart';
 
 class BookingScreen extends StatefulWidget {
   final VehicleModel vehicle;
@@ -147,6 +148,7 @@ class _BookingScreenState extends State<BookingScreen> {
         widget.existingBooking?.returnDate ?? widget.prefilledReturnDate;
     _activeBookingId = widget.existingBooking?.id;
     _activeBookingCreatedAt = widget.existingBooking?.createdAt;
+    _isOpenRental = widget.existingBooking?.isOpenRental ?? false;
 
     if (widget.existingBooking != null) {
       _currentStep = 3;
@@ -228,23 +230,29 @@ class _BookingScreenState extends State<BookingScreen> {
     return diff <= 0 ? 1 : diff;
   }
 
+  bool get _isFinalPayment => widget.existingBooking != null && widget.existingBooking!.status == 'Awaiting Final Payment';
+
   double get _totalPrice {
+    if (_isFinalPayment) return widget.existingBooking!.finalAmount;
     if (widget.isExtension) return widget.extensionAmount ?? 0.0;
     return _rentalDays * widget.vehicle.pricePerDay;
   }
 
   double get _discountAmount {
+    if (_isFinalPayment) return 0.0;
     if (widget.isExtension) return 0.0;
     return _pointsToRedeem * 0.10;
   }
 
   double get _discountedTotal {
+    if (_isFinalPayment) return widget.existingBooking!.finalAmount;
     if (widget.isExtension) return widget.extensionAmount ?? 0.0;
     final val = _totalPrice - _discountAmount;
     return val < 0.0 ? 0.0 : val;
   }
 
   double get _depositAmount {
+    if (_isFinalPayment) return widget.existingBooking!.finalAmount;
     if (widget.isExtension) return widget.extensionAmount ?? 0.0;
     if (_isOpenRental) return 0.0;
     final calc = _discountedTotal * 0.3;
@@ -253,6 +261,7 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   double get _balanceAmount {
+    if (_isFinalPayment) return 0.0;
     if (widget.isExtension) return 0.0;
     final val = _discountedTotal - _depositAmount;
     return val < 0.0 ? 0.0 : val;
@@ -416,7 +425,7 @@ class _BookingScreenState extends State<BookingScreen> {
       return;
     }
 
-    if (_isOpenRental) {
+    if (_isOpenRental && !_isFinalPayment) {
       _showOpenRentalConfirmationDialog();
       return;
     }
@@ -640,66 +649,205 @@ class _BookingScreenState extends State<BookingScreen> {
 
   void _simulateFPXGateway() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final payAmount = _paymentOption == 'Deposit'
+        ? _depositAmount
+        : _discountedTotal;
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (dialogCtx) {
-        Future.delayed(const Duration(seconds: 2), () {
-          if (!mounted) return;
-          if (dialogCtx.mounted) {
-            Navigator.of(
-              dialogCtx,
-            ).pop(); // Close the simulation dialog using its own context
-          }
+        bool showGatewayPortal = false;
 
-          final payAmount = _paymentOption == 'Deposit'
-              ? _depositAmount
-              : _discountedTotal;
-          final DateFormat timeFormat = DateFormat('HH:mm:ss');
-          final now = DateTime.now();
-          final autoTime = timeFormat.format(now);
+        return StatefulBuilder(
+          builder: (dialogCtx2, setDialogState) {
+            // After 1.5 seconds, transition from "Redirecting..." to "Gateway Portal"
+            if (!showGatewayPortal) {
+              Future.delayed(const Duration(milliseconds: 1500), () {
+                if (dialogCtx.mounted) {
+                  setDialogState(() {
+                    showGatewayPortal = true;
+                  });
+                }
+              });
+            }
 
-          _processBooking(
-            status: 'Approved',
-            txId:
-                'FPX-${_selectedBank?.substring(0, 3).toUpperCase()}-${DateTime.now().millisecondsSinceEpoch}',
-            amount: payAmount,
-            paymentDate: now,
-            paymentTime: autoTime,
-          );
-        });
+            final titleColor = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+            final textColor = isDark ? const Color(0xFFCBD5E1) : Colors.black87;
 
-        return AlertDialog(
-          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: BorderSide(
-              color: isDark ? const Color(0xFF334155) : Colors.transparent,
-            ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircularProgressIndicator(color: AppColors.primaryOrange),
-              const SizedBox(height: 20),
-              Text(
-                'Redirecting to $_selectedBank portal...',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : Colors.black,
+            if (!showGatewayPortal) {
+              return AlertDialog(
+                backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  side: BorderSide(
+                    color: isDark ? const Color(0xFF334155) : Colors.transparent,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Please authorize the FPX secure payment window.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isDark ? Colors.white60 : Colors.grey,
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(color: AppColors.primaryOrange),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Redirecting to $_selectedBank portal...',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : Colors.black,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Please authorize the FPX secure payment window.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? Colors.white60 : Colors.grey,
+                      ),
+                    ),
+                  ],
                 ),
+              );
+            }
+
+            // Secure Gateway Simulator Portal
+            return AlertDialog(
+              backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: const BorderSide(color: AppColors.primaryOrange, width: 2),
               ),
-            ],
-          ),
+              title: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text(
+                      'FPX SECURE GATEWAY SIMULATOR',
+                      style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '$_selectedBank Secure Transfer',
+                    style: TextStyle(fontWeight: FontWeight.bold, color: titleColor, fontSize: 16),
+                  ),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E293B) : AppColors.lightGray,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      children: [
+                        Text('Merchant: CarRent Enterprise', style: TextStyle(color: textColor, fontSize: 11)),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Amount Due: RM ${payAmount.toStringAsFixed(2)}',
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryOrange, fontSize: 14),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Please select a payment outcome to simulate:',
+                    style: TextStyle(color: textColor, fontSize: 11, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+              actions: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: () {
+                        Navigator.of(dialogCtx).pop();
+                        final DateFormat timeFormat = DateFormat('HH:mm:ss');
+                        final now = DateTime.now();
+                        final autoTime = timeFormat.format(now);
+                        _processBooking(
+                          status: 'Approved',
+                          txId: 'FPX-${_selectedBank?.substring(0, 3).toUpperCase()}-${DateTime.now().millisecondsSinceEpoch}',
+                          amount: payAmount,
+                          paymentDate: now,
+                          paymentTime: autoTime,
+                        );
+                      },
+                      child: const Text('Simulate Success (Authorize & Pay)'),
+                    ),
+                    const SizedBox(height: 6),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: () {
+                        Navigator.of(dialogCtx).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Payment failed: Card declined or insufficient funds.'),
+                            backgroundColor: Colors.redAccent,
+                          ),
+                        );
+                      },
+                      child: const Text('Simulate Failure (Decline Payment)'),
+                    ),
+                    const SizedBox(height: 6),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: () {
+                        Navigator.of(dialogCtx).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Simulated Network Outage: Connection closed.'),
+                            backgroundColor: Colors.orange,
+                          ),
+                        );
+                      },
+                      child: const Text('Simulate Disconnect (Timeout)'),
+                    ),
+                    const SizedBox(height: 6),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(dialogCtx).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Payment cancelled by customer.'),
+                            backgroundColor: Colors.grey,
+                          ),
+                        );
+                      },
+                      child: Text(
+                        'Simulate Cancel (Back to Merchant)',
+                        style: TextStyle(color: isDark ? Colors.white60 : Colors.black87),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -1568,7 +1716,7 @@ class _BookingScreenState extends State<BookingScreen> {
       // 1. Validate dates
       final nowToday = DateTime.now();
       final todayStart = DateTime(nowToday.year, nowToday.month, nowToday.day);
-      if (!widget.isExtension) {
+      if (!widget.isExtension && !_isFinalPayment) {
         if (_pickupDate == null) {
           throw 'Please select a pickup date.';
         }
@@ -1598,13 +1746,128 @@ class _BookingScreenState extends State<BookingScreen> {
         throw 'The selected vehicle does not exist.';
       }
       final vehicleData = vehicleSnap.value as Map<dynamic, dynamic>;
-      if (!widget.isExtension) {
+      if (!widget.isExtension && !_isFinalPayment) {
         final freshStatus = (vehicleData['status'] ?? '')
             .toString()
             .toLowerCase();
         if (freshStatus != 'available') {
           throw 'This vehicle is no longer available (Current status: $freshStatus).';
         }
+      }
+
+      if (_isFinalPayment) {
+        // Query payments to find the pending payment for this booking
+        String? paymentId;
+        try {
+          final paymentsSnap = await FirebaseDatabase.instance
+              .ref()
+              .child('payments')
+              .orderByChild('bookingId')
+              .equalTo(widget.existingBooking!.id)
+              .get();
+          if (paymentsSnap.exists && paymentsSnap.value != null) {
+            final paymentsMap = paymentsSnap.value as Map;
+            for (var entry in paymentsMap.entries) {
+              final pVal = entry.value as Map;
+              final pStatus = pVal['status'] as String?;
+              if (pStatus == 'Pending Verification' || pStatus == 'Pending Payment') {
+                paymentId = entry.key.toString();
+                break;
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('Error finding pending payment: $e');
+        }
+
+        final ref = paymentId != null
+            ? FirebaseDatabase.instance.ref().child('payments').child(paymentId)
+            : FirebaseDatabase.instance.ref().child('payments').push();
+
+        final String finalPaymentId = paymentId ?? ref.key!;
+
+        final Map<String, dynamic> paymentData = {
+          'id': finalPaymentId,
+          'bookingId': widget.existingBooking!.id,
+          'userId': currentUser.uid,
+          'customerUid': currentUser.uid,
+          'amount': amount,
+          'depositAmount': 0.0,
+          'balanceAmount': 0.0,
+          'paymentMethod': _paymentMethod,
+          'status': 'Approved',
+          'paymentStatus': 'Approved',
+          'transactionId': txId,
+          'paymentDate': paymentDate.toIso8601String(),
+          'paymentTime': paymentTime,
+          'receiptImage': receiptImage,
+          'receiptFile': receiptImage,
+          'uploadedAt': DateTime.now().toIso8601String(),
+          'rewardPointsAwarded': true,
+        };
+
+        await ref.set(paymentData).timeout(const Duration(seconds: 10));
+
+        // Directly update the booking status to completed and vehicle status to Available
+        try {
+          await _bookingService.updateBookingStatus(
+            widget.existingBooking!.id,
+            'completed',
+            currentUser.uid,
+            widget.vehicle.id,
+            '${widget.vehicle.brand} ${widget.vehicle.model}',
+          );
+
+          try {
+            await FirebaseDatabase.instance
+                .ref()
+                .child('vehicles')
+                .child(widget.vehicle.id)
+                .update({'status': 'Available'});
+          } catch (vErr) {
+            debugPrint('Error updating vehicle to Available: $vErr');
+          }
+
+          // Award reward points automatically
+          final rewardsEnabled = CompanySettingsProvider().getField('rewardsEnabled', defaultValue: true) as bool;
+          if (rewardsEnabled) {
+            try {
+              await RewardPointsService().awardPointsForBooking(widget.existingBooking!.id);
+            } catch (rewardErr) {
+              debugPrint('Error awarding reward points: $rewardErr');
+            }
+          }
+
+          // Trigger automatic receipt check
+          try {
+            await ReceiptService().triggerAutomaticReceiptCheck(widget.existingBooking!.id);
+          } catch (receiptErr) {
+            debugPrint('Error generating receipt: $receiptErr');
+          }
+        } catch (lifecycleErr) {
+          debugPrint('Error executing final payment lifecycle updates: $lifecycleErr');
+        }
+
+        // Notify Admin of Final Payment Submission
+        await NotificationService().notifyAllAdmins(
+          title: "Customer Completed Payment",
+          message: "${widget.existingBooking!.userName} completed payment for final invoice of Booking #${widget.existingBooking!.id.substring(0, 5).toUpperCase()}.",
+          type: 'payment',
+          icon: '✅',
+          color: '0xFF10B981',
+          relatedId: widget.existingBooking!.id,
+          actionRoute: 'Payments',
+        );
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Final payment submitted and booking completed successfully.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
+        return;
       }
 
       if (widget.isExtension) {
@@ -2610,7 +2873,7 @@ class _BookingScreenState extends State<BookingScreen> {
             onPressed:
                 (_pickupDate != null &&
                     (_isOpenRental || _returnDate != null) &&
-                    widget.vehicle.status.toLowerCase() == 'available')
+                    (widget.vehicle.status.toLowerCase() == 'available' || _isFinalPayment))
                 ? () {
                     if (_isOpenRental) {
                       _showOpenRentalConfirmationDialog();
@@ -2649,9 +2912,9 @@ class _BookingScreenState extends State<BookingScreen> {
               ? DateFormat('dd MMM yyyy').format(_returnDate!)
               : "");
 
-    final payAmount = _paymentOption == 'Deposit'
-        ? _depositAmount
-        : _discountedTotal;
+    final payAmount = _isFinalPayment
+        ? widget.existingBooking!.finalAmount
+        : (_paymentOption == 'Deposit' ? _depositAmount : _discountedTotal);
 
     // Dynamic premium booking ID based on time
     final String tempId = widget.vehicle.id.length > 4
@@ -2931,7 +3194,7 @@ class _BookingScreenState extends State<BookingScreen> {
                   ),
                 ],
               ),
-              if (_paymentOption == 'Deposit' && !widget.isExtension) ...[
+              if (_paymentOption == 'Deposit' && !widget.isExtension && !_isFinalPayment) ...[
                 const SizedBox(height: 8),
                 _buildPriceRow(
                   'Deposit Due Now',
@@ -3167,6 +3430,7 @@ class _BookingScreenState extends State<BookingScreen> {
             onPressed:
                 (_agreeToTerms &&
                     (widget.isExtension ||
+                        _isFinalPayment ||
                         widget.vehicle.status.toLowerCase() == 'available'))
                 ? _triggerPaymentFlow
                 : null,

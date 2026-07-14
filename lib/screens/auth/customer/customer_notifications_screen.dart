@@ -1381,15 +1381,59 @@ class _CustomerNotificationsScreenState
 
   Future<void> _sendOnMyWayStatus(String bookingId) async {
     try {
+      final snap = await FirebaseDatabase.instance
+          .ref()
+          .child('bookings')
+          .child(bookingId)
+          .get();
+      if (!snap.exists || snap.value == null) throw 'Booking not found';
+      final data = Map<dynamic, dynamic>.from(snap.value as Map);
+      final booking = BookingModel.fromMap(bookingId, data);
+
       await FirebaseDatabase.instance
           .ref()
           .child('bookings')
           .child(bookingId)
           .update({'customerStatus': 'on_my_way'});
+
+      final notificationService = NotificationService();
+
+      final bool isPickup = booking.status.toLowerCase() != 'active' &&
+                            booking.status.toLowerCase() != 'ongoing' &&
+                            booking.status.toLowerCase() != 'overdue';
+
+      final String actionMsg = isPickup ? "pick up" : "return";
+
+      // 1. Notify Admins
+      await notificationService.notifyAllAdmins(
+        title: isPickup ? "Customer On the Way 🚗" : "Return Request",
+        message: isPickup
+            ? 'Customer "${booking.userName}" is on the way to pick up Vehicle "${booking.vehicleName}".'
+            : 'Customer ${booking.userName} is on the way to return ${booking.vehicleName}. Please prepare for vehicle inspection.',
+        type: isPickup ? 'on_my_way' : 'return_request',
+        icon: '🚗',
+        color: '0xFF10B981',
+        relatedId: bookingId,
+        actionRoute: 'Bookings',
+      );
+
+      // 2. Notify Customer
+      await notificationService.createNotification(
+        userId: booking.userId,
+        title: "Status Updated: On My Way",
+        message: "You have notified the Admin that you are on your way to $actionMsg ${booking.vehicleName}.",
+        type: 'booking',
+        icon: '🚗',
+        color: '0xFF10B981',
+        relatedId: bookingId,
+        actionRoute: 'Dashboard',
+      );
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("Status sent to admin: You are on your way!"),
+            backgroundColor: Colors.green,
           ),
         );
       }
@@ -1397,7 +1441,7 @@ class _CustomerNotificationsScreenState
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text("Failed to send status: $e")));
+        ).showSnackBar(SnackBar(content: Text("Failed to send status: $e"), backgroundColor: Colors.redAccent));
       }
     }
   }

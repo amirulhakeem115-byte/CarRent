@@ -616,8 +616,82 @@ class _PaymentsViewState extends State<PaymentsView> {
                     ),
                   ],
                 ],
+                  if (payment.paymentStatus == 'Pending Verification' ||
+                      payment.status == 'Pending Verification' ||
+                      payment.paymentStatus == 'pending' ||
+                      payment.status == 'pending') ...[
+                    const Divider(height: 24),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size(0, 44),
+                            ),
+                            onPressed: () async {
+                              final messenger = ScaffoldMessenger.of(context);
+                              Navigator.pop(context);
+                              setState(() => _loading = true);
+                              try {
+                                await _paymentService.updatePaymentStatus(
+                                  payment.id,
+                                  'Approved',
+                                  payment.userId,
+                                );
+                                messenger.showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Payment approved successfully.',
+                                    ),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                              } catch (e) {
+                                messenger.showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Failed to approve payment: $e',
+                                    ),
+                                    backgroundColor: Colors.redAccent,
+                                  ),
+                                );
+                              } finally {
+                                if (mounted) {
+                                  setState(() => _loading = false);
+                                }
+                              }
+                            },
+                            child: const Text(
+                              'Approve',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.redAccent,
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size(0, 44),
+                            ),
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _promptRejectionReason(payment);
+                            },
+                            child: const Text(
+                              'Reject',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
               ),
-            ),
           ),
           contentPadding: EdgeInsets.fromLTRB(
             isPhone ? 16 : 24,
@@ -645,6 +719,86 @@ class _PaymentsViewState extends State<PaymentsView> {
     );
   }
 
+  Future<void> _promptRejectionReason(PaymentModel payment) async {
+    final reasonController = TextEditingController();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : AppColors.secondaryBlue;
+    final messenger = ScaffoldMessenger.of(context);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Reject Payment',
+          style: TextStyle(fontWeight: FontWeight.bold, color: textColor),
+        ),
+        content: TextField(
+          controller: reasonController,
+          style: TextStyle(color: textColor),
+          decoration: const InputDecoration(
+            labelText: 'Reason for Rejection',
+            hintText: 'e.g. Receipt image blurry or incorrect reference ID',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              if (reasonController.text.trim().isEmpty) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please enter a rejection reason.'),
+                    backgroundColor: Colors.redAccent,
+                  ),
+                );
+                return;
+              }
+              Navigator.pop(ctx, true);
+            },
+            child: const Text('Reject', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() => _loading = true);
+      try {
+        await _paymentService.updatePaymentStatus(
+          payment.id,
+          'Rejected',
+          payment.userId,
+          reason: reasonController.text.trim(),
+        );
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Payment rejected successfully.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } catch (e) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('Failed to reject payment: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      } finally {
+        if (mounted) {
+          setState(() => _loading = false);
+        }
+      }
+    }
+  }
   Widget _buildDetailRow(String label, String value) {
     final isCompact = _isPhoneLayout();
     final labelSize = _rf(12, min: 10);

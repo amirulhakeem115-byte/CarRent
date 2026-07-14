@@ -14,7 +14,7 @@ class UserSession {
   
   String? _userId;
   String? _role;
-  bool _isLoading = false;
+  Future<String>? _roleFuture;
   
   StreamSubscription<User?>? _authSubscription;
   final StreamController<String?> _roleController = StreamController<String?>.broadcast();
@@ -32,6 +32,7 @@ class UserSession {
         // Clear session on logout
         _userId = null;
         _role = null;
+        _roleFuture = null;
         _roleController.add(null);
         BookingLifecycleManager().stopPeriodicCheck();
         debugPrint('[UserSession] Logged out, session cleared.');
@@ -48,12 +49,16 @@ class UserSession {
       return _role!;
     }
     
-    if (_isLoading) {
-      // Return temporary customer status if already loading to prevent blocking threads
-      return _role ?? 'customer';
+    if (_roleFuture != null && _userId == uid) {
+      return _roleFuture!;
     }
     
-    _isLoading = true;
+    _userId = uid;
+    _roleFuture = _fetchRoleDirectly(uid);
+    return _roleFuture!;
+  }
+
+  Future<String> _fetchRoleDirectly(String uid) async {
     try {
       debugPrint('[UserSession] Fetching role once for uid: $uid');
       final snap = await _db.child('users').child(uid).child('role').get().timeout(const Duration(seconds: 15));
@@ -75,10 +80,9 @@ class UserSession {
       }
     } catch (e) {
       debugPrint('[UserSession] Error fetching user role: $e');
-      // If error occurs, do not cache fallback permanently so we can retry on next request
       return _role ?? 'customer';
     } finally {
-      _isLoading = false;
+      _roleFuture = null;
     }
   }
 
@@ -87,6 +91,7 @@ class UserSession {
       _userId = uid;
     }
     _role = role;
+    _roleFuture = null;
     _roleController.add(role);
     BookingLifecycleManager().startPeriodicCheck();
     debugPrint('[UserSession] Force set role to: $role for uid: $_userId');
@@ -95,6 +100,7 @@ class UserSession {
   void clear() {
     _userId = null;
     _role = null;
+    _roleFuture = null;
     debugPrint('[UserSession] Session explicitly cleared.');
   }
 

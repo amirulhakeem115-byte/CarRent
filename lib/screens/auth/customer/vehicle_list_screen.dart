@@ -8,7 +8,7 @@ import '../../../constants/colors.dart';
 import 'vehicle_details_screen.dart';
 import 'customer_responsive_shell.dart';
 import '../../../widgets/app_image.dart';
-import '../../home_screen.dart';
+
 
 class VehicleListScreen extends StatefulWidget {
   const VehicleListScreen({super.key});
@@ -129,13 +129,6 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
     });
   }
 
-  void _goToLandingPage() {
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const HomeScreen()),
-      (route) => false,
-    );
-  }
 
   @override
   Widget build(BuildContext context) {

@@ -138,6 +138,8 @@ class VehicleService {
               }
             }
           }
+            }
+          }
         }
       }
 
@@ -194,7 +196,6 @@ class VehicleService {
               ) &&
               (booking.returnDate == null || now.isBefore(booking.returnDate!));
         });
-
         // Only perform safe cleanup: Booked -> Available if no active booking
         String targetStatus = vehicle.status;
         if (vehicle.status == 'Booked' && !hasActiveBooking) {

@@ -226,6 +226,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     final ongoingCount = _bookings.where((b) {
       final s = b.status.toLowerCase();
       return (s == 'active' || s == 'ongoing') ||
+          s == 'awaiting return inspection' ||
+          s == 'awaiting final payment' ||
+          s == 'return requested' ||
           ((s == 'approved' || s == 'confirmed') &&
               b.pickUpDate.isBefore(now) &&
               (b.returnDate == null || b.returnDate!.isAfter(now)) &&
@@ -438,9 +441,11 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                     Row(
                       children: [
                         Text(
-                          booking.isOpenRental && _isOngoing(booking)
-                              ? 'RM ${(_getDynamicPrice(booking) + (overdue['charges'] as num)).toStringAsFixed(2)}'
-                              : 'RM ${(booking.totalPrice + (overdue['charges'] as num)).toStringAsFixed(2)}',
+                          booking.status == 'Awaiting Final Payment'
+                              ? 'RM ${booking.finalAmount.toStringAsFixed(2)}'
+                              : (booking.isOpenRental && _isOngoing(booking)
+                                  ? 'RM ${(_getDynamicPrice(booking) + (overdue['charges'] as num)).toStringAsFixed(2)}'
+                                  : 'RM ${(booking.totalPrice + (overdue['charges'] as num)).toStringAsFixed(2)}'),
                           style: TextStyle(
                             fontWeight: FontWeight.w900,
                             fontSize: 14,
@@ -523,6 +528,36 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                 ),
                 Row(
                   children: [
+                    if (booking.status == 'Awaiting Final Payment') ...[
+                      ElevatedButton.icon(
+                        onPressed: () => _payNowExistingBooking(booking),
+                        icon: const Icon(
+                          Icons.payment_rounded,
+                          size: 12,
+                          color: Colors.white,
+                        ),
+                        label: const Text(
+                          'Pay Final Invoice',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
                     if (isWaitingPayment) ...[
                       ElevatedButton.icon(
                         onPressed: () => _payNowExistingBooking(booking),
@@ -656,8 +691,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
             if ((bStatus == 'active' ||
                     bStatus == 'ongoing' ||
                     bStatus == 'overdue' ||
-                    bStatus == 'return requested') &&
-                !booking.isReturned) ...[
+                    bStatus == 'return requested' ||
+                    bStatus == 'awaiting return inspection' ||
+                    bStatus == 'awaiting final payment')) ...[
               _buildSelfServicePanel(booking, _isDark),
             ],
           ],
@@ -804,6 +840,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     final ongoingList = _bookings.where((b) {
       final s = b.status.toLowerCase();
       return (s == 'active' || s == 'ongoing') ||
+          s == 'awaiting return inspection' ||
+          s == 'awaiting final payment' ||
+          s == 'return requested' ||
           ((s == 'approved' || s == 'confirmed') &&
               b.pickUpDate.isBefore(now) &&
               (b.returnDate == null || b.returnDate!.isAfter(now)) &&
@@ -1158,7 +1197,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
   Widget _buildSelfServicePanel(BookingModel booking, bool isDark) {
     final hasPendingExt = booking.extensionRequest != null &&
         booking.extensionRequest!['status'] == 'pending';
-    final isReturnRequested = booking.status == 'Return Requested';
+    final isReturnRequested = booking.status == 'Return Requested' || booking.status == 'Awaiting Return Inspection' || booking.status == 'Awaiting Final Payment';
     final isOnMyWay = booking.customerStatus == 'on_my_way';
 
     return Column(
@@ -1210,10 +1249,14 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
               children: [
                 const Icon(Icons.done_all, color: Colors.blue, size: 14),
                 const SizedBox(width: 8),
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'Return request submitted. Awaiting Admin inspection & completion.',
-                    style: TextStyle(color: Colors.blue, fontSize: 10, fontWeight: FontWeight.bold),
+                    booking.status == 'Awaiting Return Inspection'
+                        ? 'Return request submitted. Please wait for the Admin to inspect the vehicle.'
+                        : (booking.status == 'Awaiting Final Payment'
+                            ? 'Inspection completed. Awaiting final payment.'
+                            : 'Return request submitted. Awaiting Admin inspection & completion.'),
+                    style: const TextStyle(color: Colors.blue, fontSize: 10, fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
@@ -1241,7 +1284,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
             ElevatedButton.icon(
               onPressed: isReturnRequested ? null : () => _confirmReturnVehicle(booking),
               icon: const Icon(Icons.keyboard_return, size: 12),
-              label: const Text('Return Vehicle', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              label: Text(booking.isOpenRental ? 'Return Car' : 'Return Vehicle', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.teal,
                 foregroundColor: Colors.white,
@@ -1564,16 +1607,37 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
           .child(booking.id)
           .update({'customerStatus': 'on_my_way'});
 
-      // Notify Admin
       final notificationService = NotificationService();
+
+      final bool isPickup = booking.status.toLowerCase() != 'active' &&
+                            booking.status.toLowerCase() != 'ongoing' &&
+                            booking.status.toLowerCase() != 'overdue';
+
+      final String actionMsg = isPickup ? "pick up" : "return";
+
+      // 1. Notify Admin
       await notificationService.notifyAllAdmins(
-        title: "Customer On the Way 🚗",
-        message: "${booking.userName} is on their way to return ${booking.vehicleName}!",
-        type: 'on_my_way',
+        title: isPickup ? "Customer On the Way 🚗" : "Return Request",
+        message: isPickup
+            ? 'Customer "${booking.userName}" is on the way to pick up Vehicle "${booking.vehicleName}".'
+            : 'Customer ${booking.userName} is on the way to return ${booking.vehicleName}. Please prepare for vehicle inspection.',
+        type: isPickup ? 'on_my_way' : 'return_request',
         icon: '🚗',
         color: '0xFF10B981',
         relatedId: booking.id,
         actionRoute: 'Bookings',
+      );
+
+      // 2. Notify Customer
+      await notificationService.createNotification(
+        userId: booking.userId,
+        title: "Status Updated: On My Way",
+        message: "You have notified the Admin that you are on your way to $actionMsg ${booking.vehicleName}.",
+        type: 'booking',
+        icon: '🚗',
+        color: '0xFF10B981',
+        relatedId: booking.id,
+        actionRoute: 'Dashboard',
       );
 
       _loadBookings();
@@ -1611,7 +1675,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
 
   bool _isOngoing(BookingModel booking) {
     final s = booking.status.toLowerCase();
-    return s == 'active' || s == 'ongoing' || s == 'overdue' || s == 'return requested';
+    return s == 'active' || s == 'ongoing' || s == 'overdue' || s == 'return requested' || s == 'awaiting return inspection' || s == 'awaiting final payment';
   }
 
   double _getDynamicPrice(BookingModel booking) {

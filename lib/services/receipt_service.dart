@@ -92,7 +92,7 @@ class ReceiptService {
         'paymentDate': approvedPayment['paymentDate'] ?? booking.createdAt.toIso8601String(),
         'paymentMethod': approvedPayment['paymentMethod'] ?? 'cash',
         'transactionId': approvedPayment['transactionId'] ?? approvedPayment['id'] ?? 'N/A',
-        'totalPaid': booking.totalPrice,
+        'totalPaid': booking.isOpenRental ? booking.finalAmount : booking.totalPrice,
         'rentalFee': booking.totalPrice + booking.discountAmount,
         'discountAmount': booking.discountAmount,
         'pointsRedeemed': booking.pointsRedeemed,
@@ -232,7 +232,7 @@ class ReceiptService {
     // Cost calculations
     final double rentalFee = booking.totalPrice + booking.discountAmount;
     final double discount = booking.discountAmount;
-    final double totalPaid = booking.totalPrice;
+    final double totalPaid = booking.isOpenRental ? booking.finalAmount : booking.totalPrice;
 
     // Reward points calculations
     int earnedPoints = receiptMap['rewardPointsEarned'] ?? (booking.totalPrice / 10).floor();
@@ -637,6 +637,62 @@ class ReceiptService {
                         pw.Padding(
                           padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           child: pw.Text('-RM ${discount.toStringAsFixed(2)}', style: pw.TextStyle(fontSize: 8, color: PdfColor.fromInt(0xFF10B981), fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right),
+                        ),
+                      ],
+                    ),
+                  // Late fees row
+                  if (booking.lateFees > 0)
+                    pw.TableRow(
+                      children: [
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          child: pw.Text('Late Return Fees', style: pw.TextStyle(fontSize: 8, color: PdfColor.fromInt(0xFFEF4444))),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          child: pw.Text('RM ${booking.lateFees.toStringAsFixed(2)}', style: pw.TextStyle(fontSize: 8, color: PdfColor.fromInt(0xFFEF4444)), textAlign: pw.TextAlign.right),
+                        ),
+                      ],
+                    ),
+                  // Damage fee row
+                  if (booking.returnInspection != null && (booking.returnInspection!['damageFee'] ?? 0.0) > 0)
+                    pw.TableRow(
+                      children: [
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          child: pw.Text('Vehicle Damage Repair Charges', style: pw.TextStyle(fontSize: 8, color: PdfColor.fromInt(0xFFEF4444))),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          child: pw.Text('RM ${(booking.returnInspection!['damageFee'] ?? 0.0).toDouble().toStringAsFixed(2)}', style: pw.TextStyle(fontSize: 8, color: PdfColor.fromInt(0xFFEF4444)), textAlign: pw.TextAlign.right),
+                        ),
+                      ],
+                    ),
+                  // Cleaning fee row
+                  if (booking.returnInspection != null && (booking.returnInspection!['cleaningFee'] ?? 0.0) > 0)
+                    pw.TableRow(
+                      children: [
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          child: pw.Text('Special Cleaning Fees', style: pw.TextStyle(fontSize: 8, color: PdfColor.fromInt(0xFFEF4444))),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          child: pw.Text('RM ${(booking.returnInspection!['cleaningFee'] ?? 0.0).toDouble().toStringAsFixed(2)}', style: pw.TextStyle(fontSize: 8, color: PdfColor.fromInt(0xFFEF4444)), textAlign: pw.TextAlign.right),
+                        ),
+                      ],
+                    ),
+                  // Extra charges row
+                  if (booking.returnInspection != null && (booking.returnInspection!['extraCharges'] ?? 0.0) > 0)
+                    pw.TableRow(
+                      children: [
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          child: pw.Text('Additional Charges (${booking.returnInspection!['additionalNotes'] ?? 'Inspection Fees'})', style: pw.TextStyle(fontSize: 8, color: PdfColor.fromInt(0xFFEF4444))),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          child: pw.Text('RM ${(booking.returnInspection!['extraCharges'] ?? 0.0).toDouble().toStringAsFixed(2)}', style: pw.TextStyle(fontSize: 8, color: PdfColor.fromInt(0xFFEF4444)), textAlign: pw.TextAlign.right),
                         ),
                       ],
                     ),

@@ -601,21 +601,63 @@ class BookingService {
       final data = Map<dynamic, dynamic>.from(snap.value as Map);
       final booking = BookingModel.fromMap(bookingId, data);
 
-      await _db.child(bookingId).update({
-        'status': 'Return Requested',
-        'updatedAt': DateTime.now().toIso8601String(),
-      }).timeout(const Duration(seconds: 10));
+      if (booking.isOpenRental) {
+        await _db.child(bookingId).update({
+          'status': 'Awaiting Return Inspection',
+          'updatedAt': DateTime.now().toIso8601String(),
+        }).timeout(const Duration(seconds: 10));
 
-      // Notify Admin
-      await _notificationService.notifyAllAdmins(
-        title: "Return Request 🔔",
-        message: "${booking.userName} wants to return vehicle ${booking.vehicleName}.",
-        type: 'return_request',
-        icon: '🔔',
-        color: '0xFF3B82F6',
-        relatedId: bookingId,
-        actionRoute: 'Bookings',
-      );
+        // Notify Admin
+        await _notificationService.notifyAllAdmins(
+          title: "Return Requested",
+          message: 'Customer ${booking.userName} has requested to return ${booking.vehicleName}. Please inspect the vehicle.',
+          type: 'return_request',
+          icon: '🚗',
+          color: '0xFF3B82F6',
+          relatedId: bookingId,
+          actionRoute: 'Bookings',
+        );
+
+        // Notify Customer
+        await _notificationService.createNotification(
+          userId: booking.userId,
+          title: "Return Request Submitted",
+          message: "Your return request has been submitted. Please wait for the Admin to inspect the vehicle.",
+          type: 'booking',
+          icon: '🚗',
+          color: '0xFF3B82F6',
+          relatedId: bookingId,
+          actionRoute: 'Dashboard',
+        );
+      } else {
+        await _db.child(bookingId).update({
+          'status': 'Return Requested',
+          'updatedAt': DateTime.now().toIso8601String(),
+        }).timeout(const Duration(seconds: 10));
+
+        // Notify Admin
+        await _notificationService.notifyAllAdmins(
+          title: "Return Requested",
+          message: 'Customer ${booking.userName} has requested to return ${booking.vehicleName}. Please inspect the vehicle.',
+          type: 'return_request',
+          icon: '🚗',
+          color: '0xFF3B82F6',
+          relatedId: bookingId,
+          actionRoute: 'Bookings',
+        );
+
+        // Notify Customer
+        await _notificationService.createNotification(
+          userId: booking.userId,
+          title: "Return Request Submitted",
+          message: "Your return request has been submitted. Please wait for the Admin to inspect the vehicle.",
+          type: 'booking',
+          icon: '🚗',
+          color: '0xFF3B82F6',
+          relatedId: bookingId,
+          actionRoute: 'Dashboard',
+        );
+      }
     } catch (e) {
       debugPrint('Error requesting return: $e');
       rethrow;
@@ -645,10 +687,13 @@ class BookingService {
       if (booking.isOpenRental) {
         final pickup = booking.actualPickupTimestamp ?? booking.pickUpDate;
         final diff = now.difference(pickup);
-        final hours = diff.inHours;
-        final d = (hours / 24.0).ceil();
-        final days = d <= 0 ? 1 : d;
-        baseCost = days * pricePerDay;
+        final double totalHoursDecimal = diff.inSeconds / 3600.0;
+        final int roundedHours = totalHoursDecimal.ceil();
+        final int hours = roundedHours <= 0 ? 1 : roundedHours;
+
+        final int days = hours ~/ 24;
+        final int remainingHours = hours % 24;
+        baseCost = (days * pricePerDay) + (remainingHours * 20.0);
       }
 
       // Calculate overdue charges using the precise rules

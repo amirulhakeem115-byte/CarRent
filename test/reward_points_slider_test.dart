@@ -22,7 +22,7 @@ void main() {
       // Verify header texts
       expect(find.text('Redeem Points'), findsOneWidget);
       expect(find.text('Available Balance: 320 pts'), findsOneWidget);
-      expect(find.text('Max Limit: 1000'), findsOneWidget);
+      expect(find.text('Limit: 1000'), findsOneWidget);
 
       // Verify preview stats values
       expect(find.text('Points Selected'), findsOneWidget);
