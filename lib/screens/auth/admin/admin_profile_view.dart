@@ -16,7 +16,9 @@ import '../../../widgets/loading_widget.dart';
 import '../../../widgets/app_image.dart';
 
 class AdminProfileView extends StatefulWidget {
-  const AdminProfileView({super.key});
+  final VoidCallback? onLogout;
+
+  const AdminProfileView({super.key, this.onLogout});
 
   @override
   State<AdminProfileView> createState() => _AdminProfileViewState();
@@ -895,6 +897,31 @@ class _AdminProfileViewState extends State<AdminProfileView> {
                       children: [col1, const SizedBox(height: 24), col2],
                     );
             },
+          ),
+          const SizedBox(height: 28),
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.redAccent,
+                    side: const BorderSide(color: Colors.redAccent),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  onPressed: widget.onLogout,
+                  icon: const Icon(Icons.logout, size: 18),
+                  label: const Text(
+                    'Logout',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),

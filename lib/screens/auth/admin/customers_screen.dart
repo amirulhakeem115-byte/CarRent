@@ -952,176 +952,238 @@ class _CustomersViewState extends State<CustomersView> {
     required Color textSecondary,
     required Color borderColor,
   }) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
-        headingRowColor: WidgetStateProperty.all(
-          isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-        ),
-        columns: [
-          DataColumn(
-            label: Text(
-              'Full Name',
-              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
-            ),
-          ),
-          DataColumn(
-            label: Text(
-              'Email Address',
-              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
-            ),
-          ),
-          DataColumn(
-            label: Text(
-              'Phone Number',
-              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
-            ),
-          ),
-          DataColumn(
-            label: Text(
-              'Role',
-              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
-            ),
-          ),
-          DataColumn(
-            label: Text(
-              'Account',
-              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
-            ),
-          ),
-          DataColumn(
-            label: Text(
-              'License Status',
-              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
-            ),
-          ),
-          DataColumn(
-            label: Text(
-              'Action',
-              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
-            ),
-          ),
-        ],
-        rows: users.map((u) {
-          Color licenseColor = Colors.orange;
-          if (u.licenseStatus == 'approved') licenseColor = Colors.green;
-          if (u.licenseStatus == 'rejected') licenseColor = Colors.red;
-          if (u.licenseStatus == 'unprovided') licenseColor = Colors.grey;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final tableWidth = constraints.maxWidth;
+        final nameWidth = tableWidth * 0.22;
+        final emailWidth = tableWidth * 0.25;
+        final phoneWidth = tableWidth * 0.14;
+        final roleWidth = tableWidth * 0.10;
+        final accountWidth = tableWidth * 0.11;
+        final licenseWidth = tableWidth * 0.12;
+        final actionWidth = tableWidth * 0.06;
 
-          final accountStatus = u.isActive ? 'ACTIVE' : 'DISABLED';
-
-          return DataRow(
-            cells: [
-              DataCell(
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 14,
-                      backgroundColor: AppColors.secondaryBlue.withValues(
-                        alpha: isDark ? 0.2 : 0.1,
-                      ),
-                      backgroundImage: getAppImageProvider(u.profileImage),
-                      child: u.profileImage.isEmpty
-                          ? Icon(Icons.person, size: 14, color: textPrimary)
-                          : null,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      u.fullName,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: textPrimary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              DataCell(Text(u.email, style: TextStyle(color: textPrimary))),
-              DataCell(
-                Text(
-                  u.phone.isNotEmpty ? u.phone : 'N/A',
-                  style: TextStyle(color: textSecondary),
-                ),
-              ),
-              DataCell(
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: u.role == 'admin'
-                        ? Colors.purple.withValues(alpha: 0.15)
-                        : Colors.blue.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    u.role.toUpperCase(),
-                    style: TextStyle(
-                      color: u.role == 'admin' ? Colors.purple : Colors.blue,
-                      fontSize: 8,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-              DataCell(
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: u.isActive
-                        ? Colors.green.withValues(alpha: 0.15)
-                        : Colors.red.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    accountStatus,
-                    style: TextStyle(
-                      color: u.isActive ? Colors.green : Colors.red,
-                      fontSize: 8,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-              DataCell(
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: licenseColor.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    u.licenseStatus.toUpperCase(),
-                    style: TextStyle(
-                      color: licenseColor,
-                      fontSize: 8,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-              DataCell(
-                IconButton(
-                  icon: Icon(
-                    Icons.edit_note_outlined,
-                    color: textPrimary,
-                    size: 20,
-                  ),
-                  tooltip: 'Manage Profile Details',
-                  onPressed: () => _showSpecsDialog(u),
-                ),
-              ),
-            ],
+        Text _header(String label) {
+          return Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: textPrimary,
+              fontSize: 14,
+            ),
           );
-        }).toList(),
-      ),
+        }
+
+        return DataTable(
+          horizontalMargin: 12,
+          columnSpacing: 8,
+          dataRowMinHeight: 54,
+          dataRowMaxHeight: 64,
+          headingRowHeight: 56,
+          headingRowColor: WidgetStateProperty.all(
+            isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+          ),
+          columns: [
+            DataColumn(
+              label: SizedBox(width: nameWidth, child: _header('Full Name')),
+            ),
+            DataColumn(
+              label: SizedBox(
+                width: emailWidth,
+                child: _header('Email Address'),
+              ),
+            ),
+            DataColumn(
+              label: SizedBox(
+                width: phoneWidth,
+                child: _header('Phone Number'),
+              ),
+            ),
+            DataColumn(
+              label: SizedBox(width: roleWidth, child: _header('Role')),
+            ),
+            DataColumn(
+              label: SizedBox(width: accountWidth, child: _header('Account')),
+            ),
+            DataColumn(
+              label: SizedBox(
+                width: licenseWidth,
+                child: _header('License Status'),
+              ),
+            ),
+            DataColumn(
+              label: SizedBox(width: actionWidth, child: _header('Action')),
+            ),
+          ],
+          rows: users.map((u) {
+            Color licenseColor = Colors.orange;
+            if (u.licenseStatus == 'approved') licenseColor = Colors.green;
+            if (u.licenseStatus == 'rejected') licenseColor = Colors.red;
+            if (u.licenseStatus == 'unprovided') licenseColor = Colors.grey;
+
+            final accountStatus = u.isActive ? 'ACTIVE' : 'DISABLED';
+
+            return DataRow(
+              cells: [
+                DataCell(
+                  SizedBox(
+                    width: nameWidth,
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 14,
+                          backgroundColor: AppColors.secondaryBlue.withValues(
+                            alpha: isDark ? 0.2 : 0.1,
+                          ),
+                          backgroundImage: getAppImageProvider(u.profileImage),
+                          child: u.profileImage.isEmpty
+                              ? Icon(Icons.person, size: 14, color: textPrimary)
+                              : null,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            u.fullName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: textPrimary,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                DataCell(
+                  SizedBox(
+                    width: emailWidth,
+                    child: Text(
+                      u.email,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: textPrimary, fontSize: 13),
+                    ),
+                  ),
+                ),
+                DataCell(
+                  SizedBox(
+                    width: phoneWidth,
+                    child: Text(
+                      u.phone.isNotEmpty ? u.phone : 'N/A',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: textSecondary, fontSize: 13),
+                    ),
+                  ),
+                ),
+                DataCell(
+                  SizedBox(
+                    width: roleWidth,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: u.role == 'admin'
+                              ? Colors.purple.withValues(alpha: 0.15)
+                              : Colors.blue.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          u.role.toUpperCase(),
+                          style: TextStyle(
+                            color: u.role == 'admin'
+                                ? Colors.purple
+                                : Colors.blue,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                DataCell(
+                  SizedBox(
+                    width: accountWidth,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: u.isActive
+                              ? Colors.green.withValues(alpha: 0.15)
+                              : Colors.red.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          accountStatus,
+                          style: TextStyle(
+                            color: u.isActive ? Colors.green : Colors.red,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                DataCell(
+                  SizedBox(
+                    width: licenseWidth,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: licenseColor.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          u.licenseStatus.toUpperCase(),
+                          style: TextStyle(
+                            color: licenseColor,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                DataCell(
+                  SizedBox(
+                    width: actionWidth,
+                    child: IconButton(
+                      icon: Icon(
+                        Icons.edit_note_outlined,
+                        color: textPrimary,
+                        size: 20,
+                      ),
+                      tooltip: 'Manage Profile Details',
+                      onPressed: () => _showSpecsDialog(u),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }).toList(),
+        );
+      },
     );
   }
 

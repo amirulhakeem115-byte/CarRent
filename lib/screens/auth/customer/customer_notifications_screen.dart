@@ -39,12 +39,22 @@ class _CustomerNotificationsScreenState
   ];
 
   bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  bool get _isPhone => MediaQuery.of(context).size.width < 420;
   Color get _textColor =>
       _isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
   Color get _subColor =>
       _isDark ? const Color(0xFFCBD5E1) : AppColors.lightText;
   Color get _borderColor =>
       _isDark ? const Color(0xFF334155) : AppColors.borderGray;
+
+  double _rf(double base, {double min = 9, double max = 24}) {
+    final width = MediaQuery.of(context).size.width;
+    final factor = (width / 390).clamp(0.86, 1.0);
+    final size = base * factor;
+    if (size < min) return min;
+    if (size > max) return max;
+    return size;
+  }
 
   Stream<List<NotificationModel>>? _notificationsStream;
 
@@ -200,18 +210,19 @@ class _CustomerNotificationsScreenState
 
               // Summary status text row
               Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 8,
+                padding: EdgeInsets.symmetric(
+                  horizontal: _isPhone ? 16 : 24,
+                  vertical: _isPhone ? 6 : 8,
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
                   children: [
                     Text(
                       'Showing ${filteredNotifs.length} alerts ($unreadCount unread)',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 12,
+                        fontSize: _rf(12, min: 10),
                         color: _textColor,
                       ),
                     ),
@@ -226,11 +237,12 @@ class _CustomerNotificationsScreenState
                             _selectedStatus = 'All';
                           });
                         },
-                        child: const Text(
+                        child: Text(
                           'Reset Filters',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             color: AppColors.primaryOrange,
+                            fontSize: _rf(12, min: 10),
                           ),
                         ),
                       ),
@@ -243,13 +255,13 @@ class _CustomerNotificationsScreenState
                 child: filteredNotifs.isEmpty
                     ? _buildEmptyState()
                     : ListView.separated(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 8,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: _isPhone ? 12 : 20,
+                          vertical: _isPhone ? 6 : 8,
                         ),
                         itemCount: filteredNotifs.length,
                         separatorBuilder: (context, index) =>
-                            const SizedBox(height: 12),
+                            SizedBox(height: _isPhone ? 10 : 12),
                         itemBuilder: (context, index) {
                           final notif = filteredNotifs[index];
                           return _buildNotificationCard(notif, currentUser.uid);
@@ -265,8 +277,13 @@ class _CustomerNotificationsScreenState
 
   Widget _buildFilterSection(List<NotificationModel> allNotifs, String userId) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(20, 10, 20, 10),
-      padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.fromLTRB(
+        _isPhone ? 12 : 20,
+        10,
+        _isPhone ? 12 : 20,
+        10,
+      ),
+      padding: EdgeInsets.all(_isPhone ? 12 : 16),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
@@ -284,15 +301,18 @@ class _CustomerNotificationsScreenState
           // Search input field
           TextField(
             onChanged: (val) => setState(() => _searchQuery = val),
-            style: TextStyle(color: _textColor, fontSize: 13),
+            style: TextStyle(color: _textColor, fontSize: _rf(13, min: 11)),
             decoration: InputDecoration(
               hintText: 'Search notifications...',
               hintStyle: TextStyle(
                 color: _isDark ? Colors.white30 : Colors.grey,
-                fontSize: 13,
+                fontSize: _rf(13, min: 11),
               ),
               prefixIcon: Icon(Icons.search, size: 20, color: _subColor),
-              contentPadding: const EdgeInsets.symmetric(vertical: 8),
+              contentPadding: EdgeInsets.symmetric(
+                vertical: _isPhone ? 6 : 8,
+                horizontal: _isPhone ? 8 : 10,
+              ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide(color: _borderColor),
@@ -306,114 +326,209 @@ class _CustomerNotificationsScreenState
           const SizedBox(height: 12),
 
           // Filters selection Row
-          Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  initialValue: _selectedType,
-                  dropdownColor: Theme.of(context).cardColor,
-                  style: TextStyle(color: _textColor, fontSize: 12),
-                  decoration: InputDecoration(
-                    labelText: 'Category',
-                    labelStyle: TextStyle(color: _subColor, fontSize: 12),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
-                    border: const OutlineInputBorder(),
-                  ),
-                  items: _typesList.map((t) {
-                    return DropdownMenuItem(
-                      value: t,
-                      child: Text(
-                        t.substring(0, 1).toUpperCase() + t.substring(1),
-                        style: const TextStyle(fontSize: 12),
+          _isPhone
+              ? Column(
+                  children: [
+                    DropdownButtonFormField<String>(
+                      initialValue: _selectedType,
+                      dropdownColor: Theme.of(context).cardColor,
+                      style: TextStyle(color: _textColor, fontSize: _rf(12)),
+                      decoration: InputDecoration(
+                        labelText: 'Category',
+                        labelStyle: TextStyle(
+                          color: _subColor,
+                          fontSize: _rf(12),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
+                        border: const OutlineInputBorder(),
                       ),
-                    );
-                  }).toList(),
-                  onChanged: (val) {
-                    if (val != null) setState(() => _selectedType = val);
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  initialValue: _selectedStatus,
-                  dropdownColor: Theme.of(context).cardColor,
-                  style: TextStyle(color: _textColor, fontSize: 12),
-                  decoration: InputDecoration(
-                    labelText: 'Status',
-                    labelStyle: TextStyle(color: _subColor, fontSize: 12),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
+                      items: _typesList.map((t) {
+                        return DropdownMenuItem(
+                          value: t,
+                          child: Text(
+                            t.substring(0, 1).toUpperCase() + t.substring(1),
+                            style: TextStyle(fontSize: _rf(12)),
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) setState(() => _selectedType = val);
+                      },
                     ),
-                    border: const OutlineInputBorder(),
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'All',
-                      child: Text('All Status', style: TextStyle(fontSize: 12)),
-                    ),
-                    DropdownMenuItem(
-                      value: 'Unread',
-                      child: Text('Unread', style: TextStyle(fontSize: 12)),
-                    ),
-                    DropdownMenuItem(
-                      value: 'Read',
-                      child: Text('Read', style: TextStyle(fontSize: 12)),
+                    const SizedBox(height: 10),
+                    DropdownButtonFormField<String>(
+                      initialValue: _selectedStatus,
+                      dropdownColor: Theme.of(context).cardColor,
+                      style: TextStyle(color: _textColor, fontSize: _rf(12)),
+                      decoration: InputDecoration(
+                        labelText: 'Status',
+                        labelStyle: TextStyle(
+                          color: _subColor,
+                          fontSize: _rf(12),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
+                        border: const OutlineInputBorder(),
+                      ),
+                      items: [
+                        DropdownMenuItem(
+                          value: 'All',
+                          child: Text(
+                            'All Status',
+                            style: TextStyle(fontSize: _rf(12)),
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Unread',
+                          child: Text(
+                            'Unread',
+                            style: TextStyle(fontSize: _rf(12)),
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Read',
+                          child: Text(
+                            'Read',
+                            style: TextStyle(fontSize: _rf(12)),
+                          ),
+                        ),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) setState(() => _selectedStatus = val);
+                      },
                     ),
                   ],
-                  onChanged: (val) {
-                    if (val != null) setState(() => _selectedStatus = val);
-                  },
+                )
+              : Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        initialValue: _selectedType,
+                        dropdownColor: Theme.of(context).cardColor,
+                        style: TextStyle(color: _textColor, fontSize: _rf(12)),
+                        decoration: InputDecoration(
+                          labelText: 'Category',
+                          labelStyle: TextStyle(
+                            color: _subColor,
+                            fontSize: _rf(12),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 8,
+                          ),
+                          border: const OutlineInputBorder(),
+                        ),
+                        items: _typesList.map((t) {
+                          return DropdownMenuItem(
+                            value: t,
+                            child: Text(
+                              t.substring(0, 1).toUpperCase() + t.substring(1),
+                              style: TextStyle(fontSize: _rf(12)),
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) setState(() => _selectedType = val);
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        initialValue: _selectedStatus,
+                        dropdownColor: Theme.of(context).cardColor,
+                        style: TextStyle(color: _textColor, fontSize: _rf(12)),
+                        decoration: InputDecoration(
+                          labelText: 'Status',
+                          labelStyle: TextStyle(
+                            color: _subColor,
+                            fontSize: _rf(12),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 8,
+                          ),
+                          border: const OutlineInputBorder(),
+                        ),
+                        items: [
+                          DropdownMenuItem(
+                            value: 'All',
+                            child: Text(
+                              'All Status',
+                              style: TextStyle(fontSize: _rf(12)),
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Unread',
+                            child: Text(
+                              'Unread',
+                              style: TextStyle(fontSize: _rf(12)),
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Read',
+                            child: Text(
+                              'Read',
+                              style: TextStyle(fontSize: _rf(12)),
+                            ),
+                          ),
+                        ],
+                        onChanged: (val) {
+                          if (val != null)
+                            setState(() => _selectedStatus = val);
+                        },
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
           const SizedBox(height: 12),
 
           // Action buttons Row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          Wrap(
+            alignment: WrapAlignment.end,
+            runSpacing: 6,
+            spacing: 6,
             children: [
               if (allNotifs.any((n) => !n.isRead))
                 TextButton.icon(
                   onPressed: () async {
                     await _notificationService.markAllAsRead(userId);
                   },
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.done_all,
-                    size: 14,
+                    size: _rf(14, min: 12),
                     color: AppColors.primaryOrange,
                   ),
-                  label: const Text(
+                  label: Text(
                     'Mark All Read',
                     style: TextStyle(
                       color: AppColors.primaryOrange,
                       fontWeight: FontWeight.bold,
-                      fontSize: 11,
+                      fontSize: _rf(11, min: 10),
                     ),
                   ),
                 ),
-              const SizedBox(width: 12),
               if (allNotifs.any((n) => n.isRead))
                 TextButton.icon(
                   onPressed: () async {
                     await _notificationService.clearReadNotifications(userId);
                   },
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.delete_sweep_outlined,
-                    size: 14,
+                    size: _rf(14, min: 12),
                     color: Colors.redAccent,
                   ),
-                  label: const Text(
+                  label: Text(
                     'Clear Read',
                     style: TextStyle(
                       color: Colors.redAccent,
                       fontWeight: FontWeight.bold,
-                      fontSize: 11,
+                      fontSize: _rf(11, min: 10),
                     ),
                   ),
                 ),
@@ -452,6 +567,7 @@ class _CustomerNotificationsScreenState
   Widget _buildNotificationCard(NotificationModel notif, String userId) {
     final parsedColor = Color(int.parse(notif.color));
     final formattedDate = DateFormat('dd MMM, hh:mm a').format(notif.createdAt);
+    final isPhone = _isPhone;
 
     return Material(
       color: Colors.transparent,
@@ -475,14 +591,18 @@ class _CustomerNotificationsScreenState
           ],
         ),
         child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 8,
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: isPhone ? 12 : 16,
+            vertical: isPhone ? 6 : 8,
           ),
+          minLeadingWidth: isPhone ? 38 : 40,
           leading: CircleAvatar(
-            radius: 20,
+            radius: isPhone ? 18 : 20,
             backgroundColor: parsedColor.withValues(alpha: 0.1),
-            child: Text(notif.icon, style: const TextStyle(fontSize: 16)),
+            child: Text(
+              notif.icon,
+              style: TextStyle(fontSize: _rf(16, min: 14)),
+            ),
           ),
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -491,7 +611,7 @@ class _CustomerNotificationsScreenState
                 notif.title,
                 style: TextStyle(
                   fontWeight: notif.isRead ? FontWeight.bold : FontWeight.w900,
-                  fontSize: 13,
+                  fontSize: _rf(13, min: 11),
                   color: _textColor,
                 ),
                 maxLines: 2,
@@ -500,7 +620,7 @@ class _CustomerNotificationsScreenState
               const SizedBox(height: 2),
               Text(
                 formattedDate,
-                style: TextStyle(fontSize: 9, color: _subColor),
+                style: TextStyle(fontSize: _rf(9, min: 8), color: _subColor),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -514,11 +634,11 @@ class _CustomerNotificationsScreenState
                 Text(
                   notif.message,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: _rf(11, min: 10),
                     height: 1.3,
                     color: notif.isRead ? _subColor : _textColor,
                   ),
-                  maxLines: 4,
+                  maxLines: isPhone ? 5 : 4,
                   overflow: TextOverflow.ellipsis,
                 ),
                 if (notif.type == 'pickup_reminder_customer') ...[
@@ -533,7 +653,7 @@ class _CustomerNotificationsScreenState
                           backgroundColor: AppColors.primaryOrange,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
+                            horizontal: 10,
                             vertical: 6,
                           ),
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -544,10 +664,10 @@ class _CustomerNotificationsScreenState
                         ),
                         onPressed: () =>
                             _showBookingDetails(context, notif.relatedId),
-                        child: const Text(
+                        child: Text(
                           'View Booking',
                           style: TextStyle(
-                            fontSize: 10,
+                            fontSize: _rf(10, min: 9),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -557,7 +677,7 @@ class _CustomerNotificationsScreenState
                           foregroundColor: Colors.teal,
                           side: const BorderSide(color: Colors.teal),
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
+                            horizontal: 10,
                             vertical: 6,
                           ),
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -567,10 +687,10 @@ class _CustomerNotificationsScreenState
                           ),
                         ),
                         onPressed: () => _sendOnMyWayStatus(notif.relatedId),
-                        child: const Text(
+                        child: Text(
                           "I'm On My Way",
                           style: TextStyle(
-                            fontSize: 10,
+                            fontSize: _rf(10, min: 9),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -590,7 +710,7 @@ class _CustomerNotificationsScreenState
                           backgroundColor: Colors.teal,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
+                            horizontal: 10,
                             vertical: 6,
                           ),
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -600,10 +720,10 @@ class _CustomerNotificationsScreenState
                           ),
                         ),
                         onPressed: () => _sendOnMyWayStatus(notif.relatedId),
-                        child: const Text(
+                        child: Text(
                           "I'm On My Way",
                           style: TextStyle(
-                            fontSize: 10,
+                            fontSize: _rf(10, min: 9),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -615,7 +735,7 @@ class _CustomerNotificationsScreenState
                             color: AppColors.primaryOrange,
                           ),
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
+                            horizontal: 10,
                             vertical: 6,
                           ),
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -625,10 +745,10 @@ class _CustomerNotificationsScreenState
                           ),
                         ),
                         onPressed: () => _showExtendRentalGuidance(),
-                        child: const Text(
+                        child: Text(
                           "Extend Rental",
                           style: TextStyle(
-                            fontSize: 10,
+                            fontSize: _rf(10, min: 9),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -646,7 +766,7 @@ class _CustomerNotificationsScreenState
                             ? Icons.mark_as_unread_outlined
                             : Icons.mark_chat_read_outlined,
                         color: _subColor,
-                        size: 16,
+                        size: _rf(16, min: 14),
                       ),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(
@@ -668,7 +788,7 @@ class _CustomerNotificationsScreenState
                       icon: Icon(
                         Icons.delete_outline_rounded,
                         color: _subColor,
-                        size: 16,
+                        size: _rf(16, min: 14),
                       ),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(
@@ -881,164 +1001,190 @@ class _CustomerNotificationsScreenState
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
+        final maxSheetHeight = MediaQuery.of(context).size.height * 0.82;
+        final isPhone = MediaQuery.of(context).size.width < 420;
         return Padding(
           padding: EdgeInsets.only(
-            top: 24,
-            left: 24,
-            right: 24,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+            top: isPhone ? 16 : 24,
+            left: isPhone ? 16 : 24,
+            right: isPhone ? 16 : 24,
+            bottom:
+                MediaQuery.of(context).viewInsets.bottom + (isPhone ? 16 : 24),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxSheetHeight),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Booking Specification',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: _textColor,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Booking Specification',
+                          style: TextStyle(
+                            fontSize: _rf(16, min: 14),
+                            fontWeight: FontWeight.bold,
+                            color: _textColor,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryOrange.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          booking.status.toUpperCase(),
+                          style: TextStyle(
+                            color: AppColors.primaryOrange,
+                            fontSize: _rf(10, min: 9),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryOrange.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      booking.status.toUpperCase(),
-                      style: const TextStyle(
-                        color: AppColors.primaryOrange,
-                        fontSize: 10,
+                  SizedBox(height: isPhone ? 14 : 20),
+                  _buildDetailRow('Reservation Ref ID', booking.id),
+                  _buildDetailRow('Vehicle Name', booking.vehicleName),
+                  _buildDetailRow(
+                    'Rental Days',
+                    booking.isOpenRental
+                        ? 'Open Ended'
+                        : '${booking.rentalDays} days',
+                  ),
+                  _buildDetailRow(
+                    'Rental Duration',
+                    booking.isOpenRental
+                        ? '${dateFormat.format(booking.pickUpDate)} to OPEN RENTAL'
+                        : '${dateFormat.format(booking.pickUpDate)} to ${booking.returnDate != null ? dateFormat.format(booking.returnDate!) : ""}',
+                  ),
+                  _buildDetailRow(
+                    'Security Deposit',
+                    'RM ${booking.depositAmount.toStringAsFixed(2)}',
+                  ),
+                  _buildDetailRow(
+                    'Total Price Paid',
+                    'RM ${booking.totalPrice.toStringAsFixed(2)}',
+                  ),
+                  if (booking.notes != null && booking.notes!.isNotEmpty)
+                    _buildDetailRow('Remarks', booking.notes!),
+                  if (isPaid) ...[
+                    const SizedBox(height: 16),
+                    Divider(color: _borderColor),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Receipt Documents',
+                      style: TextStyle(
+                        fontSize: _rf(12, min: 10),
                         fontWeight: FontWeight.bold,
+                        color: _textColor,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primaryOrange,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              padding: EdgeInsets.symmetric(
+                                vertical: isPhone ? 9 : 10,
+                              ),
+                              elevation: 0,
+                            ),
+                            onPressed: () {
+                              Navigator.pop(context);
+                              ReceiptService().viewReceipt(context, booking.id);
+                            },
+                            icon: Icon(
+                              Icons.visibility,
+                              size: _rf(14, min: 12),
+                            ),
+                            label: Text(
+                              'View',
+                              style: TextStyle(
+                                fontSize: _rf(11, min: 10),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _isDark
+                                  ? const Color(0xFF0F172A)
+                                  : AppColors.secondaryBlue,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              padding: EdgeInsets.symmetric(
+                                vertical: isPhone ? 9 : 10,
+                              ),
+                              elevation: 0,
+                            ),
+                            onPressed: () {
+                              Navigator.pop(context);
+                              ReceiptService().downloadReceipt(
+                                context,
+                                booking.id,
+                              );
+                            },
+                            icon: Icon(Icons.download, size: _rf(14, min: 12)),
+                            label: Text(
+                              'Download',
+                              style: TextStyle(
+                                fontSize: _rf(11, min: 10),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  SizedBox(height: isPhone ? 16 : 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryOrange,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: EdgeInsets.symmetric(
+                          vertical: isPhone ? 12 : 14,
+                        ),
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                      child: Text(
+                        'Close Details',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: _rf(13, min: 11),
+                        ),
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
-              _buildDetailRow('Reservation Ref ID', booking.id),
-              _buildDetailRow('Vehicle Name', booking.vehicleName),
-              _buildDetailRow(
-                'Rental Days',
-                booking.isOpenRental
-                    ? 'Open Ended'
-                    : '${booking.rentalDays} days',
-              ),
-              _buildDetailRow(
-                'Rental Duration',
-                booking.isOpenRental
-                    ? '${dateFormat.format(booking.pickUpDate)} to OPEN RENTAL'
-                    : '${dateFormat.format(booking.pickUpDate)} to ${booking.returnDate != null ? dateFormat.format(booking.returnDate!) : ""}',
-              ),
-              _buildDetailRow(
-                'Security Deposit',
-                'RM ${booking.depositAmount.toStringAsFixed(2)}',
-              ),
-              _buildDetailRow(
-                'Total Price Paid',
-                'RM ${booking.totalPrice.toStringAsFixed(2)}',
-              ),
-              if (booking.notes != null && booking.notes!.isNotEmpty)
-                _buildDetailRow('Remarks', booking.notes!),
-              if (isPaid) ...[
-                const SizedBox(height: 16),
-                Divider(color: _borderColor),
-                const SizedBox(height: 12),
-                Text(
-                  'Receipt Documents',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: _textColor,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primaryOrange,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          elevation: 0,
-                        ),
-                        onPressed: () {
-                          Navigator.pop(context);
-                          ReceiptService().viewReceipt(context, booking.id);
-                        },
-                        icon: const Icon(Icons.visibility, size: 14),
-                        label: const Text(
-                          'View',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _isDark
-                              ? const Color(0xFF0F172A)
-                              : AppColors.secondaryBlue,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          elevation: 0,
-                        ),
-                        onPressed: () {
-                          Navigator.pop(context);
-                          ReceiptService().downloadReceipt(context, booking.id);
-                        },
-                        icon: const Icon(Icons.download, size: 14),
-                        label: const Text(
-                          'Download',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryOrange,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text(
-                    'Close Details',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         );
       },
@@ -1055,92 +1201,109 @@ class _CustomerNotificationsScreenState
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
+        final maxSheetHeight = MediaQuery.of(context).size.height * 0.82;
+        final isPhone = MediaQuery.of(context).size.width < 420;
         return Padding(
           padding: EdgeInsets.only(
-            top: 24,
-            left: 24,
-            right: 24,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+            top: isPhone ? 16 : 24,
+            left: isPhone ? 16 : 24,
+            right: isPhone ? 16 : 24,
+            bottom:
+                MediaQuery.of(context).viewInsets.bottom + (isPhone ? 16 : 24),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxSheetHeight),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Payment Transaction',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: _textColor,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Payment Transaction',
+                          style: TextStyle(
+                            fontSize: _rf(16, min: 14),
+                            fontWeight: FontWeight.bold,
+                            color: _textColor,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          (payment.paymentStatus ?? payment.status)
+                              .toUpperCase(),
+                          style: TextStyle(
+                            color: Colors.green,
+                            fontSize: _rf(10, min: 9),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
+                  SizedBox(height: isPhone ? 14 : 20),
+                  _buildDetailRow('Transaction ID', payment.id),
+                  _buildDetailRow('Booking Ref ID', payment.bookingId),
+                  _buildDetailRow(
+                    'Paid Amount',
+                    'RM ${payment.amount.toStringAsFixed(2)}',
+                  ),
+                  _buildDetailRow(
+                    'Method Type',
+                    payment.paymentMethod.toUpperCase(),
+                  ),
+                  _buildDetailRow(
+                    'Lodged At',
+                    dateFormat.format(payment.paymentDate),
+                  ),
+                  if (payment.transactionId != null)
+                    _buildDetailRow('Reference Ref', payment.transactionId!),
+                  if (payment.rejectionReason != null &&
+                      payment.rejectionReason!.isNotEmpty)
+                    _buildDetailRow(
+                      'Rejection Reason',
+                      payment.rejectionReason!,
+                      isItalic: true,
                     ),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      (payment.paymentStatus ?? payment.status).toUpperCase(),
-                      style: const TextStyle(
-                        color: Colors.green,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
+                  SizedBox(height: isPhone ? 16 : 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryOrange,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: EdgeInsets.symmetric(
+                          vertical: isPhone ? 12 : 14,
+                        ),
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                      child: Text(
+                        'Close details',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: _rf(13, min: 11),
+                        ),
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
-              _buildDetailRow('Transaction ID', payment.id),
-              _buildDetailRow('Booking Ref ID', payment.bookingId),
-              _buildDetailRow(
-                'Paid Amount',
-                'RM ${payment.amount.toStringAsFixed(2)}',
-              ),
-              _buildDetailRow(
-                'Method Type',
-                payment.paymentMethod.toUpperCase(),
-              ),
-              _buildDetailRow(
-                'Lodged At',
-                dateFormat.format(payment.paymentDate),
-              ),
-              if (payment.transactionId != null)
-                _buildDetailRow('Reference Ref', payment.transactionId!),
-              if (payment.rejectionReason != null &&
-                  payment.rejectionReason!.isNotEmpty)
-                _buildDetailRow(
-                  'Rejection Reason',
-                  payment.rejectionReason!,
-                  isItalic: true,
-                ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryOrange,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text(
-                    'Close details',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         );
       },
@@ -1148,6 +1311,40 @@ class _CustomerNotificationsScreenState
   }
 
   Widget _buildDetailRow(String label, String value, {bool isItalic = false}) {
+    final compact = _isPhone;
+    final labelSize = _rf(12, min: 10);
+    final valueSize = _rf(12, min: 10);
+
+    if (compact) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: _subColor,
+                fontSize: labelSize,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              value,
+              softWrap: true,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: valueSize,
+                fontStyle: isItalic ? FontStyle.italic : FontStyle.normal,
+                color: _textColor,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -1159,7 +1356,7 @@ class _CustomerNotificationsScreenState
               label,
               style: TextStyle(
                 color: _subColor,
-                fontSize: 12,
+                fontSize: labelSize,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -1168,9 +1365,10 @@ class _CustomerNotificationsScreenState
             flex: 6,
             child: Text(
               value,
+              softWrap: true,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                fontSize: 12,
+                fontSize: valueSize,
                 fontStyle: isItalic ? FontStyle.italic : FontStyle.normal,
                 color: _textColor,
               ),

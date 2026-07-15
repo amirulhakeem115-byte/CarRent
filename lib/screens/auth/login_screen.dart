@@ -677,6 +677,17 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: isDark ? Colors.white : AppColors.secondaryBlue,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: isDesktop
           ? Row(
               children: [

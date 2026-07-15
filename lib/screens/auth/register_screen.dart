@@ -5,6 +5,7 @@ import '../../services/auth_service.dart';
 import '../../services/company_settings_provider.dart';
 import '../../widgets/custom_textfield.dart';
 import '../../widgets/app_logo.dart';
+import 'login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -150,7 +151,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
           const SizedBox(height: 32),
-          
+
           // Full Name & Phone Number side-by-side or stacked
           LayoutBuilder(
             builder: (context, constraints) {
@@ -168,7 +169,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
-                              color: isDark ? Colors.white70 : AppColors.secondaryBlue,
+                              color: isDark
+                                  ? Colors.white70
+                                  : AppColors.secondaryBlue,
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -178,7 +181,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             hintText: 'Enter your full name',
                             prefixIcon: Icons.person_outline,
                             validator: (val) =>
-                                val == null || val.trim().isEmpty ? 'Full Name is required' : null,
+                                val == null || val.trim().isEmpty
+                                ? 'Full Name is required'
+                                : null,
                           ),
                         ],
                       ),
@@ -193,7 +198,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
-                              color: isDark ? Colors.white70 : AppColors.secondaryBlue,
+                              color: isDark
+                                  ? Colors.white70
+                                  : AppColors.secondaryBlue,
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -204,9 +211,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             prefixIcon: Icons.phone_outlined,
                             keyboardType: TextInputType.phone,
                             validator: (val) {
-                              if (val == null || val.trim().isEmpty) return 'Phone Number is required';
+                              if (val == null || val.trim().isEmpty)
+                                return 'Phone Number is required';
                               final cleanVal = val.trim();
-                              if (!RegExp(r'^(\+?6?01)[0-46-9]-*[0-9]{7,8}$').hasMatch(cleanVal)) {
+                              if (!RegExp(
+                                r'^(\+?6?01)[0-46-9]-*[0-9]{7,8}$',
+                              ).hasMatch(cleanVal)) {
                                 return 'Enter a valid Malaysian phone number';
                               }
                               return null;
@@ -226,7 +236,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white70 : AppColors.secondaryBlue,
+                        color: isDark
+                            ? Colors.white70
+                            : AppColors.secondaryBlue,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -235,8 +247,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       labelText: '',
                       hintText: 'Enter your full name',
                       prefixIcon: Icons.person_outline,
-                      validator: (val) =>
-                          val == null || val.trim().isEmpty ? 'Full Name is required' : null,
+                      validator: (val) => val == null || val.trim().isEmpty
+                          ? 'Full Name is required'
+                          : null,
                     ),
                     const SizedBox(height: 16),
                     Text(
@@ -244,7 +257,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white70 : AppColors.secondaryBlue,
+                        color: isDark
+                            ? Colors.white70
+                            : AppColors.secondaryBlue,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -255,9 +270,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       prefixIcon: Icons.phone_outlined,
                       keyboardType: TextInputType.phone,
                       validator: (val) {
-                        if (val == null || val.trim().isEmpty) return 'Phone Number is required';
+                        if (val == null || val.trim().isEmpty)
+                          return 'Phone Number is required';
                         final cleanVal = val.trim();
-                        if (!RegExp(r'^(\+?6?01)[0-46-9]-*[0-9]{7,8}$').hasMatch(cleanVal)) {
+                        if (!RegExp(
+                          r'^(\+?6?01)[0-46-9]-*[0-9]{7,8}$',
+                        ).hasMatch(cleanVal)) {
                           return 'Enter a valid Malaysian phone number';
                         }
                         return null;
@@ -269,7 +287,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             },
           ),
           const SizedBox(height: 16),
-          
+
           // Email Address
           Text(
             '   Email Address',
@@ -288,12 +306,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
             keyboardType: TextInputType.emailAddress,
             validator: (val) {
               if (val == null || val.trim().isEmpty) return 'Email is required';
-              if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val)) return 'Enter a valid email';
+              if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val))
+                return 'Enter a valid email';
               return null;
             },
           ),
 
-          
           // Password
           Text(
             '   Password',
@@ -323,15 +341,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             validator: (val) {
               if (val == null || val.isEmpty) return 'Password is required';
-              if (val.length < 6) return 'Password must be at least 6 characters';
-              if (!RegExp(r'^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$').hasMatch(val)) {
+              if (val.length < 6)
+                return 'Password must be at least 6 characters';
+              if (!RegExp(
+                r'^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$',
+              ).hasMatch(val)) {
                 return 'Password must contain both letters and numbers';
               }
               return null;
             },
           ),
           const SizedBox(height: 16),
-          
+
           // Confirm Password
           Text(
             '   Confirm Password',
@@ -350,7 +371,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
             prefixIcon: Icons.lock_clock_outlined,
             suffixIcon: IconButton(
               icon: Icon(
-                _obscureConfirmPassword ? Icons.visibility : Icons.visibility_off,
+                _obscureConfirmPassword
+                    ? Icons.visibility
+                    : Icons.visibility_off,
                 color: AppColors.primaryOrange,
               ),
               onPressed: () {
@@ -360,13 +383,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
               },
             ),
             validator: (val) {
-              if (val == null || val.isEmpty) return 'Please confirm your password';
-              if (val != _passwordController.text) return 'Passwords do not match';
+              if (val == null || val.isEmpty)
+                return 'Please confirm your password';
+              if (val != _passwordController.text)
+                return 'Passwords do not match';
               return null;
             },
           ),
           const SizedBox(height: 20),
-          
+
           // Terms & Conditions Checkbox
           Row(
             children: [
@@ -379,7 +404,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 },
                 activeColor: AppColors.primaryOrange,
                 checkColor: Colors.white,
-                side: BorderSide(color: isDark ? Colors.white54 : AppColors.secondaryBlue),
+                side: BorderSide(
+                  color: isDark ? Colors.white54 : AppColors.secondaryBlue,
+                ),
               ),
               Expanded(
                 child: RichText(
@@ -393,12 +420,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       const TextSpan(text: 'I agree to the '),
                       const TextSpan(
                         text: 'Terms & Conditions',
-                        style: TextStyle(color: AppColors.primaryOrange, decoration: TextDecoration.underline),
+                        style: TextStyle(
+                          color: AppColors.primaryOrange,
+                          decoration: TextDecoration.underline,
+                        ),
                       ),
                       const TextSpan(text: ' and '),
                       const TextSpan(
                         text: 'Privacy Policy',
-                        style: TextStyle(color: AppColors.primaryOrange, decoration: TextDecoration.underline),
+                        style: TextStyle(
+                          color: AppColors.primaryOrange,
+                          decoration: TextDecoration.underline,
+                        ),
                       ),
                     ],
                   ),
@@ -407,7 +440,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ],
           ),
           const SizedBox(height: 24),
-          
+
           // Error Message
           if (_error != null) ...[
             Container(
@@ -415,17 +448,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
               decoration: BoxDecoration(
                 color: Colors.redAccent.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
+                border: Border.all(
+                  color: Colors.redAccent.withValues(alpha: 0.3),
+                ),
               ),
               child: Text(
                 _error!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  color: Colors.redAccent,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             const SizedBox(height: 20),
           ],
-          
+
           // Register Button
           SizedBox(
             height: 54,
@@ -444,7 +483,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ? const SizedBox(
                       width: 20,
                       height: 20,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
                     )
                   : const Text(
                       'Create Account',
@@ -457,7 +499,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          
+
           // Already have account Link
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -470,7 +512,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ),
               GestureDetector(
-                onTap: () => Navigator.pop(context),
+                onTap: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => LoginScreen(onLoggedIn: () {}),
+                    ),
+                  );
+                },
                 child: const Text(
                   'Login',
                   style: TextStyle(
@@ -482,7 +531,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             ],
           ),
-          
+
           // Bottom Graphics & Copyright
           _buildBottomGraphic(context, isDark),
           const SizedBox(height: 16),
@@ -505,19 +554,58 @@ class _RegisterScreenState extends State<RegisterScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded, color: isDark ? Colors.white : AppColors.secondaryBlue),
+          icon: Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: isDark ? Colors.white : AppColors.secondaryBlue,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Center(
+      body: Container(
+        width: double.infinity,
+        decoration: isDesktop
+            ? BoxDecoration(
+                gradient: LinearGradient(
+                  colors: isDark
+                      ? [const Color(0xFF0B1220), const Color(0xFF111827)]
+                      : [const Color(0xFFF1F5F9), const Color(0xFFE2E8F0)],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              )
+            : null,
         child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: EdgeInsets.symmetric(
-            horizontal: isDesktop ? 60 : 24,
-            vertical: isDesktop ? 40 : 20,
+            horizontal: isDesktop ? 40 : 24,
+            vertical: isDesktop ? 32 : 20,
           ),
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 550),
-            child: formContent,
+          child: Center(
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 550),
+              padding: isDesktop ? const EdgeInsets.all(28) : EdgeInsets.zero,
+              decoration: isDesktop
+                  ? BoxDecoration(
+                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.08)
+                            : AppColors.borderGray,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(
+                            alpha: isDark ? 0.22 : 0.08,
+                          ),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    )
+                  : null,
+              child: formContent,
+            ),
           ),
         ),
       ),

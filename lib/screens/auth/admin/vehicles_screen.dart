@@ -54,9 +54,9 @@ class _VehiclesViewState extends State<VehiclesView> {
       _error = null;
     });
     try {
-      _vehicles = await _vehicleService.getVehicles().timeout(
-        const Duration(seconds: 10),
-      );
+      _vehicles = await _vehicleService
+          .getVehicles(applyStatusSync: false)
+          .timeout(const Duration(seconds: 10));
       _branches = await _branchService.getBranches().timeout(
         const Duration(seconds: 10),
       );
@@ -888,8 +888,41 @@ class _VehiclesViewState extends State<VehiclesView> {
           ),
           onChanged: (val) async {
             if (val != null) {
-              await _vehicleService.updateVehicleStatus(vehicle.id, val);
-              _loadData();
+              final selectedStatus = val;
+              final oldStatus = vehicle.status;
+
+              setState(() {
+                _vehicles = _vehicles.map((v) {
+                  if (v.id != vehicle.id) return v;
+                  return v.copyWith(
+                    status: selectedStatus,
+                    isAvailable: selectedStatus == 'Available',
+                  );
+                }).toList();
+              });
+
+              try {
+                await _vehicleService.updateVehicleStatus(
+                  vehicle.id,
+                  selectedStatus,
+                );
+              } catch (_) {
+                if (!mounted) return;
+                setState(() {
+                  _vehicles = _vehicles.map((v) {
+                    if (v.id != vehicle.id) return v;
+                    return v.copyWith(
+                      status: oldStatus,
+                      isAvailable: oldStatus == 'Available',
+                    );
+                  }).toList();
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Failed to update vehicle status.'),
+                  ),
+                );
+              }
             }
           },
           items: const [

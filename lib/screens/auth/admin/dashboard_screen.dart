@@ -882,7 +882,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         tabContent = const Expanded(child: CompanySettingsView());
         break;
       case 'Admin Profile':
-        tabContent = const Expanded(child: AdminProfileView());
+        tabContent = Expanded(child: AdminProfileView(onLogout: _logout));
         break;
       case 'AI Assistant':
         tabContent = const Expanded(child: AdminAIAssistantView());
@@ -1643,105 +1643,71 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ),
               const SizedBox(width: 16),
 
-              // Admin Dropdown menu profile trigger
-              PopupMenuButton<String>(
-                offset: const Offset(0, 48),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                tooltip: 'Admin Settings',
-                onSelected: (val) {
-                  if (val == 'profile') {
-                    setState(() => _activeTab = 'Admin Profile');
-                  } else if (val == 'logout') {
-                    _logout();
-                  }
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'profile',
-                    child: Row(
-                      children: [
-                        Icon(Icons.settings_outlined, size: 18),
-                        SizedBox(width: 12),
-                        Text('Edit Profile', style: TextStyle(fontSize: 13)),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'logout',
-                    child: Row(
-                      children: [
-                        Icon(Icons.logout, size: 18, color: Colors.redAccent),
-                        SizedBox(width: 12),
-                        Text(
-                          'Logout',
-                          style: TextStyle(
-                            color: Colors.redAccent,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 18,
-                      backgroundColor: AppColors.secondaryBlue.withValues(
-                        alpha: 0.1,
-                      ),
-                      backgroundImage: getAppImageProvider(
-                        _adminUser?.profileImage,
-                      ),
-                      child: _adminUser?.profileImage.isNotEmpty != true
-                          ? Icon(
-                              Icons.person,
-                              size: 18,
-                              color: _isDark
-                                  ? const Color(0xFFF8FAFC)
-                                  : AppColors.secondaryBlue,
-                            )
-                          : null,
-                    ),
-                    const SizedBox(width: 8),
-                    if (isDesktop) ...[
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
+              // Admin profile trigger (direct navigation)
+              Builder(
+                builder: (context) {
+                  final isOnAdminProfile = _activeTab == 'Admin Profile';
+                  return MouseRegion(
+                    cursor: isOnAdminProfile
+                        ? SystemMouseCursors.basic
+                        : SystemMouseCursors.click,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: isOnAdminProfile
+                          ? null
+                          : () => setState(() => _activeTab = 'Admin Profile'),
+                      child: Row(
                         children: [
-                          Text(
-                            _adminUser?.fullName ?? 'Admin',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                              color: _isDark
-                                  ? const Color(0xFFF8FAFC)
-                                  : AppColors.secondaryBlue,
+                          CircleAvatar(
+                            radius: 18,
+                            backgroundColor: AppColors.secondaryBlue.withValues(
+                              alpha: 0.1,
                             ),
-                          ),
-                          Text(
-                            'Super Administrator',
-                            style: TextStyle(
-                              fontSize: 9,
-                              color: _isDark
-                                  ? const Color(0xFFE2E8F0)
-                                  : Colors.grey,
+                            backgroundImage: getAppImageProvider(
+                              _adminUser?.profileImage,
                             ),
+                            child: _adminUser?.profileImage.isNotEmpty != true
+                                ? Icon(
+                                    Icons.person,
+                                    size: 18,
+                                    color: _isDark
+                                        ? const Color(0xFFF8FAFC)
+                                        : AppColors.secondaryBlue,
+                                  )
+                                : null,
                           ),
+                          const SizedBox(width: 8),
+                          if (isDesktop)
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _adminUser?.fullName ?? 'Admin',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    color: _isDark
+                                        ? const Color(0xFFF8FAFC)
+                                        : AppColors.secondaryBlue,
+                                  ),
+                                ),
+                                Text(
+                                  'Super Administrator',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    color: _isDark
+                                        ? const Color(0xFFE2E8F0)
+                                        : Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
                         ],
                       ),
-                      Icon(
-                        Icons.arrow_drop_down,
-                        size: 16,
-                        color: _isDark
-                            ? const Color(0xFFF8FAFC)
-                            : AppColors.secondaryBlue,
-                      ),
-                    ],
-                  ],
-                ),
+                    ),
+                  );
+                },
               ),
             ],
           ),

@@ -999,17 +999,24 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
 
   Widget _buildProfileAvatar() {
     final imageProvider = getAppImageProvider(_user?.profileImage);
-    return GestureDetector(
-      onTap: () {
-        setState(() => _currentIndex = 6);
-      },
-      child: CircleAvatar(
-        radius: 18,
-        backgroundColor: AppColors.lightGray,
-        backgroundImage: imageProvider,
-        child: _user?.profileImage.isNotEmpty != true || imageProvider == null
-            ? const Icon(Icons.person, size: 18, color: AppColors.secondaryBlue)
-            : null,
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () {
+          setState(() => _currentIndex = 6);
+        },
+        child: CircleAvatar(
+          radius: 18,
+          backgroundColor: AppColors.lightGray,
+          backgroundImage: imageProvider,
+          child: _user?.profileImage.isNotEmpty != true || imageProvider == null
+              ? const Icon(
+                  Icons.person,
+                  size: 18,
+                  color: AppColors.secondaryBlue,
+                )
+              : null,
+        ),
       ),
     );
   }

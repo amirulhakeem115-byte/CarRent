@@ -11,6 +11,7 @@ import '../models/user_model.dart';
 import '../models/vehicle_model.dart';
 import '../models/branch_model.dart';
 import 'auth/login_screen.dart';
+import 'auth/register_screen.dart';
 import 'auth/customer/customer_responsive_shell.dart';
 import 'auth/admin/dashboard_screen.dart';
 import 'auth/customer/vehicle_list_screen.dart';
@@ -425,7 +426,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } else {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => LoginScreen(onLoggedIn: () {})),
+        MaterialPageRoute(builder: (context) => const RegisterScreen()),
       ).then((_) => _loadData());
     }
   }
@@ -846,7 +847,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 SizedBox(height: isDesktop ? 28 : 16),
                 Text(
-                  'Drive First.\nPay Later.',
+                  'Drive First,\nPay Later.',
                   style: TextStyle(
                     fontSize: isDesktop ? 52 : 28,
                     fontWeight: FontWeight.w900,
@@ -870,76 +871,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisAlignment: isDesktop
                       ? CrossAxisAlignment.center
                       : CrossAxisAlignment.stretch,
-                  children: [
-                    ElevatedButton(
-                      onPressed: () => _scrollToSection(_aboutKey),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryOrange,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 28,
-                          vertical: 18,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        elevation: 4,
-                        shadowColor: AppColors.primaryOrange.withValues(
-                          alpha: 0.4,
-                        ),
-                      ),
-                      child: const Text(
-                        'Explore Benefits',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                    SizedBox(
-                      width: isDesktop ? 16 : 0,
-                      height: isDesktop ? 0 : 12,
-                    ),
-                    OutlinedButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const VehicleListScreen(),
-                          ),
-                        );
-                      },
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        side: BorderSide(
-                          color: Colors.white.withValues(alpha: 0.3),
-                          width: 1.5,
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 28,
-                          vertical: 18,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Browse Fleet',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
-                          SizedBox(width: 8),
-                          Icon(Icons.arrow_forward_rounded, size: 16),
-                        ],
-                      ),
-                    ),
-                  ],
                 ),
                 if (!isDesktop) const SizedBox(height: 30),
               ],

@@ -1451,6 +1451,12 @@ class _ReportsViewState extends State<ReportsView> {
     Color textSecondary,
     Color borderColor,
   ) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isPhone = screenWidth < 600;
+    final gridColumns = screenWidth > 1100
+        ? 4
+        : (screenWidth > 900 ? 3 : (screenWidth > 700 ? 2 : 1));
+
     return Container(
       decoration: BoxDecoration(
         color: cardColor,
@@ -1486,18 +1492,18 @@ class _ReportsViewState extends State<ReportsView> {
           if (_showAdvancedFilters) ...[
             const Divider(height: 1),
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(isPhone ? 14 : 20),
               child: Column(
                 children: [
-                  GridView.count(
-                    crossAxisCount: MediaQuery.of(context).size.width > 900
-                        ? 4
-                        : 2,
+                  GridView(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    childAspectRatio: 2.8,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: gridColumns,
+                      crossAxisSpacing: isPhone ? 10 : 16,
+                      mainAxisSpacing: isPhone ? 10 : 16,
+                      mainAxisExtent: isPhone ? 98 : 90,
+                    ),
                     children: [
                       // Branch Dropdown
                       _buildFilterDropdown(
@@ -1616,7 +1622,7 @@ class _ReportsViewState extends State<ReportsView> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: isPhone ? 12 : 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [

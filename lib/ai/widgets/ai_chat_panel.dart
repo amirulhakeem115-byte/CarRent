@@ -31,31 +31,27 @@ Future<dynamic> showAIChatModal(
       barrierColor: Colors.black.withValues(alpha: 0.35),
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (ctx, anim1, anim2) {
-        return Align(
-          alignment: Alignment.bottomRight,
-          child: Padding(
-            padding: const EdgeInsets.only(right: 24, bottom: 92),
-            child: Material(
-              color: Colors.transparent,
-              child: SlideTransition(
-                position:
-                    Tween<Offset>(
-                      begin: const Offset(1.0, 0.0),
-                      end: Offset.zero,
-                    ).animate(
-                      CurvedAnimation(
-                        parent: anim1,
-                        curve: Curves.easeOutCubic,
-                      ),
-                    ),
-                child: SizedBox(
-                  width:
-                      680, // Extended width to support premium session sidebar
-                  height: 640,
-                  child: AIChatPanel(
-                    onClose: () => Navigator.of(ctx).pop(),
-                    initialMessage: initialMessage,
+        final size = MediaQuery.of(ctx).size;
+        final dialogWidth = (size.width * 0.88).clamp(900.0, 1320.0);
+        final dialogHeight = (size.height * 0.9).clamp(620.0, 960.0);
+
+        return Center(
+          child: Material(
+            color: Colors.transparent,
+            child: SlideTransition(
+              position:
+                  Tween<Offset>(
+                    begin: const Offset(0.0, 0.08),
+                    end: Offset.zero,
+                  ).animate(
+                    CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic),
                   ),
+              child: SizedBox(
+                width: dialogWidth,
+                height: dialogHeight,
+                child: AIChatPanel(
+                  onClose: () => Navigator.of(ctx).pop(),
+                  initialMessage: initialMessage,
                 ),
               ),
             ),
@@ -239,11 +235,14 @@ class _AIChatPanelState extends State<AIChatPanel>
     final bool showSidebarOverlay = !showPermanentSidebar && _showSidebar;
     final double mobileSidebarWidth = width * 0.82;
 
+    final bool isDesktopModal = widget.onClose != null && width > 900;
     final radius = widget.onClose != null
-        ? const BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
-          )
+        ? (isDesktopModal
+              ? BorderRadius.circular(24)
+              : const BorderRadius.only(
+                  topLeft: Radius.circular(24),
+                  topRight: Radius.circular(24),
+                ))
         : BorderRadius.zero;
 
     return FadeTransition(
@@ -748,6 +747,9 @@ class _AIChatPanelState extends State<AIChatPanel>
 
   // Welcome Screen with popular action cards in a Grid
   Widget _buildWelcomeGrid(bool isDark, AIService ai) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isDarkMobile = isDark && isMobile;
     final borderCol = isDark
         ? const Color(0xFF334155)
         : const Color(0xFFE2E8F0);
@@ -841,16 +843,22 @@ class _AIChatPanelState extends State<AIChatPanel>
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               crossAxisSpacing: 10,
               mainAxisSpacing: 10,
-              mainAxisExtent: 68,
+              mainAxisExtent: isDarkMobile ? 74 : 68,
             ),
             itemCount: ai.quickCommands.length,
             itemBuilder: (context, index) {
               final cmd = ai.quickCommands[index];
-              return _buildGridCard(cmd, cardBg, borderCol, isDark);
+              return _buildGridCard(
+                cmd,
+                cardBg,
+                borderCol,
+                isDark,
+                isDarkMobile: isDarkMobile,
+              );
             },
           ),
         ],
@@ -862,8 +870,9 @@ class _AIChatPanelState extends State<AIChatPanel>
     AIQuickCommand cmd,
     Color cardBg,
     Color borderCol,
-    bool isDark,
-  ) {
+    bool isDark, {
+    required bool isDarkMobile,
+  }) {
     return Material(
       color: cardBg,
       borderRadius: BorderRadius.circular(14),
@@ -873,7 +882,10 @@ class _AIChatPanelState extends State<AIChatPanel>
         hoverColor: cmd.color.withValues(alpha: 0.08),
         splashColor: cmd.color.withValues(alpha: 0.15),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: EdgeInsets.symmetric(
+            horizontal: isDarkMobile ? 10 : 12,
+            vertical: 10,
+          ),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: borderCol),
@@ -881,22 +893,27 @@ class _AIChatPanelState extends State<AIChatPanel>
           child: Row(
             children: [
               Container(
-                width: 32,
-                height: 32,
+                width: isDarkMobile ? 30 : 32,
+                height: isDarkMobile ? 30 : 32,
                 decoration: BoxDecoration(
                   color: cmd.color.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(cmd.icon, color: cmd.color, size: 16),
+                child: Icon(
+                  cmd.icon,
+                  color: cmd.color,
+                  size: isDarkMobile ? 15 : 16,
+                ),
               ),
-              const SizedBox(width: 10),
+              SizedBox(width: isDarkMobile ? 8 : 10),
               Expanded(
                 child: Text(
                   cmd.label,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 11.5,
+                    fontSize: isDarkMobile ? 10.8 : 11.5,
+                    height: isDarkMobile ? 1.2 : 1.15,
                     fontWeight: FontWeight.w700,
                     color: isDark
                         ? const Color(0xFFCBD5E1)

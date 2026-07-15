@@ -13,7 +13,9 @@ import '../../../models/user_model.dart';
 import '../../../services/payment_service.dart';
 import '../../../services/booking_service.dart';
 import '../../../widgets/loading_widget.dart';
-import '../../../services/file_download_helper.dart' if (dart.library.html) '../../../services/file_download_web.dart' as download_helper;
+import '../../../services/file_download_helper.dart'
+    if (dart.library.html) '../../../services/file_download_web.dart'
+    as download_helper;
 import '../../../services/company_settings_provider.dart';
 
 class PaymentsView extends StatefulWidget {
@@ -35,6 +37,17 @@ class _PaymentsViewState extends State<PaymentsView> {
   String? _error;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+
+  bool _isPhoneLayout() => MediaQuery.of(context).size.width < 420;
+
+  double _rf(double base, {double min = 9, double max = 26}) {
+    final width = MediaQuery.of(context).size.width;
+    final factor = (width / 390).clamp(0.86, 1.0);
+    final size = base * factor;
+    if (size < min) return min;
+    if (size > max) return max;
+    return size;
+  }
 
   @override
   void initState() {
@@ -62,20 +75,29 @@ class _PaymentsViewState extends State<PaymentsView> {
     try {
       final paymentsFuture = _paymentService.getPayments();
       final bookingsFuture = _bookingService.getBookings();
-      final usersSnap = await FirebaseDatabase.instance.ref().child('users').get().timeout(const Duration(seconds: 5));
-      
+      final usersSnap = await FirebaseDatabase.instance
+          .ref()
+          .child('users')
+          .get()
+          .timeout(const Duration(seconds: 5));
+
       final results = await Future.wait([paymentsFuture, bookingsFuture]);
       _payments = results[0] as List<PaymentModel>;
       _bookings = results[1] as List<BookingModel>;
-      
+
       _userNames.clear();
       _usersMap.clear();
       if (usersSnap.exists) {
-        final Map<dynamic, dynamic> usersData = usersSnap.value as Map<dynamic, dynamic>;
+        final Map<dynamic, dynamic> usersData =
+            usersSnap.value as Map<dynamic, dynamic>;
         usersData.forEach((key, value) {
           if (value is Map) {
-            _userNames[key.toString()] = value['fullName'] ?? value['name'] ?? 'User';
-            _usersMap[key.toString()] = UserModel.fromMap(key.toString(), value);
+            _userNames[key.toString()] =
+                value['fullName'] ?? value['name'] ?? 'User';
+            _usersMap[key.toString()] = UserModel.fromMap(
+              key.toString(),
+              value,
+            );
           }
         });
       }
@@ -93,18 +115,30 @@ class _PaymentsViewState extends State<PaymentsView> {
     }
   }
 
-
-
   Future<void> _refundTransaction(PaymentModel payment) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Confirm Refund', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
-        content: Text('Are you sure you want to issue a full refund of RM ${payment.amount.toStringAsFixed(2)} for this transaction?'),
+        title: const Text(
+          'Confirm Refund',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: AppColors.secondaryBlue,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to issue a full refund of RM ${payment.amount.toStringAsFixed(2)} for this transaction?',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Refund'),
           ),
@@ -113,7 +147,11 @@ class _PaymentsViewState extends State<PaymentsView> {
     );
 
     if (confirm == true) {
-      await _paymentService.refundPayment(payment.id, payment.userId, payment.amount);
+      await _paymentService.refundPayment(
+        payment.id,
+        payment.userId,
+        payment.amount,
+      );
       _loadPayments();
     }
   }
@@ -121,12 +159,15 @@ class _PaymentsViewState extends State<PaymentsView> {
   void _openReceiptLightbox(PaymentModel payment) {
     if (payment.receiptImage == null || payment.receiptImage!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No receipt file uploaded for this transaction.')),
+        const SnackBar(
+          content: Text('No receipt file uploaded for this transaction.'),
+        ),
       );
       return;
     }
 
-    final isPdf = payment.receiptImage!.toLowerCase().contains('.pdf') ||
+    final isPdf =
+        payment.receiptImage!.toLowerCase().contains('.pdf') ||
         payment.receiptImage!.startsWith('data:application/pdf');
 
     showDialog(
@@ -140,7 +181,10 @@ class _PaymentsViewState extends State<PaymentsView> {
               AppBar(
                 backgroundColor: Colors.black54,
                 elevation: 0,
-                title: Text(isPdf ? 'PDF Receipt document' : 'Receipt Image Lightbox', style: const TextStyle(color: Colors.white)),
+                title: Text(
+                  isPdf ? 'PDF Receipt document' : 'Receipt Image Lightbox',
+                  style: const TextStyle(color: Colors.white),
+                ),
                 leading: IconButton(
                   icon: const Icon(Icons.close, color: Colors.white),
                   onPressed: () => Navigator.pop(context),
@@ -153,13 +197,24 @@ class _PaymentsViewState extends State<PaymentsView> {
                         final rawBase64 = payment.receiptImage!.split(',').last;
                         final bytes = base64Decode(rawBase64);
                         final ext = isPdf ? 'pdf' : 'png';
-                        download_helper.downloadFile(bytes, 'receipt_${payment.id}.$ext');
+                        download_helper.downloadFile(
+                          bytes,
+                          'receipt_${payment.id}.$ext',
+                        );
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('File download initiated successfully.'), backgroundColor: Colors.green),
+                          const SnackBar(
+                            content: Text(
+                              'File download initiated successfully.',
+                            ),
+                            backgroundColor: Colors.green,
+                          ),
                         );
                       } catch (e) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Download failed: $e'), backgroundColor: Colors.redAccent),
+                          SnackBar(
+                            content: Text('Download failed: $e'),
+                            backgroundColor: Colors.redAccent,
+                          ),
                         );
                       }
                     },
@@ -174,19 +229,37 @@ class _PaymentsViewState extends State<PaymentsView> {
                       ? Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.picture_as_pdf, color: Colors.redAccent, size: 100),
+                            const Icon(
+                              Icons.picture_as_pdf,
+                              color: Colors.redAccent,
+                              size: 100,
+                            ),
                             const SizedBox(height: 16),
-                            const Text('PDF Receipt Document Uploaded', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                            const Text(
+                              'PDF Receipt Document Uploaded',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                             const SizedBox(height: 12),
                             ElevatedButton.icon(
                               onPressed: () {
                                 try {
-                                  final rawBase64 = payment.receiptImage!.split(',').last;
+                                  final rawBase64 = payment.receiptImage!
+                                      .split(',')
+                                      .last;
                                   final bytes = base64Decode(rawBase64);
-                                  download_helper.downloadFile(bytes, 'receipt_${payment.id}.pdf');
+                                  download_helper.downloadFile(
+                                    bytes,
+                                    'receipt_${payment.id}.pdf',
+                                  );
                                 } catch (e) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Download failed: $e')),
+                                    SnackBar(
+                                      content: Text('Download failed: $e'),
+                                    ),
                                   );
                                 }
                               },
@@ -226,7 +299,7 @@ class _PaymentsViewState extends State<PaymentsView> {
       TextCellValue('Deposit (RM)'),
       TextCellValue('Method'),
       TextCellValue('Status'),
-      TextCellValue('Date')
+      TextCellValue('Date'),
     ]);
 
     for (var payment in _payments) {
@@ -238,31 +311,49 @@ class _PaymentsViewState extends State<PaymentsView> {
         DoubleCellValue(payment.depositAmount),
         TextCellValue(payment.paymentMethod),
         TextCellValue(payment.status),
-        TextCellValue(DateFormat('yyyy-MM-dd HH:mm').format(payment.paymentDate))
+        TextCellValue(
+          DateFormat('yyyy-MM-dd HH:mm').format(payment.paymentDate),
+        ),
       ]);
     }
 
     final fileBytes = excelObj.save();
     if (fileBytes != null) {
-      final companyName = CompanySettingsProvider().companyName.replaceAll(' ', '_');
-      download_helper.downloadFile(Uint8List.fromList(fileBytes), '${companyName}_Payments_Report_${DateTime.now().millisecondsSinceEpoch}.xlsx');
+      final companyName = CompanySettingsProvider().companyName.replaceAll(
+        ' ',
+        '_',
+      );
+      download_helper.downloadFile(
+        Uint8List.fromList(fileBytes),
+        '${companyName}_Payments_Report_${DateTime.now().millisecondsSinceEpoch}.xlsx',
+      );
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Payments report downloaded in Excel format!'), backgroundColor: Colors.green),
+        const SnackBar(
+          content: Text('Payments report downloaded in Excel format!'),
+          backgroundColor: Colors.green,
+        ),
       );
     }
   }
 
   Future<void> _exportPdf() async {
     final pdf = pw.Document();
-    
-    List<List<String>> tableData = _payments.map((p) => [
-      p.id.substring(0, p.id.length > 8 ? 8 : p.id.length),
-      p.bookingId.substring(0, p.bookingId.length > 8 ? 8 : p.bookingId.length),
-      'RM ${p.amount.toStringAsFixed(2)}',
-      p.paymentMethod,
-      p.status.toUpperCase(),
-      DateFormat('yyyy-MM-dd').format(p.paymentDate)
-    ]).toList();
+
+    List<List<String>> tableData = _payments
+        .map(
+          (p) => [
+            p.id.substring(0, p.id.length > 8 ? 8 : p.id.length),
+            p.bookingId.substring(
+              0,
+              p.bookingId.length > 8 ? 8 : p.bookingId.length,
+            ),
+            'RM ${p.amount.toStringAsFixed(2)}',
+            p.paymentMethod,
+            p.status.toUpperCase(),
+            DateFormat('yyyy-MM-dd').format(p.paymentDate),
+          ],
+        )
+        .toList();
 
     pdf.addPage(
       pw.MultiPage(
@@ -274,18 +365,43 @@ class _PaymentsViewState extends State<PaymentsView> {
               child: pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text('${CompanySettingsProvider().companyName.toUpperCase()} PAYMENTS LEDGER', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 20, color: pdf_lib.PdfColor.fromInt(0xFF1A237E))),
-                  pw.Text('Generated: ${DateFormat('dd MMM yyyy').format(DateTime.now())}', style: pw.TextStyle(fontSize: 10)),
+                  pw.Text(
+                    '${CompanySettingsProvider().companyName.toUpperCase()} PAYMENTS LEDGER',
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 20,
+                      color: pdf_lib.PdfColor.fromInt(0xFF1A237E),
+                    ),
+                  ),
+                  pw.Text(
+                    'Generated: ${DateFormat('dd MMM yyyy').format(DateTime.now())}',
+                    style: pw.TextStyle(fontSize: 10),
+                  ),
                 ],
               ),
             ),
             pw.SizedBox(height: 20),
             pw.TableHelper.fromTextArray(
-              headers: ['Tx Ref', 'Booking Ref', 'Amount', 'Method', 'Status', 'Date'],
+              headers: [
+                'Tx Ref',
+                'Booking Ref',
+                'Amount',
+                'Method',
+                'Status',
+                'Date',
+              ],
               data: tableData,
-              border: pw.TableBorder.all(width: 0.5, color: pdf_lib.PdfColor.fromInt(0xFFE0E0E0)),
-              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: pdf_lib.PdfColors.white),
-              headerDecoration: pw.BoxDecoration(color: pdf_lib.PdfColor.fromInt(0xFF1A237E)),
+              border: pw.TableBorder.all(
+                width: 0.5,
+                color: pdf_lib.PdfColor.fromInt(0xFFE0E0E0),
+              ),
+              headerStyle: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                color: pdf_lib.PdfColors.white,
+              ),
+              headerDecoration: pw.BoxDecoration(
+                color: pdf_lib.PdfColor.fromInt(0xFF1A237E),
+              ),
               cellAlignment: pw.Alignment.centerLeft,
               cellStyle: const pw.TextStyle(fontSize: 8),
             ),
@@ -296,10 +412,19 @@ class _PaymentsViewState extends State<PaymentsView> {
 
     final messenger = ScaffoldMessenger.of(context);
     final fileBytes = await pdf.save();
-    final companyName = CompanySettingsProvider().companyName.replaceAll(' ', '_');
-    download_helper.downloadFile(fileBytes, '${companyName}_Payments_Report_${DateTime.now().millisecondsSinceEpoch}.pdf');
+    final companyName = CompanySettingsProvider().companyName.replaceAll(
+      ' ',
+      '_',
+    );
+    download_helper.downloadFile(
+      fileBytes,
+      '${companyName}_Payments_Report_${DateTime.now().millisecondsSinceEpoch}.pdf',
+    );
     messenger.showSnackBar(
-      const SnackBar(content: Text('Payments report downloaded in PDF format!'), backgroundColor: Colors.green),
+      const SnackBar(
+        content: Text('Payments report downloaded in PDF format!'),
+        backgroundColor: Colors.green,
+      ),
     );
   }
 
@@ -308,100 +433,274 @@ class _PaymentsViewState extends State<PaymentsView> {
       context: context,
       builder: (context) {
         Color statusColor = Colors.orange;
-        if (payment.paymentStatus == 'Approved' || payment.status == 'paid') statusColor = Colors.green;
-        if (payment.paymentStatus == 'Rejected' || payment.status == 'failed') statusColor = Colors.redAccent;
+        if (payment.paymentStatus == 'Approved' || payment.status == 'paid')
+          statusColor = Colors.green;
+        if (payment.paymentStatus == 'Rejected' || payment.status == 'failed')
+          statusColor = Colors.redAccent;
         if (payment.status == 'refunded') statusColor = Colors.purple;
 
         final bookingMap = {for (var b in _bookings) b.id: b};
         final booking = bookingMap[payment.bookingId];
         final user = _usersMap[payment.userId];
         final vehicleName = booking?.vehicleName ?? 'Unknown';
+        final media = MediaQuery.of(context);
+        final isPhone = media.size.width < 420;
+        final maxDialogHeight = media.size.height * (isPhone ? 0.82 : 0.78);
 
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: const Text('Transaction Receipt Spec', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('CUSTOMER INFORMATION', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
-                const SizedBox(height: 6),
-                _buildDetailRow('Full Name', user?.fullName ?? booking?.userName ?? 'Unknown'),
-                _buildDetailRow('Email', user?.email ?? 'N/A'),
-                _buildDetailRow('Phone', user?.phone ?? booking?.userPhone ?? 'N/A'),
-                const Divider(height: 20),
-                const Text('BOOKING INFORMATION', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
-                const SizedBox(height: 6),
-                _buildDetailRow('Vehicle Name', vehicleName),
-                _buildDetailRow('Booking Reference', payment.bookingId),
-                if (booking != null) ...[
-                  _buildDetailRow('Pick-up Date', DateFormat('dd MMM yyyy').format(booking.pickUpDate)),
-                  _buildDetailRow('Return Date', booking.isOpenRental ? 'Open Rental' : (booking.returnDate != null ? DateFormat('dd MMM yyyy').format(booking.returnDate!) : "")),
-                  _buildDetailRow('Booking Total', 'RM ${booking.totalPrice.toStringAsFixed(2)}'),
-                ],
-                const Divider(height: 20),
-                const Text('PAYMENT DETAILS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
-                const SizedBox(height: 6),
-                _buildDetailRow('Transaction ID', payment.id),
-                _buildDetailRow('Amount Settled', 'RM ${payment.amount.toStringAsFixed(2)}'),
-                _buildDetailRow('Payment Mode', payment.paymentMethod),
-                _buildDetailRow('Payment Date', DateFormat('dd MMM yyyy').format(payment.paymentDate)),
-                if (payment.paymentTime != null && payment.paymentTime!.isNotEmpty)
-                  _buildDetailRow('Payment Time', payment.paymentTime!),
-                if (payment.transactionId != null && payment.transactionId!.isNotEmpty)
-                  _buildDetailRow('Reference ID', payment.transactionId!),
-                if (payment.rejectionReason != null && payment.rejectionReason!.isNotEmpty)
-                  _buildDetailRow('Rejection Reason', payment.rejectionReason!),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text('Receipt Status: ', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
+          insetPadding: EdgeInsets.symmetric(
+            horizontal: isPhone ? 12 : 16,
+            vertical: isPhone ? 14 : 24,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          title: Text(
+            'Transaction Receipt Spec',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: _rf(20, min: 16),
+              color: AppColors.secondaryBlue,
+            ),
+          ),
+          titlePadding: EdgeInsets.fromLTRB(
+            isPhone ? 16 : 24,
+            isPhone ? 16 : 20,
+            isPhone ? 16 : 24,
+            8,
+          ),
+          content: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxDialogHeight),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'CUSTOMER INFORMATION',
+                    style: TextStyle(
+                      fontSize: _rf(12, min: 10),
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  SizedBox(height: isPhone ? 4 : 6),
+                  _buildDetailRow(
+                    'Full Name',
+                    user?.fullName ?? booking?.userName ?? 'Unknown',
+                  ),
+                  _buildDetailRow('Email', user?.email ?? 'N/A'),
+                  _buildDetailRow(
+                    'Phone',
+                    user?.phone ?? booking?.userPhone ?? 'N/A',
+                  ),
+                  const Divider(height: 18),
+                  Text(
+                    'BOOKING INFORMATION',
+                    style: TextStyle(
+                      fontSize: _rf(12, min: 10),
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  SizedBox(height: isPhone ? 4 : 6),
+                  _buildDetailRow('Vehicle Name', vehicleName),
+                  _buildDetailRow('Booking Reference', payment.bookingId),
+                  if (booking != null) ...[
+                    _buildDetailRow(
+                      'Pick-up Date',
+                      DateFormat('dd MMM yyyy').format(booking.pickUpDate),
+                    ),
+                    _buildDetailRow(
+                      'Return Date',
+                      booking.isOpenRental
+                          ? 'Open Rental'
+                          : (booking.returnDate != null
+                                ? DateFormat(
+                                    'dd MMM yyyy',
+                                  ).format(booking.returnDate!)
+                                : ""),
+                    ),
+                    _buildDetailRow(
+                      'Booking Total',
+                      'RM ${booking.totalPrice.toStringAsFixed(2)}',
+                    ),
+                  ],
+                  const Divider(height: 18),
+                  Text(
+                    'PAYMENT DETAILS',
+                    style: TextStyle(
+                      fontSize: _rf(12, min: 10),
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  SizedBox(height: isPhone ? 4 : 6),
+                  _buildDetailRow('Transaction ID', payment.id),
+                  _buildDetailRow(
+                    'Amount Settled',
+                    'RM ${payment.amount.toStringAsFixed(2)}',
+                  ),
+                  _buildDetailRow('Payment Mode', payment.paymentMethod),
+                  _buildDetailRow(
+                    'Payment Date',
+                    DateFormat('dd MMM yyyy').format(payment.paymentDate),
+                  ),
+                  if (payment.paymentTime != null &&
+                      payment.paymentTime!.isNotEmpty)
+                    _buildDetailRow('Payment Time', payment.paymentTime!),
+                  if (payment.transactionId != null &&
+                      payment.transactionId!.isNotEmpty)
+                    _buildDetailRow('Reference ID', payment.transactionId!),
+                  if (payment.rejectionReason != null &&
+                      payment.rejectionReason!.isNotEmpty)
+                    _buildDetailRow(
+                      'Rejection Reason',
+                      payment.rejectionReason!,
+                    ),
+                  SizedBox(height: isPhone ? 10 : 12),
+                  Wrap(
+                    alignment: WrapAlignment.start,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      Text(
+                        'Receipt Status: ',
+                        style: TextStyle(
+                          fontSize: _rf(12, min: 10),
+                          color: Colors.grey,
+                        ),
                       ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          (payment.paymentStatus ?? payment.status)
+                              .toUpperCase(),
+                          style: TextStyle(
+                            color: statusColor,
+                            fontSize: _rf(10, min: 9),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (payment.status == 'paid' ||
+                      payment.paymentStatus == 'Approved') ...[
+                    const Divider(height: 24),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.purple,
+                        foregroundColor: Colors.white,
+                        minimumSize: Size(double.infinity, isPhone ? 40 : 44),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _refundTransaction(payment);
+                      },
                       child: Text(
-                        (payment.paymentStatus ?? payment.status).toUpperCase(),
-                        style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
+                        'Issue Full Refund',
+                        style: TextStyle(
+                          fontSize: _rf(13, min: 11),
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ],
-                ),
-                if (payment.status == 'paid' || payment.paymentStatus == 'Approved') ...[
-                  const Divider(height: 24),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.purple, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 44)),
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _refundTransaction(payment);
-                    },
-                    child: const Text('Issue Full Refund'),
-                  ),
                 ],
-              ],
+              ),
             ),
           ),
+          contentPadding: EdgeInsets.fromLTRB(
+            isPhone ? 16 : 24,
+            8,
+            isPhone ? 16 : 24,
+            6,
+          ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Close',
+                style: TextStyle(fontSize: _rf(13, min: 11)),
+              ),
+            ),
           ],
+          actionsPadding: EdgeInsets.fromLTRB(
+            isPhone ? 8 : 12,
+            0,
+            isPhone ? 8 : 12,
+            isPhone ? 10 : 14,
+          ),
         );
       },
     );
   }
 
-
   Widget _buildDetailRow(String label, String value) {
+    final isCompact = _isPhoneLayout();
+    final labelSize = _rf(12, min: 10);
+    final valueSize = _rf(12, min: 10);
+
+    if (isCompact) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(fontSize: labelSize, color: Colors.grey),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              value,
+              softWrap: true,
+              style: TextStyle(
+                fontSize: valueSize,
+                fontWeight: FontWeight.bold,
+                color: AppColors.secondaryBlue,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-          Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.secondaryBlue)),
+          Expanded(
+            flex: 4,
+            child: Text(
+              label,
+              style: TextStyle(fontSize: labelSize, color: Colors.grey),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 6,
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              softWrap: true,
+              style: TextStyle(
+                fontSize: valueSize,
+                fontWeight: FontWeight.bold,
+                color: AppColors.secondaryBlue,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -410,7 +709,9 @@ class _PaymentsViewState extends State<PaymentsView> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: LoadingWidget(message: 'Syncing ledger payments...'));
+      return const Center(
+        child: LoadingWidget(message: 'Syncing ledger payments...'),
+      );
     }
 
     if (_error != null) {
@@ -418,11 +719,25 @@ class _PaymentsViewState extends State<PaymentsView> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 64),
+            const Icon(
+              Icons.error_outline_rounded,
+              color: Colors.redAccent,
+              size: 64,
+            ),
             const SizedBox(height: 16),
-            Text(_error!, style: const TextStyle(fontSize: 16, color: AppColors.secondaryBlue, fontWeight: FontWeight.w600)),
+            Text(
+              _error!,
+              style: const TextStyle(
+                fontSize: 16,
+                color: AppColors.secondaryBlue,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const SizedBox(height: 24),
-            ElevatedButton(onPressed: _loadPayments, child: const Text('Retry')),
+            ElevatedButton(
+              onPressed: _loadPayments,
+              child: const Text('Retry'),
+            ),
           ],
         ),
       );
@@ -437,9 +752,12 @@ class _PaymentsViewState extends State<PaymentsView> {
       if (p.paymentStatus == 'Approved' || p.status == 'paid') {
         totalRevenue += p.amount;
         successCount++;
-      } else if (p.paymentStatus == 'Pending Verification' || p.status == 'pending') {
+      } else if (p.paymentStatus == 'Pending Verification' ||
+          p.status == 'pending') {
         pendingCount++;
-      } else if (p.paymentStatus == 'Rejected' || p.status == 'failed' || p.status == 'refunded') {
+      } else if (p.paymentStatus == 'Rejected' ||
+          p.status == 'failed' ||
+          p.status == 'refunded') {
         failedCount++;
       }
     }
@@ -448,10 +766,12 @@ class _PaymentsViewState extends State<PaymentsView> {
 
     final filteredPayments = _payments.where((p) {
       final booking = bookingMap[p.bookingId];
-      final customerName = _userNames[p.userId] ?? booking?.userName ?? 'Unknown';
+      final customerName =
+          _userNames[p.userId] ?? booking?.userName ?? 'Unknown';
       final vehicleName = booking?.vehicleName ?? 'Unknown';
 
-      final matchesSearch = p.id.toLowerCase().contains(_searchQuery) ||
+      final matchesSearch =
+          p.id.toLowerCase().contains(_searchQuery) ||
           p.bookingId.toLowerCase().contains(_searchQuery) ||
           customerName.toLowerCase().contains(_searchQuery) ||
           vehicleName.toLowerCase().contains(_searchQuery) ||
@@ -463,8 +783,12 @@ class _PaymentsViewState extends State<PaymentsView> {
     final bool isDesktop = width > 1100;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final surfaceColor = isDark ? const Color(0xFF111827) : const Color(0xFFF1F5F9);
-    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final surfaceColor = isDark
+        ? const Color(0xFF111827)
+        : const Color(0xFFF1F5F9);
+    final textPrimary = isDark
+        ? const Color(0xFFF8FAFC)
+        : AppColors.secondaryBlue;
     final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
     final borderColor = isDark ? const Color(0xFF334155) : Colors.grey.shade200;
 
@@ -480,34 +804,65 @@ class _PaymentsViewState extends State<PaymentsView> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Payments Ledger', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textPrimary)),
-                        Text('Verify customer deposits, issue refunds, and audit revenue streams.', style: TextStyle(fontSize: 12, color: textSecondary)),
+                        Text(
+                          'Payments Ledger',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            color: textPrimary,
+                          ),
+                        ),
+                        Text(
+                          'Verify customer deposits, issue refunds, and audit revenue streams.',
+                          style: TextStyle(fontSize: 12, color: textSecondary),
+                        ),
                       ],
                     ),
                     Row(
                       children: [
                         OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: AppColors.secondaryBlue),
+                            side: const BorderSide(
+                              color: AppColors.secondaryBlue,
+                            ),
                             foregroundColor: AppColors.secondaryBlue,
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                           onPressed: _exportExcel,
                           icon: const Icon(Icons.table_view_outlined, size: 18),
-                          label: const Text('Export Excel', style: TextStyle(fontWeight: FontWeight.bold)),
+                          label: const Text(
+                            'Export Excel',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
                         ),
                         const SizedBox(width: 12),
                         ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primaryOrange,
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                           onPressed: _exportPdf,
-                          icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
-                          label: const Text('Export PDF', style: TextStyle(fontWeight: FontWeight.bold)),
+                          icon: const Icon(
+                            Icons.picture_as_pdf_outlined,
+                            size: 18,
+                          ),
+                          label: const Text(
+                            'Export PDF',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
                         ),
                       ],
                     ),
@@ -516,22 +871,48 @@ class _PaymentsViewState extends State<PaymentsView> {
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Payments Ledger', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: textPrimary)),
-                    Text('Verify customer deposits, issue refunds, and audit revenue streams.', style: TextStyle(fontSize: 12, color: textSecondary)),
+                    Text(
+                      'Payments Ledger',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: textPrimary,
+                      ),
+                    ),
+                    Text(
+                      'Verify customer deposits, issue refunds, and audit revenue streams.',
+                      style: TextStyle(fontSize: 12, color: textSecondary),
+                    ),
                     const SizedBox(height: 12),
                     Row(
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
                             style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: AppColors.secondaryBlue),
+                              side: const BorderSide(
+                                color: AppColors.secondaryBlue,
+                              ),
                               foregroundColor: AppColors.secondaryBlue,
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 12,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                             onPressed: _exportExcel,
-                            icon: const Icon(Icons.table_view_outlined, size: 16),
-                            label: const Text('Excel', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                            icon: const Icon(
+                              Icons.table_view_outlined,
+                              size: 16,
+                            ),
+                            label: const Text(
+                              'Excel',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -540,12 +921,26 @@ class _PaymentsViewState extends State<PaymentsView> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primaryOrange,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 12,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                             onPressed: _exportPdf,
-                            icon: const Icon(Icons.picture_as_pdf_outlined, size: 16),
-                            label: const Text('PDF', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                            icon: const Icon(
+                              Icons.picture_as_pdf_outlined,
+                              size: 16,
+                            ),
+                            label: const Text(
+                              'PDF',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -562,10 +957,50 @@ class _PaymentsViewState extends State<PaymentsView> {
             childAspectRatio: isDesktop ? 2.2 : 1.5,
             physics: const NeverScrollableScrollPhysics(),
             children: [
-              _buildStatCard('Total Revenue', 'RM ${totalRevenue.toStringAsFixed(2)}', Icons.monetization_on, Colors.green, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
-              _buildStatCard('Pending Verification', pendingCount.toString(), Icons.hourglass_top, Colors.orange, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
-              _buildStatCard('Cleared Payments', successCount.toString(), Icons.check_circle, Colors.teal, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
-              _buildStatCard('Failed / Refunded', failedCount.toString(), Icons.cancel_outlined, Colors.redAccent, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+              _buildStatCard(
+                'Total Revenue',
+                'RM ${totalRevenue.toStringAsFixed(2)}',
+                Icons.monetization_on,
+                Colors.green,
+                isDark: isDark,
+                cardColor: cardColor,
+                textPrimary: textPrimary,
+                textSecondary: textSecondary,
+                borderColor: borderColor,
+              ),
+              _buildStatCard(
+                'Pending Verification',
+                pendingCount.toString(),
+                Icons.hourglass_top,
+                Colors.orange,
+                isDark: isDark,
+                cardColor: cardColor,
+                textPrimary: textPrimary,
+                textSecondary: textSecondary,
+                borderColor: borderColor,
+              ),
+              _buildStatCard(
+                'Cleared Payments',
+                successCount.toString(),
+                Icons.check_circle,
+                Colors.teal,
+                isDark: isDark,
+                cardColor: cardColor,
+                textPrimary: textPrimary,
+                textSecondary: textSecondary,
+                borderColor: borderColor,
+              ),
+              _buildStatCard(
+                'Failed / Refunded',
+                failedCount.toString(),
+                Icons.cancel_outlined,
+                Colors.redAccent,
+                isDark: isDark,
+                cardColor: cardColor,
+                textPrimary: textPrimary,
+                textSecondary: textSecondary,
+                borderColor: borderColor,
+              ),
             ],
           ),
           const SizedBox(height: 24),
@@ -584,9 +1019,14 @@ class _PaymentsViewState extends State<PaymentsView> {
                     controller: _searchController,
                     style: TextStyle(color: textPrimary),
                     decoration: InputDecoration(
-                      hintText: 'Search ledger by customer, vehicle, payment ID, or reference...',
+                      hintText:
+                          'Search ledger by customer, vehicle, payment ID, or reference...',
                       hintStyle: TextStyle(color: textSecondary),
-                      prefixIcon: Icon(Icons.search, size: 20, color: textSecondary),
+                      prefixIcon: Icon(
+                        Icons.search,
+                        size: 20,
+                        color: textSecondary,
+                      ),
                       contentPadding: const EdgeInsets.symmetric(vertical: 8),
                     ),
                   ),
@@ -608,9 +1048,16 @@ class _PaymentsViewState extends State<PaymentsView> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.payment_outlined, size: 64, color: textSecondary),
+                        Icon(
+                          Icons.payment_outlined,
+                          size: 64,
+                          color: textSecondary,
+                        ),
                         const SizedBox(height: 16),
-                        Text('No transactions found matching reference.', style: TextStyle(color: textSecondary)),
+                        Text(
+                          'No transactions found matching reference.',
+                          style: TextStyle(color: textSecondary),
+                        ),
                       ],
                     ),
                   ),
@@ -622,16 +1069,40 @@ class _PaymentsViewState extends State<PaymentsView> {
                     border: Border.all(color: borderColor),
                   ),
                   child: isDesktop
-                      ? _buildDesktopTable(filteredPayments, bookingMap, isDark: isDark, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor, surfaceColor: surfaceColor)
-                      : _buildMobileList(filteredPayments, bookingMap, isDark: isDark, cardColor: cardColor, textPrimary: textPrimary, textSecondary: textSecondary, borderColor: borderColor),
+                      ? _buildDesktopTable(
+                          filteredPayments,
+                          bookingMap,
+                          isDark: isDark,
+                          textPrimary: textPrimary,
+                          textSecondary: textSecondary,
+                          borderColor: borderColor,
+                          surfaceColor: surfaceColor,
+                        )
+                      : _buildMobileList(
+                          filteredPayments,
+                          bookingMap,
+                          isDark: isDark,
+                          cardColor: cardColor,
+                          textPrimary: textPrimary,
+                          textSecondary: textSecondary,
+                          borderColor: borderColor,
+                        ),
                 ),
         ],
       ),
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, Color color, {
-    required bool isDark, required Color cardColor, required Color textPrimary, required Color textSecondary, required Color borderColor,
+  Widget _buildStatCard(
+    String label,
+    String value,
+    IconData icon,
+    Color color, {
+    required bool isDark,
+    required Color cardColor,
+    required Color textPrimary,
+    required Color textSecondary,
+    required Color borderColor,
   }) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -639,7 +1110,15 @@ class _PaymentsViewState extends State<PaymentsView> {
         color: cardColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: borderColor),
-        boxShadow: isDark ? [] : [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: isDark
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
       ),
       child: Row(
         children: [
@@ -657,9 +1136,24 @@ class _PaymentsViewState extends State<PaymentsView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(label, style: TextStyle(color: textSecondary, fontSize: 10, fontWeight: FontWeight.bold)),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: textSecondary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: textPrimary), overflow: TextOverflow.ellipsis),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: textPrimary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ),
@@ -668,110 +1162,207 @@ class _PaymentsViewState extends State<PaymentsView> {
     );
   }
 
-  Widget _buildDesktopTable(List<PaymentModel> payments, Map<String, BookingModel> bookingMap, {
-    required bool isDark, required Color textPrimary, required Color textSecondary, required Color borderColor, required Color surfaceColor,
+  Widget _buildDesktopTable(
+    List<PaymentModel> payments,
+    Map<String, BookingModel> bookingMap, {
+    required bool isDark,
+    required Color textPrimary,
+    required Color textSecondary,
+    required Color borderColor,
+    required Color surfaceColor,
   }) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: DataTable(
-          headingRowColor: WidgetStateProperty.all(isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
-          dividerThickness: 1,
-          columns: [
-            DataColumn(label: Text('Customer Name', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
-            DataColumn(label: Text('Vehicle', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
-            DataColumn(label: Text('Amount (RM)', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
-            DataColumn(label: Text('Payment Date', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
-            DataColumn(label: Text('Receipt Preview', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
-            DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
-            DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
-          ],
-          rows: payments.map((p) {
-            Color statusColor = Colors.orange;
-            String statusText = 'Pending Verification';
-            if (p.paymentStatus == 'Approved' || p.status == 'paid') {
-              statusColor = Colors.green;
-              statusText = 'Approved';
-            } else if (p.paymentStatus == 'Rejected' || p.status == 'failed') {
-              statusColor = Colors.redAccent;
-              statusText = 'Rejected';
-            } else if (p.status == 'refunded') {
-              statusColor = Colors.purple;
-              statusText = 'Refunded';
-            }
+        headingRowColor: WidgetStateProperty.all(
+          isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+        ),
+        dividerThickness: 1,
+        columns: [
+          DataColumn(
+            label: Text(
+              'Customer Name',
+              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
+            ),
+          ),
+          DataColumn(
+            label: Text(
+              'Vehicle',
+              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
+            ),
+          ),
+          DataColumn(
+            label: Text(
+              'Amount (RM)',
+              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
+            ),
+          ),
+          DataColumn(
+            label: Text(
+              'Payment Date',
+              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
+            ),
+          ),
+          DataColumn(
+            label: Text(
+              'Receipt Preview',
+              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
+            ),
+          ),
+          DataColumn(
+            label: Text(
+              'Status',
+              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
+            ),
+          ),
+          DataColumn(
+            label: Text(
+              'Actions',
+              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
+            ),
+          ),
+        ],
+        rows: payments.map((p) {
+          Color statusColor = Colors.orange;
+          String statusText = 'Pending Verification';
+          if (p.paymentStatus == 'Approved' || p.status == 'paid') {
+            statusColor = Colors.green;
+            statusText = 'Approved';
+          } else if (p.paymentStatus == 'Rejected' || p.status == 'failed') {
+            statusColor = Colors.redAccent;
+            statusText = 'Rejected';
+          } else if (p.status == 'refunded') {
+            statusColor = Colors.purple;
+            statusText = 'Refunded';
+          }
 
-            final dateFormat = DateFormat('yyyy-MM-dd HH:mm');
-            final booking = bookingMap[p.bookingId];
-            final customerName = _userNames[p.userId] ?? booking?.userName ?? 'Unknown';
-            final vehicleName = booking?.vehicleName ?? 'Unknown';
+          final dateFormat = DateFormat('yyyy-MM-dd HH:mm');
+          final booking = bookingMap[p.bookingId];
+          final customerName =
+              _userNames[p.userId] ?? booking?.userName ?? 'Unknown';
+          final vehicleName = booking?.vehicleName ?? 'Unknown';
 
-            return DataRow(
-              cells: [
-                DataCell(Text(customerName, style: TextStyle(fontWeight: FontWeight.w600, color: textPrimary))),
-                DataCell(Text(vehicleName, style: TextStyle(color: textPrimary))),
-                DataCell(Text('RM ${p.amount.toStringAsFixed(2)}', style: TextStyle(color: textPrimary))),
-                DataCell(Text(dateFormat.format(p.paymentDate), style: TextStyle(color: textSecondary))),
-                DataCell(
-                  Center(
-                    child: GestureDetector(
-                      onTap: () => _openReceiptLightbox(p),
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          border: Border.all(color: borderColor),
-                          borderRadius: BorderRadius.circular(6),
-                          color: surfaceColor,
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
-                          child: p.receiptImage == null
-                              ? const Icon(Icons.no_photography_outlined, size: 18, color: Colors.grey)
-                              : (p.receiptImage!.toLowerCase().contains('.pdf') || p.receiptImage!.startsWith('data:application/pdf')
-                                  ? const Icon(Icons.picture_as_pdf, size: 20, color: Colors.redAccent)
+          return DataRow(
+            cells: [
+              DataCell(
+                Text(
+                  customerName,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: textPrimary,
+                  ),
+                ),
+              ),
+              DataCell(Text(vehicleName, style: TextStyle(color: textPrimary))),
+              DataCell(
+                Text(
+                  'RM ${p.amount.toStringAsFixed(2)}',
+                  style: TextStyle(color: textPrimary),
+                ),
+              ),
+              DataCell(
+                Text(
+                  dateFormat.format(p.paymentDate),
+                  style: TextStyle(color: textSecondary),
+                ),
+              ),
+              DataCell(
+                Center(
+                  child: GestureDetector(
+                    onTap: () => _openReceiptLightbox(p),
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: borderColor),
+                        borderRadius: BorderRadius.circular(6),
+                        color: surfaceColor,
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: p.receiptImage == null
+                            ? const Icon(
+                                Icons.no_photography_outlined,
+                                size: 18,
+                                color: Colors.grey,
+                              )
+                            : (p.receiptImage!.toLowerCase().contains('.pdf') ||
+                                      p.receiptImage!.startsWith(
+                                        'data:application/pdf',
+                                      )
+                                  ? const Icon(
+                                      Icons.picture_as_pdf,
+                                      size: 20,
+                                      color: Colors.redAccent,
+                                    )
                                   : Image.memory(
-                                      base64Decode(p.receiptImage!.split(',').last),
+                                      base64Decode(
+                                        p.receiptImage!.split(',').last,
+                                      ),
                                       fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) => const Icon(Icons.receipt_long, size: 20),
+                                      errorBuilder:
+                                          (context, error, stackTrace) =>
+                                              const Icon(
+                                                Icons.receipt_long,
+                                                size: 20,
+                                              ),
                                     )),
-                        ),
                       ),
                     ),
                   ),
                 ),
-                DataCell(
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      statusText.toUpperCase(),
-                      style: TextStyle(color: statusColor, fontSize: 9, fontWeight: FontWeight.bold),
+              ),
+              DataCell(
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    statusText.toUpperCase(),
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-                DataCell(
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.receipt_long_outlined, color: AppColors.secondaryBlue, size: 18),
-                        tooltip: 'Details',
-                        onPressed: () => _showPaymentDetails(p),
+              ),
+              DataCell(
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(
+                        Icons.receipt_long_outlined,
+                        color: AppColors.secondaryBlue,
+                        size: 18,
                       ),
-                    ],
-                  ),
+                      tooltip: 'Details',
+                      onPressed: () => _showPaymentDetails(p),
+                    ),
+                  ],
                 ),
-              ],
-            );
-          }).toList(),
+              ),
+            ],
+          );
+        }).toList(),
       ),
     );
   }
 
-  Widget _buildMobileList(List<PaymentModel> payments, Map<String, BookingModel> bookingMap, {
-    required bool isDark, required Color cardColor, required Color textPrimary, required Color textSecondary, required Color borderColor,
+  Widget _buildMobileList(
+    List<PaymentModel> payments,
+    Map<String, BookingModel> bookingMap, {
+    required bool isDark,
+    required Color cardColor,
+    required Color textPrimary,
+    required Color textSecondary,
+    required Color borderColor,
   }) {
     return ListView.builder(
       shrinkWrap: true,
@@ -794,13 +1385,17 @@ class _PaymentsViewState extends State<PaymentsView> {
 
         final dateFormat = DateFormat('yyyy-MM-dd HH:mm');
         final booking = bookingMap[p.bookingId];
-        final customerName = _userNames[p.userId] ?? booking?.userName ?? 'Unknown';
+        final customerName =
+            _userNames[p.userId] ?? booking?.userName ?? 'Unknown';
         final vehicleName = booking?.vehicleName ?? 'Unknown';
 
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           color: cardColor,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: borderColor)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: borderColor),
+          ),
           elevation: 0,
           child: ListTile(
             leading: GestureDetector(
@@ -811,30 +1406,55 @@ class _PaymentsViewState extends State<PaymentsView> {
                 decoration: BoxDecoration(
                   border: Border.all(color: borderColor),
                   borderRadius: BorderRadius.circular(8),
-                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                  color: isDark
+                      ? const Color(0xFF0F172A)
+                      : const Color(0xFFF8FAFC),
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: p.receiptImage == null
-                      ? const Icon(Icons.no_photography_outlined, size: 18, color: Colors.grey)
-                      : (p.receiptImage!.toLowerCase().contains('.pdf') || p.receiptImage!.startsWith('data:application/pdf')
-                          ? const Icon(Icons.picture_as_pdf, size: 24, color: Colors.redAccent)
-                          : Image.memory(
-                              base64Decode(p.receiptImage!.split(',').last),
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => const Icon(Icons.receipt_long, size: 20),
-                            )),
+                      ? const Icon(
+                          Icons.no_photography_outlined,
+                          size: 18,
+                          color: Colors.grey,
+                        )
+                      : (p.receiptImage!.toLowerCase().contains('.pdf') ||
+                                p.receiptImage!.startsWith(
+                                  'data:application/pdf',
+                                )
+                            ? const Icon(
+                                Icons.picture_as_pdf,
+                                size: 24,
+                                color: Colors.redAccent,
+                              )
+                            : Image.memory(
+                                base64Decode(p.receiptImage!.split(',').last),
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    const Icon(Icons.receipt_long, size: 20),
+                              )),
                 ),
               ),
             ),
-            title: Text(customerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            title: Text(
+              customerName,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Vehicle: $vehicleName', style: const TextStyle(fontSize: 12)),
-                Text('Amount: RM ${p.amount.toStringAsFixed(2)} | Mode: ${p.paymentMethod}', style: const TextStyle(fontSize: 12)),
-                Text('Date: ${dateFormat.format(p.paymentDate)}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-
+                Text(
+                  'Vehicle: $vehicleName',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                Text(
+                  'Amount: RM ${p.amount.toStringAsFixed(2)} | Mode: ${p.paymentMethod}',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                Text(
+                  'Date: ${dateFormat.format(p.paymentDate)}',
+                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                ),
               ],
             ),
             trailing: Container(
@@ -845,7 +1465,11 @@ class _PaymentsViewState extends State<PaymentsView> {
               ),
               child: Text(
                 statusText.toUpperCase(),
-                style: TextStyle(color: statusColor, fontSize: 9, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: statusColor,
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             onTap: () => _showPaymentDetails(p),

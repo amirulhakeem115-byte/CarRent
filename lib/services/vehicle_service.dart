@@ -10,14 +10,21 @@ import 'booking_lifecycle_manager.dart';
 import 'user_role_cache.dart';
 
 class VehicleService {
-  final DatabaseReference _db = FirebaseDatabase.instance.ref().child('vehicles');
+  final DatabaseReference _db = FirebaseDatabase.instance.ref().child(
+    'vehicles',
+  );
 
-  Future<List<VehicleModel>> getVehicles() async {
+  // Cache to track manually updated vehicles
+  final Set<String> _manuallyUpdatedVehicleIds = {};
+
+  Future<List<VehicleModel>> getVehicles({bool applyStatusSync = true}) async {
     // Run lifecycle manager check first
     try {
       await BookingLifecycleManager().checkAndProcessLifecycle();
     } catch (lifecycleErr) {
-      debugPrint('[VehicleService] Warning: lifecycle check failed: $lifecycleErr');
+      debugPrint(
+        '[VehicleService] Warning: lifecycle check failed: $lifecycleErr',
+      );
     }
 
     List<VehicleModel> vehicles = [];
@@ -27,12 +34,15 @@ class VehicleService {
       currentRole = await UserRoleCache.getRole(currentUid);
     }
     debugPrint('[VehicleService] [getVehicles] Accessing path: vehicles');
-    debugPrint('[VehicleService] [getVehicles] Current UID: $currentUid, Current Role: $currentRole');
+    debugPrint(
+      '[VehicleService] [getVehicles] Current UID: $currentUid, Current Role: $currentRole',
+    );
 
     try {
       final snapshot = await _db.get().timeout(const Duration(seconds: 8));
       if (snapshot.exists && snapshot.value != null) {
-        final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
+        final Map<dynamic, dynamic> data =
+            snapshot.value as Map<dynamic, dynamic>;
         data.forEach((key, value) {
           if (value is Map) {
             vehicles.add(VehicleModel.fromMap(key.toString(), value));
@@ -40,47 +50,100 @@ class VehicleService {
         });
       }
 
-      // Fetch bookings to determine dynamic availability
-      final bookingsSnap = await FirebaseDatabase.instance.ref().child('bookings').get().timeout(const Duration(seconds: 8));
-      List<BookingModel> allBookings = [];
-      if (bookingsSnap.exists && bookingsSnap.value != null) {
-        final Map<dynamic, dynamic> data = bookingsSnap.value as Map<dynamic, dynamic>;
-        data.forEach((key, value) {
-          try {
-            allBookings.add(BookingModel.fromMap(key.toString(), value as Map<dynamic, dynamic>));
-          } catch (e) {
-            debugPrint('Error parsing booking in sync: $e');
+      if (applyStatusSync) {
+        // Fetch bookings to determine dynamic availability
+        final bookingsSnap = await FirebaseDatabase.instance
+            .ref()
+            .child('bookings')
+            .get()
+            .timeout(const Duration(seconds: 8));
+        List<BookingModel> allBookings = [];
+        if (bookingsSnap.exists && bookingsSnap.value != null) {
+          final Map<dynamic, dynamic> data =
+              bookingsSnap.value as Map<dynamic, dynamic>;
+          data.forEach((key, value) {
+            try {
+              allBookings.add(
+                BookingModel.fromMap(
+                  key.toString(),
+                  value as Map<dynamic, dynamic>,
+                ),
+              );
+            } catch (e) {
+              debugPrint('Error parsing booking in sync: $e');
+            }
+          });
+        }
+
+        final now = DateTime.now();
+        for (int i = 0; i < vehicles.length; i++) {
+          final vehicle = vehicles[i];
+
+          // CRITICAL: Skip ALL auto-sync for manually updated vehicles
+          if (_manuallyUpdatedVehicleIds.contains(vehicle.id)) {
+            debugPrint(
+              '[VehicleService] Skipping ALL auto-sync for manually updated vehicle: ${vehicle.id} (Status: ${vehicle.status})',
+            );
+            continue;
           }
-        });
-      }
 
-      for (int i = 0; i < vehicles.length; i++) {
-        final vehicle = vehicles[i];
-        final hasActiveBooking = allBookings.any((booking) {
-          if (booking.vehicleId != vehicle.id) return false;
-          final statusLower = booking.status.toLowerCase();
-          return statusLower != 'completed' && 
-                 statusLower != 'cancelled' && 
-                 statusLower != 'rejected';
-        });
+          // Skip sync for special statuses (Maintenance, Inactive, etc.)
+          if (vehicle.status != 'Available' && vehicle.status != 'Booked') {
+            continue;
+          }
 
-        final targetStatus = hasActiveBooking ? 'Booked' : 'Available';
-        final isAvailable = !hasActiveBooking;
+          final hasActiveBooking = allBookings.any((booking) {
+            if (booking.vehicleId != vehicle.id) return false;
+            final s = booking.status.toLowerCase();
+            if (s == 'completed' || s == 'cancelled' || s == 'rejected') {
+              return false;
+            }
 
-        if (vehicle.status != targetStatus) {
-          vehicles[i] = vehicle.copyWith(status: targetStatus, isAvailable: isAvailable);
-          try {
-            await _db.child(vehicle.id).update({
-              'status': targetStatus,
-              'isAvailable': isAvailable,
-            });
-          } catch (e) {
-            debugPrint('Error updating synced status for vehicle ${vehicle.id}: $e');
+            // Explicitly active or overdue rentals
+            if (s == 'active' || s == 'ongoing' || s == 'overdue') {
+              return true;
+            }
+
+            // Reservations within 12h window
+            return booking.pickUpDate.isBefore(
+                  now.add(const Duration(hours: 12)),
+                ) &&
+                (booking.returnDate == null ||
+                    now.isBefore(booking.returnDate!));
+          });
+
+          // Only perform safe cleanup: Booked -> Available if no active booking
+          String targetStatus = vehicle.status;
+          if (vehicle.status == 'Booked' && !hasActiveBooking) {
+            targetStatus = 'Available';
+          }
+          final bool isAvailable = (targetStatus == 'Available');
+
+          if (vehicle.status != targetStatus ||
+              vehicle.isAvailable != isAvailable) {
+            vehicles[i] = vehicle.copyWith(
+              status: targetStatus,
+              isAvailable: isAvailable,
+            );
+            if (currentRole == 'admin') {
+              try {
+                await _db.child(vehicle.id).update({
+                  'status': targetStatus,
+                  'isAvailable': isAvailable,
+                });
+              } catch (e) {
+                debugPrint(
+                  'Error updating synced status for vehicle ${vehicle.id}: $e',
+                );
+              }
+            }
           }
         }
       }
 
-      debugPrint('[VehicleService] [getVehicles] Vehicles count loaded: ${vehicles.length}');
+      debugPrint(
+        '[VehicleService] [getVehicles] Vehicles count loaded: ${vehicles.length}',
+      );
     } catch (e) {
       debugPrint('[VehicleService] [getVehicles] Error getting vehicles: $e');
     }
@@ -90,77 +153,109 @@ class VehicleService {
   Stream<List<VehicleModel>> getVehiclesStream() {
     final bookingsDb = FirebaseDatabase.instance.ref().child('bookings');
     final controller = StreamController<List<VehicleModel>>.broadcast();
-    
+
     StreamSubscription? vehiclesSub;
     StreamSubscription? bookingsSub;
-    
+
     Map<String, VehicleModel> latestVehicles = {};
     Map<String, BookingModel> latestBookings = {};
-    
+
     void updateAndEmit() {
       if (controller.isClosed) return;
-      
+
+      final now = DateTime.now();
       final List<VehicleModel> syncedVehicles = [];
       latestVehicles.forEach((vehicleId, vehicle) {
+        // CRITICAL: Skip ALL auto-sync for manually updated vehicles
+        if (_manuallyUpdatedVehicleIds.contains(vehicleId)) {
+          debugPrint(
+            '[VehicleService] Stream skipping ALL auto-sync for manually updated vehicle: $vehicleId (Status: ${vehicle.status})',
+          );
+          syncedVehicles.add(vehicle);
+          return;
+        }
+
+        // Skip sync for special statuses
+        if (vehicle.status != 'Available' && vehicle.status != 'Booked') {
+          syncedVehicles.add(vehicle);
+          return;
+        }
+
         final hasActiveBooking = latestBookings.values.any((booking) {
           if (booking.vehicleId != vehicle.id) return false;
-          final statusLower = booking.status.toLowerCase();
-          return statusLower != 'completed' && 
-                 statusLower != 'cancelled' && 
-                 statusLower != 'rejected';
+          final s = booking.status.toLowerCase();
+          if (s == 'completed' || s == 'cancelled' || s == 'rejected')
+            return false;
+
+          if (s == 'active' || s == 'ongoing' || s == 'overdue') return true;
+
+          return booking.pickUpDate.isBefore(
+                now.add(const Duration(hours: 12)),
+              ) &&
+              (booking.returnDate == null || now.isBefore(booking.returnDate!));
         });
-        
-        final targetStatus = hasActiveBooking ? 'Booked' : 'Available';
-        final isAvailable = !hasActiveBooking;
-        
-        VehicleModel finalVehicle = vehicle;
-        if (vehicle.status != targetStatus) {
-          finalVehicle = vehicle.copyWith(status: targetStatus, isAvailable: isAvailable);
-          _db.child(vehicle.id).update({
-            'status': targetStatus,
-            'isAvailable': isAvailable,
-          }).catchError((e) {
-            debugPrint('Error updating synced status in stream for ${vehicle.id}: $e');
-          });
+
+        // Only perform safe cleanup: Booked -> Available if no active booking
+        String targetStatus = vehicle.status;
+        if (vehicle.status == 'Booked' && !hasActiveBooking) {
+          targetStatus = 'Available';
         }
-        
+        final bool isAvailable = (targetStatus == 'Available');
+
+        VehicleModel finalVehicle = vehicle;
+        if (vehicle.status != targetStatus ||
+            vehicle.isAvailable != isAvailable) {
+          finalVehicle = vehicle.copyWith(
+            status: targetStatus,
+            isAvailable: isAvailable,
+          );
+        }
+
         syncedVehicles.add(finalVehicle);
       });
-      
+
       controller.add(syncedVehicles);
     }
-    
+
     vehiclesSub = _db.onValue.listen((event) {
       latestVehicles.clear();
       if (event.snapshot.exists && event.snapshot.value != null) {
-        final Map<dynamic, dynamic> data = event.snapshot.value as Map<dynamic, dynamic>;
+        final Map<dynamic, dynamic> data =
+            event.snapshot.value as Map<dynamic, dynamic>;
         data.forEach((key, value) {
           if (value is Map) {
-            latestVehicles[key.toString()] = VehicleModel.fromMap(key.toString(), value);
+            latestVehicles[key.toString()] = VehicleModel.fromMap(
+              key.toString(),
+              value,
+            );
           }
         });
       }
       updateAndEmit();
     });
-    
+
     bookingsSub = bookingsDb.onValue.listen((event) {
       latestBookings.clear();
       if (event.snapshot.exists && event.snapshot.value != null) {
-        final Map<dynamic, dynamic> data = event.snapshot.value as Map<dynamic, dynamic>;
+        final Map<dynamic, dynamic> data =
+            event.snapshot.value as Map<dynamic, dynamic>;
         data.forEach((key, value) {
           if (value is Map) {
-            latestBookings[key.toString()] = BookingModel.fromMap(key.toString(), value);
+            latestBookings[key.toString()] = BookingModel.fromMap(
+              key.toString(),
+              value,
+            );
           }
         });
       }
       updateAndEmit();
     });
-    
+
     controller.onCancel = () {
       vehiclesSub?.cancel();
       bookingsSub?.cancel();
     };
-    
+
     return controller.stream;
   }
 
@@ -174,7 +269,8 @@ class VehicleService {
       final notificationService = NotificationService();
       await notificationService.notifyAllAdmins(
         title: 'Vehicle Added',
-        message: 'New vehicle registered: ${vehicle.brand} ${vehicle.model} (${vehicle.plateNumber}).',
+        message:
+            'New vehicle registered: ${vehicle.brand} ${vehicle.model} (${vehicle.plateNumber}).',
         type: 'vehicle',
         icon: '🚗',
         color: '0xFF3B82F6',
@@ -190,7 +286,7 @@ class VehicleService {
   Future<void> updateVehicle(String id, Map<String, dynamic> data) async {
     try {
       await _db.child(id).update(data);
-      
+
       final brand = data['brand'] ?? '';
       final model = data['model'] ?? '';
       final plate = data['plateNumber'] ?? '';
@@ -217,11 +313,12 @@ class VehicleService {
   Future<void> deleteVehicle(String id) async {
     try {
       await _db.child(id).remove();
-      
+
       final notificationService = NotificationService();
       await notificationService.notifyAllAdmins(
         title: 'Vehicle Deleted',
-        message: 'Vehicle was permanently removed from the fleet register (ID: $id).',
+        message:
+            'Vehicle was permanently removed from the fleet register (ID: $id).',
         type: 'vehicle',
         icon: '🚗',
         color: '0xFFEF4444',
@@ -236,12 +333,29 @@ class VehicleService {
 
   Future<void> toggleAvailability(String id, bool isAvailable) async {
     try {
+      // Mark as manually updated
+      _manuallyUpdatedVehicleIds.add(id);
+
+      // Auto-clear from manual cache after some time (e.g., 1 hour)
+      Future.delayed(const Duration(hours: 1), () {
+        _manuallyUpdatedVehicleIds.remove(id);
+        debugPrint(
+          '[VehicleService] Removed $id from manual update cache (auto-clear)',
+        );
+      });
+
       await _db.child(id).update({
         'isAvailable': isAvailable,
         'status': isAvailable ? 'Available' : 'Booked',
+        'manualOverride': true,
+        'manualSyncTime': DateTime.now().toIso8601String(),
       });
+
+      debugPrint(
+        '[VehicleService] Toggled availability for vehicle $id to ${isAvailable ? "Available" : "Booked"}',
+      );
     } catch (e) {
-      debugPrint('Error toggling availability: $e');
+      debugPrint('[VehicleService] Error toggling availability: $e');
       rethrow;
     }
   }
@@ -250,23 +364,79 @@ class VehicleService {
     try {
       String normStatus = status;
       final statusLower = status.toLowerCase().replaceAll(RegExp(r'\s+'), '');
+
+      // Normalize status values
       if (statusLower == 'available') {
         normStatus = 'Available';
-      } else if (statusLower == 'booked' || statusLower == 'reserved' || statusLower == 'rented' || statusLower == 'activebooked' || statusLower == 'bookedvehicle') {
+      } else if (statusLower == 'booked' ||
+          statusLower == 'reserved' ||
+          statusLower == 'rented' ||
+          statusLower == 'activebooked' ||
+          statusLower == 'bookedvehicle') {
         normStatus = 'Booked';
       } else if (statusLower == 'maintenance') {
         normStatus = 'Maintenance';
       } else if (statusLower == 'inactive') {
         normStatus = 'Inactive';
+      } else {
+        // If status doesn't match any known status, keep it as-is but capitalize first letter
+        normStatus =
+            status[0].toUpperCase() + status.substring(1).toLowerCase();
       }
+
+      // IMPORTANT: Mark this vehicle as manually updated to prevent ALL auto-sync
+      _manuallyUpdatedVehicleIds.add(id);
+
+      // Auto-clear from manual cache after some time (e.g., 1 hour)
+      // This allows the vehicle to go back to auto-sync after manual override expires
+      Future.delayed(const Duration(hours: 1), () {
+        _manuallyUpdatedVehicleIds.remove(id);
+        debugPrint(
+          '[VehicleService] Removed $id from manual update cache (auto-clear)',
+        );
+      });
+
+      // Update the vehicle in Firebase
       await _db.child(id).update({
         'status': normStatus,
         'isAvailable': normStatus == 'Available',
+        'manualSyncTime': DateTime.now().toIso8601String(),
+        'manualOverride': true,
       });
+
+      debugPrint(
+        '[VehicleService] Successfully updated vehicle $id status to $normStatus',
+      );
     } catch (e) {
-      debugPrint('Error updating vehicle status: $e');
+      debugPrint('[VehicleService] Error updating vehicle status: $e');
       rethrow;
     }
+  }
+
+  // Method to clear manual override for a vehicle (useful for admin to reset auto-sync)
+  Future<void> clearManualOverride(String id) async {
+    _manuallyUpdatedVehicleIds.remove(id);
+    await _db.child(id).update({'manualOverride': false});
+    debugPrint('[VehicleService] Cleared manual override for vehicle $id');
+  }
+
+  // Method to get all manually updated vehicles (for debugging)
+  Set<String> getManuallyUpdatedVehicleIds() {
+    return Set<String>.from(_manuallyUpdatedVehicleIds);
+  }
+
+  // Method to manually remove a vehicle from the manual update cache
+  void removeFromManualCache(String id) {
+    _manuallyUpdatedVehicleIds.remove(id);
+    debugPrint(
+      '[VehicleService] Removed $id from manual update cache manually',
+    );
+  }
+
+  // Method to clear all manual overrides (for admin use)
+  Future<void> clearAllManualOverrides() async {
+    _manuallyUpdatedVehicleIds.clear();
+    debugPrint('[VehicleService] Cleared all manual overrides');
   }
 
   Future<String> uploadVehicleImage(Uint8List bytes, String filename) async {
@@ -294,8 +464,10 @@ class VehicleService {
         pricePerDay: 90.0,
         mileage: 28000,
         isAvailable: true,
-        mainImage: 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&q=80&w=600',
-        description: 'Super compact city hatchback, extremely fuel-efficient, easy to park, and perfect for dense traffic.',
+        mainImage:
+            'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&q=80&w=600',
+        description:
+            'Super compact city hatchback, extremely fuel-efficient, easy to park, and perfect for dense traffic.',
         createdAt: DateTime.now().toIso8601String(),
         branchName: 'Kuala Lumpur',
         engine: '1.0L EEV',
@@ -306,7 +478,13 @@ class VehicleService {
           'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&q=80&w=600',
           'https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&q=80&w=600',
         ],
-        equipment: ['ABS', 'Airbags', 'USB Port', 'Bluetooth', 'Reverse Sensors'],
+        equipment: [
+          'ABS',
+          'Airbags',
+          'USB Port',
+          'Bluetooth',
+          'Reverse Sensors',
+        ],
         maintenance: const [],
       ),
       VehicleModel(
@@ -323,8 +501,10 @@ class VehicleService {
         pricePerDay: 100.0,
         mileage: 35000,
         isAvailable: true,
-        mainImage: 'https://images.unsplash.com/photo-1606016159991-dfe4f2746ad5?auto=format&fit=crop&q=80&w=600',
-        description: 'Reliable and spacious compact sedan. A true Malaysian icon, providing absolute value and comfort.',
+        mainImage:
+            'https://images.unsplash.com/photo-1606016159991-dfe4f2746ad5?auto=format&fit=crop&q=80&w=600',
+        description:
+            'Reliable and spacious compact sedan. A true Malaysian icon, providing absolute value and comfort.',
         createdAt: DateTime.now().toIso8601String(),
         branchName: 'Kajang',
         engine: '1.3L VVT',
@@ -335,7 +515,13 @@ class VehicleService {
           'https://images.unsplash.com/photo-1606016159991-dfe4f2746ad5?auto=format&fit=crop&q=80&w=600',
           'https://images.unsplash.com/photo-1553440569-bcc63803a83d?auto=format&fit=crop&q=80&w=600',
         ],
-        equipment: ['ABS', 'Airbags', 'Bluetooth', 'Reverse Sensors', 'Spare Tyre'],
+        equipment: [
+          'ABS',
+          'Airbags',
+          'Bluetooth',
+          'Reverse Sensors',
+          'Spare Tyre',
+        ],
         maintenance: const [],
       ),
       VehicleModel(
@@ -352,8 +538,10 @@ class VehicleService {
         pricePerDay: 110.0,
         mileage: 24000,
         isAvailable: true,
-        mainImage: 'https://images.unsplash.com/photo-1616422285623-13ff0162193c?auto=format&fit=crop&q=80&w=600',
-        description: 'Affordable sedan with huge luggage boot space (508L) and exceptional fuel economy for family road trips.',
+        mainImage:
+            'https://images.unsplash.com/photo-1616422285623-13ff0162193c?auto=format&fit=crop&q=80&w=600',
+        description:
+            'Affordable sedan with huge luggage boot space (508L) and exceptional fuel economy for family road trips.',
         createdAt: DateTime.now().toIso8601String(),
         branchName: 'Putrajaya',
         engine: '1.3L Dual VVT-i',
@@ -380,8 +568,10 @@ class VehicleService {
         pricePerDay: 150.0,
         mileage: 18000,
         isAvailable: true,
-        mainImage: 'https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&q=80&w=600',
-        description: 'Sleek and spacious subcompact sedan with premium interior, excellent driving dynamics, and cold dual-zone AC.',
+        mainImage:
+            'https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&q=80&w=600',
+        description:
+            'Sleek and spacious subcompact sedan with premium interior, excellent driving dynamics, and cold dual-zone AC.',
         createdAt: DateTime.now().toIso8601String(),
         branchName: 'Shah Alam',
         engine: '1.5L i-VTEC',
@@ -391,7 +581,14 @@ class VehicleService {
         gallery: [
           'https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&q=80&w=600',
         ],
-        equipment: ['ABS', 'Airbags', 'Apple CarPlay', 'Android Auto', 'Reverse Camera', 'LED Headlights'],
+        equipment: [
+          'ABS',
+          'Airbags',
+          'Apple CarPlay',
+          'Android Auto',
+          'Reverse Camera',
+          'LED Headlights',
+        ],
         maintenance: const [],
       ),
       VehicleModel(
@@ -408,8 +605,10 @@ class VehicleService {
         pricePerDay: 160.0,
         mileage: 21000,
         isAvailable: true,
-        mainImage: 'https://images.unsplash.com/photo-1553440569-bcc63803a83d?auto=format&fit=crop&q=80&w=600',
-        description: 'The staple of reliable sedans. Offers smooth performance, high safety standards, and supreme cabin isolation.',
+        mainImage:
+            'https://images.unsplash.com/photo-1553440569-bcc63803a83d?auto=format&fit=crop&q=80&w=600',
+        description:
+            'The staple of reliable sedans. Offers smooth performance, high safety standards, and supreme cabin isolation.',
         createdAt: DateTime.now().toIso8601String(),
         branchName: 'Johor Bahru',
         engine: '1.5L Dual VVT-i',
@@ -419,7 +618,13 @@ class VehicleService {
         gallery: [
           'https://images.unsplash.com/photo-1553440569-bcc63803a83d?auto=format&fit=crop&q=80&w=600',
         ],
-        equipment: ['ABS', 'Airbags', 'Keyless Start', '360 Camera', 'Blind Spot Monitor'],
+        equipment: [
+          'ABS',
+          'Airbags',
+          'Keyless Start',
+          '360 Camera',
+          'Blind Spot Monitor',
+        ],
         maintenance: const [],
       ),
       VehicleModel(
@@ -436,8 +641,10 @@ class VehicleService {
         pricePerDay: 240.0,
         mileage: 12000,
         isAvailable: true,
-        mainImage: 'https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&q=80&w=600',
-        description: 'Sporty, powerful, and premium. Features a turbocharged engine, Honda SENSING active safety, and leather seats.',
+        mainImage:
+            'https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&q=80&w=600',
+        description:
+            'Sporty, powerful, and premium. Features a turbocharged engine, Honda SENSING active safety, and leather seats.',
         createdAt: DateTime.now().toIso8601String(),
         branchName: 'Penang',
         engine: '1.5L Turbo',
@@ -448,7 +655,14 @@ class VehicleService {
           'https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&q=80&w=600',
           'https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&q=80&w=600',
         ],
-        equipment: ['ABS', 'Airbags', 'Honda SENSING', 'Leather Seats', 'Turbo Engine', 'Digital Dashboard'],
+        equipment: [
+          'ABS',
+          'Airbags',
+          'Honda SENSING',
+          'Leather Seats',
+          'Turbo Engine',
+          'Digital Dashboard',
+        ],
         maintenance: const [],
       ),
       VehicleModel(
@@ -465,8 +679,10 @@ class VehicleService {
         pricePerDay: 180.0,
         mileage: 25000,
         isAvailable: true,
-        mainImage: 'https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&q=80&w=600',
-        description: 'Premium compact SUV with active safety systems, intelligent voice command connectivity, and powerful turbocharged engine.',
+        mainImage:
+            'https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&q=80&w=600',
+        description:
+            'Premium compact SUV with active safety systems, intelligent voice command connectivity, and powerful turbocharged engine.',
         createdAt: DateTime.now().toIso8601String(),
         branchName: 'Shah Alam',
         engine: '1.5T Turbo',
@@ -476,7 +692,13 @@ class VehicleService {
         gallery: [
           'https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&q=80&w=600',
         ],
-        equipment: ['ABS', 'Airbags', 'Voice Command', 'Panoramic Sunroof', 'Auto Park Assist'],
+        equipment: [
+          'ABS',
+          'Airbags',
+          'Voice Command',
+          'Panoramic Sunroof',
+          'Auto Park Assist',
+        ],
         maintenance: const [],
       ),
       VehicleModel(
@@ -493,8 +715,10 @@ class VehicleService {
         pricePerDay: 230.0,
         mileage: 30000,
         isAvailable: true,
-        mainImage: 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&fit=crop&q=80&w=600',
-        description: 'Spacious and intelligent mid-size SUV. Features panoramic sunroof, ventilated leather seats, and premium comfort.',
+        mainImage:
+            'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&fit=crop&q=80&w=600',
+        description:
+            'Spacious and intelligent mid-size SUV. Features panoramic sunroof, ventilated leather seats, and premium comfort.',
         createdAt: DateTime.now().toIso8601String(),
         branchName: 'Kuala Lumpur',
         engine: '1.5L TGDi',
@@ -504,7 +728,13 @@ class VehicleService {
         gallery: [
           'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&fit=crop&q=80&w=600',
         ],
-        equipment: ['ABS', 'Airbags', 'Ventilated Seats', 'GPS Tracker', 'Nappa Leather'],
+        equipment: [
+          'ABS',
+          'Airbags',
+          'Ventilated Seats',
+          'GPS Tracker',
+          'Nappa Leather',
+        ],
         maintenance: const [],
       ),
       VehicleModel(
@@ -521,8 +751,10 @@ class VehicleService {
         pricePerDay: 200.0,
         mileage: 19000,
         isAvailable: true,
-        mainImage: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=600',
-        description: 'Modern compact crossover SUV with exceptionally versatile seating space configurations and sleek design.',
+        mainImage:
+            'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=600',
+        description:
+            'Modern compact crossover SUV with exceptionally versatile seating space configurations and sleek design.',
         createdAt: DateTime.now().toIso8601String(),
         branchName: 'Putrajaya',
         engine: '1.5L VTEC',
@@ -532,7 +764,13 @@ class VehicleService {
         gallery: [
           'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=600',
         ],
-        equipment: ['ABS', 'Airbags', 'ULTRA Seats', 'Honda SENSING', 'Keyless Go'],
+        equipment: [
+          'ABS',
+          'Airbags',
+          'ULTRA Seats',
+          'Honda SENSING',
+          'Keyless Go',
+        ],
         maintenance: const [],
       ),
       VehicleModel(
@@ -549,8 +787,10 @@ class VehicleService {
         pricePerDay: 220.0,
         mileage: 15000,
         isAvailable: true,
-        mainImage: 'https://images.unsplash.com/photo-1625217527288-93919c996509?auto=format&fit=crop&q=80&w=600',
-        description: 'Hybrid technology SUV offering high fuel efficiency, Toyota Safety Sense, smooth electric motor cruising, and space.',
+        mainImage:
+            'https://images.unsplash.com/photo-1625217527288-93919c996509?auto=format&fit=crop&q=80&w=600',
+        description:
+            'Hybrid technology SUV offering high fuel efficiency, Toyota Safety Sense, smooth electric motor cruising, and space.',
         createdAt: DateTime.now().toIso8601String(),
         branchName: 'Penang',
         engine: '1.8L Hybrid',
@@ -560,7 +800,13 @@ class VehicleService {
         gallery: [
           'https://images.unsplash.com/photo-1625217527288-93919c996509?auto=format&fit=crop&q=80&w=600',
         ],
-        equipment: ['ABS', 'Airbags', 'Hybrid Engine', 'Toyota Safety Sense', 'TSS 2.0'],
+        equipment: [
+          'ABS',
+          'Airbags',
+          'Hybrid Engine',
+          'Toyota Safety Sense',
+          'TSS 2.0',
+        ],
         maintenance: const [],
       ),
       VehicleModel(
@@ -577,8 +823,10 @@ class VehicleService {
         pricePerDay: 170.0,
         mileage: 27000,
         isAvailable: true,
-        mainImage: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=600',
-        description: 'Spacious 7-seater family MPV with versatile seat configurations, rear AC vents, and advanced safety features.',
+        mainImage:
+            'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=600',
+        description:
+            'Spacious 7-seater family MPV with versatile seat configurations, rear AC vents, and advanced safety features.',
         createdAt: DateTime.now().toIso8601String(),
         branchName: 'Kajang',
         engine: '1.5L Dual VVT-i',
@@ -605,8 +853,10 @@ class VehicleService {
         pricePerDay: 260.0,
         mileage: 42000,
         isAvailable: true,
-        mainImage: 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&q=80&w=600',
-        description: 'The premier full-sized MPV. Offers spacious 8-seat cabin, exceptional cargo capacity, dual blowers, and high road view.',
+        mainImage:
+            'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&q=80&w=600',
+        description:
+            'The premier full-sized MPV. Offers spacious 8-seat cabin, exceptional cargo capacity, dual blowers, and high road view.',
         createdAt: DateTime.now().toIso8601String(),
         branchName: 'Johor Bahru',
         engine: '2.0L Dual VVT-i',
@@ -616,7 +866,13 @@ class VehicleService {
         gallery: [
           'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&q=80&w=600',
         ],
-        equipment: ['ABS', 'Airbags', '8 Seats', 'Dual Blower AC', 'Touch Screen Nav'],
+        equipment: [
+          'ABS',
+          'Airbags',
+          '8 Seats',
+          'Dual Blower AC',
+          'Touch Screen Nav',
+        ],
         maintenance: const [],
       ),
     ];
@@ -642,8 +898,10 @@ class VehicleService {
         pricePerDay: 90.0,
         mileage: 28000,
         isAvailable: true,
-        mainImage: 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&q=80&w=600',
-        description: 'Super compact city hatchback, extremely fuel-efficient, easy to park, and perfect for dense traffic.',
+        mainImage:
+            'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&q=80&w=600',
+        description:
+            'Super compact city hatchback, extremely fuel-efficient, easy to park, and perfect for dense traffic.',
         createdAt: DateTime.now().toIso8601String(),
         branchName: 'Kuala Lumpur',
         engine: '1.0L EEV',
@@ -654,7 +912,13 @@ class VehicleService {
           'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&q=80&w=600',
           'https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&q=80&w=600',
         ],
-        equipment: ['ABS', 'Airbags', 'USB Port', 'Bluetooth', 'Reverse Sensors'],
+        equipment: [
+          'ABS',
+          'Airbags',
+          'USB Port',
+          'Bluetooth',
+          'Reverse Sensors',
+        ],
         maintenance: const [],
       ),
       VehicleModel(
@@ -671,8 +935,10 @@ class VehicleService {
         pricePerDay: 100.0,
         mileage: 35000,
         isAvailable: true,
-        mainImage: 'https://images.unsplash.com/photo-1606016159991-dfe4f2746ad5?auto=format&fit=crop&q=80&w=600',
-        description: 'Reliable and spacious compact sedan. A true Malaysian icon, providing absolute value and comfort.',
+        mainImage:
+            'https://images.unsplash.com/photo-1606016159991-dfe4f2746ad5?auto=format&fit=crop&q=80&w=600',
+        description:
+            'Reliable and spacious compact sedan. A true Malaysian icon, providing absolute value and comfort.',
         createdAt: DateTime.now().toIso8601String(),
         branchName: 'Kajang',
         engine: '1.3L VVT',
@@ -683,7 +949,13 @@ class VehicleService {
           'https://images.unsplash.com/photo-1606016159991-dfe4f2746ad5?auto=format&fit=crop&q=80&w=600',
           'https://images.unsplash.com/photo-1553440569-bcc63803a83d?auto=format&fit=crop&q=80&w=600',
         ],
-        equipment: ['ABS', 'Airbags', 'Bluetooth', 'Reverse Sensors', 'Spare Tyre'],
+        equipment: [
+          'ABS',
+          'Airbags',
+          'Bluetooth',
+          'Reverse Sensors',
+          'Spare Tyre',
+        ],
         maintenance: const [],
       ),
       VehicleModel(
@@ -700,8 +972,10 @@ class VehicleService {
         pricePerDay: 110.0,
         mileage: 24000,
         isAvailable: true,
-        mainImage: 'https://images.unsplash.com/photo-1616422285623-13ff0162193c?auto=format&fit=crop&q=80&w=600',
-        description: 'Affordable sedan with huge luggage boot space (508L) and exceptional fuel economy for family road trips.',
+        mainImage:
+            'https://images.unsplash.com/photo-1616422285623-13ff0162193c?auto=format&fit=crop&q=80&w=600',
+        description:
+            'Affordable sedan with huge luggage boot space (508L) and exceptional fuel economy for family road trips.',
         createdAt: DateTime.now().toIso8601String(),
         branchName: 'Putrajaya',
         engine: '1.3L Dual VVT-i',
@@ -728,8 +1002,10 @@ class VehicleService {
         pricePerDay: 150.0,
         mileage: 18000,
         isAvailable: true,
-        mainImage: 'https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&q=80&w=600',
-        description: 'Sleek and spacious subcompact sedan with premium interior, excellent driving dynamics, and cold dual-zone AC.',
+        mainImage:
+            'https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&q=80&w=600',
+        description:
+            'Sleek and spacious subcompact sedan with premium interior, excellent driving dynamics, and cold dual-zone AC.',
         createdAt: DateTime.now().toIso8601String(),
         branchName: 'Shah Alam',
         engine: '1.5L i-VTEC',
@@ -739,7 +1015,14 @@ class VehicleService {
         gallery: [
           'https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&q=80&w=600',
         ],
-        equipment: ['ABS', 'Airbags', 'Apple CarPlay', 'Android Auto', 'Reverse Camera', 'LED Headlights'],
+        equipment: [
+          'ABS',
+          'Airbags',
+          'Apple CarPlay',
+          'Android Auto',
+          'Reverse Camera',
+          'LED Headlights',
+        ],
         maintenance: const [],
       ),
       VehicleModel(
@@ -756,8 +1039,10 @@ class VehicleService {
         pricePerDay: 160.0,
         mileage: 21000,
         isAvailable: true,
-        mainImage: 'https://images.unsplash.com/photo-1553440569-bcc63803a83d?auto=format&fit=crop&q=80&w=600',
-        description: 'The staple of reliable sedans. Offers smooth performance, high safety standards, and supreme cabin isolation.',
+        mainImage:
+            'https://images.unsplash.com/photo-1553440569-bcc63803a83d?auto=format&fit=crop&q=80&w=600',
+        description:
+            'The staple of reliable sedans. Offers smooth performance, high safety standards, and supreme cabin isolation.',
         createdAt: DateTime.now().toIso8601String(),
         branchName: 'Johor Bahru',
         engine: '1.5L Dual VVT-i',
@@ -767,7 +1052,13 @@ class VehicleService {
         gallery: [
           'https://images.unsplash.com/photo-1553440569-bcc63803a83d?auto=format&fit=crop&q=80&w=600',
         ],
-        equipment: ['ABS', 'Airbags', 'Keyless Start', '360 Camera', 'Blind Spot Monitor'],
+        equipment: [
+          'ABS',
+          'Airbags',
+          'Keyless Start',
+          '360 Camera',
+          'Blind Spot Monitor',
+        ],
         maintenance: const [],
       ),
       VehicleModel(
@@ -784,8 +1075,10 @@ class VehicleService {
         pricePerDay: 240.0,
         mileage: 12000,
         isAvailable: true,
-        mainImage: 'https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&q=80&w=600',
-        description: 'Sporty, powerful, and premium. Features a turbocharged engine, Honda SENSING active safety, and leather seats.',
+        mainImage:
+            'https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&q=80&w=600',
+        description:
+            'Sporty, powerful, and premium. Features a turbocharged engine, Honda SENSING active safety, and leather seats.',
         createdAt: DateTime.now().toIso8601String(),
         branchName: 'Penang',
         engine: '1.5L Turbo',
@@ -796,7 +1089,14 @@ class VehicleService {
           'https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&q=80&w=600',
           'https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&q=80&w=600',
         ],
-        equipment: ['ABS', 'Airbags', 'Honda SENSING', 'Leather Seats', 'Turbo Engine', 'Digital Dashboard'],
+        equipment: [
+          'ABS',
+          'Airbags',
+          'Honda SENSING',
+          'Leather Seats',
+          'Turbo Engine',
+          'Digital Dashboard',
+        ],
         maintenance: const [],
       ),
       VehicleModel(
@@ -813,8 +1113,10 @@ class VehicleService {
         pricePerDay: 180.0,
         mileage: 25000,
         isAvailable: true,
-        mainImage: 'https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&q=80&w=600',
-        description: 'Premium compact SUV with active safety systems, intelligent voice command connectivity, and powerful turbocharged engine.',
+        mainImage:
+            'https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&q=80&w=600',
+        description:
+            'Premium compact SUV with active safety systems, intelligent voice command connectivity, and powerful turbocharged engine.',
         createdAt: DateTime.now().toIso8601String(),
         branchName: 'Shah Alam',
         engine: '1.5T Turbo',
@@ -824,7 +1126,13 @@ class VehicleService {
         gallery: [
           'https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&q=80&w=600',
         ],
-        equipment: ['ABS', 'Airbags', 'Voice Command', 'Panoramic Sunroof', 'Auto Park Assist'],
+        equipment: [
+          'ABS',
+          'Airbags',
+          'Voice Command',
+          'Panoramic Sunroof',
+          'Auto Park Assist',
+        ],
         maintenance: const [],
       ),
       VehicleModel(
@@ -841,8 +1149,10 @@ class VehicleService {
         pricePerDay: 230.0,
         mileage: 30000,
         isAvailable: true,
-        mainImage: 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&fit=crop&q=80&w=600',
-        description: 'Spacious and intelligent mid-size SUV. Features panoramic sunroof, ventilated leather seats, and premium comfort.',
+        mainImage:
+            'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&fit=crop&q=80&w=600',
+        description:
+            'Spacious and intelligent mid-size SUV. Features panoramic sunroof, ventilated leather seats, and premium comfort.',
         createdAt: DateTime.now().toIso8601String(),
         branchName: 'Kuala Lumpur',
         engine: '1.5L TGDi',
@@ -852,7 +1162,13 @@ class VehicleService {
         gallery: [
           'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&fit=crop&q=80&w=600',
         ],
-        equipment: ['ABS', 'Airbags', 'Ventilated Seats', 'GPS Tracker', 'Nappa Leather'],
+        equipment: [
+          'ABS',
+          'Airbags',
+          'Ventilated Seats',
+          'GPS Tracker',
+          'Nappa Leather',
+        ],
         maintenance: const [],
       ),
       VehicleModel(
@@ -869,8 +1185,10 @@ class VehicleService {
         pricePerDay: 200.0,
         mileage: 19000,
         isAvailable: true,
-        mainImage: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=600',
-        description: 'Modern compact crossover SUV with exceptionally versatile seating space configurations and sleek design.',
+        mainImage:
+            'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=600',
+        description:
+            'Modern compact crossover SUV with exceptionally versatile seating space configurations and sleek design.',
         createdAt: DateTime.now().toIso8601String(),
         branchName: 'Putrajaya',
         engine: '1.5L VTEC',
@@ -880,7 +1198,13 @@ class VehicleService {
         gallery: [
           'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=600',
         ],
-        equipment: ['ABS', 'Airbags', 'ULTRA Seats', 'Honda SENSING', 'Keyless Go'],
+        equipment: [
+          'ABS',
+          'Airbags',
+          'ULTRA Seats',
+          'Honda SENSING',
+          'Keyless Go',
+        ],
         maintenance: const [],
       ),
       VehicleModel(
@@ -897,8 +1221,10 @@ class VehicleService {
         pricePerDay: 220.0,
         mileage: 15000,
         isAvailable: true,
-        mainImage: 'https://images.unsplash.com/photo-1625217527288-93919c996509?auto=format&fit=crop&q=80&w=600',
-        description: 'Hybrid technology SUV offering high fuel efficiency, Toyota Safety Sense, smooth electric motor cruising, and space.',
+        mainImage:
+            'https://images.unsplash.com/photo-1625217527288-93919c996509?auto=format&fit=crop&q=80&w=600',
+        description:
+            'Hybrid technology SUV offering high fuel efficiency, Toyota Safety Sense, smooth electric motor cruising, and space.',
         createdAt: DateTime.now().toIso8601String(),
         branchName: 'Penang',
         engine: '1.8L Hybrid',
@@ -908,7 +1234,13 @@ class VehicleService {
         gallery: [
           'https://images.unsplash.com/photo-1625217527288-93919c996509?auto=format&fit=crop&q=80&w=600',
         ],
-        equipment: ['ABS', 'Airbags', 'Hybrid Engine', 'Toyota Safety Sense', 'TSS 2.0'],
+        equipment: [
+          'ABS',
+          'Airbags',
+          'Hybrid Engine',
+          'Toyota Safety Sense',
+          'TSS 2.0',
+        ],
         maintenance: const [],
       ),
       VehicleModel(
@@ -925,8 +1257,10 @@ class VehicleService {
         pricePerDay: 170.0,
         mileage: 27000,
         isAvailable: true,
-        mainImage: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=600',
-        description: 'Spacious 7-seater family MPV with versatile seat configurations, rear AC vents, and advanced safety features.',
+        mainImage:
+            'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=600',
+        description:
+            'Spacious 7-seater family MPV with versatile seat configurations, rear AC vents, and advanced safety features.',
         createdAt: DateTime.now().toIso8601String(),
         branchName: 'Kajang',
         engine: '1.5L Dual VVT-i',
@@ -953,8 +1287,10 @@ class VehicleService {
         pricePerDay: 260.0,
         mileage: 42000,
         isAvailable: true,
-        mainImage: 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&q=80&w=600',
-        description: 'The premier full-sized MPV. Offers spacious 8-seat cabin, exceptional cargo capacity, dual blowers, and high road view.',
+        mainImage:
+            'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&q=80&w=600',
+        description:
+            'The premier full-sized MPV. Offers spacious 8-seat cabin, exceptional cargo capacity, dual blowers, and high road view.',
         createdAt: DateTime.now().toIso8601String(),
         branchName: 'Johor Bahru',
         engine: '2.0L Dual VVT-i',
@@ -964,7 +1300,13 @@ class VehicleService {
         gallery: [
           'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&q=80&w=600',
         ],
-        equipment: ['ABS', 'Airbags', '8 Seats', 'Dual Blower AC', 'Touch Screen Nav'],
+        equipment: [
+          'ABS',
+          'Airbags',
+          '8 Seats',
+          'Dual Blower AC',
+          'Touch Screen Nav',
+        ],
         maintenance: const [],
       ),
     ];
