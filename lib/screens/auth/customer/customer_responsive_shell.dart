@@ -677,8 +677,26 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
         floatingActionButton: AIFloatingButton(
           onTap: () async {
             final result = await showAIChatModal(context);
-            if (result == 'open_pending_bookings') {
-              if (mounted) setIndex(2);
+            if (result != null && result is String) {
+              if (mounted) {
+                if (result == 'search_vehicles') {
+                  setIndex(1);
+                } else if (result == 'view_bookings' || result == 'open_pending_bookings') {
+                  setIndex(2);
+                } else if (result == 'show_branches') {
+                  setIndex(3);
+                } else if (result == 'show_rewards') {
+                  setIndex(4);
+                } else if (result == 'view_history') {
+                  setIndex(5);
+                } else if (result == 'open_profile') {
+                  setIndex(6);
+                } else if (result == 'contact_support') {
+                  setIndex(7);
+                } else if (result == 'view_dashboard') {
+                  setIndex(0);
+                }
+              }
               return;
             }
             if (result != null &&

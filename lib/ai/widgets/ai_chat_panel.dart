@@ -153,24 +153,9 @@ class _AIChatPanelState extends State<AIChatPanel>
     // Auto-download receipt triggers
     final action = response.action;
     final bookingId = response.parameters['bookingId']?.toString();
-    if (bookingId != null && bookingId.isNotEmpty && mounted) {
-      if (action == 'view_receipts' || action == 'view_receipt') {
-        await _receiptService.viewReceipt(context, bookingId);
-      } else if (action == 'download_receipt') {
-        await _receiptService.downloadReceipt(context, bookingId);
-      } else if (action == 'select_payment_method') {
-        if (mounted) {
-          Navigator.of(context).pop({
-            'action': 'pay',
-            'bookingId': bookingId,
-            'method':
-                response.parameters['method']?.toString() ??
-                'FPX Online Banking',
-          });
-          return;
-        }
-      }
 
+    if (mounted) {
+      // 1. General navigation actions (no bookingId required)
       if (action == 'search_vehicles' ||
           action == 'view_bookings' ||
           action == 'view_history' ||
@@ -178,49 +163,103 @@ class _AIChatPanelState extends State<AIChatPanel>
           action == 'contact_support' ||
           action == 'show_branches' ||
           action == 'show_rewards' ||
+          action == 'view_dashboard' ||
           action == 'open_pending_bookings') {
-        if (mounted) {
-          Navigator.of(context).pop(action);
-          return;
-        }
-      } else if (action == 'open_payment_page') {
-        try {
-          final bookingSnap = await FirebaseDatabase.instance
-              .ref()
-              .child('bookings')
-              .child(bookingId)
-              .get();
-          if (bookingSnap.exists) {
-            final bData = Map<dynamic, dynamic>.from(bookingSnap.value as Map);
-            final booking = BookingModel.fromMap(bookingId, bData);
+        Navigator.of(context).pop(action);
+        return;
+      }
 
-            final vId = bData['vehicleId'] as String;
+      // 2. Direct Navigation to Booking screen with prefilled vehicle & dates
+      if (action == 'open_booking_page') {
+        final vehicleId = response.parameters['vehicleId']?.toString();
+        if (vehicleId != null && vehicleId.isNotEmpty) {
+          try {
             final vehicleSnap = await FirebaseDatabase.instance
                 .ref()
                 .child('vehicles')
-                .child(vId)
+                .child(vehicleId)
                 .get();
             if (vehicleSnap.exists) {
-              final vData = Map<dynamic, dynamic>.from(
-                vehicleSnap.value as Map,
-              );
-              final vehicle = VehicleModel.fromMap(vId, vData);
+              final vData = Map<dynamic, dynamic>.from(vehicleSnap.value as Map);
+              final vehicle = VehicleModel.fromMap(vehicleId, vData);
+              
+              final pickupDateStr = response.parameters['pickupDate']?.toString();
+              final returnDateStr = response.parameters['returnDate']?.toString();
+              
+              final pickupDate = pickupDateStr != null ? DateTime.tryParse(pickupDateStr) : null;
+              final returnDate = returnDateStr != null ? DateTime.tryParse(returnDateStr) : null;
 
               if (mounted) {
+                Navigator.of(context).pop(); // Close AI Chat panel
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => BookingScreen(
                       vehicle: vehicle,
-                      existingBooking: booking,
+                      prefilledPickupDate: pickupDate,
+                      prefilledReturnDate: returnDate,
                     ),
                   ),
                 );
               }
             }
+          } catch (e) {
+            debugPrint('Error navigating to booking screen from AI: $e');
           }
-        } catch (e) {
-          debugPrint('Error navigating to payment screen from AI: $e');
+        }
+        return;
+      }
+
+      // 3. Actions requiring bookingId
+      if (bookingId != null && bookingId.isNotEmpty) {
+        if (action == 'view_receipts' || action == 'view_receipt') {
+          await _receiptService.viewReceipt(context, bookingId);
+        } else if (action == 'download_receipt') {
+          await _receiptService.downloadReceipt(context, bookingId);
+        } else if (action == 'select_payment_method') {
+          Navigator.of(context).pop({
+            'action': 'pay',
+            'bookingId': bookingId,
+            'method': response.parameters['method']?.toString() ?? 'FPX Online Banking',
+          });
+          return;
+        } else if (action == 'open_payment_page') {
+          try {
+            final bookingSnap = await FirebaseDatabase.instance
+                .ref()
+                .child('bookings')
+                .child(bookingId)
+                .get();
+            if (bookingSnap.exists) {
+              final bData = Map<dynamic, dynamic>.from(bookingSnap.value as Map);
+              final booking = BookingModel.fromMap(bookingId, bData);
+
+              final vId = bData['vehicleId'] as String;
+              final vehicleSnap = await FirebaseDatabase.instance
+                  .ref()
+                  .child('vehicles')
+                  .child(vId)
+                  .get();
+              if (vehicleSnap.exists) {
+                final vData = Map<dynamic, dynamic>.from(vehicleSnap.value as Map);
+                final vehicle = VehicleModel.fromMap(vId, vData);
+
+                if (mounted) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => BookingScreen(
+                        vehicle: vehicle,
+                        existingBooking: booking,
+                      ),
+                    ),
+                  );
+                }
+              }
+            }
+          } catch (e) {
+            debugPrint('Error navigating to payment screen from AI: $e');
+          }
         }
       }
     }

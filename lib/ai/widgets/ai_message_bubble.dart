@@ -166,7 +166,27 @@ class AIMessageBubble extends StatelessWidget {
                       ),
                     ),
                     onPressed: () {
-                      context.read<AIService>().sendMessage(optionName.toString());
+                      final text = optionName.toString();
+                      final textLower = text.toLowerCase();
+                      if (text == 'View Bookings' || text == 'My Bookings' || textLower.contains('my bookings')) {
+                        Navigator.of(context).pop('view_bookings');
+                      } else if (text == 'Open Payment' || text == 'Pay outstanding balance' || text == 'Pay my invoice' || textLower.contains('outstanding balance') || textLower.contains('outstanding booking') || textLower.contains('payment method')) {
+                        Navigator.of(context).pop('open_pending_bookings');
+                      } else if (text == 'Search Vehicles' || text == 'Browse Fleet' || text == 'Available Vehicles' || text == 'Available Cars' || textLower.contains('book a car') || textLower.contains('available cars') || textLower.contains('available vehicles')) {
+                        Navigator.of(context).pop('search_vehicles');
+                      } else if (text == 'View History' || text == 'Past Rentals') {
+                        Navigator.of(context).pop('view_history');
+                      } else if (text == 'Contact Support' || text == 'Create Support Ticket' || text == 'Track Support Tickets') {
+                        Navigator.of(context).pop('contact_support');
+                      } else if (text == 'Show Branches on Map') {
+                        Navigator.of(context).pop('show_branches');
+                      } else if (text == 'Open Profile Page') {
+                        Navigator.of(context).pop('open_profile');
+                      } else if (text == 'Back to Dashboard') {
+                        Navigator.of(context).pop('view_dashboard');
+                      } else {
+                        context.read<AIService>().sendMessage(text);
+                      }
                     },
                   );
                 }).toList(),

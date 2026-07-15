@@ -297,9 +297,16 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
   }
 
   Widget _buildPageHeader(BuildContext context) {
+    final canPop = Navigator.canPop(context);
     return Row(
       children: [
-        const SizedBox(width: 8),
+        if (canPop) ...[
+          IconButton(
+            icon: Icon(Icons.arrow_back_rounded, color: _textColor),
+            onPressed: () => Navigator.pop(context),
+          ),
+          const SizedBox(width: 8),
+        ],
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

@@ -14,6 +14,7 @@ import '../../../services/database_service.dart';
 import '../../../services/reward_service.dart';
 import '../../../services/notification_service.dart';
 import 'booking_confirmation_screen.dart';
+import '../login_screen.dart';
 import '../../../widgets/loading_widget.dart';
 import '../../../widgets/app_image.dart';
 import '../../../widgets/reward_points_slider.dart';
@@ -171,6 +172,19 @@ class _BookingScreenState extends State<BookingScreen> {
     _loadUserProfile();
     _loadQrSettings();
     receipt_upload.registerPlatformDropzone();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_authService.currentUser == null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please login to continue booking.')),
+        );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => LoginScreen(onLoggedIn: () {}),
+          ),
+        );
+      }
+    });
   }
 
   Future<void> _loadQrSettings() async {

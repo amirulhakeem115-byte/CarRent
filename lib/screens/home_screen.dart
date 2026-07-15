@@ -436,7 +436,7 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: AppColors.backgroundWhite,
       endDrawer: isDesktop ? null : _buildMobileEndDrawer(),
       appBar: PreferredSize(
-        preferredSize: Size.fromHeight(isDesktop ? 80 : 124),
+        preferredSize: const Size.fromHeight(80),
         child: ClipRRect(
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
@@ -535,17 +535,46 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                           ] else
-                            Builder(
-                              builder: (context) => IconButton(
-                                onPressed: () =>
-                                    Scaffold.of(context).openEndDrawer(),
-                                icon: const Icon(
-                                  Icons.menu_rounded,
-                                  color: AppColors.secondaryBlue,
-                                  size: 28,
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                ElevatedButton(
+                                  onPressed: _navigateToDashboardOrLogin,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.secondaryBlue,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 10,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    elevation: 0,
+                                  ),
+                                  child: Text(
+                                    _user != null ? 'DASHBOARD' : 'LOGIN',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
                                 ),
-                                tooltip: 'Menu',
-                              ),
+                                const SizedBox(width: 8),
+                                Builder(
+                                  builder: (context) => IconButton(
+                                    onPressed: () =>
+                                        Scaffold.of(context).openEndDrawer(),
+                                    icon: const Icon(
+                                      Icons.menu_rounded,
+                                      color: AppColors.secondaryBlue,
+                                      size: 28,
+                                    ),
+                                    tooltip: 'Menu',
+                                  ),
+                                ),
+                              ],
                             ),
                         ],
                       ),

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import '../models/ai_intent.dart';
 
 class IntentEngine {
@@ -27,6 +28,8 @@ class IntentEngine {
 
     intents.sort((a, b) => b.confidence.compareTo(a.confidence));
     final bestMatch = intents.first;
+
+    debugPrint('[AI IntentEngine] Text: "$text" -> Cleaned: "$cleaned" -> Best Match: $bestMatch with confidence ${bestMatch.confidence}');
 
     if (bestMatch.confidence >= 0.5) {
       return bestMatch;
@@ -119,7 +122,7 @@ class IntentEngine {
     double confidence = 0.0;
     final Map<String, dynamic> params = {};
 
-    final bookingKeywords = ['booking', 'bookings', 'rentals', 'rental', 'reservation', 'reservations', 'book', 'rent', 'need a vehicle', 'rent a car', 'need a car', 'renew', 'extend', 'return', 'status'];
+    final bookingKeywords = ['booking', 'bookings', 'rentals', 'rental', 'reservation', 'reservations', 'book', 'rent', 'need a vehicle', 'rent a car', 'need a car', 'renew', 'extend', 'return', 'status', 'way', 'complete', 'finish', 'ongoing'];
     bool hasBookingKeyword = false;
     for (final kw in bookingKeywords) {
       if (text.contains(kw)) {
@@ -138,7 +141,7 @@ class IntentEngine {
       } else if (text.contains('renew') || text.contains('extend') || text.contains('extension')) {
         confidence = 0.95;
         params['action'] = 'renew_booking';
-      } else if (text.contains('return') || text.contains('give back')) {
+      } else if (text.contains('return') || text.contains('give back') || text.contains('way') || text.contains('complete') || text.contains('finish')) {
         confidence = 0.95;
         params['action'] = 'return_vehicle';
       } else if (text.contains('status') || text.contains('check')) {
@@ -168,7 +171,7 @@ class IntentEngine {
       } else if (text.contains('renew') || text.contains('extend')) {
         confidence = 0.85;
         params['action'] = 'renew_booking';
-      } else if (text.contains('return') && (text.contains('car') || text.contains('vehicle') || text.contains('my') || text.contains('vios') || text.contains('civic') || text.contains('saga') || text.contains('alza') || text.contains('myvi') || text.contains('city'))) {
+      } else if ((text.contains('return') || text.contains('way') || text.contains('complete') || text.contains('finish')) && (text.contains('car') || text.contains('vehicle') || text.contains('my') || text.contains('rental') || text.contains('vios') || text.contains('civic') || text.contains('saga') || text.contains('alza') || text.contains('myvi') || text.contains('city'))) {
         confidence = 0.85;
         params['action'] = 'return_vehicle';
       } else if (text.contains('status') && (text.contains('booking') || text.contains('reservation') || text.contains('my'))) {
@@ -257,7 +260,7 @@ class IntentEngine {
     double confidence = 0.0;
     final Map<String, dynamic> params = {};
 
-    final supportKeywords = ['support', 'help', 'contact', 'ticket', 'inbox', 'messages', 'talk to support', 'customer care', 'complaint', 'complaints'];
+    final supportKeywords = ['support', 'help', 'contact', 'ticket', 'inbox', 'messages', 'talk to support', 'customer care', 'complaint', 'complaints', 'faq', 'faqs'];
     bool hasKeyword = false;
     for (final kw in supportKeywords) {
       if (text.contains(kw)) {
@@ -367,7 +370,7 @@ class IntentEngine {
     double confidence = 0.0;
     final Map<String, dynamic> params = {};
 
-    final paymentKeywords = ['payment', 'payments', 'revenue', 'sales', 'ledger', 'pay', 'transaction', 'transactions', 'earnings', 'statement', 'owe', 'due', 'outstanding', 'how much do i', 'invoice', 'invoices'];
+    final paymentKeywords = ['payment', 'payments', 'revenue', 'sales', 'ledger', 'pay', 'transaction', 'transactions', 'earnings', 'statement', 'owe', 'due', 'outstanding', 'how much do i', 'invoice', 'invoices', 'bill', 'bills'];
     bool hasKeyword = false;
     for (final kw in paymentKeywords) {
       if (text.contains(kw)) {
@@ -378,7 +381,7 @@ class IntentEngine {
 
     if (hasKeyword) {
       confidence = 0.70;
-      if (text.contains('owe') || text.contains('due') || text.contains('outstanding') || text.contains('how much')) {
+      if (text.contains('owe') || text.contains('due') || text.contains('outstanding') || text.contains('how much') || text.contains('invoice') || text.contains('invoices') || text.contains('bill') || text.contains('bills')) {
         confidence = 0.95;
         if (text.contains('pay') || text.contains('clear') || text.contains('settle')) {
           params['action'] = 'pay_outstanding_invoice';
