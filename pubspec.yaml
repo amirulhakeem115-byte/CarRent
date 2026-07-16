@@ -52,6 +52,9 @@ dependencies:
   web: ^1.0.0
   google_sign_in: ^6.2.2
   shared_preferences: ^2.5.5
+  sign_in_with_apple: ^5.0.0
+  flutter_facebook_auth: ^6.0.0
+  twitter_login: ^4.4.1
 
 dev_dependencies:
   flutter_test:

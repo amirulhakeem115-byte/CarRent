@@ -30,6 +30,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _agreeToTerms = false;
   String? _error;
 
+  void _showSocialComingSoon(String provider) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$provider sign-up is coming soon.'),
+        backgroundColor: AppColors.primaryOrange,
+      ),
+    );
+  }
+
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -496,6 +505,157 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         letterSpacing: 0.5,
                       ),
                     ),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Social sign-up options
+          SizedBox(
+            height: 52,
+            child: OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                backgroundColor: isDark
+                    ? const Color(0xFF1E293B)
+                    : Colors.white,
+                foregroundColor: isDark
+                    ? Colors.white
+                    : AppColors.secondaryBlue,
+                side: BorderSide(
+                  color: isDark
+                      ? const Color(0xFF334155)
+                      : AppColors.borderGray,
+                  width: 1.5,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              onPressed: _loading
+                  ? null
+                  : () => _showSocialComingSoon('Google'),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Image.network(
+                    'https://www.gstatic.com/mobilesdk/160503_mobilesdk/logo/2x/google_g_normal_id_48dp.png',
+                    height: 22,
+                    width: 22,
+                    errorBuilder: (context, error, stackTrace) => const Icon(
+                      Icons.g_mobiledata_rounded,
+                      color: AppColors.primaryOrange,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Sign up with Google',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                      color: isDark ? Colors.white : AppColors.secondaryBlue,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 52,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                backgroundColor: isDark
+                    ? const Color(0xFF1E293B)
+                    : Colors.white,
+                foregroundColor: isDark
+                    ? Colors.white
+                    : AppColors.secondaryBlue,
+                side: BorderSide(
+                  color: isDark
+                      ? const Color(0xFF334155)
+                      : AppColors.borderGray,
+                  width: 1.5,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              onPressed: _loading
+                  ? null
+                  : () => _showSocialComingSoon('Facebook'),
+              icon: const Icon(
+                Icons.facebook,
+                color: Color(0xFF1877F2),
+                size: 22,
+              ),
+              label: Text(
+                'Sign up with Facebook',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                  color: isDark ? Colors.white : AppColors.secondaryBlue,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 52,
+            child: OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                backgroundColor: isDark
+                    ? const Color(0xFF1E293B)
+                    : Colors.white,
+                foregroundColor: isDark
+                    ? Colors.white
+                    : AppColors.secondaryBlue,
+                side: BorderSide(
+                  color: isDark
+                      ? const Color(0xFF334155)
+                      : AppColors.borderGray,
+                  width: 1.5,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              onPressed: _loading
+                  ? null
+                  : () => _showSocialComingSoon('Twitter (X)'),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 22,
+                    height: 22,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isDark ? Colors.white : Colors.black,
+                    ),
+                    child: Text(
+                      'X',
+                      style: TextStyle(
+                        color: isDark ? Colors.black : Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Sign up with Twitter (X)',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                      color: isDark ? Colors.white : AppColors.secondaryBlue,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 24),

@@ -37,6 +37,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
   List<String> _recentEmails = [];
 
+  void _showSocialComingSoon(String provider) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$provider sign-in is coming soon.'),
+        backgroundColor: AppColors.primaryOrange,
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -624,6 +633,110 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ],
                     ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Facebook Sign In Button
+          SizedBox(
+            height: 54,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                backgroundColor: isDark
+                    ? const Color(0xFF1E293B)
+                    : Colors.white,
+                foregroundColor: isDark
+                    ? Colors.white
+                    : AppColors.secondaryBlue,
+                side: BorderSide(
+                  color: isDark
+                      ? const Color(0xFF334155)
+                      : AppColors.borderGray,
+                  width: 1.5,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: isDark ? 0 : 1,
+              ),
+              onPressed: (_loading || _googleLoading)
+                  ? null
+                  : () => _showSocialComingSoon('Facebook'),
+              icon: const Icon(
+                Icons.facebook,
+                color: Color(0xFF1877F2),
+                size: 22,
+              ),
+              label: Text(
+                'Continue with Facebook',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                  color: isDark ? Colors.white : AppColors.secondaryBlue,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // X (Twitter) Sign In Button
+          SizedBox(
+            height: 54,
+            child: OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                backgroundColor: isDark
+                    ? const Color(0xFF1E293B)
+                    : Colors.white,
+                foregroundColor: isDark
+                    ? Colors.white
+                    : AppColors.secondaryBlue,
+                side: BorderSide(
+                  color: isDark
+                      ? const Color(0xFF334155)
+                      : AppColors.borderGray,
+                  width: 1.5,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: isDark ? 0 : 1,
+              ),
+              onPressed: (_loading || _googleLoading)
+                  ? null
+                  : () => _showSocialComingSoon('Twitter (X)'),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 22,
+                    height: 22,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isDark ? Colors.white : Colors.black,
+                    ),
+                    child: Text(
+                      'X',
+                      style: TextStyle(
+                        color: isDark ? Colors.black : Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Continue with Twitter (X)',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                      color: isDark ? Colors.white : AppColors.secondaryBlue,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 32),

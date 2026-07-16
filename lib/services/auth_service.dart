@@ -201,7 +201,7 @@ class AuthService {
             title: 'New Customer Registered',
             message: '$name registered via Google.\nEmail: $email',
             type: 'customer',
-            icon: '👤',
+            icon: '�',
             color: '0xFF14B8A6',
             relatedId: uid,
             actionRoute: 'Customers',
