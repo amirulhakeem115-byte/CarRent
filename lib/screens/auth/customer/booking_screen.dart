@@ -444,6 +444,10 @@ class _BookingScreenState extends State<BookingScreen> {
       barrierDismissible: false,
       builder: (context) {
         return AlertDialog(
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 24,
+          ),
           backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
@@ -451,15 +455,22 @@ class _BookingScreenState extends State<BookingScreen> {
               color: isDark ? const Color(0xFF334155) : Colors.transparent,
             ),
           ),
+          actionsOverflowDirection: VerticalDirection.down,
+          actionsOverflowButtonSpacing: 8,
           title: Row(
             children: [
               const Icon(Icons.stars_rounded, color: Colors.green),
               const SizedBox(width: 8),
-              Text(
-                'Open Rental Booking',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: titleColor,
+              Expanded(
+                child: Text(
+                  'Open Rental Booking',
+                  maxLines: 2,
+                  softWrap: true,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: titleColor,
+                  ),
                 ),
               ),
             ],
