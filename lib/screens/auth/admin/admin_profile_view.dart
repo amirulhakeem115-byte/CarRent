@@ -254,6 +254,31 @@ class _AdminProfileViewState extends State<AdminProfileView> {
 
   Future<void> _removeProfileImage() async {
     if (_adminUser == null) return;
+
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Deletion'),
+        content: const Text('Do you wanna delete this?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     try {
       setState(() => _loading = true);

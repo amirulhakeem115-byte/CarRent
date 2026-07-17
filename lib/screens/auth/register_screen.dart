@@ -5,6 +5,7 @@ import '../../services/auth_service.dart';
 import '../../services/company_settings_provider.dart';
 import '../../widgets/custom_textfield.dart';
 import '../../widgets/app_logo.dart';
+import '../home_screen.dart';
 import 'login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -498,7 +499,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     )
                   : const Text(
-                      'Create Account',
+                      'Register',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -509,9 +510,42 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
           const SizedBox(height: 24),
 
+          // Divider line like login layout
+          Row(
+            children: [
+              Expanded(
+                child: Divider(
+                  color: isDark
+                      ? const Color(0xFF334155)
+                      : AppColors.borderGray,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  'OR CONTINUE WITH',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? const Color(0xFF64748B) : Colors.grey[500],
+                    letterSpacing: 1.0,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Divider(
+                  color: isDark
+                      ? const Color(0xFF334155)
+                      : AppColors.borderGray,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+
           // Social sign-up options
           SizedBox(
-            height: 52,
+            height: 54,
             child: OutlinedButton(
               style: OutlinedButton.styleFrom(
                 backgroundColor: isDark
@@ -529,6 +563,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
+                elevation: isDark ? 0 : 1,
               ),
               onPressed: _loading
                   ? null
@@ -548,105 +583,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    'Sign up with Google',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                      color: isDark ? Colors.white : AppColors.secondaryBlue,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 52,
-            child: OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                backgroundColor: isDark
-                    ? const Color(0xFF1E293B)
-                    : Colors.white,
-                foregroundColor: isDark
-                    ? Colors.white
-                    : AppColors.secondaryBlue,
-                side: BorderSide(
-                  color: isDark
-                      ? const Color(0xFF334155)
-                      : AppColors.borderGray,
-                  width: 1.5,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              onPressed: _loading
-                  ? null
-                  : () => _showSocialComingSoon('Facebook'),
-              icon: const Icon(
-                Icons.facebook,
-                color: Color(0xFF1877F2),
-                size: 22,
-              ),
-              label: Text(
-                'Sign up with Facebook',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
-                  color: isDark ? Colors.white : AppColors.secondaryBlue,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 52,
-            child: OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                backgroundColor: isDark
-                    ? const Color(0xFF1E293B)
-                    : Colors.white,
-                foregroundColor: isDark
-                    ? Colors.white
-                    : AppColors.secondaryBlue,
-                side: BorderSide(
-                  color: isDark
-                      ? const Color(0xFF334155)
-                      : AppColors.borderGray,
-                  width: 1.5,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              onPressed: _loading
-                  ? null
-                  : () => _showSocialComingSoon('Twitter (X)'),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 22,
-                    height: 22,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isDark ? Colors.white : Colors.black,
-                    ),
-                    child: Text(
-                      'X',
-                      style: TextStyle(
-                        color: isDark ? Colors.black : Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Sign up with Twitter (X)',
+                    'Sign up using Google',
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
@@ -718,7 +655,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
             Icons.arrow_back_ios_new_rounded,
             color: isDark ? Colors.white : AppColors.secondaryBlue,
           ),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => const HomeScreen()),
+              (route) => false,
+            );
+          },
         ),
       ),
       body: Container(

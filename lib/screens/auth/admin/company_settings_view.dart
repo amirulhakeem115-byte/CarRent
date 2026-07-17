@@ -90,8 +90,10 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
   }
 
   void _populateFields() {
-    final provider =
-        Provider.of<CompanySettingsProvider>(context, listen: false);
+    final provider = Provider.of<CompanySettingsProvider>(
+      context,
+      listen: false,
+    );
     _companyNameController.text = provider.companyName;
     _companyRegNoController.text = provider.companyRegistrationNumber;
     _companyPhoneController.text = provider.companyPhone;
@@ -117,7 +119,7 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
     _silverThresholdController.text = provider.silverThreshold.toString();
     _goldThresholdController.text = provider.goldThreshold.toString();
     _premiumThresholdController.text = provider.premiumThreshold.toString();
- 
+
     _logoUrl = provider.companyLogo;
   }
 
@@ -143,9 +145,9 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content:
-                  Text('Logo loaded. Press Save Settings to publish!'),
-              backgroundColor: Colors.orange),
+            content: Text('Logo loaded. Press Save Settings to publish!'),
+            backgroundColor: Colors.orange,
+          ),
         );
       }
     } catch (e) {
@@ -153,8 +155,9 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Picking image failed: $e'),
-              backgroundColor: Colors.redAccent),
+            content: Text('Picking image failed: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
         );
       }
     } finally {
@@ -170,7 +173,13 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
     if (picked != null) {
       if (!mounted) return;
       final now = DateTime.now();
-      final dt = DateTime(now.year, now.month, now.day, picked.hour, picked.minute);
+      final dt = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        picked.hour,
+        picked.minute,
+      );
       final formatted = DateFormat('hh:mm a').format(dt);
       setState(() {
         controller.text = formatted;
@@ -207,29 +216,36 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
           'hotline': _supportHotlineController.text.trim(),
           'email': _supportEmailController.text.trim(),
         },
-        'silverThreshold': int.tryParse(_silverThresholdController.text.trim()) ?? 500,
-        'goldThreshold': int.tryParse(_goldThresholdController.text.trim()) ?? 1000,
-        'premiumThreshold': int.tryParse(_premiumThresholdController.text.trim()) ?? 2000,
+        'silverThreshold':
+            int.tryParse(_silverThresholdController.text.trim()) ?? 500,
+        'goldThreshold':
+            int.tryParse(_goldThresholdController.text.trim()) ?? 1000,
+        'premiumThreshold':
+            int.tryParse(_premiumThresholdController.text.trim()) ?? 2000,
       };
 
-      final provider =
-          Provider.of<CompanySettingsProvider>(context, listen: false);
+      final provider = Provider.of<CompanySettingsProvider>(
+        context,
+        listen: false,
+      );
       debugPrint('Writing settings to Firebase path: /company_settings');
       await provider.updateSettings(data);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Company settings saved successfully!'),
-            backgroundColor: Colors.green),
+          content: Text('Company settings saved successfully!'),
+          backgroundColor: Colors.green,
+        ),
       );
     } catch (e) {
       debugPrint('[COMPANY_SETTINGS] Error saving settings: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Save failed: $e'),
-              backgroundColor: Colors.redAccent),
+            content: Text('Save failed: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
         );
       }
     } finally {
@@ -245,8 +261,12 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
     final double width = MediaQuery.of(context).size.width;
     final bool isDesktop = width > 900;
     final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final surfaceColor = isDark ? const Color(0xFF111827) : const Color(0xFFF8FAFC);
-    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final surfaceColor = isDark
+        ? const Color(0xFF111827)
+        : const Color(0xFFF8FAFC);
+    final textPrimary = isDark
+        ? const Color(0xFFF8FAFC)
+        : AppColors.secondaryBlue;
     final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
     final borderColor = isDark ? const Color(0xFF334155) : Colors.grey.shade200;
 
@@ -268,13 +288,17 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
                           Text(
                             'Company Settings Configuration',
                             style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w900,
-                                color: textPrimary),
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              color: textPrimary,
+                            ),
                           ),
                           Text(
                             'Configure company name, registration, contact channels, and branding.',
-                            style: TextStyle(fontSize: 12, color: textSecondary),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: textSecondary,
+                            ),
                           ),
                         ],
                       ),
@@ -287,16 +311,20 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
                       Text(
                         'Company Settings',
                         style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: textPrimary),
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                          color: textPrimary,
+                        ),
                       ),
                       Text(
                         'Configure company profile, contacts, and branding.',
                         style: TextStyle(fontSize: 12, color: textSecondary),
                       ),
                       const SizedBox(height: 12),
-                      SizedBox(width: double.infinity, child: _buildSaveButton()),
+                      SizedBox(
+                        width: double.infinity,
+                        child: _buildSaveButton(),
+                      ),
                     ],
                   ),
             const SizedBox(height: 20),
@@ -315,13 +343,28 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
                 indicatorColor: AppColors.primaryOrange,
                 indicatorSize: TabBarIndicatorSize.label,
                 dividerColor: Colors.transparent,
-                labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                labelStyle: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
                 isScrollable: !isDesktop,
                 tabs: const [
-                  Tab(icon: Icon(Icons.business_outlined, size: 18), text: 'Branding & Profile'),
-                  Tab(icon: Icon(Icons.share_outlined, size: 18), text: 'Social Channels'),
-                  Tab(icon: Icon(Icons.support_agent_outlined, size: 18), text: 'Support & Hotline'),
-                  Tab(icon: Icon(Icons.stars_rounded, size: 18), text: 'Membership Thresholds'),
+                  Tab(
+                    icon: Icon(Icons.business_outlined, size: 18),
+                    text: 'Branding & Profile',
+                  ),
+                  Tab(
+                    icon: Icon(Icons.share_outlined, size: 18),
+                    text: 'Social Channels',
+                  ),
+                  Tab(
+                    icon: Icon(Icons.support_agent_outlined, size: 18),
+                    text: 'Support & Hotline',
+                  ),
+                  Tab(
+                    icon: Icon(Icons.stars_rounded, size: 18),
+                    text: 'Membership Thresholds',
+                  ),
                 ],
               ),
             ),
@@ -398,9 +441,16 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
           ? const SizedBox(
               width: 20,
               height: 20,
-              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+              child: CircularProgressIndicator(
+                color: Colors.white,
+                strokeWidth: 2,
+              ),
+            )
           : const Icon(Icons.save_outlined, size: 20),
-      label: const Text('Save Settings', style: TextStyle(fontWeight: FontWeight.bold)),
+      label: const Text(
+        'Save Settings',
+        style: TextStyle(fontWeight: FontWeight.bold),
+      ),
     );
   }
 
@@ -415,16 +465,28 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
     final Widget tabContent;
     switch (_activeTab) {
       case 1:
-        tabContent = _buildSocialsTab(textPrimary: textPrimary, textSecondary: textSecondary);
+        tabContent = _buildSocialsTab(
+          textPrimary: textPrimary,
+          textSecondary: textSecondary,
+        );
         break;
       case 2:
-        tabContent = _buildSupportTab(textPrimary: textPrimary, textSecondary: textSecondary);
+        tabContent = _buildSupportTab(
+          textPrimary: textPrimary,
+          textSecondary: textSecondary,
+        );
         break;
       case 3:
-        tabContent = _buildMembershipTab(textPrimary: textPrimary, textSecondary: textSecondary);
+        tabContent = _buildMembershipTab(
+          textPrimary: textPrimary,
+          textSecondary: textSecondary,
+        );
         break;
       default:
-        tabContent = _buildProfileTab(textPrimary: textPrimary, textSecondary: textSecondary);
+        tabContent = _buildProfileTab(
+          textPrimary: textPrimary,
+          textSecondary: textSecondary,
+        );
     }
 
     return Container(
@@ -438,12 +500,21 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
     );
   }
 
-  Widget _buildProfileTab({required Color textPrimary, required Color textSecondary}) {
+  Widget _buildProfileTab({
+    required Color textPrimary,
+    required Color textSecondary,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Branding Profile Settings',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary)),
+        Text(
+          'Branding Profile Settings',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: textPrimary,
+          ),
+        ),
         const SizedBox(height: 16),
         TextFormField(
           controller: _companyNameController,
@@ -452,8 +523,9 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
             hintText: 'e.g. CARRENT PLATFORM SDN BHD',
             prefixIcon: Icon(Icons.business_outlined),
           ),
-          validator: (val) =>
-              val == null || val.trim().isEmpty ? 'Company name is required' : null,
+          validator: (val) => val == null || val.trim().isEmpty
+              ? 'Company name is required'
+              : null,
         ),
         const SizedBox(height: 16),
         TextFormField(
@@ -463,8 +535,9 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
             hintText: 'e.g. 202601023456 (1234567-X)',
             prefixIcon: Icon(Icons.badge_outlined),
           ),
-          validator: (val) =>
-              val == null || val.trim().isEmpty ? 'Registration number is required' : null,
+          validator: (val) => val == null || val.trim().isEmpty
+              ? 'Registration number is required'
+              : null,
         ),
         const SizedBox(height: 16),
         TextFormField(
@@ -474,8 +547,9 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
             hintText: 'e.g. www.carrent.com.my',
             prefixIcon: Icon(Icons.language_outlined),
           ),
-          validator: (val) =>
-              val == null || val.trim().isEmpty ? 'Website URL is required' : null,
+          validator: (val) => val == null || val.trim().isEmpty
+              ? 'Website URL is required'
+              : null,
         ),
         const SizedBox(height: 16),
         TextFormField(
@@ -485,8 +559,9 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
             hintText: 'e.g. Mon - Fri: 9:00 AM - 6:00 PM MYT',
             prefixIcon: Icon(Icons.access_time_outlined),
           ),
-          validator: (val) =>
-              val == null || val.trim().isEmpty ? 'Business hours details required' : null,
+          validator: (val) => val == null || val.trim().isEmpty
+              ? 'Business hours details required'
+              : null,
         ),
         const SizedBox(height: 16),
         Row(
@@ -500,7 +575,8 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
                   labelText: 'Opening Time',
                   prefixIcon: Icon(Icons.alarm_on_outlined),
                 ),
-                validator: (val) => val == null || val.trim().isEmpty ? 'Required' : null,
+                validator: (val) =>
+                    val == null || val.trim().isEmpty ? 'Required' : null,
               ),
             ),
             const SizedBox(width: 16),
@@ -513,7 +589,8 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
                   labelText: 'Closing Time',
                   prefixIcon: Icon(Icons.alarm_off_outlined),
                 ),
-                validator: (val) => val == null || val.trim().isEmpty ? 'Required' : null,
+                validator: (val) =>
+                    val == null || val.trim().isEmpty ? 'Required' : null,
               ),
             ),
           ],
@@ -527,8 +604,9 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
             hintText: 'Full physical building address',
             prefixIcon: Icon(Icons.location_on_outlined),
           ),
-          validator: (val) =>
-              val == null || val.trim().isEmpty ? 'Physical address required' : null,
+          validator: (val) => val == null || val.trim().isEmpty
+              ? 'Physical address required'
+              : null,
         ),
         const SizedBox(height: 16),
         TextFormField(
@@ -544,15 +622,26 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
     );
   }
 
-  Widget _buildSocialsTab({required Color textPrimary, required Color textSecondary}) {
+  Widget _buildSocialsTab({
+    required Color textPrimary,
+    required Color textSecondary,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Social Media Connections',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary)),
+        Text(
+          'Social Media Connections',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: textPrimary,
+          ),
+        ),
         const SizedBox(height: 6),
-        Text('Add URLs to configure the clickable handles in app footers.',
-            style: TextStyle(fontSize: 11, color: textSecondary)),
+        Text(
+          'Add URLs to configure the clickable handles in app footers.',
+          style: TextStyle(fontSize: 11, color: textSecondary),
+        ),
         const SizedBox(height: 20),
         TextFormField(
           controller: _socialWhatsappController,
@@ -602,12 +691,21 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
     );
   }
 
-  Widget _buildSupportTab({required Color textPrimary, required Color textSecondary}) {
+  Widget _buildSupportTab({
+    required Color textPrimary,
+    required Color textSecondary,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Customer Support Configuration',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary)),
+        Text(
+          'Customer Support Configuration',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: textPrimary,
+          ),
+        ),
         const SizedBox(height: 20),
         TextFormField(
           controller: _companyPhoneController,
@@ -616,8 +714,9 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
             hintText: 'e.g., +60 3-2274 1234',
             prefixIcon: Icon(Icons.phone_outlined),
           ),
-          validator: (val) =>
-              val == null || val.trim().isEmpty ? 'Phone hotline required' : null,
+          validator: (val) => val == null || val.trim().isEmpty
+              ? 'Phone hotline required'
+              : null,
         ),
         const SizedBox(height: 16),
         TextFormField(
@@ -628,16 +727,24 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
             prefixIcon: Icon(Icons.email_outlined),
           ),
           validator: (val) {
-            if (val == null || val.trim().isEmpty) return 'Support email required';
-            if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val)) return 'Enter a valid email';
+            if (val == null || val.trim().isEmpty)
+              return 'Support email required';
+            if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val))
+              return 'Enter a valid email';
             return null;
           },
         ),
         const SizedBox(height: 16),
         const Divider(),
         const SizedBox(height: 16),
-        Text('Additional Support Desk Channels',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textPrimary)),
+        Text(
+          'Additional Support Desk Channels',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            color: textPrimary,
+          ),
+        ),
         const SizedBox(height: 16),
         TextFormField(
           controller: _supportWhatsappController,
@@ -669,15 +776,26 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
     );
   }
 
-  Widget _buildMembershipTab({required Color textPrimary, required Color textSecondary}) {
+  Widget _buildMembershipTab({
+    required Color textPrimary,
+    required Color textSecondary,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Membership Level Thresholds Settings',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary)),
+        Text(
+          'Membership Level Thresholds Settings',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: textPrimary,
+          ),
+        ),
         const SizedBox(height: 8),
-        Text('Configure reward point thresholds for automatic membership tier assignments.',
-            style: TextStyle(fontSize: 12, color: textSecondary)),
+        Text(
+          'Configure reward point thresholds for automatic membership tier assignments.',
+          style: TextStyle(fontSize: 12, color: textSecondary),
+        ),
         const SizedBox(height: 24),
         TextFormField(
           controller: _silverThresholdController,
@@ -688,9 +806,11 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
             prefixIcon: Icon(Icons.verified_user_rounded),
           ),
           validator: (val) {
-            if (val == null || val.trim().isEmpty) return 'Silver threshold is required';
+            if (val == null || val.trim().isEmpty)
+              return 'Silver threshold is required';
             final parsed = int.tryParse(val);
-            if (parsed == null || parsed < 0) return 'Must be a positive integer';
+            if (parsed == null || parsed < 0)
+              return 'Must be a positive integer';
             return null;
           },
         ),
@@ -704,11 +824,14 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
             prefixIcon: Icon(Icons.stars_rounded),
           ),
           validator: (val) {
-            if (val == null || val.trim().isEmpty) return 'Gold threshold is required';
+            if (val == null || val.trim().isEmpty)
+              return 'Gold threshold is required';
             final parsed = int.tryParse(val);
-            if (parsed == null || parsed < 0) return 'Must be a positive integer';
+            if (parsed == null || parsed < 0)
+              return 'Must be a positive integer';
             final silverVal = int.tryParse(_silverThresholdController.text);
-            if (silverVal != null && parsed <= silverVal) return 'Gold threshold must be higher than Silver';
+            if (silverVal != null && parsed <= silverVal)
+              return 'Gold threshold must be higher than Silver';
             return null;
           },
         ),
@@ -722,18 +845,21 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
             prefixIcon: Icon(Icons.military_tech_rounded),
           ),
           validator: (val) {
-            if (val == null || val.trim().isEmpty) return 'Premium threshold is required';
+            if (val == null || val.trim().isEmpty)
+              return 'Premium threshold is required';
             final parsed = int.tryParse(val);
-            if (parsed == null || parsed < 0) return 'Must be a positive integer';
+            if (parsed == null || parsed < 0)
+              return 'Must be a positive integer';
             final goldVal = int.tryParse(_goldThresholdController.text);
-            if (goldVal != null && parsed <= goldVal) return 'Premium threshold must be higher than Gold';
+            if (goldVal != null && parsed <= goldVal)
+              return 'Premium threshold must be higher than Gold';
             return null;
           },
         ),
       ],
     );
   }
- 
+
   Widget _buildPreviewCard({
     required bool isDark,
     required Color cardColor,
@@ -755,7 +881,10 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
           Text(
             'Corporate Logo & Preview',
             style: TextStyle(
-                fontWeight: FontWeight.bold, fontSize: 14, color: textPrimary),
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: textPrimary,
+            ),
           ),
           const SizedBox(height: 16),
           Container(
@@ -770,18 +899,27 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
                     imageSrc: _logoUrl!,
                     fit: BoxFit.contain,
                     placeholder: Center(
-                        child: Icon(Icons.broken_image,
-                            size: 50, color: textSecondary)),
+                      child: Icon(
+                        Icons.broken_image,
+                        size: 50,
+                        color: textSecondary,
+                      ),
+                    ),
                   )
                 : Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.directions_car_filled_rounded,
-                            size: 48, color: textSecondary),
+                        Icon(
+                          Icons.directions_car_filled_rounded,
+                          size: 48,
+                          color: textSecondary,
+                        ),
                         const SizedBox(height: 8),
-                        Text('No Custom Corporate Logo',
-                            style: TextStyle(color: textSecondary, fontSize: 12)),
+                        Text(
+                          'No Custom Corporate Logo',
+                          style: TextStyle(color: textSecondary, fontSize: 12),
+                        ),
                       ],
                     ),
                   ),
@@ -791,30 +929,37 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
             style: OutlinedButton.styleFrom(
               side: const BorderSide(color: AppColors.primaryOrange),
               foregroundColor: AppColors.primaryOrange,
-              shape:
-                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
               padding: const EdgeInsets.symmetric(vertical: 12),
             ),
             onPressed: _pickLogo,
             icon: const Icon(Icons.upload_file, size: 18),
-            label: Text(_logoUrl != null && _logoUrl!.isNotEmpty
-                ? 'Replace Corporate Logo'
-                : 'Upload Corporate Logo'),
+            label: Text(
+              _logoUrl != null && _logoUrl!.isNotEmpty
+                  ? 'Replace Corporate Logo'
+                  : 'Upload Corporate Logo',
+            ),
           ),
           const SizedBox(height: 24),
           Divider(color: borderColor),
           const SizedBox(height: 16),
           Row(
             children: [
-              const Icon(Icons.info_outline,
-                  color: AppColors.primaryOrange, size: 16),
+              const Icon(
+                Icons.info_outline,
+                color: AppColors.primaryOrange,
+                size: 16,
+              ),
               const SizedBox(width: 8),
               const Text(
                 'Global Updates Enabled',
                 style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                    color: AppColors.primaryOrange),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  color: AppColors.primaryOrange,
+                ),
               ),
             ],
           ),

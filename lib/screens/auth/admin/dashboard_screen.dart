@@ -675,7 +675,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
+      drawer: !isDesktop
+          ? Drawer(
+              child: SafeArea(
+                top: true,
+                bottom: true,
+                child: _buildSidebar(context),
+              ),
+            )
+          : null,
       body: SafeArea(
         top: true,
         bottom: false,
@@ -926,6 +934,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildSidebar(BuildContext context) {
+    final bool isDesktop = MediaQuery.of(context).size.width > 1100;
+    final double bottomInset = MediaQuery.of(context).padding.bottom;
+
     return Container(
       width: 250,
       color: Theme.of(context).brightness == Brightness.dark
@@ -940,13 +951,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               children: [
                 const AppLogo(size: 28, fallbackColor: AppColors.primaryOrange),
                 const SizedBox(width: 8),
-                Text(
-                  context.watch<CompanySettingsProvider>().companyName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.5,
+                Expanded(
+                  child: Text(
+                    context.watch<CompanySettingsProvider>().companyName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.5,
+                    ),
                   ),
                 ),
               ],
@@ -955,7 +970,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           const Divider(color: Colors.white12, height: 1),
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.symmetric(vertical: 12),
+              padding: EdgeInsets.fromLTRB(
+                0,
+                12,
+                0,
+                isDesktop ? 12 : 56 + bottomInset,
+              ),
               children: [
                 _buildSidebarTile(
                   Icons.dashboard_outlined,
@@ -1030,7 +1050,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: isDesktop ? 16 : 8),
         ],
       ),
     );
@@ -1060,12 +1080,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               size: 20,
             ),
             const SizedBox(width: 16),
-            Text(
-              title,
-              style: TextStyle(
-                color: isActive ? Colors.white : Colors.white70,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                fontSize: 13,
+            Expanded(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: isActive ? Colors.white : Colors.white70,
+                  fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                  fontSize: 13,
+                ),
               ),
             ),
           ],
@@ -1100,10 +1124,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       'dd MMM yyyy',
     ).format(DateTime.now());
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final bool isCompactMobile =
+        !isDesktop && MediaQuery.of(context).size.width < 430;
 
     return Container(
       color: isDark ? const Color(0xFF1B2436) : Theme.of(context).cardColor,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      padding: EdgeInsets.symmetric(
+        horizontal: isDesktop ? 24 : 12,
+        vertical: isDesktop ? 16 : 12,
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -1203,7 +1232,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ],
             ),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: isDesktop ? 16 : 8),
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1250,21 +1279,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ],
 
               // Refresh Button
-              IconButton(
-                icon: Icon(
-                  Icons.refresh,
-                  color: isDark
-                      ? const Color(0xFFF8FAFC)
-                      : AppColors.secondaryBlue,
+              if (isDesktop)
+                IconButton(
+                  icon: Icon(
+                    Icons.refresh,
+                    color: isDark
+                        ? const Color(0xFFF8FAFC)
+                        : AppColors.secondaryBlue,
+                  ),
+                  onPressed: _loadDashboardData,
+                  tooltip: 'Refresh Data',
                 ),
-                onPressed: _loadDashboardData,
-                tooltip: 'Refresh Data',
-              ),
-              const SizedBox(width: 16),
+              SizedBox(width: isDesktop ? 16 : 6),
 
               // Notifications Bell
               PopupMenuButton<void>(
-                offset: const Offset(0, 48),
+                offset: Offset(0, isDesktop ? 48 : 42),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
@@ -1282,7 +1312,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       enabled: false,
                       padding: EdgeInsets.zero,
                       child: Container(
-                        width: 380,
+                        width: (MediaQuery.of(context).size.width - 24).clamp(
+                          260.0,
+                          380.0,
+                        ),
                         color: isDark ? const Color(0xFF1E293B) : Colors.white,
                         child: Column(
                           mainAxisSize: MainAxisSize.min,

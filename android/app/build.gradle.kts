@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.llfbandit.twitter_login"
+    namespace = "com.example.carrent_system"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
