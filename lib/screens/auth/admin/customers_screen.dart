@@ -972,7 +972,7 @@ class _CustomersViewState extends State<CustomersView> {
         final licenseWidth = contentWidth * 0.12;
         final actionWidth = contentWidth * 0.08;
 
-        Text _header(String label) {
+        Text header(String label) {
           return Text(
             label,
             maxLines: 1,
@@ -1001,6 +1001,10 @@ class _CustomersViewState extends State<CustomersView> {
               columns: [
                 DataColumn(
                   label: SizedBox(
+                    width: nameWidth,
+                    child: _header('Full Name'),
+                  ),
+                ),
                     width: nameWidth,
                     child: _header('Full Name'),
                   ),
@@ -2313,11 +2317,15 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
       itemBuilder: (context, index) {
         final b = bookings[index];
         Color statusColor = Colors.orange;
-        if (['approved', 'active', 'ongoing'].contains(b.status.toLowerCase()))
+        if (['approved', 'active', 'ongoing'].contains(b.status.toLowerCase())) {
           statusColor = Colors.blue;
-        if (b.status.toLowerCase() == 'completed') statusColor = Colors.green;
-        if (['cancelled', 'rejected'].contains(b.status.toLowerCase()))
+        }
+        if (b.status.toLowerCase() == 'completed') {
+          statusColor = Colors.green;
+        }
+        if (['cancelled', 'rejected'].contains(b.status.toLowerCase())) {
           statusColor = Colors.red;
+        }
 
         final startStr = DateFormat('dd MMM yy').format(b.pickUpDate);
         final endStr = b.isOpenRental
@@ -2439,10 +2447,15 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
       itemBuilder: (context, index) {
         final p = payments[index];
         Color statusColor = Colors.orange;
-        if (p.status.toLowerCase() == 'paid') statusColor = Colors.green;
-        if (['failed', 'rejected'].contains(p.status.toLowerCase()))
+        if (p.status.toLowerCase() == 'paid') {
+          statusColor = Colors.green;
+        }
+        if (['failed', 'rejected'].contains(p.status.toLowerCase())) {
           statusColor = Colors.redAccent;
-        if (p.status.toLowerCase() == 'refunded') statusColor = Colors.purple;
+        }
+        if (p.status.toLowerCase() == 'refunded') {
+          statusColor = Colors.purple;
+        }
 
         final payDate = DateFormat('dd MMM yy, hh:mm a').format(p.paymentDate);
 

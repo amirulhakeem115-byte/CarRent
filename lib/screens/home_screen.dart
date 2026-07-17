@@ -10,11 +10,9 @@ import '../services/company_settings_provider.dart';
 import '../models/user_model.dart';
 import '../models/vehicle_model.dart';
 import '../models/branch_model.dart';
-import 'auth/login_screen.dart';
 import 'auth/register_screen.dart';
 import 'auth/customer/customer_responsive_shell.dart';
 import 'auth/admin/dashboard_screen.dart';
-import 'auth/customer/vehicle_list_screen.dart';
 import 'auth/customer/vehicle_details_screen.dart';
 import '../widgets/loading_widget.dart';
 import '../widgets/app_image.dart';
@@ -2021,9 +2019,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
 class _BranchDropdownItem extends StatefulWidget {
   final String label;
-  final bool isPlaceholder;
 
-  const _BranchDropdownItem({required this.label, this.isPlaceholder = false});
+  const _BranchDropdownItem({required this.label});
 
   @override
   State<_BranchDropdownItem> createState() => _BranchDropdownItemState();
@@ -2034,9 +2031,7 @@ class _BranchDropdownItemState extends State<_BranchDropdownItem> {
 
   @override
   Widget build(BuildContext context) {
-    final textColor = widget.isPlaceholder
-        ? AppColors.lightText
-        : AppColors.secondaryBlue;
+    final textColor = AppColors.secondaryBlue;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),

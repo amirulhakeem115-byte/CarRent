@@ -479,8 +479,9 @@ class _CustomerNotificationsScreenState
                           ),
                         ],
                         onChanged: (val) {
-                          if (val != null)
+                          if (val != null) {
                             setState(() => _selectedStatus = val);
+                          }
                         },
                       ),
                     ),

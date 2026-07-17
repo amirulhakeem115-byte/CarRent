@@ -184,12 +184,17 @@ class VehicleService {
         }
 
         final hasActiveBooking = latestBookings.values.any((booking) {
-          if (booking.vehicleId != vehicle.id) return false;
-          final s = booking.status.toLowerCase();
-          if (s == 'completed' || s == 'cancelled' || s == 'rejected')
+          if (booking.vehicleId != vehicle.id) {
             return false;
+          }
+          final s = booking.status.toLowerCase();
+          if (s == 'completed' || s == 'cancelled' || s == 'rejected') {
+            return false;
+          }
 
-          if (s == 'active' || s == 'ongoing' || s == 'overdue') return true;
+          if (s == 'active' || s == 'ongoing' || s == 'overdue') {
+            return true;
+          }
 
           return booking.pickUpDate.isBefore(
                 now.add(const Duration(hours: 12)),

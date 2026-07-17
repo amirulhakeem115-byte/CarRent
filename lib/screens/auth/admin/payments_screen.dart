@@ -433,11 +433,15 @@ class _PaymentsViewState extends State<PaymentsView> {
       context: context,
       builder: (context) {
         Color statusColor = Colors.orange;
-        if (payment.paymentStatus == 'Approved' || payment.status == 'paid')
+        if (payment.paymentStatus == 'Approved' || payment.status == 'paid') {
           statusColor = Colors.green;
-        if (payment.paymentStatus == 'Rejected' || payment.status == 'failed')
+        }
+        if (payment.paymentStatus == 'Rejected' || payment.status == 'failed') {
           statusColor = Colors.redAccent;
-        if (payment.status == 'refunded') statusColor = Colors.purple;
+        }
+        if (payment.status == 'refunded') {
+          statusColor = Colors.purple;
+        }
 
         final bookingMap = {for (var b in _bookings) b.id: b};
         final booking = bookingMap[payment.bookingId];

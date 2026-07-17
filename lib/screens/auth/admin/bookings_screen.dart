@@ -138,11 +138,21 @@ class _BookingsViewState extends State<BookingsView> {
         final isCompleted = bStat == 'completed';
         final isCancelled = bStat == 'cancelled' || bStat == 'canceled';
         final hideTransitionStateSection = isCompleted || isCancelled;
-        if (bStat == 'approved') statusColor = Colors.green;
-        if (bStat == 'ongoing' || bStat == 'active') statusColor = Colors.blue;
-        if (isCompleted) statusColor = Colors.indigo;
-        if (isCancelled || bStat == 'rejected') statusColor = Colors.redAccent;
-        if (bStat == 'overdue') statusColor = Colors.red;
+        if (bStat == 'approved') {
+          statusColor = Colors.green;
+        }
+        if (bStat == 'ongoing' || bStat == 'active') {
+          statusColor = Colors.blue;
+        }
+        if (isCompleted) {
+          statusColor = Colors.indigo;
+        }
+        if (isCancelled || bStat == 'rejected') {
+          statusColor = Colors.redAccent;
+        }
+        if (bStat == 'overdue') {
+          statusColor = Colors.red;
+        }
 
         return Padding(
           padding: EdgeInsets.only(
@@ -887,13 +897,21 @@ class _BookingsViewState extends State<BookingsView> {
         rows: bookings.map((b) {
           Color statusColor = Colors.orange;
           final bStat = b.status.toLowerCase();
-          if (bStat == 'approved') statusColor = Colors.green;
-          if (bStat == 'ongoing' || bStat == 'active')
+          if (bStat == 'approved') {
+            statusColor = Colors.green;
+          }
+          if (bStat == 'ongoing' || bStat == 'active') {
             statusColor = Colors.blue;
-          if (bStat == 'completed') statusColor = Colors.indigo;
-          if (bStat == 'cancelled' || bStat == 'rejected')
+          }
+          if (bStat == 'completed') {
+            statusColor = Colors.indigo;
+          }
+          if (bStat == 'cancelled' || bStat == 'rejected') {
             statusColor = Colors.redAccent;
-          if (bStat == 'overdue') statusColor = Colors.red;
+          }
+          if (bStat == 'overdue') {
+            statusColor = Colors.red;
+          }
           final dateFormat = DateFormat('yyyy-MM-dd');
           return DataRow(
             cells: [
@@ -1026,12 +1044,21 @@ class _BookingsViewState extends State<BookingsView> {
         final b = bookings[index];
         Color statusColor = Colors.orange;
         final bStat = b.status.toLowerCase();
-        if (bStat == 'approved') statusColor = Colors.green;
-        if (bStat == 'ongoing' || bStat == 'active') statusColor = Colors.blue;
-        if (bStat == 'completed') statusColor = Colors.indigo;
-        if (bStat == 'cancelled' || bStat == 'rejected')
+        if (bStat == 'approved') {
+          statusColor = Colors.green;
+        }
+        if (bStat == 'ongoing' || bStat == 'active') {
+          statusColor = Colors.blue;
+        }
+        if (bStat == 'completed') {
+          statusColor = Colors.indigo;
+        }
+        if (bStat == 'cancelled' || bStat == 'rejected') {
           statusColor = Colors.redAccent;
-        if (bStat == 'overdue') statusColor = Colors.red;
+        }
+        if (bStat == 'overdue') {
+          statusColor = Colors.red;
+        }
         final dateFormat = DateFormat('yyyy-MM-dd');
         return Card(
           color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8F9FA),

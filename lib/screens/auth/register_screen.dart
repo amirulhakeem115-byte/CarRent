@@ -221,8 +221,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             prefixIcon: Icons.phone_outlined,
                             keyboardType: TextInputType.phone,
                             validator: (val) {
-                              if (val == null || val.trim().isEmpty)
+                              if (val == null || val.trim().isEmpty) {
                                 return 'Phone Number is required';
+                              }
                               final cleanVal = val.trim();
                               if (!RegExp(
                                 r'^(\+?6?01)[0-46-9]-*[0-9]{7,8}$',
@@ -280,8 +281,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       prefixIcon: Icons.phone_outlined,
                       keyboardType: TextInputType.phone,
                       validator: (val) {
-                        if (val == null || val.trim().isEmpty)
+                        if (val == null || val.trim().isEmpty) {
                           return 'Phone Number is required';
+                        }
                         final cleanVal = val.trim();
                         if (!RegExp(
                           r'^(\+?6?01)[0-46-9]-*[0-9]{7,8}$',
@@ -315,9 +317,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
             prefixIcon: Icons.email_outlined,
             keyboardType: TextInputType.emailAddress,
             validator: (val) {
-              if (val == null || val.trim().isEmpty) return 'Email is required';
-              if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val))
+              if (val == null || val.trim().isEmpty) {
+                return 'Email is required';
+              }
+              if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val)) {
                 return 'Enter a valid email';
+              }
               return null;
             },
           ),
@@ -350,9 +355,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
               },
             ),
             validator: (val) {
-              if (val == null || val.isEmpty) return 'Password is required';
-              if (val.length < 6)
+              if (val == null || val.isEmpty) {
+                return 'Password is required';
+              }
+              if (val.length < 6) {
                 return 'Password must be at least 6 characters';
+              }
               if (!RegExp(
                 r'^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$',
               ).hasMatch(val)) {
@@ -393,10 +401,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
               },
             ),
             validator: (val) {
-              if (val == null || val.isEmpty)
+              if (val == null || val.isEmpty) {
                 return 'Please confirm your password';
-              if (val != _passwordController.text)
+              }
+              if (val != _passwordController.text) {
                 return 'Passwords do not match';
+              }
               return null;
             },
           ),
