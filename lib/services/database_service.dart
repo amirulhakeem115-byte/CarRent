@@ -5,6 +5,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_model.dart';
 import 'notification_service.dart';
 import 'user_role_cache.dart';
+import 'user_session.dart';
+
 
 class DatabaseService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref();
@@ -377,19 +379,18 @@ class DatabaseService {
           .child('users')
           .child(uid)
           .get()
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 15));
       debugPrint(
         '[DatabaseService] Raw snapshot value for $path: ${snapshot.value}',
       );
       if (snapshot.exists) {
         final data = snapshot.value as Map<dynamic, dynamic>;
         final user = UserModel.fromMap(uid, data);
-        UserRoleCache.set(uid, user.role);
+        UserSession().forceSetUser(user);
         if (user.email.trim().toLowerCase() == 'admin@gmail.com' &&
             user.role != 'admin') {
           await updateUser(uid, {'role': 'admin'});
-          UserRoleCache.set(uid, 'admin');
-          return UserModel(
+          final updatedAdmin = UserModel(
             id: user.id,
             fullName: user.fullName,
             email: user.email,
@@ -404,6 +405,8 @@ class DatabaseService {
             licenseClass: user.licenseClass,
             licenseExpiry: user.licenseExpiry,
           );
+          UserSession().forceSetUser(updatedAdmin);
+          return updatedAdmin;
         }
         return user;
       } else {
@@ -422,34 +425,72 @@ class DatabaseService {
           .child(uid)
           .update(data)
           .timeout(const Duration(seconds: 5));
+
+      final notificationService = NotificationService();
+      String customerName = 'Customer';
+      try {
+        final uSnap = await _db
+            .child('users')
+            .child(uid)
+            .child('fullName')
+            .get();
+        if (uSnap.exists && uSnap.value != null) {
+          customerName = uSnap.value.toString();
+        }
+      } catch (_) {}
+
       if (data.containsKey('licenseImage') &&
           data['licenseStatus'] == 'pending') {
-        final notificationService = NotificationService();
-        String customerName = 'Customer';
-        try {
-          final uSnap = await _db
-              .child('users')
-              .child(uid)
-              .child('fullName')
-              .get();
-          if (uSnap.exists) {
-            customerName = uSnap.value.toString();
-          }
-        } catch (_) {}
-
-        await notificationService.notifyAllAdmins(
-          title: 'Customer Uploaded Driving License',
-          message:
-              '$customerName uploaded their driving license for verification.',
-          type: 'customer',
+        await notificationService.notifyCustomerEvent(
+          eventName: 'Customer Uploaded License',
+          customerName: customerName,
+          customerUid: uid,
+          details: 'uploaded driving license for verification.',
+          priority: 'high',
           icon: '👤',
           color: '0xFF14B8A6',
-          relatedId: uid,
-          actionRoute: 'Customers',
+        );
+      } else {
+        await notificationService.notifyCustomerEvent(
+          eventName: 'Customer Profile Updated',
+          customerName: customerName,
+          customerUid: uid,
+          details: 'updated profile details.',
+          priority: 'normal',
+          icon: '👤',
+          color: '0xFF3B82F6',
         );
       }
     } catch (e) {
       debugPrint('Error updating user: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteUser(String uid) async {
+    try {
+      String customerName = 'Customer';
+      try {
+        final uSnap = await _db.child('users').child(uid).child('fullName').get();
+        if (uSnap.exists && uSnap.value != null) {
+          customerName = uSnap.value.toString();
+        }
+      } catch (_) {}
+
+      await _db.child('users').child(uid).remove().timeout(const Duration(seconds: 5));
+
+      final notificationService = NotificationService();
+      await notificationService.notifyCustomerEvent(
+        eventName: 'Customer Account Deleted',
+        customerName: customerName,
+        customerUid: uid,
+        details: 'account was deleted.',
+        priority: 'high',
+        icon: '👤',
+        color: '0xFFEF4444',
+      );
+    } catch (e) {
+      debugPrint('Error deleting user: $e');
       rethrow;
     }
   }
@@ -467,7 +508,7 @@ class DatabaseService {
       final snapshot = await _db
           .child('users')
           .get()
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 15));
       if (snapshot.exists) {
         final Map<dynamic, dynamic> data =
             snapshot.value as Map<dynamic, dynamic>;
@@ -564,6 +605,19 @@ class DatabaseService {
           color: isApproved ? '0xFF10B981' : '0xFFEF4444',
           relatedId: uid,
           actionRoute: 'Dashboard',
+        );
+
+        final customerName = data['fullName'] ?? data['name'] ?? 'Customer';
+        await notificationService.notifyAllAdmins(
+          title: isApproved ? 'Customer $docName Approved' : 'Customer $docName Rejected',
+          message: isApproved
+              ? 'Customer $customerName\'s $docName has been approved.'
+              : 'Customer $customerName\'s $docName was rejected. Reason: $reason',
+          type: 'customer',
+          icon: '👤',
+          color: isApproved ? '0xFF10B981' : '0xFFEF4444',
+          relatedId: uid,
+          actionRoute: 'Customers',
         );
       } catch (notifErr) {
         debugPrint(

@@ -75,12 +75,12 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
 
   Future<void> _loadData() async {
     if (!mounted) return;
-    setState(() {
-      _loading = true;
-      _error = null;
-      _allVehicles = [];
-      _branches = [];
-    });
+    if (_branches.isEmpty) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final branchesList = await _branchService.getBranches().timeout(
         const Duration(seconds: 8),
@@ -92,6 +92,11 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
       }
     } catch (e) {
       debugPrint('Error loading branches: $e.');
+      if (mounted && _branches.isEmpty) {
+        setState(() {
+          _error = 'Failed to load branches. Please check your connection.';
+        });
+      }
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -1269,7 +1274,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                                           ),
                                         ),
                                   ),
-                                ).then((_) => _loadData());
+                                );
                               }
                             : null,
                         style: ElevatedButton.styleFrom(
@@ -1315,7 +1320,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                                             ),
                                           ),
                                     ),
-                                  ).then((_) => _loadData());
+                                  );
                                 }
                               : null,
                           style: ElevatedButton.styleFrom(
@@ -1554,7 +1559,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                                               ),
                                             ),
                                       ),
-                                    ).then((_) => _loadData());
+                                    );
                                   }
                                 : null,
                             style: ElevatedButton.styleFrom(

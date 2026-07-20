@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:intl/intl.dart';
@@ -13,6 +14,8 @@ import '../../../services/auth_service.dart';
 import '../../../services/database_service.dart';
 import '../../../services/reward_service.dart';
 import '../../../services/notification_service.dart';
+import '../../../models/promotion_model.dart';
+import '../../../services/promotion_service.dart';
 import 'booking_confirmation_screen.dart';
 import '../login_screen.dart';
 import '../../../widgets/loading_widget.dart';
@@ -97,9 +100,11 @@ class _BookingScreenState extends State<BookingScreen> {
   final PaymentService _paymentService = PaymentService();
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
+  final PromotionService _promotionService = PromotionService();
 
   final _notesController = TextEditingController();
   final _txnIdController = TextEditingController();
+  final _promoCodeController = TextEditingController();
   DateTime? _pickupDate;
   DateTime? _returnDate;
   String? _pickupTime;
@@ -108,6 +113,13 @@ class _BookingScreenState extends State<BookingScreen> {
   int _availablePoints = 0;
   int _pointsToRedeem = 0;
   final _pointsController = TextEditingController();
+
+  // Promotion discount fields
+  PromotionModel? _appliedPromotion;
+  double _promotionDiscountAmount = 0.0;
+  String? _promoCodeMessage;
+  bool _promoCodeSuccess = false;
+  bool _isEvaluatingPromo = false;
 
   String _paymentMethod =
       'DuitNow QR'; // 'DuitNow QR', 'Online Bank Transfer', 'FPX Online Banking', 'Cash'
@@ -140,13 +152,18 @@ class _BookingScreenState extends State<BookingScreen> {
   String? _activeBookingId;
   DateTime? _activeBookingCreatedAt;
 
+  Set<DateTime> _blockedDates = {};
+  StreamSubscription<Set<DateTime>>? _blockedDatesSubscription;
+
   @override
   void initState() {
     super.initState();
-    _pickupDate =
-        widget.existingBooking?.pickUpDate ?? widget.prefilledPickupDate;
-    _returnDate =
-        widget.existingBooking?.returnDate ?? widget.prefilledReturnDate;
+    _pickupDate = widget.existingBooking?.pickUpDate ??
+        widget.prefilledPickupDate ??
+        DateTime.now();
+    _returnDate = widget.existingBooking?.returnDate ??
+        widget.prefilledReturnDate ??
+        _pickupDate!.add(const Duration(days: 1));
     _activeBookingId = widget.existingBooking?.id;
     _activeBookingCreatedAt = widget.existingBooking?.createdAt;
     _isOpenRental = widget.existingBooking?.isOpenRental ?? false;
@@ -171,6 +188,8 @@ class _BookingScreenState extends State<BookingScreen> {
     }
     _loadUserProfile();
     _loadQrSettings();
+    _loadActivePromotions();
+    _subscribeToBlockedDates();
     receipt_upload.registerPlatformDropzone();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_authService.currentUser == null && mounted) {
@@ -239,12 +258,95 @@ class _BookingScreenState extends State<BookingScreen> {
 
   int get _rentalDays {
     if (_isOpenRental) return 1;
-    if (_pickupDate == null || _returnDate == null) return 0;
-    final diff = _returnDate!.difference(_pickupDate!).inDays;
+    final pDate = _pickupDate ?? DateTime.now();
+    final rDate = _returnDate ?? pDate.add(const Duration(days: 1));
+    final diff = rDate.difference(pDate).inDays;
     return diff <= 0 ? 1 : diff;
   }
 
+  Future<void> _loadActivePromotions() async {
+    try {
+      await _promotionService.getPromotions();
+      _evaluateAutoApplyPromotion();
+    } catch (e) {
+      debugPrint('Error loading promotions: $e');
+    }
+  }
+
+  void _evaluateAutoApplyPromotion() async {
+    if (_promoCodeSuccess && _appliedPromotion?.promoCode != null) return;
+    final subtotal = _rentalDays * widget.vehicle.pricePerDay;
+    if (subtotal <= 0) return;
+
+    final result = await _promotionService.findBestAutoApplyPromotion(
+      bookingAmount: subtotal,
+      vehicleId: widget.vehicle.id,
+      vehicleType: widget.vehicle.category,
+      vehicleBrand: widget.vehicle.brand,
+    );
+
+    if (mounted && result != null && result.isValid) {
+      setState(() {
+        _appliedPromotion = result.promotion;
+        _promotionDiscountAmount = result.discountAmount;
+        _promoCodeMessage = result.message;
+        _promoCodeSuccess = true;
+      });
+    }
+  }
+
+  Future<void> _applyPromoCode() async {
+    final code = _promoCodeController.text.trim();
+    if (code.isEmpty) return;
+
+    setState(() {
+      _isEvaluatingPromo = true;
+      _promoCodeMessage = null;
+    });
+
+    final subtotal = _rentalDays * widget.vehicle.pricePerDay;
+    final result = await _promotionService.validatePromoCode(
+      code,
+      bookingAmount: subtotal,
+      vehicleId: widget.vehicle.id,
+      vehicleType: widget.vehicle.category,
+      vehicleBrand: widget.vehicle.brand,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _isEvaluatingPromo = false;
+      _promoCodeSuccess = result.isValid;
+      _promoCodeMessage = result.message;
+      if (result.isValid) {
+        _appliedPromotion = result.promotion;
+        _promotionDiscountAmount = result.discountAmount;
+      } else {
+        _appliedPromotion = null;
+        _promotionDiscountAmount = 0.0;
+      }
+    });
+  }
+
+  void _removeAppliedPromotion() {
+    setState(() {
+      _appliedPromotion = null;
+      _promotionDiscountAmount = 0.0;
+      _promoCodeController.clear();
+      _promoCodeMessage = null;
+      _promoCodeSuccess = false;
+    });
+    _evaluateAutoApplyPromotion();
+  }
+
   bool get _isFinalPayment => widget.existingBooking != null && widget.existingBooking!.status == 'Awaiting Final Payment';
+
+  bool get _isOnlinePayment {
+    final method = widget.existingBooking?.paymentMethod ?? _paymentMethod;
+    final mLower = method.toLowerCase();
+    return mLower != 'cash' && mLower != 'open rental' && mLower.isNotEmpty;
+  }
 
   double get _totalPrice {
     if (_isFinalPayment) return widget.existingBooking!.finalAmount;
@@ -252,10 +354,17 @@ class _BookingScreenState extends State<BookingScreen> {
     return _rentalDays * widget.vehicle.pricePerDay;
   }
 
-  double get _discountAmount {
+  double get _pointsDiscountAmount {
     if (_isFinalPayment) return 0.0;
     if (widget.isExtension) return 0.0;
     return _pointsToRedeem * 0.10;
+  }
+
+  double get _discountAmount {
+    if (_isFinalPayment) return 0.0;
+    if (widget.isExtension) return 0.0;
+    final sum = _pointsDiscountAmount + _promotionDiscountAmount;
+    return sum > _totalPrice ? _totalPrice : sum;
   }
 
   double get _discountedTotal {
@@ -344,13 +453,125 @@ class _BookingScreenState extends State<BookingScreen> {
     }
   }
 
+  void _subscribeToBlockedDates() {
+    _blockedDatesSubscription?.cancel();
+    _blockedDatesSubscription = _bookingService
+        .getBlockedDatesStreamForVehicle(
+          widget.vehicle.id,
+          excludeBookingId: widget.existingBooking?.id,
+        )
+        .listen((blockedSet) {
+      if (mounted) {
+        setState(() {
+          _blockedDates = blockedSet;
+
+          // Check if previously selected dates are now blocked by another user
+          bool selectionInvalid = false;
+          if (_pickupDate != null) {
+            final pNorm = DateTime(_pickupDate!.year, _pickupDate!.month, _pickupDate!.day);
+            if (_blockedDates.contains(pNorm)) {
+              selectionInvalid = true;
+            }
+          }
+          if (_returnDate != null) {
+            final rNorm = DateTime(_returnDate!.year, _returnDate!.month, _returnDate!.day);
+            if (_blockedDates.contains(rNorm)) {
+              selectionInvalid = true;
+            }
+          }
+
+          if (_pickupDate != null && _returnDate != null) {
+            final pNorm = DateTime(_pickupDate!.year, _pickupDate!.month, _pickupDate!.day);
+            final rNorm = DateTime(_returnDate!.year, _returnDate!.month, _returnDate!.day);
+            DateTime cur = pNorm;
+            while (!cur.isAfter(rNorm)) {
+              if (_blockedDates.contains(cur)) {
+                selectionInvalid = true;
+                break;
+              }
+              cur = cur.add(const Duration(days: 1));
+            }
+          }
+
+          if (selectionInvalid) {
+            _pickupDate = null;
+            _returnDate = null;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'This vehicle is already booked for the selected date.',
+                ),
+                backgroundColor: Colors.redAccent,
+              ),
+            );
+          }
+        });
+      }
+    });
+  }
+
+  String _formatBlockedDatesSummary(Set<DateTime> dates) {
+    if (dates.isEmpty) return '';
+    final sorted = dates.toList()..sort((a, b) => a.compareTo(b));
+    final List<String> ranges = [];
+    DateTime? start;
+    DateTime? prev;
+
+    final DateFormat fmt = DateFormat('dd MMM yyyy');
+
+    for (final d in sorted) {
+      if (start == null) {
+        start = d;
+        prev = d;
+      } else if (d.difference(prev!).inDays == 1) {
+        prev = d;
+      } else {
+        if (start == prev) {
+          ranges.add(fmt.format(start));
+        } else {
+          ranges.add('${fmt.format(start)} - ${fmt.format(prev)}');
+        }
+        start = d;
+        prev = d;
+      }
+    }
+    if (start != null && prev != null) {
+      if (start == prev) {
+        ranges.add(fmt.format(start));
+      } else {
+        ranges.add('${fmt.format(start)} - ${fmt.format(prev)}');
+      }
+    }
+
+    return ranges.join(', ');
+  }
+
   Future<void> _selectPickupDate() async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    DateTime initial = DateTime.now().add(const Duration(days: 1));
+    final today = DateTime.now();
+    final todayNorm = DateTime(today.year, today.month, today.day);
+    if (_blockedDates.contains(DateTime(initial.year, initial.month, initial.day))) {
+      DateTime check = todayNorm;
+      for (int i = 0; i < 90; i++) {
+        if (!_blockedDates.contains(check)) {
+          initial = check;
+          break;
+        }
+        check = check.add(const Duration(days: 1));
+      }
+    }
+
     final picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now().add(const Duration(days: 1)),
+      initialDate: initial.isBefore(DateTime.now()) ? DateTime.now() : initial,
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 90)),
+      selectableDayPredicate: (DateTime day) {
+        final norm = DateTime(day.year, day.month, day.day);
+        return !_blockedDates.contains(norm);
+      },
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -371,12 +592,47 @@ class _BookingScreenState extends State<BookingScreen> {
         );
       },
     );
+    if (!mounted) return;
     if (picked != null) {
+      final normPicked = DateTime(picked.year, picked.month, picked.day);
+      if (_blockedDates.contains(normPicked)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('This vehicle is already booked for the selected date.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        return;
+      }
+
       setState(() {
         _pickupDate = picked;
         _updateDateTimes();
-        if (_returnDate != null && _returnDate!.isBefore(_pickupDate!)) {
-          _returnDate = null;
+        if (_returnDate != null) {
+          if (_returnDate!.isBefore(_pickupDate!)) {
+            _returnDate = null;
+          } else {
+            final pNorm = DateTime(_pickupDate!.year, _pickupDate!.month, _pickupDate!.day);
+            final rNorm = DateTime(_returnDate!.year, _returnDate!.month, _returnDate!.day);
+            DateTime cur = pNorm;
+            bool rangeHasBlocked = false;
+            while (!cur.isAfter(rNorm)) {
+              if (_blockedDates.contains(cur)) {
+                rangeHasBlocked = true;
+                break;
+              }
+              cur = cur.add(const Duration(days: 1));
+            }
+            if (rangeHasBlocked) {
+              _returnDate = null;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('This vehicle is already booked for the selected date.'),
+                  backgroundColor: Colors.redAccent,
+                ),
+              );
+            }
+          }
         }
       });
     }
@@ -390,11 +646,38 @@ class _BookingScreenState extends State<BookingScreen> {
       return;
     }
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final pNorm = DateTime(_pickupDate!.year, _pickupDate!.month, _pickupDate!.day);
+
+    DateTime? firstBlockedAfterPickup;
+    DateTime check = pNorm.add(const Duration(days: 1));
+    for (int i = 0; i < 90; i++) {
+      if (_blockedDates.contains(check)) {
+        firstBlockedAfterPickup = check;
+        break;
+      }
+      check = check.add(const Duration(days: 1));
+    }
+
     final picked = await showDatePicker(
       context: context,
       initialDate: _pickupDate!.add(const Duration(days: 1)),
       firstDate: _pickupDate!.add(const Duration(days: 1)),
       lastDate: _pickupDate!.add(const Duration(days: 90)),
+      selectableDayPredicate: (DateTime day) {
+        final dNorm = DateTime(day.year, day.month, day.day);
+
+        // Date cannot be blocked itself
+        if (_blockedDates.contains(dNorm)) {
+          return false;
+        }
+
+        // If there is a blocked date between pickupDate and day, disable day!
+        if (firstBlockedAfterPickup != null && !dNorm.isBefore(firstBlockedAfterPickup)) {
+          return false;
+        }
+
+        return true;
+      },
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -415,7 +698,19 @@ class _BookingScreenState extends State<BookingScreen> {
         );
       },
     );
+    if (!mounted) return;
     if (picked != null) {
+      final rNorm = DateTime(picked.year, picked.month, picked.day);
+      if (_blockedDates.contains(rNorm)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('This vehicle is already booked for the selected date.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        return;
+      }
+
       setState(() {
         _returnDate = picked;
         _updateDateTimes();
@@ -1767,6 +2062,18 @@ class _BookingScreenState extends State<BookingScreen> {
         if (freshStatus != 'available') {
           throw 'This vehicle is no longer available (Current status: $freshStatus).';
         }
+
+        // Perform final database check to ensure selected dates are available
+        final isAvailable = await _bookingService.isVehicleAvailableForDates(
+          widget.vehicle.id,
+          _pickupDate!,
+          _returnDate ?? _pickupDate!,
+          excludeBookingId: widget.existingBooking?.id,
+        );
+
+        if (!isAvailable) {
+          throw 'This vehicle is already booked for the selected date.';
+        }
       }
 
       if (_isFinalPayment) {
@@ -1964,6 +2271,11 @@ class _BookingScreenState extends State<BookingScreen> {
         createdAt: _activeBookingCreatedAt ?? DateTime.now(),
         pointsRedeemed: _pointsToRedeem,
         discountAmount: _discountAmount,
+        promotionId: _appliedPromotion?.id,
+        promotionCode: _appliedPromotion?.promoCode,
+        promotionName: _appliedPromotion?.name,
+        promotionDiscountAmount: _promotionDiscountAmount,
+        paymentMethod: _isOpenRental ? 'Open Rental' : _paymentMethod,
         pointsRedeemedProcessed: _pointsToRedeem > 0,
         rewardPointsAwarded: false,
       );
@@ -2030,8 +2342,10 @@ class _BookingScreenState extends State<BookingScreen> {
 
   @override
   void dispose() {
+    _blockedDatesSubscription?.cancel();
     _notesController.dispose();
     _txnIdController.dispose();
+    _promoCodeController.dispose();
     _pointsController.dispose();
     super.dispose();
   }
@@ -2311,6 +2625,56 @@ class _BookingScreenState extends State<BookingScreen> {
 
         // 2. Date select
         Text('Select Rental Dates & Time', style: headingStyle),
+        if (_blockedDates.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.amber.withValues(alpha: 0.15)
+                  : const Color(0xFFFFFBEB),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDark
+                    ? Colors.amber.withValues(alpha: 0.4)
+                    : const Color(0xFFFDE68A),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.event_busy_rounded,
+                  color: isDark ? Colors.amber[300] : const Color(0xFFD97706),
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Already Booked Dates (Unavailable):',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.amber[200] : const Color(0xFF92400E),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _formatBlockedDatesSummary(_blockedDates),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isDark ? Colors.amber[100] : const Color(0xFFB45309),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 10),
         Row(
           children: [
@@ -2919,12 +3283,13 @@ class _BookingScreenState extends State<BookingScreen> {
     );
     final textMuted = isDark ? const Color(0xFF94A3B8) : Colors.grey[500]!;
 
-    final pickupDateStr = DateFormat('dd MMM yyyy').format(_pickupDate!);
+    final safePickupDate = _pickupDate ?? DateTime.now();
+    final safeReturnDate = _returnDate ?? safePickupDate.add(const Duration(days: 1));
+
+    final pickupDateStr = DateFormat('dd MMM yyyy').format(safePickupDate);
     final returnDateStr = _isOpenRental
         ? 'Open Rental'
-        : (_returnDate != null
-              ? DateFormat('dd MMM yyyy').format(_returnDate!)
-              : "");
+        : DateFormat('dd MMM yyyy').format(safeReturnDate);
 
     final payAmount = _isFinalPayment
         ? widget.existingBooking!.finalAmount
@@ -3158,8 +3523,140 @@ class _BookingScreenState extends State<BookingScreen> {
         ),
         const SizedBox(height: 20),
 
-        // 2. Price Breakdown Card
-        Text('Price Breakdown', style: headingStyle),
+        // 2. Promotional Code & Discount Card
+        if (!widget.isExtension && !_isFinalPayment) ...[
+          Text('Promotions & Discounts', style: headingStyle),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: cardColor,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: borderColor),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_appliedPromotion != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.local_offer, color: Colors.green, size: 22),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _appliedPromotion!.name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  color: Colors.green,
+                                ),
+                              ),
+                              if (_appliedPromotion!.promoCode != null)
+                                Text(
+                                  'Code: ${_appliedPromotion!.promoCode}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isDark ? Colors.white70 : Colors.black87,
+                                  ),
+                                ),
+                              Text(
+                                'Discount: - RM ${_promotionDiscountAmount.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 12,
+                                  color: Colors.green,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, color: Colors.grey, size: 20),
+                          onPressed: _removeAppliedPromotion,
+                          tooltip: 'Remove promotion',
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _promoCodeController,
+                        textCapitalization: TextCapitalization.characters,
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'Enter Promo Code (e.g. SAVE50)',
+                          hintStyle: TextStyle(
+                            color: isDark ? Colors.white30 : Colors.grey,
+                            fontSize: 12,
+                          ),
+                          filled: true,
+                          fillColor: isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryOrange,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      ),
+                      onPressed: _isEvaluatingPromo ? null : _applyPromoCode,
+                      child: _isEvaluatingPromo
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Text('APPLY', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    ),
+                  ],
+                ),
+                if (_promoCodeMessage != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    _promoCodeMessage!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: _promoCodeSuccess ? Colors.green : Colors.redAccent,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+
+        // 3. Price Breakdown Card
+        Text(_isFinalPayment ? 'Final Invoice Breakdown' : 'Price Breakdown', style: headingStyle),
         const SizedBox(height: 10),
         Container(
           padding: const EdgeInsets.all(16),
@@ -3170,58 +3667,191 @@ class _BookingScreenState extends State<BookingScreen> {
           ),
           child: Column(
             children: [
-              _buildPriceRow(
-                widget.isExtension
-                    ? 'Extension Cost'
-                    : 'Base Rental ($_rentalDays Days)',
-                'RM ${_totalPrice.toStringAsFixed(2)}',
-                isDark: isDark,
-              ),
-              _buildPriceRow('Extra Charges', 'RM 0.00', isDark: isDark),
-              _buildPriceRow('Tax (6% SST)', 'RM 0.00', isDark: isDark),
-              if (_pointsToRedeem > 0)
-                _buildPriceRow(
-                  'Discount',
-                  '- RM ${_discountAmount.toStringAsFixed(2)}',
-                  color: Colors.green,
-                  isDark: isDark,
+              if (_isFinalPayment) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Base Rental',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: _isOnlinePayment
+                                ? Colors.green.withValues(alpha: 0.15)
+                                : Colors.orange.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _isOnlinePayment ? Icons.check_circle : Icons.schedule,
+                                color: _isOnlinePayment ? Colors.green : Colors.orange,
+                                size: 12,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _isOnlinePayment
+                                    ? '✓ Paid via ${widget.existingBooking?.paymentMethod ?? "FPX"}'
+                                    : 'Pending (Cash)',
+                                style: TextStyle(
+                                  color: _isOnlinePayment ? Colors.green : Colors.orange,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      'RM ${widget.existingBooking!.totalPrice.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: _isOnlinePayment
+                            ? Colors.grey
+                            : (isDark ? Colors.white : AppColors.secondaryBlue),
+                        decoration: _isOnlinePayment
+                            ? TextDecoration.lineThrough
+                            : TextDecoration.none,
+                      ),
+                    ),
+                  ],
                 ),
-              const Divider(color: Colors.white10, height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Total Amount',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: isDark ? Colors.white : AppColors.secondaryBlue,
-                    ),
-                  ),
-                  Text(
-                    'RM ${_discountedTotal.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 16,
-                      color: AppColors.primaryOrange,
-                    ),
+                if (widget.existingBooking!.lateFees > 0) ...[
+                  const SizedBox(height: 12),
+                  _buildPriceRow(
+                    'Overdue Fee',
+                    'RM ${widget.existingBooking!.lateFees.toStringAsFixed(2)}',
+                    color: Colors.redAccent,
+                    isBold: true,
+                    isDark: isDark,
                   ),
                 ],
-              ),
-              if (_paymentOption == 'Deposit' && !widget.isExtension && !_isFinalPayment) ...[
-                const SizedBox(height: 8),
+                if ((widget.existingBooking!.returnInspection?['damageFee'] ?? 0.0) > 0) ...[
+                  const SizedBox(height: 6),
+                  _buildPriceRow(
+                    'Damage Fee',
+                    'RM ${(widget.existingBooking!.returnInspection!['damageFee'] as num).toDouble().toStringAsFixed(2)}',
+                    color: Colors.redAccent,
+                    isBold: true,
+                    isDark: isDark,
+                  ),
+                ],
+                if ((widget.existingBooking!.returnInspection?['cleaningFee'] ?? 0.0) > 0) ...[
+                  const SizedBox(height: 6),
+                  _buildPriceRow(
+                    'Cleaning Fee',
+                    'RM ${(widget.existingBooking!.returnInspection!['cleaningFee'] as num).toDouble().toStringAsFixed(2)}',
+                    color: Colors.redAccent,
+                    isDark: isDark,
+                  ),
+                ],
+                if ((widget.existingBooking!.returnInspection?['extraCharges'] ?? 0.0) > 0) ...[
+                  const SizedBox(height: 6),
+                  _buildPriceRow(
+                    'Extra Fee',
+                    'RM ${(widget.existingBooking!.returnInspection!['extraCharges'] as num).toDouble().toStringAsFixed(2)}',
+                    color: Colors.redAccent,
+                    isDark: isDark,
+                  ),
+                ],
+                const Divider(color: Colors.white10, height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Amount Due',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: isDark ? Colors.white : AppColors.secondaryBlue,
+                      ),
+                    ),
+                    Text(
+                      'RM ${widget.existingBooking!.finalAmount.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 18,
+                        color: AppColors.primaryOrange,
+                      ),
+                    ),
+                  ],
+                ),
+              ] else ...[
                 _buildPriceRow(
-                  'Deposit Due Now',
-                  'RM ${_depositAmount.toStringAsFixed(2)}',
-                  color: AppColors.primaryOrange,
-                  isBold: true,
+                  widget.isExtension
+                      ? 'Extension Cost'
+                      : 'Base Rental ($_rentalDays Days)',
+                  'RM ${_totalPrice.toStringAsFixed(2)}',
                   isDark: isDark,
                 ),
-                _buildPriceRow(
-                  'Remaining Balance',
-                  'RM ${_balanceAmount.toStringAsFixed(2)}',
-                  isDark: isDark,
+                _buildPriceRow('Extra Charges', 'RM 0.00', isDark: isDark),
+                _buildPriceRow('Tax (6% SST)', 'RM 0.00', isDark: isDark),
+                if (_promotionDiscountAmount > 0)
+                  _buildPriceRow(
+                    'Promotion Discount (${_appliedPromotion?.name ?? "Promo"})',
+                    '- RM ${_promotionDiscountAmount.toStringAsFixed(2)}',
+                    color: Colors.green,
+                    isDark: isDark,
+                  ),
+                if (_pointsDiscountAmount > 0)
+                  _buildPriceRow(
+                    'Reward Points Discount ($_pointsToRedeem pts)',
+                    '- RM ${_pointsDiscountAmount.toStringAsFixed(2)}',
+                    color: Colors.green,
+                    isDark: isDark,
+                  ),
+                const Divider(color: Colors.white10, height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Total Amount',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: isDark ? Colors.white : AppColors.secondaryBlue,
+                      ),
+                    ),
+                    Text(
+                      'RM ${_discountedTotal.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                        color: AppColors.primaryOrange,
+                      ),
+                    ),
+                  ],
                 ),
+                if (_paymentOption == 'Deposit' && !widget.isExtension && !_isFinalPayment) ...[
+                  const SizedBox(height: 8),
+                  _buildPriceRow(
+                    'Deposit Due Now',
+                    'RM ${_depositAmount.toStringAsFixed(2)}',
+                    color: AppColors.primaryOrange,
+                    isBold: true,
+                    isDark: isDark,
+                  ),
+                  _buildPriceRow(
+                    'Remaining Balance',
+                    'RM ${_balanceAmount.toStringAsFixed(2)}',
+                    isDark: isDark,
+                  ),
+                ],
               ],
             ],
           ),

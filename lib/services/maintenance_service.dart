@@ -121,6 +121,16 @@ class MaintenanceService {
         type: 'maintenance',
       );
 
+      await notificationService.notifyAllAdmins(
+        title: 'Vehicle Entered Maintenance 🔧',
+        message: 'Vehicle "$vehicleName" has entered maintenance (Status: $status).',
+        type: 'maintenance',
+        icon: '🔧',
+        color: '0xFFF59E0B',
+        relatedId: vehicleId,
+        actionRoute: 'Vehicle Maintenance',
+      );
+
       // Check for active/pending bookings that are affected by this maintenance
       try {
         final bookingsSnap = await FirebaseDatabase.instance.ref().child('bookings').get().timeout(const Duration(seconds: 5));

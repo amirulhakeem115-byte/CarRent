@@ -5,16 +5,19 @@ import 'package:intl/intl.dart';
 
 import '../../../constants/colors.dart';
 import '../../../services/auth_service.dart';
-import '../../../services/database_service.dart';
 import '../../../services/vehicle_service.dart';
 import '../../../services/booking_service.dart';
 import '../../../services/payment_service.dart';
+import '../../../services/promotion_service.dart';
 import '../../../models/user_model.dart';
 import '../../../models/vehicle_model.dart';
 import '../../../models/booking_model.dart';
 import '../../../models/payment_model.dart';
+import '../../../models/promotion_model.dart';
 import '../../../widgets/app_image.dart';
+import '../../../widgets/hero_promotion_carousel.dart';
 import '../../../services/company_settings_provider.dart';
+import '../../../services/user_session.dart';
 
 import 'vehicle_list_screen.dart';
 import 'vehicle_details_screen.dart';
@@ -35,15 +38,16 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
       _isDark ? const Color(0xFFCBD5E1) : AppColors.lightText;
 
   final AuthService _authService = AuthService();
-  final DatabaseService _databaseService = DatabaseService();
   final VehicleService _vehicleService = VehicleService();
   final BookingService _bookingService = BookingService();
   final PaymentService _paymentService = PaymentService();
+  final PromotionService _promotionService = PromotionService();
 
   UserModel? _user;
   List<VehicleModel> _vehicles = [];
   List<BookingModel> _bookings = [];
   List<PaymentModel> _payments = [];
+  List<PromotionModel> _promotions = [];
   bool _loading = true;
   String? _error;
 
@@ -51,6 +55,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   StreamSubscription<List<BookingModel>>? _bookingsSubscription;
   StreamSubscription<List<PaymentModel>>? _paymentsSubscription;
   StreamSubscription<List<VehicleModel>>? _vehiclesSubscription;
+  StreamSubscription<List<PromotionModel>>? _promotionsSubscription;
 
   @override
   void initState() {
@@ -119,6 +124,17 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         });
       }
     });
+
+    _promotionsSubscription?.cancel();
+    _promotionsSubscription = _promotionService.getPromotionsStream().listen((
+      allPromotions,
+    ) {
+      if (mounted) {
+        setState(() {
+          _promotions = allPromotions;
+        });
+      }
+    });
   }
 
   @override
@@ -127,6 +143,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     _bookingsSubscription?.cancel();
     _paymentsSubscription?.cancel();
     _vehiclesSubscription?.cancel();
+    _promotionsSubscription?.cancel();
     super.dispose();
   }
 
@@ -139,46 +156,14 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     try {
       final currentUser = _authService.currentUser;
       if (currentUser != null) {
-        _user = await _databaseService
-            .getUser(currentUser.uid)
-            .timeout(const Duration(seconds: 5));
+        _user = await UserSession().fetchAndCacheUserModel(currentUser.uid);
         if (_user == null) {
           throw Exception("User data not found in database");
         }
-
-        if (mounted) {
-          setState(() {
-            _loading = false;
-          });
-        }
-
-        // Load bookings, payments, and vehicles in background (non-blocking)
-        Future.wait([
-              _bookingService.getUserBookings(currentUser.uid),
-              _paymentService.getUserPayments(currentUser.uid),
-              _vehicleService.getVehicles(),
-            ])
-            .timeout(const Duration(seconds: 10))
-            .then((results) {
-              if (mounted) {
-                setState(() {
-                  _bookings = results[0] as List<BookingModel>;
-                  _payments = results[1] as List<PaymentModel>;
-                  _vehicles = results[2] as List<VehicleModel>;
-                });
-              }
-            })
-            .catchError((err) {
-              debugPrint('Error loading dashboard background data: $err');
-              if (mounted) {
-                setState(() {
-                  if (_vehicles.isEmpty) {
-                    _vehicles = [];
-                  }
-                });
-              }
-            });
       }
+      // Seed preset promotions if empty
+      await _promotionService.seedDefaultPromotions();
+      _promotions = await _promotionService.getPromotions(forceRefresh: true);
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -278,13 +263,26 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildHeroBanner(),
+            const SizedBox(height: 14),
+
+            // Hero Promotional Carousel
+            if (_promotions.isNotEmpty)
+              HeroPromotionCarousel(promotions: _promotions),
+
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildStatsRow(),
                   const SizedBox(height: 20),
+
+                  // Compact Special Deals Section
+                  if (_promotions.isNotEmpty) ...[
+                    PromotionCardsSection(promotions: _promotions),
+                    const SizedBox(height: 24),
+                  ],
+
                   _buildMembershipProgressCard(context),
                   const SizedBox(height: 20),
                   _buildLastPaymentCard(),

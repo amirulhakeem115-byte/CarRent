@@ -4,6 +4,12 @@ class NotificationModel {
   final String title;
   final String message;
   final String type;
+  final String category;
+  final String customerName;
+  final String vehicleName;
+  final String bookingId;
+  final String paymentId;
+  final String priority; // 'high', 'normal', 'low'
   final bool isRead;
   final DateTime createdAt;
   final String icon;
@@ -17,6 +23,12 @@ class NotificationModel {
     required this.title,
     required this.message,
     required this.type,
+    this.category = 'General',
+    this.customerName = '',
+    this.vehicleName = '',
+    this.bookingId = '',
+    this.paymentId = '',
+    this.priority = 'normal',
     required this.isRead,
     required this.createdAt,
     this.icon = '⚙️',
@@ -32,6 +44,12 @@ class NotificationModel {
       title: data['title'] ?? '',
       message: data['message'] ?? '',
       type: data['type'] ?? 'general',
+      category: data['category'] ?? 'General',
+      customerName: data['customerName'] ?? '',
+      vehicleName: data['vehicleName'] ?? '',
+      bookingId: data['bookingId'] ?? '',
+      paymentId: data['paymentId'] ?? '',
+      priority: data['priority'] ?? 'normal',
       isRead: data['isRead'] ?? false,
       createdAt: DateTime.parse(
         data['createdAt'] ?? DateTime.now().toIso8601String(),
@@ -49,6 +67,12 @@ class NotificationModel {
       'title': title,
       'message': message,
       'type': type,
+      'category': category,
+      'customerName': customerName,
+      'vehicleName': vehicleName,
+      'bookingId': bookingId,
+      'paymentId': paymentId,
+      'priority': priority,
       'isRead': isRead,
       'createdAt': createdAt.toIso8601String(),
       'icon': icon,

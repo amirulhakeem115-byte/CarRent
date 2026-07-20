@@ -28,15 +28,13 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
 
   final List<String> _typesList = [
     'All',
-    'booking',
-    'payment',
-    'customer',
-    'support',
-    'maintenance',
-    'vehicle',
-    'location',
-    'security',
-    'system',
+    'Bookings',
+    'Open Rental',
+    'Payments',
+    'Customers',
+    'Vehicles',
+    'Promotions',
+    'System',
   ];
 
   Stream<List<NotificationModel>>? _notificationsStream;
@@ -94,8 +92,28 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
           final query = _searchQuery.toLowerCase();
           final matchesQuery =
               n.title.toLowerCase().contains(query) ||
-              n.message.toLowerCase().contains(query);
-          final matchesType = _selectedType == 'All' || n.type == _selectedType;
+              n.message.toLowerCase().contains(query) ||
+              n.customerName.toLowerCase().contains(query) ||
+              n.vehicleName.toLowerCase().contains(query) ||
+              n.bookingId.toLowerCase().contains(query);
+
+          bool matchesType = true;
+          final catLower = n.category.toLowerCase();
+          if (_selectedType == 'Bookings' || _selectedType == 'Booking') {
+            matchesType = catLower == 'bookings' || n.type == 'booking' || n.type == 'extension_request' || n.type == 'extension_approved' || n.type == 'extension_rejected' || n.type == 'pickup_reminder_admin';
+          } else if (_selectedType == 'Open Rental') {
+            matchesType = catLower == 'open rental' || n.type == 'open_rental' || n.type == 'on_my_way' || n.type == 'return_request' || n.type == 'return_reminder_admin';
+          } else if (_selectedType == 'Payments' || _selectedType == 'Payment') {
+            matchesType = catLower == 'payments' || n.type == 'payment';
+          } else if (_selectedType == 'Vehicles' || _selectedType == 'Vehicle') {
+            matchesType = catLower == 'vehicles' || n.type == 'vehicle' || n.type == 'maintenance';
+          } else if (_selectedType == 'Customers' || _selectedType == 'Customer') {
+            matchesType = catLower == 'customers' || n.type == 'customer';
+          } else if (_selectedType == 'Promotions' || _selectedType == 'Promotion') {
+            matchesType = catLower == 'promotions' || n.type == 'promotion';
+          } else if (_selectedType == 'System') {
+            matchesType = catLower == 'system' || n.type == 'system' || n.type == 'support' || n.type == 'location' || n.type == 'security';
+          }
           bool matchesStatus = true;
           if (_selectedStatus == 'Unread') {
             matchesStatus = !n.isRead;
@@ -120,6 +138,10 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
         }).toList();
 
         final unreadCount = filteredNotifs.where((n) => !n.isRead).length;
+
+        debugPrint(
+          '[STEP 8] Admin UI updated (${filteredNotifs.length} notifications displayed, $unreadCount unread)',
+        );
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -979,7 +1001,10 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
               ),
             ),
             onPressed: () async =>
-                await _notificationService.clearReadNotifications(userId),
+                await _notificationService.clearReadNotifications(
+                  userId,
+                  includeAdminShared: true,
+                ),
             icon: const Icon(Icons.delete_sweep_outlined, size: 16),
             label: const Text(
               'Clear Read',

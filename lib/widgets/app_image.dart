@@ -1,5 +1,25 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
+final Map<String, Uint8List> _base64Cache = {};
+
+Uint8List? _getDecodedBase64(String src) {
+  if (_base64Cache.containsKey(src)) {
+    return _base64Cache[src];
+  }
+  try {
+    String base64Str = src;
+    if (src.contains(',')) {
+      base64Str = src.split(',').last;
+    }
+    final decoded = base64Decode(base64Str.trim());
+    _base64Cache[src] = decoded;
+    return decoded;
+  } catch (e) {
+    return null;
+  }
+}
 
 ImageProvider? getAppImageProvider(String? imageSrc) {
   if (imageSrc == null || imageSrc.trim().isEmpty) {
@@ -8,16 +28,11 @@ ImageProvider? getAppImageProvider(String? imageSrc) {
   if (imageSrc.startsWith('http://') || imageSrc.startsWith('https://')) {
     return NetworkImage(imageSrc);
   }
-  try {
-    String base64Str = imageSrc;
-    if (imageSrc.contains(',')) {
-      base64Str = imageSrc.split(',').last;
-    }
-    final decodedBytes = base64Decode(base64Str.trim());
-    return MemoryImage(decodedBytes);
-  } catch (e) {
-    return null;
+  final bytes = _getDecodedBase64(imageSrc);
+  if (bytes != null) {
+    return MemoryImage(bytes);
   }
+  return null;
 }
 
 class AppImage extends StatelessWidget {
@@ -51,12 +66,8 @@ class AppImage extends StatelessWidget {
         errorBuilder: (context, error, stackTrace) => placeholder ?? _defaultPlaceholder(),
       );
     }
-    try {
-      String base64Str = src;
-      if (src.contains(',')) {
-        base64Str = src.split(',').last;
-      }
-      final decodedBytes = base64Decode(base64Str.trim());
+    final decodedBytes = _getDecodedBase64(src);
+    if (decodedBytes != null) {
       return Image.memory(
         decodedBytes,
         width: width,
@@ -64,9 +75,8 @@ class AppImage extends StatelessWidget {
         fit: fit,
         errorBuilder: (context, error, stackTrace) => placeholder ?? _defaultPlaceholder(),
       );
-    } catch (e) {
-      return placeholder ?? _defaultPlaceholder();
     }
+    return placeholder ?? _defaultPlaceholder();
   }
 
   Widget _defaultPlaceholder() {

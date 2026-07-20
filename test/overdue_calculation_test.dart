@@ -42,6 +42,33 @@ void main() {
       expect(detailsOverOneDay['isOverdue'], true);
       expect(detailsOverOneDay['days'], 2);
       expect(detailsOverOneDay['hours'], 3);
+
+      // Overdue 5 days late (15 July to 20 July test case @ RM100/day = RM500)
+      final rate100 = 100.0;
+      final returnJuly15 = DateTime(2026, 7, 15, 16, 0);
+      final actualJuly20 = DateTime(2026, 7, 20, 16, 0);
+      final booking5DaysOverdue = BookingModel(
+        id: 'b_5days',
+        vehicleId: 'v1',
+        vehicleName: 'Camry',
+        userId: 'u1',
+        userName: 'Musab',
+        userPhone: '12345',
+        pickUpDate: returnJuly15.subtract(const Duration(days: 3)),
+        returnDate: returnJuly15,
+        totalPrice: 300.0,
+        depositAmount: 50.0,
+        status: 'Active',
+        createdAt: DateTime.now(),
+      );
+
+      final charges5Days = BookingService.calculateOverdueCharges(booking5DaysOverdue, rate100, now: actualJuly20);
+      final details5Days = BookingService.getOverdueDetails(booking5DaysOverdue, rate100, now: actualJuly20);
+
+      expect(charges5Days, 500.0); // 5 days @ RM100/day = RM500
+      expect(details5Days['isOverdue'], true);
+      expect(details5Days['days'], 5);
+      expect(details5Days['hours'], 0);
     });
 
     test('Completed bookings never receive new overdue charges (frozen late fees)', () {

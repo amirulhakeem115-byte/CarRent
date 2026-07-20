@@ -52,14 +52,14 @@ class AuthService {
 
       try {
         final notificationService = NotificationService();
-        await notificationService.notifyAllAdmins(
-          title: 'New Customer Registered',
-          message: '$fullName has registered.\nEmail: $email',
-          type: 'customer',
+        await notificationService.notifyCustomerEvent(
+          eventName: 'Customer Registered',
+          customerName: fullName,
+          customerUid: uid,
+          details: 'registered a new customer account ($email).',
+          priority: 'high',
           icon: '👤',
           color: '0xFF14B8A6',
-          relatedId: uid,
-          actionRoute: 'Customers',
         );
       } catch (err) {
         debugPrint('Failed to notify admins of registration: $err');

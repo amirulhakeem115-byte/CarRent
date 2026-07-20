@@ -11,6 +11,8 @@ import 'services/company_settings_provider.dart';
 import 'services/theme_provider.dart';
 import 'ai/services/ai_service.dart';
 import 'services/user_session.dart';
+import 'services/overdue_reminder_service.dart';
+import 'services/admin_booking_observer_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,27 +24,15 @@ Future<void> main() async {
       );
     }
 
-    // App Check settings for development testing
-    // Set to true if App Check enforcement is active in your Firebase Console
-    // bool enableAppCheckInDebug = false;
-
-    // Persistent debug token registered in Firebase Console under App Check > Manage debug tokens
-    // const String webDebugToken = 'b1761c25-c825-49a0-9932-fed7f28437ad';
-
-    // [source: 1]
     await FirebaseAppCheck.instance.activate(
       providerWeb: kDebugMode
           ? WebDebugProvider(debugToken: 'b1761c25-c825-49a0-9932-fed7f28437ad')
           : ReCaptchaV3Provider('6LeBqystAAAAAJS3i4iO7I6aKG8uh-Dt4NgpET8J'),
-
-      // Update Android to use a custom hardcoded token in Debug mode
       providerAndroid: kDebugMode
           ? const AndroidDebugProvider(
               debugToken: 'b1761c25-c825-49a0-9932-fed7f28437ad',
             )
           : const AndroidPlayIntegrityProvider(),
-
-      // Update Apple to use a custom hardcoded token in Debug mode
       providerApple: kDebugMode
           ? const AppleDebugProvider(
               debugToken: 'b1761c25-c825-49a0-9932-fed7f28437ad',
@@ -52,6 +42,12 @@ Future<void> main() async {
 
     // Initialize user session monitoring
     UserSession().initialize();
+
+    // Start background late return reminder monitoring
+    OverdueReminderService().startMonitoring();
+
+    // Start background admin booking observer
+    AdminBookingObserverService().startObserving();
   } catch (e) {
     if (e.toString().contains('duplicate-app')) {
       debugPrint('Firebase already initialized: $e');

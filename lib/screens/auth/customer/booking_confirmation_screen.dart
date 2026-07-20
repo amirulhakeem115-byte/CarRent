@@ -213,6 +213,8 @@ class BookingConfirmationScreen extends StatelessWidget {
                                     ),
                                     const SizedBox(height: 16),
                                     _detailRow('Payment Method', paymentMethod, isDark),
+                                    if (booking.promotionDiscountAmount > 0)
+                                      _detailRow('Promotion (${booking.promotionCode ?? booking.promotionName ?? "Applied"})', '- RM ${booking.promotionDiscountAmount.toStringAsFixed(2)}', isDark, highlightValue: true),
                                     _detailRow('Points Redeemed', '${booking.pointsRedeemed} Points', isDark, isPoints: booking.pointsRedeemed > 0),
                                     _detailRow('Total Rent Price', 'RM ${booking.totalPrice.toStringAsFixed(2)}', isDark, isPrice: true),
                                     if (booking.depositAmount > 0)

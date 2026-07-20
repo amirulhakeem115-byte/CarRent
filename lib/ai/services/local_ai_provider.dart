@@ -425,7 +425,7 @@ class LocalAIProvider implements AIProvider {
 
       final target = _findBookingForAction(text, unpaid);
       if (target == null) {
-        final listStr = unpaid.map((b) => "• **${b.vehicleName}** (Ref: `#${b.id.substring(0, 5).toUpperCase()}`, Status: **${b.status}**, Owed: RM ${(b.isOpenRental && b.status.toLowerCase() == 'awaiting final payment' ? b.finalAmount : b.totalPrice).toStringAsFixed(2)})").join('\n');
+        final listStr = unpaid.map((b) => "• **${b.vehicleName}** (Ref: `#${b.id.substring(0, 5).toUpperCase()}`, Status: **${b.status}**, Owed: RM ${(b.status.toLowerCase() == 'awaiting final payment' ? b.finalAmount : b.totalPrice).toStringAsFixed(2)})").join('\n');
         final List<String> opt = unpaid.map((b) => "Choose payment method for booking #${b.id}").toList();
         opt.add('Back to Dashboard');
         return AIResponse(
@@ -439,7 +439,7 @@ class LocalAIProvider implements AIProvider {
 
       final bId = target.id;
       final vehicleName = target.vehicleName;
-      final totalPrice = target.isOpenRental && target.status.toLowerCase() == 'awaiting final payment' ? target.finalAmount : target.totalPrice;
+      final totalPrice = target.status.toLowerCase() == 'awaiting final payment' ? target.finalAmount : target.totalPrice;
       final depositAmount = target.status.toLowerCase() == 'awaiting final payment' ? totalPrice : target.depositAmount;
 
       session.reset();

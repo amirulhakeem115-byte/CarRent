@@ -15,14 +15,23 @@ class NotificationService {
     required String title,
     required String message,
     required String type,
+    String category = 'General',
+    String customerName = '',
+    String vehicleName = '',
+    String bookingId = '',
+    String paymentId = '',
+    String priority = 'normal',
     String icon = '⚙️',
     String color = '0xFF64748B',
     String relatedId = '',
     String actionRoute = 'Dashboard',
   }) async {
+    final stopwatch = Stopwatch()..start();
+    debugPrint(
+      '[STEP 3] Calling NotificationService.createAdminNotification() (Event="$title", Target="$userId")',
+    );
+
     try {
-      // ignore: avoid_print
-      print("Saving notification for customer: $userId");
       final newRef = _baseDb.push();
       final finalNotification = NotificationModel(
         id: newRef.key!,
@@ -30,6 +39,12 @@ class NotificationService {
         title: title,
         message: message,
         type: type,
+        category: category,
+        customerName: customerName,
+        vehicleName: vehicleName,
+        bookingId: bookingId,
+        paymentId: paymentId,
+        priority: priority,
         isRead: false,
         createdAt: DateTime.now(),
         icon: icon,
@@ -37,18 +52,33 @@ class NotificationService {
         relatedId: relatedId,
         actionRoute: actionRoute,
       );
+
+      debugPrint(
+        '[STEP 4] Notification object created (ID="${finalNotification.id}", Title="$title", Target="$userId")',
+      );
+      debugPrint(
+        '[STEP 5] Writing notification to Firebase at path: notifications/${newRef.key}',
+      );
+
       await newRef
           .set(finalNotification.toMap())
           .timeout(const Duration(seconds: 10));
-      // ignore: avoid_print
-      print("Notification saved successfully");
+
+      stopwatch.stop();
+      debugPrint(
+        '[STEP 6] Firebase write successful (Ref: notifications/${newRef.key}) in ${stopwatch.elapsedMilliseconds}ms',
+      );
 
       // Non-blocking cleanup of old notifications to keep latest 50 per user
       _cleanupOldNotifications(userId).catchError((e) {
-        debugPrint('Error cleaning up notifications: $e');
+        debugPrint('[NotificationService] Error cleaning up notifications: $e');
       });
-    } catch (e) {
-      debugPrint('Error creating notification: $e');
+    } catch (e, stack) {
+      stopwatch.stop();
+      debugPrint(
+        '[NotificationService] [FAILURE] Firebase write failed after ${stopwatch.elapsedMilliseconds}ms. '
+        'Exception: $e\nStack: $stack',
+      );
       rethrow;
     }
   }
@@ -87,7 +117,7 @@ class NotificationService {
         }
       }
     } catch (e) {
-      debugPrint('Asynchronous notification cleanup failed: $e');
+      debugPrint('[NotificationService] Async notification cleanup failed: $e');
     }
   }
 
@@ -131,10 +161,9 @@ class NotificationService {
         });
       }
     } catch (e) {
-      debugPrint('Error getting notifications with filtered query: $e');
-
-      // Fallback: handle environments where query-based reads are rejected
-      // while a plain node read is still permitted.
+      debugPrint(
+        '[NotificationService] Error getting notifications with query: $e. Using node fallback.',
+      );
       try {
         final fallbackSnapshot = await _baseDb.get().timeout(
           const Duration(seconds: 10),
@@ -151,7 +180,9 @@ class NotificationService {
           });
         }
       } catch (fallbackError) {
-        debugPrint('Fallback notification load failed: $fallbackError');
+        debugPrint(
+          '[NotificationService] Fallback notification load failed: $fallbackError',
+        );
         rethrow;
       }
     }
@@ -173,7 +204,6 @@ class NotificationService {
     final controller = StreamController<List<NotificationModel>>.broadcast();
     StreamSubscription<DatabaseEvent>? personalSub;
     StreamSubscription<DatabaseEvent>? adminSub;
-    StreamSubscription<DatabaseEvent>? fallbackSub;
     List<NotificationModel> personalList = [];
     List<NotificationModel> adminList = [];
 
@@ -188,6 +218,9 @@ class NotificationService {
       }
       final list = merged.values.toList();
       list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      debugPrint(
+        '[TRACE STEP 8] Admin listener received notification update: Total count=${list.length}, Admin count=${adminList.length}',
+      );
       if (limit != null && list.length > limit) {
         controller.add(list.take(limit).toList());
       } else {
@@ -195,7 +228,7 @@ class NotificationService {
       }
     }
 
-    // 1. Immediately subscribe to personal notifications
+    // 1. Subscribe to personal notifications
     Query personalQuery = _baseDb
         .orderByChild('userId')
         .equalTo(currentUser.uid);
@@ -218,108 +251,60 @@ class NotificationService {
               );
             });
           } catch (e) {
-            debugPrint('Error parsing personal notifications: $e');
+            debugPrint('[NotificationService] Error parsing personal notifications: $e');
           }
         }
         emitMerged();
       },
       onError: (e) {
-        debugPrint('Error loading personal notifications stream: $e');
-
-        // Customer-mode fallback: subscribe without query and filter locally.
-        if (!includeAdminNotifications && fallbackSub == null) {
-          fallbackSub = _baseDb.onValue.listen(
-            (fallbackEvent) {
-              personalList = [];
-              if (fallbackEvent.snapshot.exists &&
-                  fallbackEvent.snapshot.value != null) {
-                try {
-                  final Map<dynamic, dynamic> data =
-                      fallbackEvent.snapshot.value as Map<dynamic, dynamic>;
-                  data.forEach((key, value) {
-                    if (value is Map &&
-                        value['userId']?.toString() == currentUser.uid) {
-                      personalList.add(
-                        NotificationModel.fromMap(key.toString(), value),
-                      );
-                    }
-                  });
-                } catch (parseError) {
-                  debugPrint(
-                    'Error parsing fallback notifications: $parseError',
-                  );
-                }
-              }
-              emitMerged();
-            },
-            onError: (fallbackError) {
-              debugPrint(
-                'Fallback notifications stream failed: $fallbackError',
-              );
-              if (!controller.isClosed) {
-                controller.addError(fallbackError);
-              }
-            },
-          );
-        } else {
-          if (!controller.isClosed) {
-            controller.addError(e);
-          }
+        debugPrint('[NotificationService] Error in personal notifications stream query: $e');
+        if (!controller.isClosed) {
+          controller.addError(e);
         }
       },
     );
 
+    // 2. Subscribe to admin notifications if requested
     if (includeAdminNotifications) {
-      UserRoleCache.getRole(currentUser.uid)
-          .then((role) {
-            if (controller.isClosed) return;
-
-            if (role == 'admin') {
-              Query adminQuery = _baseDb
-                  .orderByChild('userId')
-                  .equalTo('admin');
-              if (limit != null) {
-                adminQuery = adminQuery.limitToLast(limit);
-              }
-              adminSub = adminQuery.onValue.listen(
-                (event) {
-                  adminList = [];
-                  if (event.snapshot.exists && event.snapshot.value != null) {
-                    try {
-                      final Map<dynamic, dynamic> data =
-                          event.snapshot.value as Map<dynamic, dynamic>;
-                      data.forEach((key, value) {
-                        adminList.add(
-                          NotificationModel.fromMap(
-                            key.toString(),
-                            value as Map<dynamic, dynamic>,
-                          ),
-                        );
-                      });
-                    } catch (e) {
-                      debugPrint('Error parsing admin notifications: $e');
-                    }
-                  }
-                  emitMerged();
-                },
-                onError: (e) {
-                  debugPrint('Error loading admin notifications stream: $e');
-                  if (!controller.isClosed) {
-                    controller.addError(e);
-                  }
-                },
+      Query adminQuery = _baseDb.orderByChild('userId').equalTo('admin');
+      if (limit != null) {
+        adminQuery = adminQuery.limitToLast(limit);
+      }
+      adminSub = adminQuery.onValue.listen(
+        (event) {
+          debugPrint('[STEP 7] Admin listener received notification from Firebase');
+          adminList = [];
+          if (event.snapshot.exists && event.snapshot.value != null) {
+            try {
+              final Map<dynamic, dynamic> data =
+                  event.snapshot.value as Map<dynamic, dynamic>;
+              data.forEach((key, value) {
+                adminList.add(
+                  NotificationModel.fromMap(
+                    key.toString(),
+                    value as Map<dynamic, dynamic>,
+                  ),
+                );
+              });
+            } catch (e) {
+              debugPrint(
+                '[NotificationService] Error parsing admin notifications: $e',
               );
             }
-          })
-          .catchError((e) {
-            debugPrint('Error checking user role for notification stream: $e');
-          });
+          }
+          emitMerged();
+        },
+        onError: (e) {
+          debugPrint(
+            '[NotificationService] Error in admin notifications stream query: $e',
+          );
+        },
+      );
     }
 
     controller.onCancel = () {
       personalSub?.cancel();
       adminSub?.cancel();
-      fallbackSub?.cancel();
     };
 
     return controller.stream;
@@ -332,7 +317,7 @@ class NotificationService {
           .update({'isRead': true})
           .timeout(const Duration(seconds: 10));
     } catch (e) {
-      debugPrint('Error marking notification as read: $e');
+      debugPrint('[NotificationService] Error marking notification as read: $e');
       rethrow;
     }
   }
@@ -344,7 +329,7 @@ class NotificationService {
           .update({'isRead': isRead})
           .timeout(const Duration(seconds: 10));
     } catch (e) {
-      debugPrint('Error toggling read status: $e');
+      debugPrint('[NotificationService] Error toggling read status: $e');
       rethrow;
     }
   }
@@ -382,34 +367,44 @@ class NotificationService {
         await _baseDb.update(updates).timeout(const Duration(seconds: 10));
       }
     } catch (e) {
-      debugPrint('Error marking all notifications as read: $e');
+      debugPrint('[NotificationService] Error marking all notifications as read: $e');
       rethrow;
     }
   }
 
-  Future<void> clearReadNotifications(String userId) async {
+  Future<void> clearReadNotifications(
+    String userId, {
+    bool includeAdminShared = false,
+  }) async {
     try {
-      final snapshot = await _baseDb
-          .orderByChild('userId')
-          .equalTo(userId)
-          .get()
-          .timeout(const Duration(seconds: 10));
-      if (snapshot.exists) {
-        final Map<dynamic, dynamic> data =
-            snapshot.value as Map<dynamic, dynamic>;
-        final Map<String, dynamic> updates = {};
-        data.forEach((key, value) {
-          final isReadVal = (value as Map)['isRead'] ?? false;
-          if (isReadVal) {
-            updates[key.toString()] = null; // delete
-          }
-        });
-        if (updates.isNotEmpty) {
-          await _baseDb.update(updates).timeout(const Duration(seconds: 10));
+      final targetUserIds = <String>{userId};
+      if (includeAdminShared) {
+        targetUserIds.add('admin');
+      }
+
+      final Map<String, dynamic> updates = {};
+      for (final targetUserId in targetUserIds) {
+        final snapshot = await _baseDb
+            .orderByChild('userId')
+            .equalTo(targetUserId)
+            .get()
+            .timeout(const Duration(seconds: 10));
+        if (snapshot.exists) {
+          final Map<dynamic, dynamic> data =
+              snapshot.value as Map<dynamic, dynamic>;
+          data.forEach((key, value) {
+            final isReadVal = (value as Map)['isRead'] ?? false;
+            if (isReadVal) {
+              updates[key.toString()] = null; // delete
+            }
+          });
         }
       }
+      if (updates.isNotEmpty) {
+        await _baseDb.update(updates).timeout(const Duration(seconds: 10));
+      }
     } catch (e) {
-      debugPrint('Error clearing read notifications: $e');
+      debugPrint('[NotificationService] Error clearing read notifications: $e');
       rethrow;
     }
   }
@@ -418,7 +413,7 @@ class NotificationService {
     try {
       await _baseDb.child(id).remove().timeout(const Duration(seconds: 10));
     } catch (e) {
-      debugPrint('Error deleting notification: $e');
+      debugPrint('[NotificationService] Error deleting notification: $e');
       rethrow;
     }
   }
@@ -442,7 +437,7 @@ class NotificationService {
         }
       }
     } catch (e) {
-      debugPrint('Error clearing notifications: $e');
+      debugPrint('[NotificationService] Error clearing notifications: $e');
       rethrow;
     }
   }
@@ -451,6 +446,7 @@ class NotificationService {
     required String title,
     required String message,
     required String type,
+    String category = 'General',
     String icon = '⚙️',
     String color = '0xFF64748B',
     String relatedId = '',
@@ -461,7 +457,6 @@ class NotificationService {
       if (currentUser == null) return;
 
       final currentRole = await UserRoleCache.getRole(currentUser.uid);
-
       if (currentRole != 'admin') {
         debugPrint(
           '[NotificationService] [notifyAllCustomers] Customer user cannot read user list to notify customers. Skipping.',
@@ -485,6 +480,7 @@ class NotificationService {
               title: title,
               message: message,
               type: type,
+              category: category,
               icon: icon,
               color: color,
               relatedId: relatedId,
@@ -494,7 +490,7 @@ class NotificationService {
         }
       }
     } catch (e) {
-      debugPrint('Error notifying all customers: $e');
+      debugPrint('[NotificationService] Error notifying all customers: $e');
     }
   }
 
@@ -502,74 +498,213 @@ class NotificationService {
     required String title,
     required String message,
     required String type,
+    String category = 'General',
+    String customerName = '',
+    String vehicleName = '',
+    String bookingId = '',
+    String paymentId = '',
+    String priority = 'normal',
     String icon = '⚙️',
     String color = '0xFF64748B',
     String relatedId = '',
     String actionRoute = 'Dashboard',
   }) async {
     try {
-      final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser == null) return;
+      debugPrint(
+        '[TRACE STEP 4] notifyAllAdmins invoked: Title="$title", Category="$category", BookingId="$bookingId"',
+      );
 
-      final currentRole = await UserRoleCache.getRole(currentUser.uid);
-
-      if (currentRole != 'admin') {
-        // Fallback for customer actions: write directly to 'admin' topic
-        await createNotification(
-          userId: 'admin',
-          title: title,
-          message: message,
-          type: type,
-          icon: icon,
-          color: color,
-          relatedId: relatedId,
-          actionRoute: actionRoute,
-        );
-        return;
-      }
-
-      // If caller is admin, try to create individual notifications for each admin
-      try {
-        final snapshot = await FirebaseDatabase.instance
-            .ref()
-            .child('users')
-            .get()
-            .timeout(const Duration(seconds: 5));
-        if (snapshot.exists) {
-          final Map<dynamic, dynamic> users =
-              snapshot.value as Map<dynamic, dynamic>;
-          for (var entry in users.entries) {
-            final userData = entry.value as Map<dynamic, dynamic>;
-            final role = userData['role'] ?? 'customer';
-            if (role == 'admin') {
-              await createNotification(
-                userId: entry.key.toString(),
-                title: title,
-                message: message,
-                type: type,
-                icon: icon,
-                color: color,
-                relatedId: relatedId,
-                actionRoute: actionRoute,
-              );
-            }
-          }
-        }
-      } catch (e) {
-        // Fallback if users list reading is permission-denied
-        await createNotification(
-          userId: 'admin',
-          title: title,
-          message: message,
-          type: type,
-          icon: icon,
-          color: color,
-          relatedId: relatedId,
-          actionRoute: actionRoute,
-        );
-      }
+      // Write notification to centralized 'admin' topic
+      await createNotification(
+        userId: 'admin',
+        title: title,
+        message: message,
+        type: type,
+        category: category,
+        customerName: customerName,
+        vehicleName: vehicleName,
+        bookingId: bookingId,
+        paymentId: paymentId,
+        priority: priority,
+        icon: icon,
+        color: color,
+        relatedId: relatedId,
+        actionRoute: actionRoute,
+      );
     } catch (e) {
-      debugPrint('Error notifying all admins: $e');
+      debugPrint('[NotificationService] Error notifying all admins: $e');
     }
+  }
+
+  // =========================================================================
+  // CENTRALIZED EVENT HELPER METHODS FOR EVERY SYSTEM ACTIVITY
+  // =========================================================================
+
+  /// 1. BOOKINGS EVENT HELPER
+  Future<void> notifyBookingEvent({
+    required String eventName,
+    required String customerName,
+    required String vehicleName,
+    required String bookingId,
+    required String details,
+    bool isUpcoming = false,
+    String priority = 'normal',
+    String icon = '📅',
+    String color = '0xFF3B82F6',
+    String actionRoute = 'Bookings',
+  }) async {
+    final title = isUpcoming
+        ? 'Upcoming Booking Created'
+        : 'Booking Event: $eventName';
+    final message = isUpcoming
+        ? '$customerName booked $vehicleName (Booking #${bookingId.toUpperCase()}). $details'
+        : '$customerName - $vehicleName: $details (Booking #${bookingId.toUpperCase()}).';
+
+    await notifyAllAdmins(
+      title: title,
+      message: message,
+      type: 'booking',
+      category: 'Bookings',
+      customerName: customerName,
+      vehicleName: vehicleName,
+      bookingId: bookingId,
+      priority: priority,
+      icon: icon,
+      color: color,
+      relatedId: bookingId,
+      actionRoute: actionRoute,
+    );
+  }
+
+  /// 2. OPEN RENTAL & LIFECYCLE EVENT HELPER
+  Future<void> notifyOpenRentalEvent({
+    required String eventName,
+    required String customerName,
+    required String vehicleName,
+    required String bookingId,
+    required String details,
+    String priority = 'high',
+    String icon = '🚗',
+    String color = '0xFF10B981',
+    String actionRoute = 'Bookings',
+  }) async {
+    await notifyAllAdmins(
+      title: 'Open Rental: $eventName',
+      message: '$customerName ($vehicleName): $details (Booking #${bookingId.toUpperCase()}).',
+      type: 'open_rental',
+      category: 'Open Rental',
+      customerName: customerName,
+      vehicleName: vehicleName,
+      bookingId: bookingId,
+      priority: priority,
+      icon: icon,
+      color: color,
+      relatedId: bookingId,
+      actionRoute: actionRoute,
+    );
+  }
+
+  /// 3. PAYMENTS EVENT HELPER
+  Future<void> notifyPaymentEvent({
+    required String eventName,
+    required String customerName,
+    required String bookingId,
+    required String paymentId,
+    required double amount,
+    required String details,
+    String priority = 'normal',
+    String icon = '💳',
+    String color = '0xFF10B981',
+    String actionRoute = 'Payments',
+  }) async {
+    await notifyAllAdmins(
+      title: 'Payment: $eventName',
+      message: '$customerName paid RM ${amount.toStringAsFixed(2)}. $details (Booking #${bookingId.toUpperCase()}).',
+      type: 'payment',
+      category: 'Payments',
+      customerName: customerName,
+      bookingId: bookingId,
+      paymentId: paymentId,
+      priority: priority,
+      icon: icon,
+      color: color,
+      relatedId: paymentId.isNotEmpty ? paymentId : bookingId,
+      actionRoute: actionRoute,
+    );
+  }
+
+  /// 4. CUSTOMERS EVENT HELPER
+  Future<void> notifyCustomerEvent({
+    required String eventName,
+    required String customerName,
+    required String customerUid,
+    required String details,
+    String priority = 'normal',
+    String icon = '👤',
+    String color = '0xFF8B5CF6',
+    String actionRoute = 'Customers',
+  }) async {
+    await notifyAllAdmins(
+      title: 'Customer: $eventName',
+      message: '$customerName ($customerUid): $details',
+      type: 'customer',
+      category: 'Customers',
+      customerName: customerName,
+      priority: priority,
+      icon: icon,
+      color: color,
+      relatedId: customerUid,
+      actionRoute: actionRoute,
+    );
+  }
+
+  /// 5. VEHICLES & MAINTENANCE EVENT HELPER
+  Future<void> notifyVehicleEvent({
+    required String eventName,
+    required String vehicleId,
+    required String vehicleName,
+    required String details,
+    String priority = 'normal',
+    String icon = '🚘',
+    String color = '0xFFF59E0B',
+    String actionRoute = 'Vehicles',
+  }) async {
+    await notifyAllAdmins(
+      title: 'Vehicle Alert: $eventName',
+      message: '$vehicleName: $details',
+      type: 'vehicle',
+      category: 'Vehicles',
+      vehicleName: vehicleName,
+      priority: priority,
+      icon: icon,
+      color: color,
+      relatedId: vehicleId,
+      actionRoute: actionRoute,
+    );
+  }
+
+  /// 6. PROMOTIONS EVENT HELPER
+  Future<void> notifyPromotionEvent({
+    required String eventName,
+    required String promoId,
+    required String promoCode,
+    required String promoName,
+    required String details,
+    String priority = 'normal',
+    String icon = '🏷️',
+    String color = '0xFFEC4899',
+    String actionRoute = 'Promotions',
+  }) async {
+    await notifyAllAdmins(
+      title: 'Promotion: $eventName',
+      message: 'Code "$promoCode" ($promoName): $details',
+      type: 'promotion',
+      category: 'Promotions',
+      priority: priority,
+      icon: icon,
+      color: color,
+      relatedId: promoId,
+      actionRoute: actionRoute,
+    );
   }
 }

@@ -92,7 +92,13 @@ class ReceiptService {
         'paymentDate': approvedPayment['paymentDate'] ?? booking.createdAt.toIso8601String(),
         'paymentMethod': approvedPayment['paymentMethod'] ?? 'cash',
         'transactionId': approvedPayment['transactionId'] ?? approvedPayment['id'] ?? 'N/A',
-        'totalPaid': booking.isOpenRental ? booking.finalAmount : booking.totalPrice,
+        'totalPaid': booking.isOpenRental
+            ? booking.finalAmount
+            : booking.totalPrice +
+                booking.lateFees +
+                ((booking.returnInspection?['damageFee'] ?? 0.0) as num).toDouble() +
+                ((booking.returnInspection?['cleaningFee'] ?? 0.0) as num).toDouble() +
+                ((booking.returnInspection?['extraCharges'] ?? 0.0) as num).toDouble(),
         'rentalFee': booking.totalPrice + booking.discountAmount,
         'discountAmount': booking.discountAmount,
         'pointsRedeemed': booking.pointsRedeemed,
@@ -232,7 +238,13 @@ class ReceiptService {
     // Cost calculations
     final double rentalFee = booking.totalPrice + booking.discountAmount;
     final double discount = booking.discountAmount;
-    final double totalPaid = booking.isOpenRental ? booking.finalAmount : booking.totalPrice;
+    final double totalPaid = booking.isOpenRental
+        ? booking.finalAmount
+        : booking.totalPrice +
+            booking.lateFees +
+            ((booking.returnInspection?['damageFee'] ?? 0.0) as num).toDouble() +
+            ((booking.returnInspection?['cleaningFee'] ?? 0.0) as num).toDouble() +
+            ((booking.returnInspection?['extraCharges'] ?? 0.0) as num).toDouble();
 
     // Reward points calculations
     int earnedPoints = receiptMap['rewardPointsEarned'] ?? (booking.totalPrice / 10).floor();
@@ -626,7 +638,21 @@ class ReceiptService {
                       ),
                     ],
                   ),
-                  // Discount row
+                  // Promotional Discount row
+                  if (booking.promotionDiscountAmount > 0)
+                    pw.TableRow(
+                      children: [
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          child: pw.Text('Promotional Discount (${booking.promotionCode ?? booking.promotionName ?? 'Applied'})', style: pw.TextStyle(fontSize: 8, color: PdfColor.fromInt(0xFF10B981))),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          child: pw.Text('-RM ${booking.promotionDiscountAmount.toStringAsFixed(2)}', style: pw.TextStyle(fontSize: 8, color: PdfColor.fromInt(0xFF10B981), fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right),
+                        ),
+                      ],
+                    ),
+                  // Loyalty Points Discount row
                   if (discount > 0)
                     pw.TableRow(
                       children: [

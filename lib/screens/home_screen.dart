@@ -17,6 +17,8 @@ import 'auth/customer/vehicle_details_screen.dart';
 import '../widgets/loading_widget.dart';
 import '../widgets/app_image.dart';
 import '../widgets/app_logo.dart';
+import '../services/user_session.dart';
+
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -202,8 +204,8 @@ class _HomeScreenState extends State<HomeScreen> {
       final currentUser = _authService.currentUser;
       if (currentUser != null) {
         try {
-          _user = await _databaseService
-              .getUser(currentUser.uid)
+          _user = await UserSession()
+              .fetchAndCacheUserModel(currentUser.uid)
               .timeout(const Duration(seconds: 4));
           if (_user != null && mounted) {
             if (_user!.role == 'admin') {

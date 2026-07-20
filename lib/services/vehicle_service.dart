@@ -17,15 +17,13 @@ class VehicleService {
   // Cache to track manually updated vehicles
   final Set<String> _manuallyUpdatedVehicleIds = {};
 
-  Future<List<VehicleModel>> getVehicles({bool applyStatusSync = true}) async {
-    // Run lifecycle manager check first
-    try {
-      await BookingLifecycleManager().checkAndProcessLifecycle();
-    } catch (lifecycleErr) {
+  Future<List<VehicleModel>> getVehicles({bool applyStatusSync = false}) async {
+    // Run lifecycle manager check asynchronously in the background
+    BookingLifecycleManager().checkAndProcessLifecycle().catchError((lifecycleErr) {
       debugPrint(
-        '[VehicleService] Warning: lifecycle check failed: $lifecycleErr',
+        '[VehicleService] Warning: background lifecycle check failed: $lifecycleErr',
       );
-    }
+    });
 
     List<VehicleModel> vehicles = [];
     final currentUid = FirebaseAuth.instance.currentUser?.uid;
@@ -409,6 +407,27 @@ class VehicleService {
         'manualSyncTime': DateTime.now().toIso8601String(),
         'manualOverride': true,
       });
+
+      String vName = 'Vehicle';
+      try {
+        final snap = await _db.child(id).get();
+        if (snap.exists) {
+          final m = snap.value as Map;
+          vName = '${m['brand'] ?? ''} ${m['model'] ?? ''}'.trim();
+          if (vName.isEmpty) vName = m['name'] ?? 'Vehicle';
+        }
+      } catch (_) {}
+
+      final notificationService = NotificationService();
+      await notificationService.notifyVehicleEvent(
+        eventName: normStatus == 'Available' ? 'Vehicle Became Available' : 'Vehicle Status Changed ($normStatus)',
+        vehicleId: id,
+        vehicleName: vName,
+        details: 'status changed to "$normStatus".',
+        priority: normStatus == 'Maintenance' ? 'high' : 'normal',
+        icon: normStatus == 'Available' ? '✅' : '🚗',
+        color: normStatus == 'Available' ? '0xFF10B981' : (normStatus == 'Maintenance' ? '0xFFEF4444' : '0xFFF59E0B'),
+      );
 
       debugPrint(
         '[VehicleService] Successfully updated vehicle $id status to $normStatus',

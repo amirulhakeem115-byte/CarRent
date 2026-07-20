@@ -28,7 +28,7 @@
       ".indexOn": ["userId", "vehicleId", "status"],
       "$bookingId": {
         ".read": "auth != null",
-        ".write": "auth != null && (data.child('userId').val() == auth.uid || newData.child('userId').val() == auth.uid || !data.exists() || root.child('users').child(auth.uid).child('role').val() == 'admin')"
+        ".write": "auth != null && (data.child('userId').val() == auth.uid || newData.child('userId').val() == auth.uid || data.child('customerUid').val() == auth.uid || newData.child('customerUid').val() == auth.uid || !data.hasChild('userId') || data.child('userId').val() == '' || !data.exists() || root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'Admin')"
       }
     },
 
@@ -44,10 +44,10 @@
 
     "notifications": {
       ".indexOn": ["userId", "relatedId", "type"],
-      ".read": "auth != null && query.orderByChild == 'userId' && (query.equalTo == auth.uid || (query.equalTo == 'admin' && root.child('users').child(auth.uid).child('role').val() == 'admin'))",
+      ".read": "auth != null && query.orderByChild == 'userId' && (query.equalTo == auth.uid || (query.equalTo == 'admin' && (root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'Admin')))",
       "$notificationId": {
-        ".read": "auth != null && (data.child('userId').val() == auth.uid || (data.child('userId').val() == 'admin' && root.child('users').child(auth.uid).child('role').val() == 'admin'))",
-        ".write": "auth != null && (( !data.exists() && (newData.child('userId').val() == auth.uid || newData.child('userId').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'admin')) || (data.exists() && (data.child('userId').val() == auth.uid || root.child('users').child(auth.uid).child('role').val() == 'admin')))"
+        ".read": "auth != null && (data.child('userId').val() == auth.uid || (data.child('userId').val() == 'admin' && (root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'Admin')))",
+        ".write": "auth != null && ((!data.exists() && (newData.child('userId').val() == auth.uid || newData.child('userId').val() == 'admin')) || (data.exists() && (data.child('userId').val() == auth.uid || root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'Admin')))"
       }
     },
 
@@ -126,6 +126,11 @@
     "failed_logins": {
       ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'admin'",
       ".write": "auth != null"
+    },
+
+    "promotions": {
+      ".read": true,
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'Admin' || root.child('users').child(auth.uid).child('role').val() == 'super_admin' || root.child('users').child(auth.uid).child('role').val() == 'SUPER_ADMIN')"
     }
   }
 }

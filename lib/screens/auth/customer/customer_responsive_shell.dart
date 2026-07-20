@@ -7,10 +7,11 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../../constants/colors.dart';
 import '../../../services/auth_service.dart';
-import '../../../services/database_service.dart';
 import '../../../services/notification_service.dart';
 import '../../../services/company_settings_provider.dart';
 import '../../../services/web_audio_player.dart';
+import '../../../services/user_session.dart';
+
 import '../../../models/user_model.dart';
 import '../../../models/notification_model.dart';
 import '../../../widgets/app_image.dart';
@@ -54,7 +55,6 @@ class CustomerResponsiveShell extends StatefulWidget {
 
 class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
   final AuthService _authService = AuthService();
-  final DatabaseService _databaseService = DatabaseService();
   final NotificationService _notificationService = NotificationService();
   final FirebaseDatabase _firebaseDatabase = FirebaseDatabase.instance;
 
@@ -203,7 +203,7 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
     final currentUser = _authService.currentUser;
     if (currentUser != null) {
       try {
-        final userModel = await _databaseService.getUser(currentUser.uid);
+        final userModel = await UserSession().fetchAndCacheUserModel(currentUser.uid);
         if (mounted) {
           setState(() {
             _user = userModel;

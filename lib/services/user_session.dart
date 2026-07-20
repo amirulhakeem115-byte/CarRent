@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
+import '../models/user_model.dart';
 import 'booking_lifecycle_manager.dart';
 
 class UserSession {
@@ -14,6 +15,8 @@ class UserSession {
   
   String? _userId;
   String? _role;
+  UserModel? _userModel;
+  Future<UserModel?>? _userFuture;
   Future<String>? _roleFuture;
   
   StreamSubscription<User?>? _authSubscription;
@@ -23,6 +26,7 @@ class UserSession {
 
   String? get currentRole => _role;
   String? get currentUserId => _userId;
+  UserModel? get currentUserModel => _userModel;
   bool get isInitialized => _role != null;
 
   void initialize() {
@@ -32,16 +36,60 @@ class UserSession {
         // Clear session on logout
         _userId = null;
         _role = null;
+        _userModel = null;
+        _userFuture = null;
         _roleFuture = null;
         _roleController.add(null);
         BookingLifecycleManager().stopPeriodicCheck();
         debugPrint('[UserSession] Logged out, session cleared.');
       } else {
         _userId = user.uid;
-        // Fetch and cache role
-        await fetchAndCacheRole(user.uid);
+        // Fetch and cache role/user model on startup
+        await fetchAndCacheUserModel(user.uid);
       }
     });
+  }
+
+  Future<UserModel?> fetchAndCacheUserModel(String uid) async {
+    if (_userModel != null && _userId == uid) {
+      return _userModel;
+    }
+
+    if (_userFuture != null && _userId == uid) {
+      return _userFuture;
+    }
+
+    _userId = uid;
+    _userFuture = _fetchUserDirectly(uid);
+    return _userFuture;
+  }
+
+  Future<UserModel?> _fetchUserDirectly(String uid) async {
+    try {
+      debugPrint('[UserSession] Fetching full user profile once for uid: $uid');
+      final snap = await _db.child('users').child(uid).get().timeout(const Duration(seconds: 15));
+      if (snap.exists && snap.value != null) {
+        final data = snap.value as Map<dynamic, dynamic>;
+        final user = UserModel.fromMap(uid, data);
+        _userModel = user;
+        _role = user.role;
+        _roleController.add(_role);
+        
+        BookingLifecycleManager().startPeriodicCheck();
+        return _userModel;
+      } else {
+        debugPrint('[UserSession] User profile node not found in DB. Setting default customer.');
+        _role = 'customer';
+        _roleController.add(_role);
+        BookingLifecycleManager().startPeriodicCheck();
+        return null;
+      }
+    } catch (e) {
+      debugPrint('[UserSession] Error fetching user profile: $e');
+      return _userModel;
+    } finally {
+      _userFuture = null;
+    }
   }
 
   Future<String> fetchAndCacheRole(String uid) async {
@@ -60,30 +108,28 @@ class UserSession {
 
   Future<String> _fetchRoleDirectly(String uid) async {
     try {
-      debugPrint('[UserSession] Fetching role once for uid: $uid');
-      final snap = await _db.child('users').child(uid).child('role').get().timeout(const Duration(seconds: 15));
-      if (snap.exists) {
-        _role = snap.value.toString();
-        debugPrint('[UserSession] Cached role: $_role');
-        _roleController.add(_role);
-        
-        // Start BookingLifecycleManager checks
-        BookingLifecycleManager().startPeriodicCheck();
-        
-        return _role!;
-      } else {
-        debugPrint('[UserSession] Role node not found in DB. Defaulting to customer.');
-        _role = 'customer';
-        _roleController.add(_role);
-        BookingLifecycleManager().startPeriodicCheck();
-        return 'customer';
+      final user = await fetchAndCacheUserModel(uid);
+      if (user != null) {
+        return user.role;
       }
+      return _role ?? 'customer';
     } catch (e) {
-      debugPrint('[UserSession] Error fetching user role: $e');
+      debugPrint('[UserSession] Error fetching user role via user model: $e');
       return _role ?? 'customer';
     } finally {
       _roleFuture = null;
     }
+  }
+
+  void forceSetUser(UserModel user) {
+    _userId = user.id;
+    _userModel = user;
+    _role = user.role;
+    _roleFuture = null;
+    _userFuture = null;
+    _roleController.add(user.role);
+    BookingLifecycleManager().startPeriodicCheck();
+    debugPrint('[UserSession] Force set user and role to: ${user.role} for uid: ${user.id}');
   }
 
   void forceSetRole(String role, {String? uid}) {
@@ -100,6 +146,8 @@ class UserSession {
   void clear() {
     _userId = null;
     _role = null;
+    _userModel = null;
+    _userFuture = null;
     _roleFuture = null;
     debugPrint('[UserSession] Session explicitly cleared.');
   }

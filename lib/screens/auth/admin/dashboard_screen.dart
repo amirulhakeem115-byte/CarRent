@@ -5,6 +5,8 @@ import 'package:latlong2/latlong.dart' hide Path;
 import 'package:intl/intl.dart';
 import 'dart:ui' as ui;
 import 'dart:async';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
 
@@ -22,6 +24,7 @@ import '../../../models/review_model.dart';
 import '../../../services/notification_service.dart';
 import '../../../models/notification_model.dart';
 import '../../../services/tracking_service.dart';
+import '../../../services/user_session.dart';
 
 import 'vehicles_screen.dart';
 import 'bookings_screen.dart';
@@ -37,10 +40,10 @@ import 'reports_view.dart';
 import 'admin_tracking_view.dart';
 import 'admin_notifications_view.dart';
 import 'reward_points_view.dart';
+import 'promotions_view.dart';
 import '../../../services/maintenance_service.dart';
 import '../../../models/maintenance_job_model.dart';
 import '../login_screen.dart';
-import '../../../widgets/loading_widget.dart';
 import '../../../widgets/app_image.dart';
 import '../../../widgets/app_logo.dart';
 import '../../../services/company_settings_provider.dart';
@@ -528,90 +531,211 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     });
   }
 
+  bool _isInitializing = false;
+
+  void _logDiagnosticFailure(
+    String stage,
+    Object? exception,
+    StackTrace? stackTrace,
+    int elapsedMs,
+  ) {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    debugPrint('================================================================');
+    debugPrint('[ADMIN DASHBOARD INITIALIZATION FAILURE TELEMETRY]');
+    debugPrint('Stage: $stage');
+    debugPrint('Firebase App Initialized: ${Firebase.apps.isNotEmpty} (${Firebase.apps.map((a) => a.name).join(", ")})');
+    debugPrint('Authentication Status: ${currentUser != null ? "Authenticated" : "Unauthenticated"}');
+    debugPrint('Current User UID: ${currentUser?.uid ?? "N/A"}');
+    debugPrint('Current User Role: ${UserSession().currentRole ?? "Unknown"}');
+    debugPrint('Dashboard Services Status: DatabaseService(Ready), VehicleService(Ready), BookingService(Ready), PaymentService(Ready), MaintenanceService(Ready)');
+    debugPrint('Exact Exception: $exception');
+    if (stackTrace != null) {
+      debugPrint('Stack Trace:\n$stackTrace');
+    }
+    debugPrint('Request Timing: $elapsedMs ms');
+    debugPrint('================================================================');
+  }
+
   Future<void> _loadDashboardData() async {
+    if (_isInitializing) return;
+    _isInitializing = true;
+
     if (!mounted) return;
     setState(() {
       _loading = true;
       _error = null;
     });
+
+    final stopwatch = Stopwatch()..start();
+
     try {
-      final results = await Future.wait([
-        _databaseService.getUsers(),
-        _vehicleService.getVehicles(),
-        _bookingService.getBookings(),
-        _paymentService.getPayments(),
-        _maintenanceService.getMaintenanceJobs(),
-      ]).timeout(const Duration(seconds: 15));
-
-      _users = results[0] as List<UserModel>;
-      _vehicles = results[1] as List<VehicleModel>;
-      _bookings = results[2] as List<BookingModel>;
-      _payments = results[3] as List<PaymentModel>;
-      _maintenanceJobs = results[4] as List<MaintenanceJobModel>;
-
-      // Load admin profile user data
-      final currentUser = _authService.currentUser;
-      if (currentUser != null) {
-        _adminUser = await _databaseService.getUser(currentUser.uid);
+      // 1. Ensure Firebase Core is ready
+      if (Firebase.apps.isEmpty) {
+        debugPrint('[AdminDashboard] Initializing Firebase Core...');
+        await Firebase.initializeApp();
       }
 
-      _totalCustomers = _users.where((u) => u.role == 'customer').length;
-      _totalCars = _vehicles.length;
-      _availableCars = _vehicles
-          .where((v) => v.status.toLowerCase() == 'available')
-          .length;
+      // 2. Ensure Firebase Auth User is ready
+      User? currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        debugPrint('[AdminDashboard] Awaiting Firebase Auth user stream...');
+        try {
+          currentUser = await FirebaseAuth.instance
+              .authStateChanges()
+              .firstWhere((u) => u != null)
+              .timeout(const Duration(seconds: 10));
+        } catch (_) {
+          currentUser = FirebaseAuth.instance.currentUser;
+        }
+      }
 
-      _activeBookingsCount = _bookings
-          .where(
-            (b) =>
-                b.status == 'pending' ||
-                b.status == 'approved' ||
-                b.status == 'ongoing',
-          )
-          .length;
+      if (currentUser == null) {
+        final errStr = 'No authenticated user available. Please log in again.';
+        _logDiagnosticFailure('Auth User Check', errStr, StackTrace.current, stopwatch.elapsedMilliseconds);
+        if (mounted) {
+          setState(() {
+            _error = errStr;
+            _loading = false;
+          });
+        }
+        return;
+      }
 
-      // Automatically trigger mock hardware simulator for active bookings
-      for (var booking in _bookings) {
-        if (booking.status == 'ongoing' || booking.status == 'approved') {
-          if (!_simulators.containsKey(booking.vehicleId)) {
-            _simulators[booking.vehicleId] = _trackingService
-                .startRouteSimulation(booking.vehicleId);
+      // 3. Ensure User Profile & Admin Role are cached in UserSession
+      try {
+        final cachedUser = await UserSession()
+            .fetchAndCacheUserModel(currentUser.uid)
+            .timeout(const Duration(seconds: 10));
+        final role = UserSession().currentRole ??
+            await UserSession()
+                .fetchAndCacheRole(currentUser.uid)
+                .timeout(const Duration(seconds: 10));
+        if (cachedUser != null) {
+          _adminUser = cachedUser;
+        }
+        debugPrint('[AdminDashboard] Verified admin session: UID=${currentUser.uid}, Role=$role');
+      } catch (roleErr) {
+        debugPrint('[AdminDashboard] Non-fatal role verification warning: $roleErr');
+      }
+
+      // 4. Query statistics with automatic retry loop (up to 3 attempts)
+      int attempt = 0;
+      const int maxAttempts = 3;
+      bool success = false;
+      Object? lastException;
+      StackTrace? lastStackTrace;
+
+      while (attempt < maxAttempts && !success) {
+        attempt++;
+        try {
+          debugPrint('[AdminDashboard] Querying dashboard data (Attempt $attempt of $maxAttempts)...');
+          final results = await Future.wait([
+            _databaseService.getUsers(),
+            _vehicleService.getVehicles(),
+            _bookingService.getBookings(),
+            _paymentService.getPayments(),
+            _maintenanceService.getMaintenanceJobs(),
+          ]).timeout(const Duration(seconds: 15));
+
+          _users = results[0] as List<UserModel>;
+          _vehicles = results[1] as List<VehicleModel>;
+          _bookings = results[2] as List<BookingModel>;
+          _payments = results[3] as List<PaymentModel>;
+          _maintenanceJobs = results[4] as List<MaintenanceJobModel>;
+
+          _adminUser ??= await _databaseService.getUser(currentUser.uid);
+
+          _totalCustomers = _users.where((u) => u.role == 'customer').length;
+          _totalCars = _vehicles.length;
+          _availableCars = _vehicles
+              .where((v) => v.status.toLowerCase() == 'available')
+              .length;
+
+          _activeBookingsCount = _bookings
+              .where(
+                (b) =>
+                    b.status == 'pending' ||
+                    b.status == 'approved' ||
+                    b.status == 'ongoing',
+              )
+              .length;
+
+          for (var booking in _bookings) {
+            if (booking.status == 'ongoing' || booking.status == 'approved') {
+              if (!_simulators.containsKey(booking.vehicleId)) {
+                _simulators[booking.vehicleId] = _trackingService
+                    .startRouteSimulation(booking.vehicleId);
+              }
+            }
+          }
+
+          double monthlyRev = 0.0;
+          final now = DateTime.now();
+
+          for (var payment in _payments) {
+            final status = payment.status.toLowerCase();
+            final pStatus = (payment.paymentStatus ?? '').toLowerCase();
+            if (status == 'approved' || status == 'paid' || pStatus == 'approved') {
+              final pDate = payment.paymentDate;
+              if (pDate.year == now.year && pDate.month == now.month) {
+                monthlyRev += payment.amount;
+              }
+            }
+          }
+          _monthlyRevenue = monthlyRev;
+
+          _pendingPaymentsCount = _payments
+              .where(
+                (p) => p.status == 'pending' || p.status == 'Pending Verification',
+              )
+              .length;
+
+          success = true;
+        } catch (e, st) {
+          lastException = e;
+          lastStackTrace = st;
+          debugPrint('[AdminDashboard] Query attempt $attempt failed with error: $e');
+          if (attempt < maxAttempts) {
+            await Future.delayed(Duration(milliseconds: 1000 * attempt));
           }
         }
       }
 
-      double monthlyRev = 0.0;
-      final now = DateTime.now();
+      stopwatch.stop();
 
-      for (var payment in _payments) {
-        final status = payment.status.toLowerCase();
-        final pStatus = (payment.paymentStatus ?? '').toLowerCase();
-        if (status == 'approved' || status == 'paid' || pStatus == 'approved') {
-          final pDate = payment.paymentDate;
-          if (pDate.year == now.year && pDate.month == now.month) {
-            monthlyRev += payment.amount;
-          }
+      if (success) {
+        if (mounted) {
+          setState(() {
+            _loading = false;
+            _error = null;
+          });
+        }
+        _checkMaintenanceDue();
+      } else {
+        _logDiagnosticFailure(
+          'Query Execution',
+          lastException,
+          lastStackTrace,
+          stopwatch.elapsedMilliseconds,
+        );
+        if (mounted) {
+          setState(() {
+            _error = 'Failed to load dashboard statistics. Please check your connection and try again.';
+            _loading = false;
+          });
         }
       }
-      _monthlyRevenue = monthlyRev;
-
-      _pendingPaymentsCount = _payments
-          .where(
-            (p) => p.status == 'pending' || p.status == 'Pending Verification',
-          )
-          .length;
-    } catch (e) {
-      debugPrint('Dashboard loading error: $e');
+    } catch (fatalErr, fatalSt) {
+      stopwatch.stop();
+      _logDiagnosticFailure('Fatal Initialization Flow', fatalErr, fatalSt, stopwatch.elapsedMilliseconds);
       if (mounted) {
         setState(() {
           _error = 'Failed to load dashboard statistics. Please try again.';
+          _loading = false;
         });
       }
     } finally {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
-      _checkMaintenanceDue();
+      _isInitializing = false;
     }
   }
 
@@ -666,6 +790,237 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
+  Widget _buildDashboardSkeleton(bool isDesktop) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final shimmerBg = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header skeleton card
+          Container(
+            height: 90,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isDark ? const Color(0xFF334155) : Colors.grey[200]!,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: shimmerBg,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 180,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: shimmerBg,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: 120,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: shimmerBg,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // 4 Stats Cards Skeleton Grid
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: isDesktop ? 4 : 2,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              childAspectRatio: isDesktop ? 1.6 : 1.4,
+            ),
+            itemCount: 4,
+            itemBuilder: (context, index) {
+              return Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF334155) : Colors.grey[200]!,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: shimmerBg,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        Container(
+                          width: 50,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: shimmerBg,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 100,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: shimmerBg,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Container(
+                          width: 70,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: shimmerBg,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 24),
+
+          // Middle Section Skeleton Cards
+          Flex(
+            direction: isDesktop ? Axis.horizontal : Axis.vertical,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: isDesktop ? 2 : 0,
+                child: Container(
+                  height: 320,
+                  decoration: BoxDecoration(
+                    color: cardBg,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isDark ? const Color(0xFF334155) : Colors.grey[200]!,
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 160,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            color: shimmerBg,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Expanded(
+                          child: ListView.separated(
+                            itemCount: 4,
+                            separatorBuilder: (context, index) => const SizedBox(height: 12),
+                            itemBuilder: (context, idx) => Container(
+                              height: 45,
+                              decoration: BoxDecoration(
+                                color: shimmerBg,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              if (isDesktop) const SizedBox(width: 24),
+              if (!isDesktop) const SizedBox(height: 24),
+              Expanded(
+                flex: isDesktop ? 1 : 0,
+                child: Container(
+                  height: 320,
+                  decoration: BoxDecoration(
+                    color: cardBg,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isDark ? const Color(0xFF334155) : Colors.grey[200]!,
+                    ),
+                  ),
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              AppColors.primaryOrange,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Initializing Dashboard Statistics...',
+                          style: TextStyle(
+                            color: isDark ? Colors.white70 : AppColors.secondaryBlue,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final double width = MediaQuery.of(context).size.width;
@@ -697,11 +1052,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       ? 1650
                       : constraints.maxWidth;
                   final Widget content = _loading
-                      ? const Center(
-                          child: LoadingWidget(
-                            message: 'Syncing dashboard with Firebase...',
-                          ),
-                        )
+                      ? _buildDashboardSkeleton(isDesktop)
                       : _error != null
                       ? Center(
                           child: Column(
@@ -845,6 +1196,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       case 'Reward Points':
         tabContent = const Expanded(child: RewardPointsView());
         break;
+      case 'Promotions & Discounts':
+        tabContent = const Expanded(child: PromotionsView());
+        break;
       case 'Vehicle Tracking':
         tabContent = Expanded(
           child: AdminTrackingView(
@@ -899,18 +1253,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         tabContent = Expanded(
           child: AdminNotificationsView(
             onNavigateTab: (route, relatedId) {
+              String targetTab = route;
+              if (route == 'Promotions') targetTab = 'Promotions & Discounts';
+              if (route == 'Support') targetTab = 'Support Inbox';
+              if (route == 'Vehicles') targetTab = 'Cars';
+
               setState(() {
-                _activeTab = route;
+                _activeTab = targetTab;
               });
               if (relatedId != null && relatedId.isNotEmpty) {
-                if (route == 'Bookings') {
+                if (targetTab == 'Bookings') {
                   try {
                     final booking = _bookings.firstWhere(
                       (b) => b.id == relatedId,
                     );
                     _showBookingDetailsDialog(booking);
                   } catch (_) {}
-                } else if (route == 'Payments') {
+                } else if (targetTab == 'Payments') {
                   try {
                     final payment = _payments.firstWhere(
                       (p) => p.id == relatedId,
@@ -1006,6 +1365,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   Icons.stars_rounded,
                   'Reward Points',
                   () => setState(() => _activeTab = 'Reward Points'),
+                ),
+                _buildSidebarTile(
+                  Icons.local_offer_outlined,
+                  'Promotions & Discounts',
+                  () => setState(() => _activeTab = 'Promotions & Discounts'),
                 ),
                 _buildSidebarTile(
                   Icons.map_outlined,

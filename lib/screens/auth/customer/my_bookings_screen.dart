@@ -17,6 +17,7 @@ import 'booking_screen.dart';
 import 'customer_responsive_shell.dart';
 import 'contact_support_screen.dart';
 import '../../../services/notification_service.dart';
+import '../../../services/user_role_cache.dart';
 
 class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({super.key});
@@ -1601,44 +1602,74 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
 
   Future<void> _markOnMyWay(BookingModel booking) async {
     try {
+      debugPrint('[STEP 1] Customer clicked I\'m On My Way (Booking ID: ${booking.id})');
+      final currentUser = _authService.currentUser;
+      final uid = currentUser?.uid ?? 'unauthenticated';
+      final role = currentUser != null ? await UserRoleCache.getRole(currentUser.uid) : 'customer';
+
+      final effectiveUserId = uid.isNotEmpty && uid != 'unauthenticated' ? uid : booking.userId;
+
+      debugPrint('=== BOOKING STATUS UPDATE TRACE ===');
+      debugPrint('Current UID: $uid');
+      debugPrint('Current Role: $role');
+      debugPrint('Booking ID: ${booking.id}');
+      debugPrint('Firebase path being updated: bookings/${booking.id}');
+      debugPrint('Old Status: ${booking.customerStatus ?? booking.status}');
+      debugPrint('New Status: on_my_way');
+      debugPrint('===================================');
+
       await FirebaseDatabase.instance
           .ref()
           .child('bookings')
           .child(booking.id)
-          .update({'customerStatus': 'on_my_way'});
+          .update({
+        'customerStatus': 'on_my_way',
+        'userId': effectiveUserId,
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
 
-      final notificationService = NotificationService();
+      debugPrint('[STEP 2] Booking status updated successfully (Booking ID: ${booking.id})');
 
-      final bool isPickup = booking.status.toLowerCase() != 'active' &&
-                            booking.status.toLowerCase() != 'ongoing' &&
-                            booking.status.toLowerCase() != 'overdue';
+      // Safely perform notification write without blocking or failing status update
+      try {
+        final notificationService = NotificationService();
+        final bool isPickup = booking.status.toLowerCase() != 'active' &&
+                              booking.status.toLowerCase() != 'ongoing' &&
+                              booking.status.toLowerCase() != 'overdue';
+        final String actionMsg = isPickup ? "pick up" : "return";
 
-      final String actionMsg = isPickup ? "pick up" : "return";
+        // 1. Notify Admin directly via centralized service
+        await notificationService.notifyOpenRentalEvent(
+          eventName: isPickup ? "Customer On The Way for Pickup 🚗" : "Customer On The Way for Return 🚗",
+          customerName: booking.userName,
+          vehicleName: booking.vehicleName,
+          bookingId: booking.id,
+          details: isPickup
+              ? 'is on the way to pick up ${booking.vehicleName}.'
+              : 'is on the way to return ${booking.vehicleName}. Please prepare for inspection.',
+          priority: 'high',
+          icon: '🚗',
+          color: '0xFF10B981',
+        );
 
-      // 1. Notify Admin
-      await notificationService.notifyAllAdmins(
-        title: isPickup ? "Customer On the Way 🚗" : "Return Request",
-        message: isPickup
-            ? 'Customer "${booking.userName}" is on the way to pick up Vehicle "${booking.vehicleName}".'
-            : 'Customer ${booking.userName} is on the way to return ${booking.vehicleName}. Please prepare for vehicle inspection.',
-        type: isPickup ? 'on_my_way' : 'return_request',
-        icon: '🚗',
-        color: '0xFF10B981',
-        relatedId: booking.id,
-        actionRoute: 'Bookings',
-      );
-
-      // 2. Notify Customer
-      await notificationService.createNotification(
-        userId: booking.userId,
-        title: "Status Updated: On My Way",
-        message: "You have notified the Admin that you are on your way to $actionMsg ${booking.vehicleName}.",
-        type: 'booking',
-        icon: '🚗',
-        color: '0xFF10B981',
-        relatedId: booking.id,
-        actionRoute: 'Dashboard',
-      );
+        // 2. Notify Customer
+        await notificationService.createNotification(
+          userId: effectiveUserId,
+          title: "Status Updated: On My Way",
+          message: "You have notified the Admin that you are on your way to $actionMsg ${booking.vehicleName}.",
+          type: 'booking',
+          category: 'Open Rental',
+          customerName: booking.userName,
+          vehicleName: booking.vehicleName,
+          bookingId: booking.id,
+          icon: '🚗',
+          color: '0xFF10B981',
+          relatedId: booking.id,
+          actionRoute: 'Dashboard',
+        );
+      } catch (notifErr) {
+        debugPrint('[MyBookingsScreen] Warning: notification creation failed: $notifErr');
+      }
 
       _loadBookings();
       if (mounted) {
@@ -1653,7 +1684,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Failed to notify admin: $e"),
+            content: Text("Failed to update status: $e"),
             backgroundColor: Colors.redAccent,
           ),
         );

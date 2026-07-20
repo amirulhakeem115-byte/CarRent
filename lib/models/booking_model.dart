@@ -38,6 +38,12 @@ class BookingModel {
   final DateTime? actualPickupTimestamp;
   final DateTime? actualReturnTimestamp;
 
+  // Promotional Discount fields
+  final String? promotionId;
+  final String? promotionCode;
+  final String? promotionName;
+  final double promotionDiscountAmount;
+
   BookingModel({
     required this.id,
     required this.vehicleId,
@@ -71,6 +77,10 @@ class BookingModel {
     this.isOpenRental = false,
     this.actualPickupTimestamp,
     this.actualReturnTimestamp,
+    this.promotionId,
+    this.promotionCode,
+    this.promotionName,
+    this.promotionDiscountAmount = 0.0,
   });
 
   factory BookingModel.fromMap(
@@ -128,6 +138,10 @@ class BookingModel {
       actualReturnTimestamp: data['actualReturnTimestamp'] != null
           ? DateTime.parse(data['actualReturnTimestamp'] as String)
           : null,
+      promotionId: data['promotionId'],
+      promotionCode: data['promotionCode'],
+      promotionName: data['promotionName'],
+      promotionDiscountAmount: (data['promotionDiscountAmount'] ?? 0.0).toDouble(),
     );
   }
 
@@ -164,6 +178,10 @@ class BookingModel {
       'isOpenRental': isOpenRental,
       'actualPickupTimestamp': actualPickupTimestamp?.toIso8601String(),
       'actualReturnTimestamp': actualReturnTimestamp?.toIso8601String(),
+      'promotionId': promotionId,
+      'promotionCode': promotionCode,
+      'promotionName': promotionName,
+      'promotionDiscountAmount': promotionDiscountAmount,
     };
   }
 

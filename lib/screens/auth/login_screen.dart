@@ -91,7 +91,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final uid = userCreds.user!.uid;
       final userModel = await _databaseService.getUser(uid);
       if (userModel != null) {
-        UserSession().forceSetRole(userModel.role);
+        UserSession().forceSetUser(userModel);
       }
       if (!mounted) return;
 
@@ -183,7 +183,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final uid = userCreds.user!.uid;
       final userModel = await _databaseService.getUser(uid);
       if (userModel != null) {
-        UserSession().forceSetRole(userModel.role);
+        UserSession().forceSetUser(userModel);
       }
       if (!mounted) return;
 

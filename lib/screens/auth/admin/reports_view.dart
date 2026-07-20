@@ -969,6 +969,17 @@ class _ReportsViewState extends State<ReportsView> {
         return ['Booking ID', 'Vehicle', 'Customer', 'Pickup Date', 'Status'];
       case 'Overdue Rentals':
         return ['Booking ID', 'Vehicle', 'Customer', 'Due Date', 'Status'];
+      case 'Promotions & Discounts':
+      case 'Promotions':
+        return [
+          'Booking ID',
+          'Customer',
+          'Promo Code / Name',
+          'Original Price',
+          'Discount Amount',
+          'Final Price',
+          'Date',
+        ];
       default:
         return [];
     }
@@ -1124,6 +1135,22 @@ class _ReportsViewState extends State<ReportsView> {
                     ? DateFormat('dd/MM/yyyy').format(b.returnDate!)
                     : 'N/A',
                 b.status.toUpperCase(),
+              ],
+            )
+            .toList();
+      case 'Promotions & Discounts':
+      case 'Promotions':
+        return _getFilteredBookings()
+            .where((b) => b.discountAmount > 0 || b.promotionDiscountAmount > 0)
+            .map(
+              (b) => [
+                b.id.substring(0, min(8, b.id.length)),
+                b.userName,
+                b.promotionCode ?? b.promotionName ?? 'Points Discount',
+                'RM ${(b.totalPrice + b.discountAmount).toStringAsFixed(2)}',
+                'RM ${b.discountAmount.toStringAsFixed(2)}',
+                'RM ${b.totalPrice.toStringAsFixed(2)}',
+                DateFormat('dd/MM/yyyy').format(b.createdAt),
               ],
             )
             .toList();
@@ -2689,6 +2716,7 @@ class _ReportsViewState extends State<ReportsView> {
                             'Bookings',
                             'Payments',
                             'Revenue',
+                            'Promotions & Discounts',
                             'Vehicles',
                             'Maintenance',
                             'Customers',

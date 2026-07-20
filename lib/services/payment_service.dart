@@ -131,15 +131,16 @@ class PaymentService {
         );
 
         // Notify admins of auto-approved payment
-        await _notificationService.notifyAllAdmins(
-          title: 'Payment Approved Automatically',
-          message:
-              'Customer: $customerName\nVehicle: $vehicleName\nAmount: RM ${payment.amount.toStringAsFixed(2)}',
-          type: 'payment',
+        await _notificationService.notifyPaymentEvent(
+          eventName: 'Payment Approved Automatically',
+          customerName: customerName,
+          bookingId: payment.bookingId,
+          paymentId: newRef.key!,
+          amount: payment.amount,
+          details: 'for vehicle $vehicleName.',
+          priority: 'normal',
           icon: '💳',
           color: '0xFF10B981',
-          relatedId: newRef.key!,
-          actionRoute: 'Payments',
         );
       } else {
         // Notify user their payment is pending review
@@ -149,6 +150,11 @@ class PaymentService {
           message:
               'Your payment of RM ${payment.amount.toStringAsFixed(2)} has been submitted and is awaiting admin verification.',
           type: 'payment',
+          category: 'Payments',
+          customerName: customerName,
+          vehicleName: vehicleName,
+          bookingId: payment.bookingId,
+          paymentId: newRef.key!,
           icon: '🕐',
           color: '0xFFF59E0B',
           relatedId: newRef.key!,
@@ -156,15 +162,16 @@ class PaymentService {
         );
 
         // Notify admins of new payment requiring verification
-        await _notificationService.notifyAllAdmins(
-          title: 'New Payment — Action Required',
-          message:
-              'Customer: $customerName\nVehicle: $vehicleName\nAmount: RM ${payment.amount.toStringAsFixed(2)}\nPlease verify and approve.',
-          type: 'payment',
+        await _notificationService.notifyPaymentEvent(
+          eventName: 'New Payment — Action Required',
+          customerName: customerName,
+          bookingId: payment.bookingId,
+          paymentId: newRef.key!,
+          amount: payment.amount,
+          details: 'submitted payment for $vehicleName. Verification required.',
+          priority: 'high',
           icon: '💳',
           color: '0xFFF59E0B',
-          relatedId: newRef.key!,
-          actionRoute: 'Payments',
         );
       }
     } catch (e) {
@@ -524,23 +531,33 @@ class PaymentService {
             ? 'Your payment has been approved.'
             : 'Your payment was rejected. Reason: $reason',
         type: 'payment',
+        category: 'Payments',
+        customerName: customerName,
+        paymentId: paymentId,
         icon: '💳',
         color: isApproved ? '0xFF10B981' : '0xFFEF4444',
         relatedId: paymentId,
         actionRoute: 'Dashboard',
       );
 
+      final payAmount = (paySnap.value as Map)['amount'] != null
+          ? ((paySnap.value as Map)['amount'] as num).toDouble()
+          : 0.0;
+      final bookingIdStr = (paySnap.value as Map)['bookingId']?.toString() ?? '';
+
       // Notify admins
-      await _notificationService.notifyAllAdmins(
-        title: isApproved ? 'Payment Approved' : 'Payment Rejected',
-        message: isApproved
-            ? 'Payment of RM ${(paySnap.value as Map)['amount']} approved for customer $customerName.'
-            : 'Payment of RM ${(paySnap.value as Map)['amount']} rejected for customer $customerName. Reason: $reason',
-        type: 'payment',
+      await _notificationService.notifyPaymentEvent(
+        eventName: isApproved ? 'Payment Approved' : 'Payment Rejected',
+        customerName: customerName,
+        bookingId: bookingIdStr,
+        paymentId: paymentId,
+        amount: payAmount,
+        details: isApproved
+            ? 'payment approved.'
+            : 'payment rejected. Reason: $reason',
+        priority: isApproved ? 'normal' : 'high',
         icon: '💳',
         color: isApproved ? '0xFF10B981' : '0xFFEF4444',
-        relatedId: paymentId,
-        actionRoute: 'Payments',
       );
     } catch (e) {
       debugPrint('Error updating payment status: $e');
@@ -562,16 +579,47 @@ class PaymentService {
           })
           .timeout(const Duration(seconds: 10));
 
+      String customerName = 'Customer';
+      try {
+        final uSnap = await FirebaseDatabase.instance.ref().child('users').child(userId).child('fullName').get();
+        if (uSnap.exists) {
+          customerName = uSnap.value.toString();
+        }
+      } catch (_) {}
+
       await _notificationService.createNotification(
         userId: userId,
         title: 'Refund Processed',
         message:
             'A refund of RM ${amount.toStringAsFixed(2)} has been issued to your account.',
         type: 'payment',
+        category: 'Payments',
+        customerName: customerName,
+        paymentId: paymentId,
         icon: '💳',
         color: '0xFF3B82F6',
         relatedId: paymentId,
         actionRoute: 'Dashboard',
+      );
+
+      String bookingIdStr = '';
+      try {
+        final paySnap = await _db.child(paymentId).get();
+        if (paySnap.exists) {
+          bookingIdStr = (paySnap.value as Map)['bookingId']?.toString() ?? '';
+        }
+      } catch (_) {}
+
+      await _notificationService.notifyPaymentEvent(
+        eventName: 'Refund Processed',
+        customerName: customerName,
+        bookingId: bookingIdStr,
+        paymentId: paymentId,
+        amount: amount,
+        details: 'refund of RM ${amount.toStringAsFixed(2)} processed for Booking #${bookingIdStr.toUpperCase()}.',
+        priority: 'high',
+        icon: '💳',
+        color: '0xFF3B82F6',
       );
     } catch (e) {
       debugPrint('Error refunding payment: $e');
