@@ -149,7 +149,10 @@ class _BookingsViewState extends State<BookingsView> {
             top: 24,
             left: isCompactMobile ? 16 : 24,
             right: isCompactMobile ? 16 : 24,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+            bottom:
+                MediaQuery.of(context).viewInsets.bottom +
+                MediaQuery.of(context).padding.bottom +
+                24,
           ),
           child: SingleChildScrollView(
             child: Column(
