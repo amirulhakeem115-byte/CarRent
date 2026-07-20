@@ -955,13 +955,22 @@ class _CustomersViewState extends State<CustomersView> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final tableWidth = constraints.maxWidth;
-        final nameWidth = tableWidth * 0.22;
-        final emailWidth = tableWidth * 0.25;
-        final phoneWidth = tableWidth * 0.14;
-        final roleWidth = tableWidth * 0.10;
-        final accountWidth = tableWidth * 0.11;
-        final licenseWidth = tableWidth * 0.12;
-        final actionWidth = tableWidth * 0.06;
+        const horizontalMargin = 12.0;
+        const columnSpacing = 8.0;
+        const columnCount = 7;
+        final internalSpacing =
+            (horizontalMargin * 2) + (columnSpacing * (columnCount - 1));
+        final contentWidth =
+            (tableWidth - internalSpacing).clamp(620.0, double.infinity)
+                as double;
+
+        final nameWidth = contentWidth * 0.21;
+        final emailWidth = contentWidth * 0.24;
+        final phoneWidth = contentWidth * 0.14;
+        final roleWidth = contentWidth * 0.10;
+        final accountWidth = contentWidth * 0.11;
+        final licenseWidth = contentWidth * 0.12;
+        final actionWidth = contentWidth * 0.08;
 
         Text _header(String label) {
           return Text(
@@ -976,212 +985,229 @@ class _CustomersViewState extends State<CustomersView> {
           );
         }
 
-        return DataTable(
-          horizontalMargin: 12,
-          columnSpacing: 8,
-          dataRowMinHeight: 54,
-          dataRowMaxHeight: 64,
-          headingRowHeight: 56,
-          headingRowColor: WidgetStateProperty.all(
-            isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-          ),
-          columns: [
-            DataColumn(
-              label: SizedBox(width: nameWidth, child: _header('Full Name')),
-            ),
-            DataColumn(
-              label: SizedBox(
-                width: emailWidth,
-                child: _header('Email Address'),
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minWidth: tableWidth),
+            child: DataTable(
+              horizontalMargin: horizontalMargin,
+              columnSpacing: columnSpacing,
+              dataRowMinHeight: 54,
+              dataRowMaxHeight: 64,
+              headingRowHeight: 56,
+              headingRowColor: WidgetStateProperty.all(
+                isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
               ),
-            ),
-            DataColumn(
-              label: SizedBox(
-                width: phoneWidth,
-                child: _header('Phone Number'),
-              ),
-            ),
-            DataColumn(
-              label: SizedBox(width: roleWidth, child: _header('Role')),
-            ),
-            DataColumn(
-              label: SizedBox(width: accountWidth, child: _header('Account')),
-            ),
-            DataColumn(
-              label: SizedBox(
-                width: licenseWidth,
-                child: _header('License Status'),
-              ),
-            ),
-            DataColumn(
-              label: SizedBox(width: actionWidth, child: _header('Action')),
-            ),
-          ],
-          rows: users.map((u) {
-            Color licenseColor = Colors.orange;
-            if (u.licenseStatus == 'approved') licenseColor = Colors.green;
-            if (u.licenseStatus == 'rejected') licenseColor = Colors.red;
-            if (u.licenseStatus == 'unprovided') licenseColor = Colors.grey;
-
-            final accountStatus = u.isActive ? 'ACTIVE' : 'DISABLED';
-
-            return DataRow(
-              cells: [
-                DataCell(
-                  SizedBox(
+              columns: [
+                DataColumn(
+                  label: SizedBox(
                     width: nameWidth,
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 14,
-                          backgroundColor: AppColors.secondaryBlue.withValues(
-                            alpha: isDark ? 0.2 : 0.1,
-                          ),
-                          backgroundImage: getAppImageProvider(u.profileImage),
-                          child: u.profileImage.isEmpty
-                              ? Icon(Icons.person, size: 14, color: textPrimary)
-                              : null,
+                    child: _header('Full Name'),
+                  ),
+                ),
+                DataColumn(
+                  label: SizedBox(
+                    width: emailWidth,
+                    child: _header('Email Address'),
+                  ),
+                ),
+                DataColumn(
+                  label: SizedBox(
+                    width: phoneWidth,
+                    child: _header('Phone Number'),
+                  ),
+                ),
+                DataColumn(
+                  label: SizedBox(width: roleWidth, child: _header('Role')),
+                ),
+                DataColumn(
+                  label: SizedBox(
+                    width: accountWidth,
+                    child: _header('Account'),
+                  ),
+                ),
+                DataColumn(
+                  label: SizedBox(
+                    width: licenseWidth,
+                    child: _header('License Status'),
+                  ),
+                ),
+                DataColumn(
+                  label: SizedBox(width: actionWidth, child: _header('Action')),
+                ),
+              ],
+              rows: users.map((u) {
+                Color licenseColor = Colors.orange;
+                if (u.licenseStatus == 'approved') licenseColor = Colors.green;
+                if (u.licenseStatus == 'rejected') licenseColor = Colors.red;
+                if (u.licenseStatus == 'unprovided') licenseColor = Colors.grey;
+
+                final accountStatus = u.isActive ? 'ACTIVE' : 'DISABLED';
+
+                return DataRow(
+                  cells: [
+                    DataCell(
+                      SizedBox(
+                        width: nameWidth,
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 14,
+                              backgroundColor: AppColors.secondaryBlue
+                                  .withValues(alpha: isDark ? 0.2 : 0.1),
+                              backgroundImage: getAppImageProvider(
+                                u.profileImage,
+                              ),
+                              child: u.profileImage.isEmpty
+                                  ? Icon(
+                                      Icons.person,
+                                      size: 14,
+                                      color: textPrimary,
+                                    )
+                                  : null,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                u.fullName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: textPrimary,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            u.fullName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: textPrimary,
-                              fontSize: 13,
+                      ),
+                    ),
+                    DataCell(
+                      SizedBox(
+                        width: emailWidth,
+                        child: Text(
+                          u.email,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: textPrimary, fontSize: 13),
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      SizedBox(
+                        width: phoneWidth,
+                        child: Text(
+                          u.phone.isNotEmpty ? u.phone : 'N/A',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: textSecondary, fontSize: 13),
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      SizedBox(
+                        width: roleWidth,
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: u.role == 'admin'
+                                  ? Colors.purple.withValues(alpha: 0.15)
+                                  : Colors.blue.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              u.role.toUpperCase(),
+                              style: TextStyle(
+                                color: u.role == 'admin'
+                                    ? Colors.purple
+                                    : Colors.blue,
+                                fontSize: 8,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-                DataCell(
-                  SizedBox(
-                    width: emailWidth,
-                    child: Text(
-                      u.email,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: textPrimary, fontSize: 13),
-                    ),
-                  ),
-                ),
-                DataCell(
-                  SizedBox(
-                    width: phoneWidth,
-                    child: Text(
-                      u.phone.isNotEmpty ? u.phone : 'N/A',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: textSecondary, fontSize: 13),
-                    ),
-                  ),
-                ),
-                DataCell(
-                  SizedBox(
-                    width: roleWidth,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: u.role == 'admin'
-                              ? Colors.purple.withValues(alpha: 0.15)
-                              : Colors.blue.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          u.role.toUpperCase(),
-                          style: TextStyle(
-                            color: u.role == 'admin'
-                                ? Colors.purple
-                                : Colors.blue,
-                            fontSize: 8,
-                            fontWeight: FontWeight.bold,
+                    DataCell(
+                      SizedBox(
+                        width: accountWidth,
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: u.isActive
+                                  ? Colors.green.withValues(alpha: 0.15)
+                                  : Colors.red.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              accountStatus,
+                              style: TextStyle(
+                                color: u.isActive ? Colors.green : Colors.red,
+                                fontSize: 8,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ),
-                DataCell(
-                  SizedBox(
-                    width: accountWidth,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: u.isActive
-                              ? Colors.green.withValues(alpha: 0.15)
-                              : Colors.red.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          accountStatus,
-                          style: TextStyle(
-                            color: u.isActive ? Colors.green : Colors.red,
-                            fontSize: 8,
-                            fontWeight: FontWeight.bold,
+                    DataCell(
+                      SizedBox(
+                        width: licenseWidth,
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: licenseColor.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              u.licenseStatus.toUpperCase(),
+                              style: TextStyle(
+                                color: licenseColor,
+                                fontSize: 8,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ),
-                DataCell(
-                  SizedBox(
-                    width: licenseWidth,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: licenseColor.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          u.licenseStatus.toUpperCase(),
-                          style: TextStyle(
-                            color: licenseColor,
-                            fontSize: 8,
-                            fontWeight: FontWeight.bold,
+                    DataCell(
+                      SizedBox(
+                        width: actionWidth,
+                        child: IconButton(
+                          icon: Icon(
+                            Icons.edit_note_outlined,
+                            color: textPrimary,
+                            size: 20,
                           ),
+                          tooltip: 'Manage Profile Details',
+                          onPressed: () => _showSpecsDialog(u),
                         ),
                       ),
                     ),
-                  ),
-                ),
-                DataCell(
-                  SizedBox(
-                    width: actionWidth,
-                    child: IconButton(
-                      icon: Icon(
-                        Icons.edit_note_outlined,
-                        color: textPrimary,
-                        size: 20,
-                      ),
-                      tooltip: 'Manage Profile Details',
-                      onPressed: () => _showSpecsDialog(u),
-                    ),
-                  ),
-                ),
-              ],
-            );
-          }).toList(),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
         );
       },
     );

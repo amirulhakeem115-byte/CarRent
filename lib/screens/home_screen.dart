@@ -426,7 +426,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } else {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => const RegisterScreen()),
+        MaterialPageRoute(builder: (context) => LoginScreen(onLoggedIn: () {})),
       ).then((_) => _loadData());
     }
   }

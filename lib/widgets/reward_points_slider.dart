@@ -288,28 +288,33 @@ class _RewardPointsSliderState extends State<RewardPointsSlider> {
               border: Border.all(color: borderColor),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildPreviewItem(
-                  'Points Selected',
-                  '$_selectedValue',
-                  widget.isDeductMode
-                      ? Colors.redAccent
-                      : AppColors.primaryOrange,
-                  isDark,
-                ),
-                if (!widget.isAdmin)
-                  _buildPreviewItem(
-                    'Equivalent Discount',
-                    'RM ${discount.toStringAsFixed(2)}',
-                    Colors.green,
+                Expanded(
+                  child: _buildPreviewItem(
+                    'Points Selected',
+                    '$_selectedValue',
+                    widget.isDeductMode
+                        ? Colors.redAccent
+                        : AppColors.primaryOrange,
                     isDark,
                   ),
-                _buildPreviewItem(
-                  widget.isAdmin ? 'New Balance' : 'Remaining Balance',
-                  '$targetBalance pts',
-                  textPrimary,
-                  isDark,
+                ),
+                if (!widget.isAdmin)
+                  Expanded(
+                    child: _buildPreviewItem(
+                      'Equivalent Discount',
+                      'RM ${discount.toStringAsFixed(2)}',
+                      Colors.green,
+                      isDark,
+                    ),
+                  ),
+                Expanded(
+                  child: _buildPreviewItem(
+                    widget.isAdmin ? 'New Balance' : 'Remaining Balance',
+                    '$targetBalance pts',
+                    textPrimary,
+                    isDark,
+                  ),
                 ),
               ],
             ),
@@ -385,6 +390,9 @@ class _RewardPointsSliderState extends State<RewardPointsSlider> {
       children: [
         Text(
           label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 9,
             fontWeight: FontWeight.bold,
@@ -394,6 +402,9 @@ class _RewardPointsSliderState extends State<RewardPointsSlider> {
         const SizedBox(height: 4),
         Text(
           value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w900,

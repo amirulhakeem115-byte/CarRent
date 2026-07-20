@@ -134,12 +134,14 @@ class _BookingsViewState extends State<BookingsView> {
       builder: (context) {
         final isCompactMobile = MediaQuery.of(context).size.width < 420;
         Color statusColor = Colors.orange;
-        final bStat = booking.status.toLowerCase();
+        final bStat = booking.status.trim().toLowerCase();
+        final isCompleted = bStat == 'completed';
+        final isCancelled = bStat == 'cancelled' || bStat == 'canceled';
+        final hideTransitionStateSection = isCompleted || isCancelled;
         if (bStat == 'approved') statusColor = Colors.green;
         if (bStat == 'ongoing' || bStat == 'active') statusColor = Colors.blue;
-        if (bStat == 'completed') statusColor = Colors.indigo;
-        if (bStat == 'cancelled' || bStat == 'rejected')
-          statusColor = Colors.redAccent;
+        if (isCompleted) statusColor = Colors.indigo;
+        if (isCancelled || bStat == 'rejected') statusColor = Colors.redAccent;
         if (bStat == 'overdue') statusColor = Colors.red;
 
         return Padding(
@@ -243,96 +245,99 @@ class _BookingsViewState extends State<BookingsView> {
                     booking.notes!,
                     isItalic: true,
                   ),
-                const Divider(height: 32),
-                Text(
-                  'Transition Rental State',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: textPrimary,
+                if (!hideTransitionStateSection) ...[
+                  const Divider(height: 32),
+                  Text(
+                    'Transition Rental State',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: textPrimary,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
-                    if (booking.status == 'pending') ...[
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
+                  const SizedBox(height: 12),
+                ],
+                if (!hideTransitionStateSection)
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      if (booking.status == 'pending') ...[
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _updateStatus(booking, 'approved');
+                          },
+                          child: const Text('Approve Reservation'),
                         ),
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _updateStatus(booking, 'approved');
-                        },
-                        child: const Text('Approve Reservation'),
-                      ),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.redAccent,
-                          foregroundColor: Colors.white,
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.redAccent,
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _updateStatus(booking, 'rejected');
+                          },
+                          child: const Text('Reject & Deny'),
                         ),
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _updateStatus(booking, 'rejected');
-                        },
-                        child: const Text('Reject & Deny'),
-                      ),
+                      ],
+                      if (booking.status == 'approved' ||
+                          booking.status == 'Confirmed' ||
+                          booking.status == 'confirmed') ...[
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue,
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _updateStatus(booking, 'active');
+                          },
+                          child: Text(
+                            booking.isOpenRental
+                                ? 'Vehicle Picked Up'
+                                : 'Handover Keys (Active)',
+                          ),
+                        ),
+                      ],
+                      if (booking.status.toLowerCase() == 'return requested' ||
+                          booking.status == 'ongoing' ||
+                          booking.status.toLowerCase() == 'active' ||
+                          booking.status.toLowerCase() == 'overdue') ...[
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.teal,
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _showReturnInspectionDialog(booking);
+                          },
+                          child: const Text('Inspect & Complete Return'),
+                        ),
+                      ],
+                      if (booking.status != 'cancelled' &&
+                          booking.status != 'completed' &&
+                          booking.status != 'rejected') ...[
+                        OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.redAccent,
+                            side: const BorderSide(color: Colors.redAccent),
+                          ),
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _updateStatus(booking, 'cancelled');
+                          },
+                          child: const Text('Cancel Booking'),
+                        ),
+                      ],
                     ],
-                    if (booking.status == 'approved' ||
-                        booking.status == 'Confirmed' ||
-                        booking.status == 'confirmed') ...[
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          foregroundColor: Colors.white,
-                        ),
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _updateStatus(booking, 'active');
-                        },
-                        child: Text(
-                          booking.isOpenRental
-                              ? 'Vehicle Picked Up'
-                              : 'Handover Keys (Active)',
-                        ),
-                      ),
-                    ],
-                    if (booking.status.toLowerCase() == 'return requested' ||
-                        booking.status == 'ongoing' ||
-                        booking.status.toLowerCase() == 'active' ||
-                        booking.status.toLowerCase() == 'overdue') ...[
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.teal,
-                          foregroundColor: Colors.white,
-                        ),
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _showReturnInspectionDialog(booking);
-                        },
-                        child: const Text('Inspect & Complete Return'),
-                      ),
-                    ],
-                    if (booking.status != 'cancelled' &&
-                        booking.status != 'completed' &&
-                        booking.status != 'rejected') ...[
-                      OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.redAccent,
-                          side: const BorderSide(color: Colors.redAccent),
-                        ),
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _updateStatus(booking, 'cancelled');
-                        },
-                        child: const Text('Cancel Booking'),
-                      ),
-                    ],
-                  ],
-                ),
+                  ),
                 if (booking.extensionRequest != null &&
                     booking.extensionRequest!['status'] == 'pending') ...[
                   const Divider(height: 32),

@@ -578,7 +578,7 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
         drawer: showMobileBottomNav ? _buildDrawer() : null,
         body: SafeArea(
           top: true,
-          bottom: false,
+          bottom: true,
           child: Row(
             children: [
               if (isDesktop) _buildSidebar(),

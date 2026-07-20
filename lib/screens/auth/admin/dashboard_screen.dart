@@ -686,7 +686,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           : null,
       body: SafeArea(
         top: true,
-        bottom: false,
+        bottom: true,
         child: Row(
           children: [
             if (isDesktop) _buildSidebar(context),
