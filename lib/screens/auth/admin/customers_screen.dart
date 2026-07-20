@@ -1002,42 +1002,38 @@ class _CustomersViewState extends State<CustomersView> {
                 DataColumn(
                   label: SizedBox(
                     width: nameWidth,
-                    child: _header('Full Name'),
-                  ),
-                ),
-                    width: nameWidth,
-                    child: _header('Full Name'),
+                    child: header('Full Name'),
                   ),
                 ),
                 DataColumn(
                   label: SizedBox(
                     width: emailWidth,
-                    child: _header('Email Address'),
+                    child: header('Email Address'),
                   ),
                 ),
                 DataColumn(
                   label: SizedBox(
                     width: phoneWidth,
-                    child: _header('Phone Number'),
+                    child: header('Phone Number'),
                   ),
                 ),
                 DataColumn(
-                  label: SizedBox(width: roleWidth, child: _header('Role')),
+                  label: SizedBox(width: roleWidth, child: header('Role')),
                 ),
                 DataColumn(
                   label: SizedBox(
                     width: accountWidth,
-                    child: _header('Account'),
+                    child: header('Account'),
                   ),
                 ),
                 DataColumn(
                   label: SizedBox(
                     width: licenseWidth,
-                    child: _header('License Status'),
+                    child: header('License Status'),
                   ),
                 ),
                 DataColumn(
-                  label: SizedBox(width: actionWidth, child: _header('Action')),
+                  label: SizedBox(width: actionWidth, child: header('Action')),
                 ),
               ],
               rows: users.map((u) {

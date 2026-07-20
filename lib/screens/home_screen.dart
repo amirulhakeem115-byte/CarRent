@@ -10,7 +10,7 @@ import '../services/company_settings_provider.dart';
 import '../models/user_model.dart';
 import '../models/vehicle_model.dart';
 import '../models/branch_model.dart';
-import 'auth/register_screen.dart';
+import 'auth/login_screen.dart';
 import 'auth/customer/customer_responsive_shell.dart';
 import 'auth/admin/dashboard_screen.dart';
 import 'auth/customer/vehicle_details_screen.dart';

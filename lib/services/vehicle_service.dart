@@ -136,8 +136,6 @@ class VehicleService {
               }
             }
           }
-            }
-          }
         }
       }
 

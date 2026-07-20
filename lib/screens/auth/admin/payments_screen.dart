@@ -619,7 +619,6 @@ class _PaymentsViewState extends State<PaymentsView> {
                       ),
                     ),
                   ],
-                ],
                   if (payment.paymentStatus == 'Pending Verification' ||
                       payment.status == 'Pending Verification' ||
                       payment.paymentStatus == 'pending' ||
@@ -696,6 +695,7 @@ class _PaymentsViewState extends State<PaymentsView> {
                   ],
                 ],
               ),
+            ),
           ),
           contentPadding: EdgeInsets.fromLTRB(
             isPhone ? 16 : 24,
