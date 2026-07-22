@@ -13,7 +13,20 @@
           "package_name": "com.example.carrent"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "469656910476-fau8rbkfdvvkqbnq41q5ncil8vg073na.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.carrent",
+            "certificate_hash": "22eb19785db6442db3abbfb902197308cfb75d96"
+          }
+        },
+        {
+          "client_id": "469656910476-agpmtn5dd2edaoiv2s60calf6m4g326q.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAtxnljKXp7xcAf5zEe3s23uB4Nlr6VTyU"
@@ -21,7 +34,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "469656910476-5fcb6su75bub53v0ujvftjma4v0iksom.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "469656910476-62uns8hedk8i67jf3v3r8pkf10ga9fei.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.carrentSystem"
+              }
+            }
+          ]
         }
       }
     },
@@ -32,7 +57,20 @@
           "package_name": "com.example.carrent_system"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "469656910476-q6qm7tsflt5sf4tbuq4k8f877ql614r7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.carrent_system",
+            "certificate_hash": "e68daf88f528985e71e03aff171057d4cfaf5dcd"
+          }
+        },
+        {
+          "client_id": "469656910476-agpmtn5dd2edaoiv2s60calf6m4g326q.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAtxnljKXp7xcAf5zEe3s23uB4Nlr6VTyU"
@@ -40,7 +78,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "469656910476-5fcb6su75bub53v0ujvftjma4v0iksom.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "469656910476-62uns8hedk8i67jf3v3r8pkf10ga9fei.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.carrentSystem"
+              }
+            }
+          ]
         }
       }
     }

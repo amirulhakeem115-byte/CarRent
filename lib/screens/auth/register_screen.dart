@@ -2,11 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../constants/colors.dart';
 import '../../services/auth_service.dart';
+import '../../services/database_service.dart';
 import '../../services/company_settings_provider.dart';
+import '../../services/booking_lifecycle_manager.dart';
+import '../../services/user_session.dart';
 import '../../widgets/custom_textfield.dart';
 import '../../widgets/app_logo.dart';
 import '../home_screen.dart';
 import 'login_screen.dart';
+import 'customer/customer_responsive_shell.dart';
+import 'admin/dashboard_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -24,20 +29,87 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _confirmPasswordController = TextEditingController();
 
   final AuthService _authService = AuthService();
+  final DatabaseService _databaseService = DatabaseService();
 
   bool _loading = false;
+  bool _googleLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _agreeToTerms = false;
   String? _error;
 
-  void _showSocialComingSoon(String provider) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$provider sign-up is coming soon.'),
-        backgroundColor: AppColors.primaryOrange,
-      ),
-    );
+  Future<void> _registerWithGoogle() async {
+    setState(() {
+      _googleLoading = true;
+      _error = null;
+    });
+
+    try {
+      final userCreds = await _authService.signInWithGoogle();
+
+      final uid = userCreds.user!.uid;
+      final userModel = await _databaseService.getUser(uid);
+      if (userModel != null) {
+        UserSession().forceSetUser(userModel);
+      }
+      if (!mounted) return;
+
+      if (userModel == null) {
+        setState(() {
+          _error = 'Failed to load user profile. Please contact support.';
+          _googleLoading = false;
+        });
+        return;
+      }
+
+      if (!userModel.isActive) {
+        setState(() {
+          _error =
+              'Your account has been disabled or suspended. Please contact support.';
+          _googleLoading = false;
+        });
+        await _authService.logout();
+        return;
+      }
+
+      // Trigger booking lifecycle check on first login
+      await BookingLifecycleManager().checkAndProcessLifecycle();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Welcome, ${userModel.fullName}!'),
+          backgroundColor: AppColors.primaryOrange,
+        ),
+      );
+
+      // Route based on role
+      if (userModel.role == 'admin') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const AdminDashboardScreen()),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const CustomerResponsiveShell(),
+          ),
+        );
+      }
+    } catch (e) {
+      final msg = e.toString();
+      setState(() {
+        _error = msg.startsWith('Exception: ') ? msg.substring(11) : msg;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _googleLoading = false;
+        });
+      }
+    }
   }
 
   Future<void> _register() async {
@@ -340,7 +412,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           CustomTextField(
             controller: _passwordController,
             labelText: '',
-            hintText: 'Create a password',
+            hintText: 'Min 6 chars, upper, lower, number & symbol',
             obscureText: _obscurePassword,
             prefixIcon: Icons.lock_outline,
             suffixIcon: IconButton(
@@ -361,10 +433,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
               if (val.length < 6) {
                 return 'Password must be at least 6 characters';
               }
-              if (!RegExp(
-                r'^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$',
-              ).hasMatch(val)) {
-                return 'Password must contain both letters and numbers';
+              if (!RegExp(r'[A-Z]').hasMatch(val)) {
+                return 'Password must contain an uppercase letter';
+              }
+              if (!RegExp(r'[a-z]').hasMatch(val)) {
+                return 'Password must contain a lowercase letter';
+              }
+              if (!RegExp(r'\d').hasMatch(val)) {
+                return 'Password must contain a number';
+              }
+              if (!RegExp(r'[^A-Za-z\d]').hasMatch(val)) {
+                return 'Password must contain a special character';
               }
               return null;
             },
@@ -497,7 +576,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 elevation: 2,
               ),
-              onPressed: _loading ? null : _register,
+              onPressed: (_loading || _googleLoading) ? null : _register,
               icon: const Icon(Icons.person_add_alt_1_rounded, size: 20),
               label: _loading
                   ? const SizedBox(
@@ -575,34 +654,48 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 elevation: isDark ? 0 : 1,
               ),
-              onPressed: _loading
+              onPressed: (_loading || _googleLoading)
                   ? null
-                  : () => _showSocialComingSoon('Google'),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Image.network(
-                    'https://www.gstatic.com/mobilesdk/160503_mobilesdk/logo/2x/google_g_normal_id_48dp.png',
-                    height: 22,
-                    width: 22,
-                    errorBuilder: (context, error, stackTrace) => const Icon(
-                      Icons.g_mobiledata_rounded,
-                      color: AppColors.primaryOrange,
-                      size: 28,
+                  : _registerWithGoogle,
+              child: _googleLoading
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppColors.primaryOrange,
+                        ),
+                      ),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Image.network(
+                          'https://www.gstatic.com/mobilesdk/160503_mobilesdk/logo/2x/google_g_normal_id_48dp.png',
+                          height: 22,
+                          width: 22,
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Icon(
+                                Icons.g_mobiledata_rounded,
+                                color: AppColors.primaryOrange,
+                                size: 28,
+                              ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Sign up using Google',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                            color: isDark
+                                ? Colors.white
+                                : AppColors.secondaryBlue,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Sign up using Google',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                      color: isDark ? Colors.white : AppColors.secondaryBlue,
-                    ),
-                  ),
-                ],
-              ),
             ),
           ),
           const SizedBox(height: 24),

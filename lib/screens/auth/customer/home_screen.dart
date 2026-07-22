@@ -277,11 +277,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   _buildStatsRow(),
                   const SizedBox(height: 20),
 
-                  // Compact Special Deals Section
-                  if (_promotions.isNotEmpty) ...[
-                    PromotionCardsSection(promotions: _promotions),
-                    const SizedBox(height: 24),
-                  ],
+                  const SizedBox(height: 4),
 
                   _buildMembershipProgressCard(context),
                   const SizedBox(height: 20),
@@ -1084,7 +1080,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                         Text(
                           booking.isOpenRental
                               ? 'Open Rental'
-                              : (booking.returnDate != null ? dateFormat.format(booking.returnDate!) : ""),
+                              : (booking.returnDate != null
+                                    ? dateFormat.format(booking.returnDate!)
+                                    : ""),
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
@@ -1512,7 +1510,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         benefits = [
           'Open Rental access (no upfront payment!)',
           '1.5x Reward Points earning multiplier',
-          'Priority booking approval & support'
+          'Priority booking approval & support',
         ];
         break;
       case 'Gold':
@@ -1522,7 +1520,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         benefits = [
           'Priority booking approval',
           'Exclusive promotions',
-          'Dynamic discount points redemptions'
+          'Dynamic discount points redemptions',
         ];
         break;
       case 'Silver':
@@ -1531,17 +1529,14 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         levelIcon = Icons.verified_user_rounded;
         benefits = [
           'Dynamic discount points redemptions',
-          'Priority customer support channels'
+          'Priority customer support channels',
         ];
         break;
       default: // Standard
         levelColor = const Color(0xFF94A3B8);
         gradientColors = [const Color(0xFF374151), const Color(0xFF1F2937)];
         levelIcon = Icons.emoji_events_outlined;
-        benefits = [
-          'Standard points earning',
-          'Standard booking approval'
-        ];
+        benefits = ['Standard points earning', 'Standard booking approval'];
     }
 
     final int pct = (status.progress * 100).toInt();
@@ -1601,7 +1596,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                       ],
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(20),
@@ -1641,8 +1639,8 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      status.currentLevel == 'Premium' 
-                          ? 'Maximum Membership Level Reached.' 
+                      status.currentLevel == 'Premium'
+                          ? 'Maximum Membership Level Reached.'
                           : '${status.pointsNeededForNext} more points to unlock ${status.nextLevel}.',
                       style: const TextStyle(
                         color: Colors.white70,
@@ -1665,7 +1663,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(10),
                   child: LinearProgressIndicator(
-                    value: status.currentLevel == 'Premium' ? 1.0 : status.progress,
+                    value: status.currentLevel == 'Premium'
+                        ? 1.0
+                        : status.progress,
                     backgroundColor: Colors.white.withValues(alpha: 0.15),
                     valueColor: AlwaysStoppedAnimation<Color>(levelColor),
                     minHeight: 8,
@@ -1682,24 +1682,30 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                ...benefits.map((b) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Row(
-                    children: [
-                      Icon(Icons.check_circle_outline, color: levelColor, size: 12),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          b,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
+                ...benefits.map(
+                  (b) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.check_circle_outline,
+                          color: levelColor,
+                          size: 12,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            b,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                )),
+                ),
               ],
             ),
           ),

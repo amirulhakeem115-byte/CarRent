@@ -25,6 +25,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _emailFocusNode = FocusNode();
 
   final AuthService _authService = AuthService();
   final DatabaseService _databaseService = DatabaseService();
@@ -36,11 +37,20 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _error;
 
   List<String> _recentEmails = [];
+  bool _showEmailSuggestions = false;
 
   @override
   void initState() {
     super.initState();
     _loadSavedEmails();
+
+    _emailFocusNode.addListener(() {
+      setState(() {
+        // Show suggestions when email field gets focus and there are recent emails
+        _showEmailSuggestions =
+            _emailFocusNode.hasFocus && _recentEmails.isNotEmpty;
+      });
+    });
   }
 
   Future<void> _loadSavedEmails() async {
@@ -61,6 +71,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _recentEmails.remove(email);
+      _showEmailSuggestions = _recentEmails.isNotEmpty;
     });
     await prefs.setStringList('recent_login_emails', _recentEmails);
 
@@ -68,10 +79,20 @@ class _LoginScreenState extends State<LoginScreen> {
     if (lastEmail == email) {
       await prefs.remove('last_login_email');
     }
+  }
 
-    if (_recentEmails.isEmpty) {
-      setState(() {});
-    }
+  void _selectEmail(String email) {
+    setState(() {
+      _emailController.text = email;
+      _showEmailSuggestions = false;
+      _error = null;
+    });
+    // Move focus to password field after selecting email
+    FocusScope.of(context).requestFocus(FocusNode());
+    // Focus to password field after a short delay
+    Future.delayed(const Duration(milliseconds: 100), () {
+      FocusScope.of(context).nextFocus();
+    });
   }
 
   Future<void> _login() async {
@@ -80,6 +101,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _loading = true;
       _error = null;
+      _showEmailSuggestions = false;
     });
 
     try {
@@ -127,6 +149,9 @@ class _LoginScreenState extends State<LoginScreen> {
           list.removeRange(5, list.length);
         }
         await prefs.setStringList('recent_login_emails', list);
+        setState(() {
+          _recentEmails = list;
+        });
       }
 
       if (!mounted) return;
@@ -175,6 +200,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _googleLoading = true;
       _error = null;
+      _showEmailSuggestions = false;
     });
 
     try {
@@ -249,6 +275,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _emailFocusNode.dispose();
     super.dispose();
   }
 
@@ -315,74 +342,162 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          CustomTextField(
-            controller: _emailController,
-            labelText: '',
-            hintText: 'Enter your email',
-            prefixIcon: Icons.email_outlined,
-            keyboardType: TextInputType.emailAddress,
-            validator: (val) {
-              if (val == null || val.trim().isEmpty) {
-                return 'Email is required';
-              }
-              if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val)) {
-                return 'Enter a valid email';
-              }
-              return null;
-            },
-          ),
-          if (_recentEmails.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Recent accounts',
-                style: TextStyle(
-                  color: isDark ? Colors.white54 : AppColors.lightText,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
+          Column(
+            children: [
+              CustomTextField(
+                controller: _emailController,
+                labelText: '',
+                hintText: 'Enter your email',
+                prefixIcon: Icons.email_outlined,
+                focusNode: _emailFocusNode,
+                keyboardType: TextInputType.emailAddress,
+                onTap: () {
+                  setState(() {
+                    _showEmailSuggestions = _recentEmails.isNotEmpty;
+                  });
+                },
+                onChanged: (value) {
+                  setState(() {
+                    _showEmailSuggestions = false;
+                    _error = null;
+                  });
+                },
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) {
+                    return 'Email is required';
+                  }
+                  if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val)) {
+                    return 'Enter a valid email';
+                  }
+                  return null;
+                },
               ),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _recentEmails.map((email) {
-                final bool isSelected = _emailController.text.trim() == email;
-                return InputChip(
-                  label: Text(email),
-                  selected: isSelected,
-                  onSelected: (_) {
-                    setState(() {
-                      _emailController.text = email;
-                    });
-                  },
-                  deleteIcon: const Icon(Icons.close, size: 18),
-                  onDeleted: () => _deleteEmail(email),
-                  backgroundColor: isDark
-                      ? const Color(0xFF1E293B)
-                      : Colors.white,
-                  selectedColor: AppColors.primaryOrange.withValues(
-                    alpha: 0.15,
+              // Email suggestions dropdown
+              if (_showEmailSuggestions && _recentEmails.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.only(top: 4),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isDark
+                          ? const Color(0xFF334155)
+                          : Colors.grey[300]!,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  side: BorderSide(
-                    color: isSelected
-                        ? AppColors.primaryOrange
-                        : (isDark
-                              ? const Color(0xFF334155)
-                              : Colors.grey[300]!),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                        child: Row(
+                          children: [
+                            Text(
+                              'Recent accounts',
+                              style: TextStyle(
+                                color: isDark
+                                    ? Colors.white54
+                                    : AppColors.lightText,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const Spacer(),
+                            TextButton(
+                              onPressed: () {
+                                setState(() {
+                                  _showEmailSuggestions = false;
+                                });
+                              },
+                              style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                minimumSize: const Size(40, 30),
+                              ),
+                              child: const Text(
+                                'Close',
+                                style: TextStyle(
+                                  color: AppColors.primaryOrange,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      ..._recentEmails.map((email) {
+                        return InkWell(
+                          onTap: () => _selectEmail(email),
+                          onLongPress: () => _deleteEmail(email),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.history,
+                                  size: 18,
+                                  color: isDark
+                                      ? Colors.white54
+                                      : Colors.grey[500],
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    email,
+                                    style: TextStyle(
+                                      color: isDark
+                                          ? Colors.white
+                                          : AppColors.secondaryBlue,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () => _deleteEmail(email),
+                                  child: Icon(
+                                    Icons.close,
+                                    size: 18,
+                                    color: isDark
+                                        ? Colors.white38
+                                        : Colors.grey[400],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        child: Text(
+                          'Long press email to remove',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark ? Colors.white38 : Colors.grey[400],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  labelStyle: TextStyle(
-                    color: isSelected
-                        ? AppColors.primaryOrange
-                        : (isDark ? Colors.white70 : AppColors.secondaryBlue),
-                    fontSize: 12,
-                  ),
-                );
-              }).toList(),
-            ),
-          ],
+                ),
+            ],
+          ),
           const SizedBox(height: 20),
 
           // Password label and field
@@ -412,6 +527,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 });
               },
             ),
+            onChanged: (_) {
+              setState(() {
+                _error = null;
+              });
+            },
             validator: (val) {
               if (val == null || val.isEmpty) return 'Password is required';
               return null;
@@ -725,7 +845,6 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                             const SizedBox(height: 48),
-                            // Security / minimal premium illustration in vector-style
                             Container(
                               padding: const EdgeInsets.all(24),
                               decoration: BoxDecoration(

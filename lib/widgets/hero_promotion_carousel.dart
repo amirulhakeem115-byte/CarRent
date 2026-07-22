@@ -197,258 +197,269 @@ class _HeroPromotionCarouselState extends State<HeroPromotionCarousel> {
     );
   }
 
-  Widget _buildBannerCard(BuildContext context, PromotionModel promo, bool isDark) {
+  Widget _buildBannerCard(
+    BuildContext context,
+    PromotionModel promo,
+    bool isDark,
+  ) {
     final discountLabel = promo.discountType == 'percentage'
         ? '${promo.discountValue.toStringAsFixed(0)}% OFF'
         : 'RM ${promo.discountValue.toStringAsFixed(0)} OFF';
 
-    return GestureDetector(
-      onTap: () {
-        PromotionService().recordClick(promo.id);
-        if (widget.onPromotionTap != null) {
-          widget.onPromotionTap!(promo);
-        } else {
-          showPromotionDetailsDialog(context, promo);
-        }
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primaryOrange.withValues(alpha: 0.15),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: Stack(
-            children: [
-              // Banner Background Image
-              Positioned.fill(
-                child: promo.bannerUrl.isNotEmpty
-                    ? AppImage(
-                        imageSrc: promo.bannerUrl,
-                        fit: BoxFit.cover,
-                      )
-                    : Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryOrange.withValues(alpha: 0.15),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Stack(
+          children: [
+            // Banner Background Image
+            Positioned.fill(
+              child: promo.bannerUrl.isNotEmpty
+                  ? AppImage(imageSrc: promo.bannerUrl, fit: BoxFit.cover)
+                  : Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
                       ),
-              ),
-
-              // Gradient Overlay for Readability
-              Positioned.fill(
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.black.withValues(alpha: 0.85),
-                        Colors.black.withValues(alpha: 0.45),
-                        Colors.black.withValues(alpha: 0.85),
-                      ],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
                     ),
+            ),
+
+            // Gradient Overlay for Readability
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.black.withValues(alpha: 0.85),
+                      Colors.black.withValues(alpha: 0.45),
+                      Colors.black.withValues(alpha: 0.85),
+                    ],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
                   ),
                 ),
               ),
+            ),
 
-              // Content Layer
-              Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Discount Badge
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [AppColors.primaryOrange, Color(0xFFEA580C)],
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.primaryOrange.withValues(alpha: 0.4),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.bolt,
-                                color: Colors.white,
-                                size: 14,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                discountLabel,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 13,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ],
-                          ),
+            // Content Layer
+            Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Discount Badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
                         ),
-
-                        // Auto Apply / Code Pill
-                        if (promo.autoApply)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF10B981).withValues(alpha: 0.9),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Row(
-                              children: [
-                                Icon(
-                                  Icons.check_circle_rounded,
-                                  color: Colors.white,
-                                  size: 12,
-                                ),
-                                SizedBox(width: 4),
-                                Text(
-                                  'AUTO-APPLY',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                        else if (promo.promoCode != null &&
-                            promo.promoCode!.isNotEmpty)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.4),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [
+                              AppColors.primaryOrange,
+                              Color(0xFFEA580C),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primaryOrange.withValues(
+                                alpha: 0.4,
                               ),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
                             ),
-                            child: Text(
-                              'CODE: ${promo.promoCode}',
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.bolt,
+                              color: Colors.white,
+                              size: 14,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              discountLabel,
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 13,
                                 letterSpacing: 0.5,
                               ),
                             ),
-                          ),
-                      ],
-                    ),
-
-                    // Title & Subtitle
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          promo.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 17,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.3,
-                          ),
+                          ],
                         ),
-                        if (promo.subtitle.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            promo.subtitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.85),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
+                      ),
 
-                    // Bottom Row: Date & Action CTA
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Valid until ${DateFormat('dd MMM').format(promo.endDate)}',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.7),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
+                      // Auto Apply / Code Pill
+                      if (promo.autoApply)
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 7,
+                            horizontal: 10,
+                            vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
+                            color: const Color(
+                              0xFF10B981,
+                            ).withValues(alpha: 0.9),
+                            borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Row(
-                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(
-                                'View Offer',
-                                style: TextStyle(
-                                  color: AppColors.secondaryBlue,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                ),
+                              Icon(
+                                Icons.check_circle_rounded,
+                                color: Colors.white,
+                                size: 12,
                               ),
                               SizedBox(width: 4),
-                              Icon(
-                                Icons.arrow_forward_rounded,
-                                color: AppColors.secondaryBlue,
-                                size: 14,
+                              Text(
+                                'AUTO-APPLY',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ],
                           ),
+                        )
+                      else if (promo.promoCode != null &&
+                          promo.promoCode!.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: Text(
+                            'CODE: ${promo.promoCode}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+
+                  // Title & Subtitle
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        promo.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                      if (promo.subtitle.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          promo.subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ],
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+
+                  // Bottom Row: Date & Action CTA
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Valid until ${DateFormat('dd MMM').format(promo.endDate)}',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.7),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: GestureDetector(
+                          onTap: () {
+                            PromotionService().recordClick(promo.id);
+                            if (widget.onPromotionTap != null) {
+                              widget.onPromotionTap!(promo);
+                            } else {
+                              showPromotionDetailsDialog(context, promo);
+                            }
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 7,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'View Offer',
+                                  style: TextStyle(
+                                    color: AppColors.secondaryBlue,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                SizedBox(width: 4),
+                                Icon(
+                                  Icons.arrow_forward_rounded,
+                                  color: AppColors.secondaryBlue,
+                                  size: 14,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -483,27 +494,6 @@ class PromotionCardsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Special Deals & Discounts',
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 16,
-                color: isDark ? Colors.white : AppColors.secondaryBlue,
-              ),
-            ),
-            Text(
-              '${active.length} Available',
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.primaryOrange,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
         const SizedBox(height: 14),
         SizedBox(
           height: 155,
@@ -521,7 +511,11 @@ class PromotionCardsSection extends StatelessWidget {
     );
   }
 
-  Widget _buildCompactCard(BuildContext context, PromotionModel promo, bool isDark) {
+  Widget _buildCompactCard(
+    BuildContext context,
+    PromotionModel promo,
+    bool isDark,
+  ) {
     final discountText = promo.discountType == 'percentage'
         ? '${promo.discountValue.toStringAsFixed(0)}%'
         : 'RM ${promo.discountValue.toStringAsFixed(0)}';
@@ -560,7 +554,10 @@ class PromotionCardsSection extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.primaryOrange.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(8),
@@ -576,7 +573,10 @@ class PromotionCardsSection extends StatelessWidget {
                 ),
                 if (promo.promoCode != null && promo.promoCode!.isNotEmpty)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.blueAccent.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(6),
@@ -607,7 +607,9 @@ class PromotionCardsSection extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  promo.subtitle.isNotEmpty ? promo.subtitle : promo.description,
+                  promo.subtitle.isNotEmpty
+                      ? promo.subtitle
+                      : promo.description,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -654,6 +656,8 @@ void showPromotionDetailsDialog(BuildContext context, PromotionModel promo) {
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (ctx) {
+      final bottomInset = MediaQuery.of(ctx).viewPadding.bottom;
+
       return Container(
         height: MediaQuery.of(context).size.height * 0.85,
         decoration: BoxDecoration(
@@ -686,7 +690,10 @@ void showPromotionDetailsDialog(BuildContext context, PromotionModel promo) {
                       child: AspectRatio(
                         aspectRatio: 16 / 9,
                         child: promo.bannerUrl.isNotEmpty
-                            ? AppImage(imageSrc: promo.bannerUrl, fit: BoxFit.cover)
+                            ? AppImage(
+                                imageSrc: promo.bannerUrl,
+                                fit: BoxFit.cover,
+                              )
                             : Container(
                                 color: AppColors.secondaryBlue,
                                 child: const Center(
@@ -782,7 +789,8 @@ void showPromotionDetailsDialog(BuildContext context, PromotionModel promo) {
                                 ),
                             ],
                           ),
-                          if (promo.promoCode != null && promo.promoCode!.isNotEmpty) ...[
+                          if (promo.promoCode != null &&
+                              promo.promoCode!.isNotEmpty) ...[
                             const Divider(height: 20),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -804,7 +812,9 @@ void showPromotionDetailsDialog(BuildContext context, PromotionModel promo) {
                                         fontSize: 18,
                                         fontWeight: FontWeight.w900,
                                         letterSpacing: 1.5,
-                                        color: isDark ? Colors.white : AppColors.secondaryBlue,
+                                        color: isDark
+                                            ? Colors.white
+                                            : AppColors.secondaryBlue,
                                       ),
                                     ),
                                   ],
@@ -819,7 +829,8 @@ void showPromotionDetailsDialog(BuildContext context, PromotionModel promo) {
                                         content: Text(
                                           'Promo code "${promo.promoCode}" copied to clipboard!',
                                         ),
-                                        backgroundColor: AppColors.primaryOrange,
+                                        backgroundColor:
+                                            AppColors.primaryOrange,
                                       ),
                                     );
                                   },
@@ -830,7 +841,10 @@ void showPromotionDetailsDialog(BuildContext context, PromotionModel promo) {
                                       borderRadius: BorderRadius.circular(10),
                                     ),
                                   ),
-                                  icon: const Icon(Icons.copy_rounded, size: 14),
+                                  icon: const Icon(
+                                    Icons.copy_rounded,
+                                    size: 14,
+                                  ),
                                   label: const Text('Copy Code'),
                                 ),
                               ],
@@ -906,7 +920,9 @@ void showPromotionDetailsDialog(BuildContext context, PromotionModel promo) {
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : AppColors.secondaryBlue,
+                          color: isDark
+                              ? Colors.white
+                              : AppColors.secondaryBlue,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -918,13 +934,20 @@ void showPromotionDetailsDialog(BuildContext context, PromotionModel promo) {
                                 child: Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text('• ', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    const Text(
+                                      '• ',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
                                     Expanded(
                                       child: Text(
                                         tc,
                                         style: TextStyle(
                                           fontSize: 12,
-                                          color: isDark ? Colors.white60 : Colors.grey[600],
+                                          color: isDark
+                                              ? Colors.white60
+                                              : Colors.grey[600],
                                         ),
                                       ),
                                     ),
@@ -942,7 +965,7 @@ void showPromotionDetailsDialog(BuildContext context, PromotionModel promo) {
 
             // Bottom CTA
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF1E293B) : Colors.white,
                 boxShadow: [
@@ -970,10 +993,7 @@ void showPromotionDetailsDialog(BuildContext context, PromotionModel promo) {
                   ),
                   child: const Text(
                     'Book Vehicle with This Offer',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
