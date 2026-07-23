@@ -13,31 +13,39 @@ import 'company_settings_provider.dart';
 import 'user_role_cache.dart';
 
 class BookingService {
-  final DatabaseReference _db = FirebaseDatabase.instance.ref().child('bookings');
+  final DatabaseReference _db = FirebaseDatabase.instance.ref().child(
+    'bookings',
+  );
   final VehicleService _vehicleService = VehicleService();
   final NotificationService _notificationService = NotificationService();
 
-  static double calculateOverdueCharges(BookingModel booking, double pricePerDay, {DateTime? now}) {
+  static double calculateOverdueCharges(
+    BookingModel booking,
+    double pricePerDay, {
+    DateTime? now,
+  }) {
     if (booking.isOpenRental || booking.returnDate == null) return 0.0;
-    
+
     final statusLower = booking.status.toLowerCase();
     if (statusLower == 'cancelled' || statusLower == 'rejected') return 0.0;
 
-    final bool isStatusValid = statusLower == 'active' || 
-                               statusLower == 'ongoing' || 
-                               statusLower == 'overdue' ||
-                               statusLower == 'return requested' || 
-                               statusLower == 'awaiting return' ||
-                               statusLower == 'awaiting return inspection' ||
-                               statusLower == 'awaiting final payment';
-    
+    final bool isStatusValid =
+        statusLower == 'active' ||
+        statusLower == 'ongoing' ||
+        statusLower == 'overdue' ||
+        statusLower == 'return requested' ||
+        statusLower == 'awaiting return' ||
+        statusLower == 'awaiting return inspection' ||
+        statusLower == 'awaiting final payment';
+
     if (statusLower == 'completed') {
       return booking.lateFees;
     }
-    
+
     if (!isStatusValid) return 0.0;
 
-    final DateTime cutoffTime = booking.actualReturnTimestamp ?? now ?? DateTime.now();
+    final DateTime cutoffTime =
+        booking.actualReturnTimestamp ?? now ?? DateTime.now();
 
     if (!cutoffTime.isAfter(booking.returnDate!)) return 0.0;
 
@@ -53,7 +61,11 @@ class BookingService {
     return double.parse(overdueCharge.toStringAsFixed(2));
   }
 
-  static Map<String, dynamic> getOverdueDetails(BookingModel booking, double pricePerDay, {DateTime? now}) {
+  static Map<String, dynamic> getOverdueDetails(
+    BookingModel booking,
+    double pricePerDay, {
+    DateTime? now,
+  }) {
     if (booking.isOpenRental || booking.returnDate == null) {
       return {
         'isOverdue': false,
@@ -63,7 +75,7 @@ class BookingService {
         'charges': 0.0,
       };
     }
-    
+
     final statusLower = booking.status.toLowerCase();
     if (statusLower == 'cancelled' || statusLower == 'rejected') {
       return {
@@ -85,13 +97,14 @@ class BookingService {
       };
     }
 
-    final bool isStatusValid = statusLower == 'active' || 
-                               statusLower == 'ongoing' || 
-                               statusLower == 'overdue' ||
-                               statusLower == 'return requested' || 
-                               statusLower == 'awaiting return' ||
-                               statusLower == 'awaiting return inspection' ||
-                               statusLower == 'awaiting final payment';
+    final bool isStatusValid =
+        statusLower == 'active' ||
+        statusLower == 'ongoing' ||
+        statusLower == 'overdue' ||
+        statusLower == 'return requested' ||
+        statusLower == 'awaiting return' ||
+        statusLower == 'awaiting return inspection' ||
+        statusLower == 'awaiting final payment';
     if (!isStatusValid) {
       return {
         'isOverdue': false,
@@ -102,7 +115,8 @@ class BookingService {
       };
     }
 
-    final DateTime cutoffTime = booking.actualReturnTimestamp ?? now ?? DateTime.now();
+    final DateTime cutoffTime =
+        booking.actualReturnTimestamp ?? now ?? DateTime.now();
 
     if (!cutoffTime.isAfter(booking.returnDate!)) {
       return {
@@ -128,7 +142,9 @@ class BookingService {
 
     final days = totalHours ~/ 24;
     final remainingHours = totalHours % 24;
-    final charges = double.parse(((days * pricePerDay) + (remainingHours * 20.0)).toStringAsFixed(2));
+    final charges = double.parse(
+      ((days * pricePerDay) + (remainingHours * 20.0)).toStringAsFixed(2),
+    );
 
     return {
       'isOverdue': charges > 0,
@@ -141,8 +157,11 @@ class BookingService {
 
   Future<void> createBooking(BookingModel booking) async {
     try {
-      await _db.child(booking.id).set(booking.toMap()).timeout(const Duration(seconds: 10));
-      
+      await _db
+          .child(booking.id)
+          .set(booking.toMap())
+          .timeout(const Duration(seconds: 10));
+
       // If promotion was used, record promotion analytics!
       if (booking.promotionId != null && booking.promotionId!.isNotEmpty) {
         try {
@@ -155,12 +174,19 @@ class BookingService {
           debugPrint('Error recording promotion booking analytics: $pErr');
         }
       }
-      
-      final bool isConfirmed = booking.status == 'Confirmed' || booking.status == 'Confirmed';
 
-      if (isConfirmed) {
+      final bookingStatusLower = booking.status.toLowerCase();
+      final bool shouldMarkBooked =
+          bookingStatusLower != 'cancelled' &&
+          bookingStatusLower != 'rejected' &&
+          bookingStatusLower != 'completed';
+
+      if (shouldMarkBooked) {
         try {
-          await _vehicleService.updateVehicleStatus(booking.vehicleId, 'Booked');
+          await _vehicleService.updateVehicleStatus(
+            booking.vehicleId,
+            'Booked',
+          );
         } catch (vErr) {
           debugPrint('Error auto-marking vehicle as booked: $vErr');
         }
@@ -169,8 +195,8 @@ class BookingService {
       // Create booking notification for user
       await _notificationService.createNotification(
         userId: booking.userId,
-        title: isConfirmed ? 'Booking Confirmed' : 'Booking Created',
-        message: isConfirmed
+        title: shouldMarkBooked ? 'Booking Confirmed' : 'Booking Created',
+        message: shouldMarkBooked
             ? 'Your booking for ${booking.vehicleName} is confirmed! Get ready for your rental.'
             : 'Your booking for ${booking.vehicleName} has been submitted and is pending approval.',
         type: 'booking',
@@ -180,7 +206,7 @@ class BookingService {
         bookingId: booking.id,
         priority: 'high',
         icon: '📅',
-        color: isConfirmed ? '0xFF10B981' : '0xFFF59E0B',
+        color: shouldMarkBooked ? '0xFF10B981' : '0xFFF59E0B',
         relatedId: booking.id,
         actionRoute: 'Dashboard',
       );
@@ -199,24 +225,38 @@ class BookingService {
 
     final currentRole = await UserRoleCache.getRole(currentUid);
     debugPrint('[BookingService] [getBookings] Accessing path: bookings');
-    debugPrint('[BookingService] [getBookings] Current UID: $currentUid, Current Role: $currentRole');
+    debugPrint(
+      '[BookingService] [getBookings] Current UID: $currentUid, Current Role: $currentRole',
+    );
 
     try {
       final DataSnapshot snapshot;
       if (currentRole == 'admin') {
         snapshot = await _db.get().timeout(const Duration(seconds: 10));
       } else {
-        snapshot = await _db.orderByChild('userId').equalTo(currentUid).get().timeout(const Duration(seconds: 10));
+        snapshot = await _db
+            .orderByChild('userId')
+            .equalTo(currentUid)
+            .get()
+            .timeout(const Duration(seconds: 10));
       }
 
       if (snapshot.exists) {
-        final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
+        final Map<dynamic, dynamic> data =
+            snapshot.value as Map<dynamic, dynamic>;
         data.forEach((key, value) {
-          bookings.add(BookingModel.fromMap(key.toString(), value as Map<dynamic, dynamic>));
+          bookings.add(
+            BookingModel.fromMap(
+              key.toString(),
+              value as Map<dynamic, dynamic>,
+            ),
+          );
         });
       }
 
-      debugPrint('[BookingService] [getBookings] Bookings count loaded: ${bookings.length}');
+      debugPrint(
+        '[BookingService] [getBookings] Bookings count loaded: ${bookings.length}',
+      );
     } catch (e) {
       debugPrint('[BookingService] [getBookings] Error getting bookings: $e');
       rethrow;
@@ -233,33 +273,45 @@ class BookingService {
     final controller = StreamController<List<BookingModel>>.broadcast();
     StreamSubscription? sub;
 
-    UserRoleCache.getRole(currentUid).then((currentRole) {
-      if (controller.isClosed) return;
-      debugPrint('[BookingService] getBookingsStream — uid: $currentUid, role: $currentRole');
+    UserRoleCache.getRole(currentUid)
+        .then((currentRole) {
+          if (controller.isClosed) return;
+          debugPrint(
+            '[BookingService] getBookingsStream — uid: $currentUid, role: $currentRole',
+          );
 
-      final Query query =
-          currentRole == 'admin' ? _db : _db.orderByChild('userId').equalTo(currentUid);
+          final Query query = currentRole == 'admin'
+              ? _db
+              : _db.orderByChild('userId').equalTo(currentUid);
 
-      sub = query.onValue.listen((event) {
-        if (controller.isClosed) return;
-        List<BookingModel> bookings = [];
-        if (event.snapshot.exists) {
-          final Map<dynamic, dynamic> data =
-              event.snapshot.value as Map<dynamic, dynamic>;
-          data.forEach((key, value) {
-            bookings.add(
-                BookingModel.fromMap(key.toString(), value as Map<dynamic, dynamic>));
-          });
-        }
-        controller.add(bookings);
-      }, onError: (e) {
-        debugPrint('[BookingService] getBookingsStream error: $e');
-        if (!controller.isClosed) controller.add([]);
-      });
-    }).catchError((e) {
-      debugPrint('[BookingService] getBookingsStream role fetch error: $e');
-      if (!controller.isClosed) controller.add([]);
-    });
+          sub = query.onValue.listen(
+            (event) {
+              if (controller.isClosed) return;
+              List<BookingModel> bookings = [];
+              if (event.snapshot.exists) {
+                final Map<dynamic, dynamic> data =
+                    event.snapshot.value as Map<dynamic, dynamic>;
+                data.forEach((key, value) {
+                  bookings.add(
+                    BookingModel.fromMap(
+                      key.toString(),
+                      value as Map<dynamic, dynamic>,
+                    ),
+                  );
+                });
+              }
+              controller.add(bookings);
+            },
+            onError: (e) {
+              debugPrint('[BookingService] getBookingsStream error: $e');
+              if (!controller.isClosed) controller.add([]);
+            },
+          );
+        })
+        .catchError((e) {
+          debugPrint('[BookingService] getBookingsStream role fetch error: $e');
+          if (!controller.isClosed) controller.add([]);
+        });
 
     controller.onCancel = () => sub?.cancel();
     return controller.stream;
@@ -268,11 +320,21 @@ class BookingService {
   Future<List<BookingModel>> getUserBookings(String userId) async {
     List<BookingModel> bookings = [];
     try {
-      final snapshot = await _db.orderByChild('userId').equalTo(userId).get().timeout(const Duration(seconds: 10));
+      final snapshot = await _db
+          .orderByChild('userId')
+          .equalTo(userId)
+          .get()
+          .timeout(const Duration(seconds: 10));
       if (snapshot.exists) {
-        final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
+        final Map<dynamic, dynamic> data =
+            snapshot.value as Map<dynamic, dynamic>;
         data.forEach((key, value) {
-          bookings.add(BookingModel.fromMap(key.toString(), value as Map<dynamic, dynamic>));
+          bookings.add(
+            BookingModel.fromMap(
+              key.toString(),
+              value as Map<dynamic, dynamic>,
+            ),
+          );
         });
       }
     } catch (e) {
@@ -302,33 +364,53 @@ class BookingService {
       };
 
       if (statusLower == 'active') {
-        updates['actualPickupTime'] = DateFormat('hh:mm a').format(DateTime.now());
-        updates['actualPickupDate'] = DateFormat('yyyy-MM-dd').format(DateTime.now());
+        updates['actualPickupTime'] = DateFormat(
+          'hh:mm a',
+        ).format(DateTime.now());
+        updates['actualPickupDate'] = DateFormat(
+          'yyyy-MM-dd',
+        ).format(DateTime.now());
         updates['actualPickupTimestamp'] = DateTime.now().toIso8601String();
       }
 
       if (statusLower == 'completed') {
         updates['isReturned'] = true;
-        updates['actualReturnTime'] = DateFormat('hh:mm a').format(DateTime.now());
-        updates['actualReturnDate'] = DateFormat('yyyy-MM-dd').format(DateTime.now());
+        updates['actualReturnTime'] = DateFormat(
+          'hh:mm a',
+        ).format(DateTime.now());
+        updates['actualReturnDate'] = DateFormat(
+          'yyyy-MM-dd',
+        ).format(DateTime.now());
         updates['actualReturnTimestamp'] = DateTime.now().toIso8601String();
       }
 
-      await _db.child(bookingId).update(updates).timeout(const Duration(seconds: 10));
+      await _db
+          .child(bookingId)
+          .update(updates)
+          .timeout(const Duration(seconds: 10));
 
       // Update vehicle status
       try {
-        if (statusLower == 'ongoing' || statusLower == 'active' || statusLower == 'approved' || statusLower == 'confirmed' || statusLower == 'overdue') {
+        if (statusLower == 'ongoing' ||
+            statusLower == 'active' ||
+            statusLower == 'approved' ||
+            statusLower == 'confirmed' ||
+            statusLower == 'overdue') {
           if (statusLower == 'active') {
             await _vehicleService.updateVehicleStatus(vehicleId, 'Rented');
           } else {
             await _vehicleService.updateVehicleStatus(vehicleId, 'Booked');
           }
-        } else if (statusLower == 'completed' || statusLower == 'cancelled' || statusLower == 'rejected' || statusLower == 'pending payment') {
+        } else if (statusLower == 'completed' ||
+            statusLower == 'cancelled' ||
+            statusLower == 'rejected' ||
+            statusLower == 'pending payment') {
           await _vehicleService.updateVehicleStatus(vehicleId, 'Available');
         }
       } catch (vehicleErr) {
-        debugPrint('[BookingService] Warning: vehicle status update failed: $vehicleErr');
+        debugPrint(
+          '[BookingService] Warning: vehicle status update failed: $vehicleErr',
+        );
       }
 
       // Create notification
@@ -343,12 +425,14 @@ class BookingService {
         color = '0xFFF59E0B'; // orange
       } else if (statusLower == 'approved' || statusLower == 'confirmed') {
         title = 'Booking Confirmed!';
-        message = 'Your booking for $vehicleName is confirmed. Get ready for your rental!';
+        message =
+            'Your booking for $vehicleName is confirmed. Get ready for your rental!';
         color = '0xFF10B981'; // green
 
         await _notificationService.notifyAllAdmins(
           title: 'Booking Confirmed',
-          message: 'Booking #${bookingId.toUpperCase()} for $vehicleName confirmed.',
+          message:
+              'Booking #${bookingId.toUpperCase()} for $vehicleName confirmed.',
           type: 'booking',
           icon: '📅',
           color: '0xFF10B981',
@@ -360,14 +444,20 @@ class BookingService {
         message = 'Your booking for $vehicleName has been rejected.';
         color = '0xFFEF4444'; // red
         try {
-          await RewardPointsService().refundOrCancelPointsForBooking(bookingId, userId);
+          await RewardPointsService().refundOrCancelPointsForBooking(
+            bookingId,
+            userId,
+          );
         } catch (rewardErr) {
-          debugPrint('[BookingService] Warning: reward points reversion failed: $rewardErr');
+          debugPrint(
+            '[BookingService] Warning: reward points reversion failed: $rewardErr',
+          );
         }
 
         await _notificationService.notifyAllAdmins(
           title: 'Booking Rejected',
-          message: 'Booking #${bookingId.toUpperCase()} for $vehicleName was rejected.',
+          message:
+              'Booking #${bookingId.toUpperCase()} for $vehicleName was rejected.',
           type: 'booking',
           icon: '❌',
           color: '0xFFEF4444',
@@ -385,7 +475,8 @@ class BookingService {
 
         await _notificationService.notifyAllAdmins(
           title: 'Rental Started 🚗',
-          message: 'Rental started for Booking #${bookingId.toUpperCase()} ($vehicleName).',
+          message:
+              'Rental started for Booking #${bookingId.toUpperCase()} ($vehicleName).',
           type: 'booking',
           icon: '🚗',
           color: '0xFF3B82F6',
@@ -396,11 +487,12 @@ class BookingService {
         title = 'Rental Completed';
         message = 'Your booking has been completed successfully.';
         color = '0xFF10B981'; // green
-        
+
         // Also notify admins!
         await _notificationService.notifyAllAdmins(
           title: 'Booking Completed',
-          message: 'Booking #${bookingId.toUpperCase()} for $vehicleName completed.',
+          message:
+              'Booking #${bookingId.toUpperCase()} for $vehicleName completed.',
           type: 'booking',
           icon: '📅',
           color: '0xFF10B981',
@@ -409,12 +501,19 @@ class BookingService {
         );
 
         // Award reward points automatically if Rewards System is enabled
-        final rewardsEnabled = CompanySettingsProvider().getField('rewardsEnabled', defaultValue: true) as bool;
+        final rewardsEnabled =
+            CompanySettingsProvider().getField(
+                  'rewardsEnabled',
+                  defaultValue: true,
+                )
+                as bool;
         if (rewardsEnabled) {
           try {
             await RewardPointsService().awardPointsForBooking(bookingId);
           } catch (rewardErr) {
-            debugPrint('[BookingService] Warning: reward points award failed: $rewardErr');
+            debugPrint(
+              '[BookingService] Warning: reward points award failed: $rewardErr',
+            );
           }
         }
 
@@ -422,31 +521,44 @@ class BookingService {
         try {
           await ReceiptService().triggerAutomaticReceiptCheck(bookingId);
         } catch (receiptErr) {
-          debugPrint('[BookingService] Warning: receipt check failed: $receiptErr');
+          debugPrint(
+            '[BookingService] Warning: receipt check failed: $receiptErr',
+          );
         }
       } else if (statusLower == 'cancelled') {
         title = 'Booking Cancelled';
         message = 'Your booking for $vehicleName has been cancelled.';
         color = '0xFFEF4444'; // red
-        
+
         try {
-          await RewardPointsService().refundOrCancelPointsForBooking(bookingId, userId);
+          await RewardPointsService().refundOrCancelPointsForBooking(
+            bookingId,
+            userId,
+          );
         } catch (rewardErr) {
-          debugPrint('[BookingService] Warning: reward points reversion failed: $rewardErr');
+          debugPrint(
+            '[BookingService] Warning: reward points reversion failed: $rewardErr',
+          );
         }
-        
+
         // Also notify admins!
         String customerName = 'Customer';
         try {
-          final uSnap = await FirebaseDatabase.instance.ref().child('users').child(userId).child('fullName').get();
+          final uSnap = await FirebaseDatabase.instance
+              .ref()
+              .child('users')
+              .child(userId)
+              .child('fullName')
+              .get();
           if (uSnap.exists) {
             customerName = uSnap.value.toString();
           }
         } catch (_) {}
-        
+
         await _notificationService.notifyAllAdmins(
           title: 'Booking Cancelled',
-          message: 'Customer $customerName cancelled booking #${bookingId.toUpperCase()} for $vehicleName.',
+          message:
+              'Customer $customerName cancelled booking #${bookingId.toUpperCase()} for $vehicleName.',
           type: 'booking',
           icon: '📅',
           color: '0xFFEF4444',
@@ -455,14 +567,16 @@ class BookingService {
         );
       } else if (statusLower == 'overdue') {
         title = 'Rental Overdue ⚠️';
-        message = 'Your rental has passed its return date. Please contact support or return the vehicle immediately.';
+        message =
+            'Your rental has passed its return date. Please contact support or return the vehicle immediately.';
         color = '0xFFEF4444'; // red
         icon = '⚠️';
 
         // Notify admins!
         await _notificationService.notifyAllAdmins(
           title: 'Booking Overdue ⚠️',
-          message: 'Booking #${bookingId.toUpperCase()} for $vehicleName is overdue.',
+          message:
+              'Booking #${bookingId.toUpperCase()} for $vehicleName is overdue.',
           type: 'booking',
           icon: '⚠️',
           color: '0xFFEF4444',
@@ -496,13 +610,18 @@ class BookingService {
     try {
       final snapshot = await _db.get();
       if (!snapshot.exists || snapshot.value == null) return true;
-      final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
+      final Map<dynamic, dynamic> data =
+          snapshot.value as Map<dynamic, dynamic>;
       for (final entry in data.entries) {
         final bId = entry.key.toString();
         if (bId == excludeBookingId) continue;
         final val = entry.value as Map;
         final status = (val['status'] ?? '').toString().toLowerCase();
-        if (status == 'cancelled' || status == 'rejected' || status == 'completed') continue;
+        if (status == 'cancelled' ||
+            status == 'rejected' ||
+            status == 'completed') {
+          continue;
+        }
         final vId = (val['vehicleId'] ?? '').toString();
         if (vId != vehicleId) continue;
         final bStart = DateTime.parse(val['pickUpDate']);
@@ -609,8 +728,16 @@ class BookingService {
       final Map<dynamic, dynamic> data =
           snapshot.value as Map<dynamic, dynamic>;
 
-      final reqStart = DateTime(pickUpDate.year, pickUpDate.month, pickUpDate.day);
-      final reqEnd = DateTime(returnDate.year, returnDate.month, returnDate.day);
+      final reqStart = DateTime(
+        pickUpDate.year,
+        pickUpDate.month,
+        pickUpDate.day,
+      );
+      final reqEnd = DateTime(
+        returnDate.year,
+        returnDate.month,
+        returnDate.day,
+      );
 
       for (final entry in data.entries) {
         final String bId = entry.key.toString();
@@ -650,7 +777,9 @@ class BookingService {
 
       return true;
     } catch (e) {
-      debugPrint('[BookingService] Error checking vehicle availability for dates: $e');
+      debugPrint(
+        '[BookingService] Error checking vehicle availability for dates: $e',
+      );
       return false;
     }
   }
@@ -670,14 +799,18 @@ class BookingService {
           'status': status,
           'paymentStatus': paymentStatus,
           'requestedAt': DateTime.now().toIso8601String(),
-        }
+        },
       };
-      await _db.child(bookingId).update(updates).timeout(const Duration(seconds: 10));
+      await _db
+          .child(bookingId)
+          .update(updates)
+          .timeout(const Duration(seconds: 10));
 
       // Notify Admin
       await _notificationService.notifyAllAdmins(
         title: "Extension Request ⚠️",
-        message: "Customer ${bookingId.isNotEmpty ? 'requested extension' : ''} for Booking #${bookingId.toUpperCase()}.",
+        message:
+            "Customer ${bookingId.isNotEmpty ? 'requested extension' : ''} for Booking #${bookingId.toUpperCase()}.",
         type: 'extension_request',
         category: 'Bookings',
         bookingId: bookingId,
@@ -699,7 +832,7 @@ class BookingService {
       if (!snap.exists || snap.value == null) throw 'Booking not found';
       final data = Map<dynamic, dynamic>.from(snap.value as Map);
       final booking = BookingModel.fromMap(bookingId, data);
-      
+
       final ext = booking.extensionRequest;
       if (ext == null) throw 'No extension request found';
 
@@ -713,13 +846,17 @@ class BookingService {
         'updatedAt': DateTime.now().toIso8601String(),
       };
 
-      await _db.child(bookingId).update(updates).timeout(const Duration(seconds: 10));
+      await _db
+          .child(bookingId)
+          .update(updates)
+          .timeout(const Duration(seconds: 10));
 
       // Notify Customer
       await _notificationService.createNotification(
         userId: booking.userId,
         title: "Extension Approved 🎉",
-        message: "Extension approved until ${DateFormat('dd MMM yyyy hh:mm a').format(newReturn)}.",
+        message:
+            "Extension approved until ${DateFormat('dd MMM yyyy hh:mm a').format(newReturn)}.",
         type: 'extension_approved',
         category: 'Bookings',
         customerName: booking.userName,
@@ -737,7 +874,8 @@ class BookingService {
         customerName: booking.userName,
         vehicleName: booking.vehicleName,
         bookingId: bookingId,
-        details: 'approved extension until ${DateFormat('dd MMM yyyy hh:mm a').format(newReturn)} (+RM ${addCost.toStringAsFixed(2)}).',
+        details:
+            'approved extension until ${DateFormat('dd MMM yyyy hh:mm a').format(newReturn)} (+RM ${addCost.toStringAsFixed(2)}).',
         priority: 'normal',
         icon: '🎉',
         color: '0xFF10B981',
@@ -755,16 +893,20 @@ class BookingService {
       final data = Map<dynamic, dynamic>.from(snap.value as Map);
       final booking = BookingModel.fromMap(bookingId, data);
 
-      await _db.child(bookingId).update({
-        'extensionRequest/status': 'rejected',
-        'updatedAt': DateTime.now().toIso8601String(),
-      }).timeout(const Duration(seconds: 10));
+      await _db
+          .child(bookingId)
+          .update({
+            'extensionRequest/status': 'rejected',
+            'updatedAt': DateTime.now().toIso8601String(),
+          })
+          .timeout(const Duration(seconds: 10));
 
       // Notify Customer
       await _notificationService.createNotification(
         userId: booking.userId,
         title: "Extension Rejected ❌",
-        message: "Your extension request for ${booking.vehicleName} was rejected.",
+        message:
+            "Your extension request for ${booking.vehicleName} was rejected.",
         type: 'extension_rejected',
         category: 'Bookings',
         customerName: booking.userName,
@@ -783,18 +925,26 @@ class BookingService {
 
   Future<void> requestReturn(String bookingId) async {
     try {
-      debugPrint('[STEP 1] Customer clicked Return Vehicle (Booking ID: $bookingId)');
+      debugPrint(
+        '[STEP 1] Customer clicked Return Vehicle (Booking ID: $bookingId)',
+      );
       final user = FirebaseAuth.instance.currentUser;
       final uid = user?.uid ?? 'unauthenticated';
-      final role = user != null ? await UserRoleCache.getRole(user.uid) : 'unauthenticated';
+      final role = user != null
+          ? await UserRoleCache.getRole(user.uid)
+          : 'unauthenticated';
 
       final snap = await _db.child(bookingId).get();
       if (!snap.exists || snap.value == null) throw 'Booking not found';
       final data = Map<dynamic, dynamic>.from(snap.value as Map);
       final booking = BookingModel.fromMap(bookingId, data);
 
-      final effectiveUserId = uid.isNotEmpty && uid != 'unauthenticated' ? uid : booking.userId;
-      final newStatus = booking.isOpenRental ? 'Awaiting Return Inspection' : 'Return Requested';
+      final effectiveUserId = uid.isNotEmpty && uid != 'unauthenticated'
+          ? uid
+          : booking.userId;
+      final newStatus = booking.isOpenRental
+          ? 'Awaiting Return Inspection'
+          : 'Return Requested';
 
       debugPrint('=== BOOKING STATUS UPDATE TRACE ===');
       debugPrint('Current UID: $uid');
@@ -805,13 +955,18 @@ class BookingService {
       debugPrint('New Status: $newStatus');
       debugPrint('===================================');
 
-      await _db.child(bookingId).update({
-        'status': newStatus,
-        'userId': effectiveUserId,
-        'updatedAt': DateTime.now().toIso8601String(),
-      }).timeout(const Duration(seconds: 10));
+      await _db
+          .child(bookingId)
+          .update({
+            'status': newStatus,
+            'userId': effectiveUserId,
+            'updatedAt': DateTime.now().toIso8601String(),
+          })
+          .timeout(const Duration(seconds: 10));
 
-      debugPrint('[STEP 2] Booking status updated successfully (Booking ID: $bookingId)');
+      debugPrint(
+        '[STEP 2] Booking status updated successfully (Booking ID: $bookingId)',
+      );
 
       // Safely perform notification write without blocking or failing status update
       try {
@@ -821,7 +976,8 @@ class BookingService {
           customerName: booking.userName,
           vehicleName: booking.vehicleName,
           bookingId: bookingId,
-          details: 'submitted Return Request for ${booking.vehicleName}. Please schedule vehicle inspection.',
+          details:
+              'submitted Return Request for ${booking.vehicleName}. Please schedule vehicle inspection.',
           priority: 'high',
           icon: '🚗',
           color: '0xFF3B82F6',
@@ -831,7 +987,8 @@ class BookingService {
         await _notificationService.createNotification(
           userId: effectiveUserId,
           title: "Return Request Submitted",
-          message: "Your return request has been submitted. Please wait for the Admin to inspect the vehicle.",
+          message:
+              "Your return request has been submitted. Please wait for the Admin to inspect the vehicle.",
           type: 'booking',
           category: booking.isOpenRental ? 'Open Rental' : 'Bookings',
           customerName: booking.userName,
@@ -843,7 +1000,9 @@ class BookingService {
           actionRoute: 'Dashboard',
         );
       } catch (notifErr) {
-        debugPrint('[BookingService] Warning: return request notification failed: $notifErr');
+        debugPrint(
+          '[BookingService] Warning: return request notification failed: $notifErr',
+        );
       }
     } catch (e) {
       debugPrint('Error requesting return: $e');
@@ -851,7 +1010,9 @@ class BookingService {
     }
   }
 
-  static Future<Map<String, dynamic>> getOriginalPaymentInfo(BookingModel booking) async {
+  static Future<Map<String, dynamic>> getOriginalPaymentInfo(
+    BookingModel booking,
+  ) async {
     String method = booking.paymentMethod ?? '';
     bool isPaidOnline = false;
     double initialAmountPaid = 0.0;
@@ -938,8 +1099,8 @@ class BookingService {
             .child(booking.vehicleId)
             .get();
         if (vSnap.exists) {
-          pricePerDay =
-              ((vSnap.value as Map)['pricePerDay'] ?? 100.0).toDouble();
+          pricePerDay = ((vSnap.value as Map)['pricePerDay'] ?? 100.0)
+              .toDouble();
         }
       } catch (_) {}
 
@@ -972,16 +1133,18 @@ class BookingService {
 
       // Rule 1: Online Payment (FPX/DuitNow QR) -> Base rental ALREADY paid!
       // Rule 2: Cash Payment -> Base rental NOT paid yet!
-      final double outstandingBase =
-          isPaidOnline ? 0.0 : (baseCost - booking.discountAmount);
+      final double outstandingBase = isPaidOnline
+          ? 0.0
+          : (baseCost - booking.discountAmount);
       final double finalAmount = double.parse(
         (outstandingBase + lateFees + cleaningFee + damageFee + extraCharges)
             .toStringAsFixed(2),
       );
 
       final bool requiresAdditionalPayment = finalAmount > 0.0;
-      final String newStatus =
-          requiresAdditionalPayment ? 'Awaiting Final Payment' : 'completed';
+      final String newStatus = requiresAdditionalPayment
+          ? 'Awaiting Final Payment'
+          : 'completed';
 
       final Map<String, dynamic> updates = {
         'status': newStatus,
@@ -1188,8 +1351,18 @@ class BookingService {
     }
   }
 
-  Future<void> cancelBooking(String bookingId, String userId, String vehicleId, String vehicleName) async {
-    await updateBookingStatus(bookingId, 'cancelled', userId, vehicleId, vehicleName);
+  Future<void> cancelBooking(
+    String bookingId,
+    String userId,
+    String vehicleId,
+    String vehicleName,
+  ) async {
+    await updateBookingStatus(
+      bookingId,
+      'cancelled',
+      userId,
+      vehicleId,
+      vehicleName,
+    );
   }
 }
-

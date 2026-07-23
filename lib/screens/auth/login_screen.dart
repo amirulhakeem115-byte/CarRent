@@ -539,11 +539,15 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           const SizedBox(height: 12),
 
-          // Forgot Password / Remember me Row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
+          // Forgot Password / Remember me row with adaptive layout for long text.
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final hasLargeText =
+                  MediaQuery.of(context).textScaler.scale(1.0) > 1.15;
+              final stacked = constraints.maxWidth < 360 || hasLargeText;
+
+              final remember = Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Checkbox(
                     value: _rememberMe,
@@ -558,17 +562,22 @@ class _LoginScreenState extends State<LoginScreen> {
                       color: isDark ? Colors.white54 : AppColors.secondaryBlue,
                     ),
                   ),
-                  Text(
-                    'Remember Me',
-                    style: TextStyle(
-                      color: isDark ? Colors.white70 : AppColors.secondaryBlue,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+                  Flexible(
+                    child: Text(
+                      'Remember Me',
+                      style: TextStyle(
+                        color: isDark
+                            ? Colors.white70
+                            : AppColors.secondaryBlue,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
-              ),
-              TextButton(
+              );
+
+              final forgot = TextButton(
                 onPressed: () {
                   Navigator.push(
                     context,
@@ -585,8 +594,23 @@ class _LoginScreenState extends State<LoginScreen> {
                     fontSize: 13,
                   ),
                 ),
-              ),
-            ],
+              );
+
+              if (stacked) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [remember, forgot],
+                );
+              }
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Flexible(child: remember),
+                  forgot,
+                ],
+              );
+            },
           ),
           const SizedBox(height: 16),
 

@@ -1006,31 +1006,71 @@ void showPromotionDetailsDialog(BuildContext context, PromotionModel promo) {
 }
 
 Widget _buildInfoRow(IconData icon, String title, String value, bool isDark) {
-  return Padding(
-    padding: const EdgeInsets.only(bottom: 10),
-    child: Row(
-      children: [
-        Icon(icon, size: 16, color: AppColors.primaryOrange),
-        const SizedBox(width: 10),
-        Text(
-          '$title: ',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white70 : Colors.grey[700],
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: isDark ? Colors.white : AppColors.secondaryBlue,
-            ),
-          ),
-        ),
-      ],
-    ),
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      final hasLargeText = MediaQuery.of(context).textScaler.scale(1.0) > 1.15;
+      final stacked = constraints.maxWidth < 340 || hasLargeText;
+
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: stacked
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(icon, size: 16, color: AppColors.primaryOrange),
+                      const SizedBox(width: 10),
+                      Text(
+                        '$title:',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white70 : Colors.grey[700],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    value,
+                    softWrap: true,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: isDark ? Colors.white : AppColors.secondaryBlue,
+                    ),
+                  ),
+                ],
+              )
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(icon, size: 16, color: AppColors.primaryOrange),
+                  const SizedBox(width: 10),
+                  Text(
+                    '$title: ',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white70 : Colors.grey[700],
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      value,
+                      softWrap: true,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: isDark ? Colors.white : AppColors.secondaryBlue,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+      );
+    },
   );
 }

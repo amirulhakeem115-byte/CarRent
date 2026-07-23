@@ -1783,33 +1783,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                             const Divider(height: 16),
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'Total Price:',
-                                  style: TextStyle(fontSize: 12),
+                                const Expanded(
+                                  child: Text(
+                                    'Total Price:',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
                                 ),
-                                Text(
-                                  'RM ${booking.totalPrice.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    'RM ${booking.totalPrice.toStringAsFixed(2)}',
+                                    textAlign: TextAlign.end,
+                                    softWrap: true,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'Deposit Amount:',
-                                  style: TextStyle(fontSize: 12),
+                                const Expanded(
+                                  child: Text(
+                                    'Deposit Amount:',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
                                 ),
-                                Text(
-                                  'RM ${booking.depositAmount.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    'RM ${booking.depositAmount.toStringAsFixed(2)}',
+                                    textAlign: TextAlign.end,
+                                    softWrap: true,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -1822,80 +1836,102 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       const Divider(),
                       const SizedBox(height: 8),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Bank Name:',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey,
-                            ),
-                          ),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (_bankLogoUrl != null &&
-                                  _bankLogoUrl!.isNotEmpty) ...[
-                                AppImage(
-                                  imageSrc: _bankLogoUrl!,
-                                  height: 18,
-                                  placeholder: const SizedBox(),
-                                ),
-                                const SizedBox(width: 6),
-                              ],
-                              Text(
-                                _bankName!,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.secondaryBlue,
-                                ),
+                          const Expanded(
+                            child: Text(
+                              'Bank Name:',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey,
                               ),
-                            ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 6,
+                              runSpacing: 4,
+                              alignment: WrapAlignment.end,
+                              children: [
+                                if (_bankLogoUrl != null &&
+                                    _bankLogoUrl!.isNotEmpty)
+                                  AppImage(
+                                    imageSrc: _bankLogoUrl!,
+                                    height: 18,
+                                    placeholder: const SizedBox(),
+                                  ),
+                                Text(
+                                  _bankName!,
+                                  softWrap: true,
+                                  textAlign: TextAlign.end,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.secondaryBlue,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 4),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Account Number:',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey,
+                          const Expanded(
+                            child: Text(
+                              'Account Number:',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey,
+                              ),
                             ),
                           ),
-                          Text(
-                            _accountNumber ?? '',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.secondaryBlue,
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              _accountNumber ?? '',
+                              textAlign: TextAlign.end,
+                              softWrap: true,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.secondaryBlue,
+                              ),
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 4),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Account Name:',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey,
+                          const Expanded(
+                            child: Text(
+                              'Account Name:',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey,
+                              ),
                             ),
                           ),
-                          Text(
-                            _accountName ?? '',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.secondaryBlue,
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              _accountName ?? '',
+                              textAlign: TextAlign.end,
+                              softWrap: true,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.secondaryBlue,
+                              ),
                             ),
                           ),
                         ],

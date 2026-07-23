@@ -71,6 +71,15 @@ class _ReportsViewState extends State<ReportsView> {
   final int _rowsPerPage = 10;
   bool _showAdvancedFilters = false;
 
+  bool _useStackedLayout(
+    BuildContext context,
+    BoxConstraints constraints, {
+    double widthThreshold = 560,
+  }) {
+    final textScale = MediaQuery.textScalerOf(context).scale(1.0);
+    return constraints.maxWidth < widthThreshold || textScale > 1.15;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -226,7 +235,8 @@ class _ReportsViewState extends State<ReportsView> {
       if (_selectedBranch != 'All') {
         final v = _getVehicleById(b.vehicleId);
         if (v == null ||
-            (v.branchName != _selectedBranch && v.branchId != _selectedBranch)) {
+            (v.branchName != _selectedBranch &&
+                v.branchId != _selectedBranch)) {
           return false;
         }
       }
@@ -428,7 +438,8 @@ class _ReportsViewState extends State<ReportsView> {
       if (_selectedBranch != 'All') {
         final v = _getVehicleById(j.vehicleId);
         if (v == null ||
-            (v.branchName != _selectedBranch && v.branchId != _selectedBranch)) {
+            (v.branchName != _selectedBranch &&
+                v.branchId != _selectedBranch)) {
           return false;
         }
       }
@@ -466,7 +477,8 @@ class _ReportsViewState extends State<ReportsView> {
       if (_selectedBranch != 'All') {
         final v = _getVehicleById(r.vehicleId);
         if (v == null ||
-            (v.branchName != _selectedBranch && v.branchId != _selectedBranch)) {
+            (v.branchName != _selectedBranch &&
+                v.branchId != _selectedBranch)) {
           return false;
         }
       }
@@ -1448,58 +1460,75 @@ class _ReportsViewState extends State<ReportsView> {
             const SizedBox(height: 16),
             const Divider(),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () async {
-                      final date = await showDatePicker(
-                        context: context,
-                        initialDate: _startDate ?? DateTime.now(),
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime(2030),
-                      );
-                      if (date != null) {
-                        setState(() {
-                          _startDate = date;
-                          _currentPage = 1;
-                        });
-                      }
-                    },
-                    icon: const Icon(Icons.date_range, size: 16),
-                    label: Text(
-                      _startDate == null
-                          ? 'Select Start Date'
-                          : DateFormat('dd MMM yyyy').format(_startDate!),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final stacked = _useStackedLayout(
+                  context,
+                  constraints,
+                  widthThreshold: 640,
+                );
+                final buttonWidth = stacked
+                    ? constraints.maxWidth
+                    : (constraints.maxWidth - 16) / 2;
+                return Wrap(
+                  spacing: 16,
+                  runSpacing: 12,
+                  children: [
+                    SizedBox(
+                      width: buttonWidth,
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final date = await showDatePicker(
+                            context: context,
+                            initialDate: _startDate ?? DateTime.now(),
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2030),
+                          );
+                          if (date != null) {
+                            setState(() {
+                              _startDate = date;
+                              _currentPage = 1;
+                            });
+                          }
+                        },
+                        icon: const Icon(Icons.date_range, size: 16),
+                        label: Text(
+                          _startDate == null
+                              ? 'Select Start Date'
+                              : DateFormat('dd MMM yyyy').format(_startDate!),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () async {
-                      final date = await showDatePicker(
-                        context: context,
-                        initialDate: _endDate ?? DateTime.now(),
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime(2030),
-                      );
-                      if (date != null) {
-                        setState(() {
-                          _endDate = date;
-                          _currentPage = 1;
-                        });
-                      }
-                    },
-                    icon: const Icon(Icons.date_range, size: 16),
-                    label: Text(
-                      _endDate == null
-                          ? 'Select End Date'
-                          : DateFormat('dd MMM yyyy').format(_endDate!),
+                    SizedBox(
+                      width: buttonWidth,
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final date = await showDatePicker(
+                            context: context,
+                            initialDate: _endDate ?? DateTime.now(),
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2030),
+                          );
+                          if (date != null) {
+                            setState(() {
+                              _endDate = date;
+                              _currentPage = 1;
+                            });
+                          }
+                        },
+                        icon: const Icon(Icons.date_range, size: 16),
+                        label: Text(
+                          _endDate == null
+                              ? 'Select End Date'
+                              : DateFormat('dd MMM yyyy').format(_endDate!),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              ],
+                  ],
+                );
+              },
             ),
           ],
         ],
@@ -1557,132 +1586,153 @@ class _ReportsViewState extends State<ReportsView> {
               padding: EdgeInsets.all(isPhone ? 14 : 20),
               child: Column(
                 children: [
-                  GridView(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: gridColumns,
-                      crossAxisSpacing: isPhone ? 10 : 16,
-                      mainAxisSpacing: isPhone ? 10 : 16,
-                      mainAxisExtent: isPhone ? 98 : 90,
-                    ),
-                    children: [
-                      // Branch Dropdown
-                      _buildFilterDropdown(
-                        'Branch Location',
-                        _selectedBranch,
-                        [
-                          'All',
-                          'Kuala Lumpur',
-                          'Main Hub',
-                          'Kajang',
-                          'PenangHub',
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final availableWidth = constraints.maxWidth;
+                      final spacing = isPhone ? 10.0 : 16.0;
+                      final itemWidth =
+                          (availableWidth - (spacing * (gridColumns - 1))) /
+                          gridColumns;
+
+                      Widget filterCell(Widget child) {
+                        return SizedBox(width: itemWidth, child: child);
+                      }
+
+                      return Wrap(
+                        spacing: spacing,
+                        runSpacing: spacing,
+                        children: [
+                          filterCell(
+                            _buildFilterDropdown(
+                              'Branch Location',
+                              _selectedBranch,
+                              [
+                                'All',
+                                'Kuala Lumpur',
+                                'Main Hub',
+                                'Kajang',
+                                'PenangHub',
+                              ],
+                              (val) {
+                                setState(() => _selectedBranch = val!);
+                              },
+                              textPrimary,
+                              textSecondary,
+                            ),
+                          ),
+                          filterCell(
+                            _buildFilterDropdown(
+                              'Vehicle',
+                              _selectedVehicle,
+                              ['All', ...widget.vehicles.map((v) => v.id)],
+                              (val) {
+                                setState(() => _selectedVehicle = val!);
+                              },
+                              textPrimary,
+                              textSecondary,
+                              itemLabelBuilder: (val) {
+                                if (val == 'All') return 'All Vehicles';
+                                final v = _getVehicleById(val);
+                                return v != null
+                                    ? '${v.brand} ${v.model} (${v.plateNumber})'
+                                    : val;
+                              },
+                            ),
+                          ),
+                          filterCell(
+                            _buildFilterDropdown(
+                              'Customer',
+                              _selectedCustomer,
+                              [
+                                'All',
+                                ...widget.users
+                                    .where((u) => u.role == 'customer')
+                                    .map((u) => u.id),
+                              ],
+                              (val) {
+                                setState(() => _selectedCustomer = val!);
+                              },
+                              textPrimary,
+                              textSecondary,
+                              itemLabelBuilder: (val) {
+                                if (val == 'All') return 'All Customers';
+                                final u = _getUserById(val);
+                                return u != null ? u.fullName : val;
+                              },
+                            ),
+                          ),
+                          filterCell(
+                            _buildFilterDropdown(
+                              'Booking Status',
+                              _selectedBookingStatus,
+                              [
+                                'All',
+                                'Pending',
+                                'Approved',
+                                'Confirmed',
+                                'Ongoing',
+                                'Completed',
+                                'Cancelled',
+                                'Overdue',
+                              ],
+                              (val) {
+                                setState(() => _selectedBookingStatus = val!);
+                              },
+                              textPrimary,
+                              textSecondary,
+                            ),
+                          ),
+                          filterCell(
+                            _buildFilterDropdown(
+                              'Payment Status',
+                              _selectedPaymentStatus,
+                              [
+                                'All',
+                                'Pending',
+                                'Paid',
+                                'Approved',
+                                'Rejected',
+                              ],
+                              (val) {
+                                setState(() => _selectedPaymentStatus = val!);
+                              },
+                              textPrimary,
+                              textSecondary,
+                            ),
+                          ),
+                          filterCell(
+                            _buildFilterDropdown(
+                              'Vehicle Status',
+                              _selectedVehicleStatus,
+                              [
+                                'All',
+                                'Available',
+                                'Booked',
+                                'Maintenance',
+                                'Inactive',
+                              ],
+                              (val) {
+                                setState(() => _selectedVehicleStatus = val!);
+                              },
+                              textPrimary,
+                              textSecondary,
+                            ),
+                          ),
+                          filterCell(
+                            _buildFilterDropdown(
+                              'Membership Level',
+                              _selectedMembershipLevel,
+                              ['All', 'Bronze', 'Silver', 'Gold', 'Premium'],
+                              (val) {
+                                setState(() => _selectedMembershipLevel = val!);
+                              },
+                              textPrimary,
+                              textSecondary,
+                            ),
+                          ),
                         ],
-                        (val) {
-                          setState(() => _selectedBranch = val!);
-                        },
-                        textPrimary,
-                        textSecondary,
-                      ),
-                      // Vehicle Dropdown
-                      _buildFilterDropdown(
-                        'Vehicle',
-                        _selectedVehicle,
-                        ['All', ...widget.vehicles.map((v) => v.id)],
-                        (val) {
-                          setState(() => _selectedVehicle = val!);
-                        },
-                        textPrimary,
-                        textSecondary,
-                        itemLabelBuilder: (val) {
-                          if (val == 'All') return 'All Vehicles';
-                          final v = _getVehicleById(val);
-                          return v != null
-                              ? '${v.brand} ${v.model} (${v.plateNumber})'
-                              : val;
-                        },
-                      ),
-                      // Customer Dropdown
-                      _buildFilterDropdown(
-                        'Customer',
-                        _selectedCustomer,
-                        [
-                          'All',
-                          ...widget.users
-                              .where((u) => u.role == 'customer')
-                              .map((u) => u.id),
-                        ],
-                        (val) {
-                          setState(() => _selectedCustomer = val!);
-                        },
-                        textPrimary,
-                        textSecondary,
-                        itemLabelBuilder: (val) {
-                          if (val == 'All') return 'All Customers';
-                          final u = _getUserById(val);
-                          return u != null ? u.fullName : val;
-                        },
-                      ),
-                      // Booking Status
-                      _buildFilterDropdown(
-                        'Booking Status',
-                        _selectedBookingStatus,
-                        [
-                          'All',
-                          'Pending',
-                          'Approved',
-                          'Confirmed',
-                          'Ongoing',
-                          'Completed',
-                          'Cancelled',
-                          'Overdue',
-                        ],
-                        (val) {
-                          setState(() => _selectedBookingStatus = val!);
-                        },
-                        textPrimary,
-                        textSecondary,
-                      ),
-                      // Payment Status
-                      _buildFilterDropdown(
-                        'Payment Status',
-                        _selectedPaymentStatus,
-                        ['All', 'Pending', 'Paid', 'Approved', 'Rejected'],
-                        (val) {
-                          setState(() => _selectedPaymentStatus = val!);
-                        },
-                        textPrimary,
-                        textSecondary,
-                      ),
-                      // Vehicle Availability Status
-                      _buildFilterDropdown(
-                        'Vehicle Status',
-                        _selectedVehicleStatus,
-                        [
-                          'All',
-                          'Available',
-                          'Booked',
-                          'Maintenance',
-                          'Inactive',
-                        ],
-                        (val) {
-                          setState(() => _selectedVehicleStatus = val!);
-                        },
-                        textPrimary,
-                        textSecondary,
-                      ),
-                      // Membership Levels
-                      _buildFilterDropdown(
-                        'Membership Level',
-                        _selectedMembershipLevel,
-                        ['All', 'Bronze', 'Silver', 'Gold', 'Premium'],
-                        (val) {
-                          setState(() => _selectedMembershipLevel = val!);
-                        },
-                        textPrimary,
-                        textSecondary,
-                      ),
-                    ],
+                      );
+                    },
                   ),
                   SizedBox(height: isPhone ? 12 : 16),
                   Row(
@@ -1742,25 +1792,26 @@ class _ReportsViewState extends State<ReportsView> {
           ),
         ),
         const SizedBox(height: 4),
-        Expanded(
-          child: DropdownButtonFormField<String>(
-            initialValue: value,
-            decoration: const InputDecoration(
-              contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              border: OutlineInputBorder(),
-            ),
-            style: TextStyle(color: textPrimary, fontSize: 11),
-            items: items.map((item) {
-              return DropdownMenuItem<String>(
-                value: item,
-                child: Text(
-                  itemLabelBuilder != null ? itemLabelBuilder(item) : item,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              );
-            }).toList(),
-            onChanged: onChanged,
+        DropdownButtonFormField<String>(
+          initialValue: value,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            border: OutlineInputBorder(),
+            isDense: true,
           ),
+          style: TextStyle(color: textPrimary, fontSize: 11),
+          items: items.map((item) {
+            return DropdownMenuItem<String>(
+              value: item,
+              child: Text(
+                itemLabelBuilder != null ? itemLabelBuilder(item) : item,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            );
+          }).toList(),
+          onChanged: onChanged,
         ),
       ],
     );
@@ -2134,48 +2185,70 @@ class _ReportsViewState extends State<ReportsView> {
             padding: const EdgeInsets.only(top: 10),
             child: revEntries.isEmpty
                 ? const Center(child: Text('No revenue records in this period'))
-                : Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: revEntries.map((e) {
-                      final maxVal = revEntries
-                          .map((entry) => entry.value)
-                          .reduce(max);
-                      final pct = maxVal > 0 ? e.value / maxVal : 0.0;
-                      return Column(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Text(
-                            'RM ${e.value.toStringAsFixed(0)}',
-                            style: TextStyle(
-                              fontSize: 8,
-                              color: textPrimary,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Container(
-                            width: 24,
-                            height: 80 * pct,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [Colors.green, Colors.teal[300]!],
-                                begin: Alignment.bottomCenter,
-                                end: Alignment.topCenter,
+                : LayoutBuilder(
+                    builder: (context, constraints) {
+                      final minChartWidth = revEntries.length * 54.0;
+                      final chart = Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: revEntries.map((e) {
+                          final maxVal = revEntries
+                              .map((entry) => entry.value)
+                              .reduce(max);
+                          final pct = maxVal > 0 ? e.value / maxVal : 0.0;
+                          return Column(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Text(
+                                'RM ${e.value.toStringAsFixed(0)}',
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  color: textPrimary,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(4),
+                              const SizedBox(height: 4),
+                              Container(
+                                width: 24,
+                                height: 80 * pct,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [Colors.green, Colors.teal[300]!],
+                                    begin: Alignment.bottomCenter,
+                                    end: Alignment.topCenter,
+                                  ),
+                                  borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(4),
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            e.key,
-                            style: TextStyle(fontSize: 8, color: textSecondary),
-                          ),
-                        ],
+                              const SizedBox(height: 6),
+                              Text(
+                                e.key,
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  color: textSecondary,
+                                ),
+                              ),
+                            ],
+                          );
+                        }).toList(),
                       );
-                    }).toList(),
+
+                      if (constraints.maxWidth < minChartWidth) {
+                        return SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minWidth: minChartWidth,
+                            ),
+                            child: chart,
+                          ),
+                        );
+                      }
+
+                      return chart;
+                    },
                   ),
           ),
           const SizedBox(height: 20),
@@ -2193,48 +2266,70 @@ class _ReportsViewState extends State<ReportsView> {
                 ? const Center(
                     child: Text('No bookings records in this period'),
                   )
-                : Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: bookingEntries.map((e) {
-                      final maxVal = bookingEntries
-                          .map((entry) => entry.value)
-                          .reduce(max);
-                      final pct = maxVal > 0 ? e.value / maxVal : 0.0;
-                      return Column(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Text(
-                            '${e.value}',
-                            style: TextStyle(
-                              fontSize: 8,
-                              color: textPrimary,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Container(
-                            width: 24,
-                            height: 80 * pct,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [Colors.purple, Colors.pink[300]!],
-                                begin: Alignment.bottomCenter,
-                                end: Alignment.topCenter,
+                : LayoutBuilder(
+                    builder: (context, constraints) {
+                      final minChartWidth = bookingEntries.length * 54.0;
+                      final chart = Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: bookingEntries.map((e) {
+                          final maxVal = bookingEntries
+                              .map((entry) => entry.value)
+                              .reduce(max);
+                          final pct = maxVal > 0 ? e.value / maxVal : 0.0;
+                          return Column(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Text(
+                                '${e.value}',
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  color: textPrimary,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(4),
+                              const SizedBox(height: 4),
+                              Container(
+                                width: 24,
+                                height: 80 * pct,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [Colors.purple, Colors.pink[300]!],
+                                    begin: Alignment.bottomCenter,
+                                    end: Alignment.topCenter,
+                                  ),
+                                  borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(4),
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            e.key,
-                            style: TextStyle(fontSize: 8, color: textSecondary),
-                          ),
-                        ],
+                              const SizedBox(height: 6),
+                              Text(
+                                e.key,
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  color: textSecondary,
+                                ),
+                              ),
+                            ],
+                          );
+                        }).toList(),
                       );
-                    }).toList(),
+
+                      if (constraints.maxWidth < minChartWidth) {
+                        return SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minWidth: minChartWidth,
+                            ),
+                            child: chart,
+                          ),
+                        );
+                      }
+
+                      return chart;
+                    },
                   ),
           ),
         ],
@@ -2547,9 +2642,10 @@ class _ReportsViewState extends State<ReportsView> {
                                 ),
                               ),
                               const SizedBox(height: 6),
-                              const Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceEvenly,
+                              const Wrap(
+                                spacing: 24,
+                                runSpacing: 2,
+                                alignment: WrapAlignment.center,
                                 children: [
                                   Text(
                                     'Overdue',

@@ -180,14 +180,22 @@ class _AIChatPanelState extends State<AIChatPanel>
                 .child(vehicleId)
                 .get();
             if (vehicleSnap.exists) {
-              final vData = Map<dynamic, dynamic>.from(vehicleSnap.value as Map);
+              final vData = Map<dynamic, dynamic>.from(
+                vehicleSnap.value as Map,
+              );
               final vehicle = VehicleModel.fromMap(vehicleId, vData);
-              
-              final pickupDateStr = response.parameters['pickupDate']?.toString();
-              final returnDateStr = response.parameters['returnDate']?.toString();
-              
-              final pickupDate = pickupDateStr != null ? DateTime.tryParse(pickupDateStr) : null;
-              final returnDate = returnDateStr != null ? DateTime.tryParse(returnDateStr) : null;
+
+              final pickupDateStr = response.parameters['pickupDate']
+                  ?.toString();
+              final returnDateStr = response.parameters['returnDate']
+                  ?.toString();
+
+              final pickupDate = pickupDateStr != null
+                  ? DateTime.tryParse(pickupDateStr)
+                  : null;
+              final returnDate = returnDateStr != null
+                  ? DateTime.tryParse(returnDateStr)
+                  : null;
 
               if (mounted) {
                 Navigator.of(context).pop(); // Close AI Chat panel
@@ -220,7 +228,9 @@ class _AIChatPanelState extends State<AIChatPanel>
           Navigator.of(context).pop({
             'action': 'pay',
             'bookingId': bookingId,
-            'method': response.parameters['method']?.toString() ?? 'FPX Online Banking',
+            'method':
+                response.parameters['method']?.toString() ??
+                'FPX Online Banking',
           });
           return;
         } else if (action == 'open_payment_page') {
@@ -231,7 +241,9 @@ class _AIChatPanelState extends State<AIChatPanel>
                 .child(bookingId)
                 .get();
             if (bookingSnap.exists) {
-              final bData = Map<dynamic, dynamic>.from(bookingSnap.value as Map);
+              final bData = Map<dynamic, dynamic>.from(
+                bookingSnap.value as Map,
+              );
               final booking = BookingModel.fromMap(bookingId, bData);
 
               final vId = bData['vehicleId'] as String;
@@ -241,7 +253,9 @@ class _AIChatPanelState extends State<AIChatPanel>
                   .child(vId)
                   .get();
               if (vehicleSnap.exists) {
-                final vData = Map<dynamic, dynamic>.from(vehicleSnap.value as Map);
+                final vData = Map<dynamic, dynamic>.from(
+                  vehicleSnap.value as Map,
+                );
                 final vehicle = VehicleModel.fromMap(vId, vData);
 
                 if (mounted) {
@@ -590,8 +604,9 @@ class _AIChatPanelState extends State<AIChatPanel>
         final textSecondary = isDark
             ? const Color(0xFF64748B)
             : AppColors.lightText;
-        final isNarrowMobile =
-            !showPermanentSidebar && MediaQuery.of(context).size.width < 390;
+        final media = MediaQuery.of(context);
+        final isNarrowMobile = !showPermanentSidebar && media.size.width < 390;
+        final hasLargeText = media.textScaler.scale(1.0) > 1.15;
 
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -646,12 +661,18 @@ class _AIChatPanelState extends State<AIChatPanel>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Expanded(
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: isAdmin ? 180 : 230,
+                          ),
                           child: Text(
                             'CARENT AI Operator',
-                            maxLines: 1,
+                            maxLines: hasLargeText ? 2 : 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: isNarrowMobile ? 12.5 : 14,
@@ -661,8 +682,7 @@ class _AIChatPanelState extends State<AIChatPanel>
                             ),
                           ),
                         ),
-                        if (isAdmin) ...[
-                          const SizedBox(width: 6),
+                        if (isAdmin)
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 6,
@@ -688,7 +708,6 @@ class _AIChatPanelState extends State<AIChatPanel>
                               ),
                             ),
                           ),
-                        ],
                       ],
                     ),
                     const SizedBox(height: 2),
@@ -703,13 +722,18 @@ class _AIChatPanelState extends State<AIChatPanel>
                           ),
                         ),
                         const SizedBox(width: 5),
-                        Text(
-                          isNarrowMobile
-                              ? 'Connected'
-                              : 'Connected · Live Data Feed',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 10, color: textSecondary),
+                        Expanded(
+                          child: Text(
+                            isNarrowMobile
+                                ? 'Connected'
+                                : 'Connected · Live Data Feed',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: textSecondary,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -879,24 +903,33 @@ class _AIChatPanelState extends State<AIChatPanel>
           const SizedBox(height: 12),
 
           // Action Grid
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
-              mainAxisExtent: isDarkMobile ? 74 : 68,
-            ),
-            itemCount: ai.quickCommands.length,
-            itemBuilder: (context, index) {
-              final cmd = ai.quickCommands[index];
-              return _buildGridCard(
-                cmd,
-                cardBg,
-                borderCol,
-                isDark,
-                isDarkMobile: isDarkMobile,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final hasLargeText =
+                  MediaQuery.of(context).textScaler.scale(1.0) > 1.15;
+              final crossAxisCount = constraints.maxWidth < 340 || hasLargeText
+                  ? 1
+                  : 2;
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: crossAxisCount,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                  mainAxisExtent: isDarkMobile ? 74 : 68,
+                ),
+                itemCount: ai.quickCommands.length,
+                itemBuilder: (context, index) {
+                  final cmd = ai.quickCommands[index];
+                  return _buildGridCard(
+                    cmd,
+                    cardBg,
+                    borderCol,
+                    isDark,
+                    isDarkMobile: isDarkMobile,
+                  );
+                },
               );
             },
           ),

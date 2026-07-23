@@ -16,7 +16,6 @@ import '../../../services/reward_service.dart';
 import '../../../services/notification_service.dart';
 import '../../../models/promotion_model.dart';
 import '../../../services/promotion_service.dart';
-import 'booking_confirmation_screen.dart';
 import '../login_screen.dart';
 import '../../../widgets/loading_widget.dart';
 import '../../../widgets/app_image.dart';
@@ -26,6 +25,8 @@ import '../../../services/receipt_upload_helper.dart'
     as receipt_upload;
 import '../../../services/company_settings_provider.dart';
 import '../../../services/receipt_service.dart';
+import 'customer_responsive_shell.dart';
+import 'history_screen.dart';
 
 class BookingScreen extends StatefulWidget {
   final VehicleModel vehicle;
@@ -158,10 +159,23 @@ class _BookingScreenState extends State<BookingScreen> {
   @override
   void initState() {
     super.initState();
-    _pickupDate = widget.existingBooking?.pickUpDate ??
-        widget.prefilledPickupDate ??
-        DateTime.now();
-    _returnDate = widget.existingBooking?.returnDate ??
+    final now = DateTime.now();
+    final tomorrowStart = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).add(const Duration(days: 1));
+
+    final prefilledPickup =
+        widget.existingBooking?.pickUpDate ?? widget.prefilledPickupDate;
+    final normalizedPickup =
+        prefilledPickup != null && prefilledPickup.isAfter(tomorrowStart)
+        ? prefilledPickup
+        : tomorrowStart;
+
+    _pickupDate = widget.existingBooking?.pickUpDate ?? normalizedPickup;
+    _returnDate =
+        widget.existingBooking?.returnDate ??
         widget.prefilledReturnDate ??
         _pickupDate!.add(const Duration(days: 1));
     _activeBookingId = widget.existingBooking?.id;
@@ -340,7 +354,9 @@ class _BookingScreenState extends State<BookingScreen> {
     _evaluateAutoApplyPromotion();
   }
 
-  bool get _isFinalPayment => widget.existingBooking != null && widget.existingBooking!.status == 'Awaiting Final Payment';
+  bool get _isFinalPayment =>
+      widget.existingBooking != null &&
+      widget.existingBooking!.status == 'Awaiting Final Payment';
 
   bool get _isOnlinePayment {
     final method = widget.existingBooking?.paymentMethod ?? _paymentMethod;
@@ -453,6 +469,59 @@ class _BookingScreenState extends State<BookingScreen> {
     }
   }
 
+  DateTime? _composePickupDateTime() {
+    if (_pickupDate == null || _pickupTime == null) return null;
+    try {
+      final parsedTime = DateFormat('hh:mm a').parse(_pickupTime!);
+      return DateTime(
+        _pickupDate!.year,
+        _pickupDate!.month,
+        _pickupDate!.day,
+        parsedTime.hour,
+        parsedTime.minute,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  List<String> _availablePickupTimeSlots() {
+    final allSlots = _generateTimeSlots();
+    if (_pickupDate == null) return allSlots;
+
+    final now = DateTime.now();
+    final selectedDay = DateTime(
+      _pickupDate!.year,
+      _pickupDate!.month,
+      _pickupDate!.day,
+    );
+    final today = DateTime(now.year, now.month, now.day);
+
+    if (selectedDay.isAfter(today)) {
+      return allSlots;
+    }
+
+    if (selectedDay.isBefore(today)) {
+      return const [];
+    }
+
+    return allSlots.where((slot) {
+      try {
+        final parsed = DateFormat('hh:mm a').parse(slot);
+        final slotDateTime = DateTime(
+          selectedDay.year,
+          selectedDay.month,
+          selectedDay.day,
+          parsed.hour,
+          parsed.minute,
+        );
+        return slotDateTime.isAfter(now);
+      } catch (_) {
+        return false;
+      }
+    }).toList();
+  }
+
   void _subscribeToBlockedDates() {
     _blockedDatesSubscription?.cancel();
     _blockedDatesSubscription = _bookingService
@@ -461,53 +530,69 @@ class _BookingScreenState extends State<BookingScreen> {
           excludeBookingId: widget.existingBooking?.id,
         )
         .listen((blockedSet) {
-      if (mounted) {
-        setState(() {
-          _blockedDates = blockedSet;
+          if (mounted) {
+            setState(() {
+              _blockedDates = blockedSet;
 
-          // Check if previously selected dates are now blocked by another user
-          bool selectionInvalid = false;
-          if (_pickupDate != null) {
-            final pNorm = DateTime(_pickupDate!.year, _pickupDate!.month, _pickupDate!.day);
-            if (_blockedDates.contains(pNorm)) {
-              selectionInvalid = true;
-            }
-          }
-          if (_returnDate != null) {
-            final rNorm = DateTime(_returnDate!.year, _returnDate!.month, _returnDate!.day);
-            if (_blockedDates.contains(rNorm)) {
-              selectionInvalid = true;
-            }
-          }
-
-          if (_pickupDate != null && _returnDate != null) {
-            final pNorm = DateTime(_pickupDate!.year, _pickupDate!.month, _pickupDate!.day);
-            final rNorm = DateTime(_returnDate!.year, _returnDate!.month, _returnDate!.day);
-            DateTime cur = pNorm;
-            while (!cur.isAfter(rNorm)) {
-              if (_blockedDates.contains(cur)) {
-                selectionInvalid = true;
-                break;
+              // Check if previously selected dates are now blocked by another user
+              bool selectionInvalid = false;
+              if (_pickupDate != null) {
+                final pNorm = DateTime(
+                  _pickupDate!.year,
+                  _pickupDate!.month,
+                  _pickupDate!.day,
+                );
+                if (_blockedDates.contains(pNorm)) {
+                  selectionInvalid = true;
+                }
               }
-              cur = cur.add(const Duration(days: 1));
-            }
-          }
+              if (_returnDate != null) {
+                final rNorm = DateTime(
+                  _returnDate!.year,
+                  _returnDate!.month,
+                  _returnDate!.day,
+                );
+                if (_blockedDates.contains(rNorm)) {
+                  selectionInvalid = true;
+                }
+              }
 
-          if (selectionInvalid) {
-            _pickupDate = null;
-            _returnDate = null;
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'This vehicle is already booked for the selected date.',
-                ),
-                backgroundColor: Colors.redAccent,
-              ),
-            );
+              if (_pickupDate != null && _returnDate != null) {
+                final pNorm = DateTime(
+                  _pickupDate!.year,
+                  _pickupDate!.month,
+                  _pickupDate!.day,
+                );
+                final rNorm = DateTime(
+                  _returnDate!.year,
+                  _returnDate!.month,
+                  _returnDate!.day,
+                );
+                DateTime cur = pNorm;
+                while (!cur.isAfter(rNorm)) {
+                  if (_blockedDates.contains(cur)) {
+                    selectionInvalid = true;
+                    break;
+                  }
+                  cur = cur.add(const Duration(days: 1));
+                }
+              }
+
+              if (selectionInvalid) {
+                _pickupDate = null;
+                _returnDate = null;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'This vehicle is already booked for the selected date.',
+                    ),
+                    backgroundColor: Colors.redAccent,
+                  ),
+                );
+              }
+            });
           }
         });
-      }
-    });
   }
 
   String _formatBlockedDatesSummary(Set<DateTime> dates) {
@@ -548,12 +633,15 @@ class _BookingScreenState extends State<BookingScreen> {
 
   Future<void> _selectPickupDate() async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     DateTime initial = DateTime.now().add(const Duration(days: 1));
     final today = DateTime.now();
     final todayNorm = DateTime(today.year, today.month, today.day);
-    if (_blockedDates.contains(DateTime(initial.year, initial.month, initial.day))) {
-      DateTime check = todayNorm;
+    final tomorrowNorm = todayNorm.add(const Duration(days: 1));
+    if (_blockedDates.contains(
+      DateTime(initial.year, initial.month, initial.day),
+    )) {
+      DateTime check = tomorrowNorm;
       for (int i = 0; i < 90; i++) {
         if (!_blockedDates.contains(check)) {
           initial = check;
@@ -565,11 +653,14 @@ class _BookingScreenState extends State<BookingScreen> {
 
     final picked = await showDatePicker(
       context: context,
-      initialDate: initial.isBefore(DateTime.now()) ? DateTime.now() : initial,
-      firstDate: DateTime.now(),
+      initialDate: initial.isBefore(tomorrowNorm) ? tomorrowNorm : initial,
+      firstDate: tomorrowNorm,
       lastDate: DateTime.now().add(const Duration(days: 90)),
       selectableDayPredicate: (DateTime day) {
         final norm = DateTime(day.year, day.month, day.day);
+        if (!norm.isAfter(todayNorm)) {
+          return false;
+        }
         return !_blockedDates.contains(norm);
       },
       builder: (context, child) {
@@ -598,7 +689,9 @@ class _BookingScreenState extends State<BookingScreen> {
       if (_blockedDates.contains(normPicked)) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('This vehicle is already booked for the selected date.'),
+            content: Text(
+              'This vehicle is already booked for the selected date.',
+            ),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -607,13 +700,25 @@ class _BookingScreenState extends State<BookingScreen> {
 
       setState(() {
         _pickupDate = picked;
+        final validSlots = _availablePickupTimeSlots();
+        if (_pickupTime != null && !validSlots.contains(_pickupTime)) {
+          _pickupTime = null;
+        }
         _updateDateTimes();
         if (_returnDate != null) {
           if (_returnDate!.isBefore(_pickupDate!)) {
             _returnDate = null;
           } else {
-            final pNorm = DateTime(_pickupDate!.year, _pickupDate!.month, _pickupDate!.day);
-            final rNorm = DateTime(_returnDate!.year, _returnDate!.month, _returnDate!.day);
+            final pNorm = DateTime(
+              _pickupDate!.year,
+              _pickupDate!.month,
+              _pickupDate!.day,
+            );
+            final rNorm = DateTime(
+              _returnDate!.year,
+              _returnDate!.month,
+              _returnDate!.day,
+            );
             DateTime cur = pNorm;
             bool rangeHasBlocked = false;
             while (!cur.isAfter(rNorm)) {
@@ -627,7 +732,9 @@ class _BookingScreenState extends State<BookingScreen> {
               _returnDate = null;
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('This vehicle is already booked for the selected date.'),
+                  content: Text(
+                    'This vehicle is already booked for the selected date.',
+                  ),
                   backgroundColor: Colors.redAccent,
                 ),
               );
@@ -646,7 +753,11 @@ class _BookingScreenState extends State<BookingScreen> {
       return;
     }
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final pNorm = DateTime(_pickupDate!.year, _pickupDate!.month, _pickupDate!.day);
+    final pNorm = DateTime(
+      _pickupDate!.year,
+      _pickupDate!.month,
+      _pickupDate!.day,
+    );
 
     DateTime? firstBlockedAfterPickup;
     DateTime check = pNorm.add(const Duration(days: 1));
@@ -672,7 +783,8 @@ class _BookingScreenState extends State<BookingScreen> {
         }
 
         // If there is a blocked date between pickupDate and day, disable day!
-        if (firstBlockedAfterPickup != null && !dNorm.isBefore(firstBlockedAfterPickup)) {
+        if (firstBlockedAfterPickup != null &&
+            !dNorm.isBefore(firstBlockedAfterPickup)) {
           return false;
         }
 
@@ -704,7 +816,9 @@ class _BookingScreenState extends State<BookingScreen> {
       if (_blockedDates.contains(rNorm)) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('This vehicle is already booked for the selected date.'),
+            content: Text(
+              'This vehicle is already booked for the selected date.',
+            ),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -735,7 +849,66 @@ class _BookingScreenState extends State<BookingScreen> {
     }
 
     if (_isOpenRental && !_isFinalPayment) {
+      final now = DateTime.now();
+      final todayStart = DateTime(now.year, now.month, now.day);
+      final selectedPickupDay = DateTime(
+        _pickupDate!.year,
+        _pickupDate!.month,
+        _pickupDate!.day,
+      );
+      if (!selectedPickupDay.isAfter(todayStart)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Pickup date must be after today.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        return;
+      }
+
+      final pickupDateTime = _composePickupDateTime();
+      if (pickupDateTime == null || !pickupDateTime.isAfter(DateTime.now())) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Pickup date and time must be later than the current time.',
+            ),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        return;
+      }
       _showOpenRentalConfirmationDialog();
+      return;
+    }
+
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final selectedPickupDay = DateTime(
+      _pickupDate!.year,
+      _pickupDate!.month,
+      _pickupDate!.day,
+    );
+    if (!selectedPickupDay.isAfter(todayStart)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pickup date must be after today.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    final pickupDateTime = _composePickupDateTime();
+    if (pickupDateTime == null || !pickupDateTime.isAfter(DateTime.now())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Pickup date and time must be later than the current time.',
+          ),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
       return;
     }
 
@@ -981,22 +1154,30 @@ class _BookingScreenState extends State<BookingScreen> {
               });
             }
 
-            final titleColor = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+            final titleColor = isDark
+                ? const Color(0xFFF8FAFC)
+                : AppColors.secondaryBlue;
             final textColor = isDark ? const Color(0xFFCBD5E1) : Colors.black87;
 
             if (!showGatewayPortal) {
               return AlertDialog(
-                backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                backgroundColor: isDark
+                    ? const Color(0xFF1E293B)
+                    : Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
                   side: BorderSide(
-                    color: isDark ? const Color(0xFF334155) : Colors.transparent,
+                    color: isDark
+                        ? const Color(0xFF334155)
+                        : Colors.transparent,
                   ),
                 ),
                 content: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const CircularProgressIndicator(color: AppColors.primaryOrange),
+                    const CircularProgressIndicator(
+                      color: AppColors.primaryOrange,
+                    ),
                     const SizedBox(height: 20),
                     Text(
                       'Redirecting to $_selectedBank portal...',
@@ -1024,25 +1205,39 @@ class _BookingScreenState extends State<BookingScreen> {
               backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
-                side: const BorderSide(color: AppColors.primaryOrange, width: 2),
+                side: const BorderSide(
+                  color: AppColors.primaryOrange,
+                  width: 2,
+                ),
               ),
               title: Column(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.redAccent,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: const Text(
                       'FPX SECURE GATEWAY SIMULATOR',
-                      style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     '$_selectedBank Secure Transfer',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: titleColor, fontSize: 16),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: titleColor,
+                      fontSize: 16,
+                    ),
                   ),
                 ],
               ),
@@ -1053,16 +1248,25 @@ class _BookingScreenState extends State<BookingScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1E293B) : AppColors.lightGray,
+                      color: isDark
+                          ? const Color(0xFF1E293B)
+                          : AppColors.lightGray,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(
                       children: [
-                        Text('Merchant: CarRent Enterprise', style: TextStyle(color: textColor, fontSize: 11)),
+                        Text(
+                          'Merchant: CarRent Enterprise',
+                          style: TextStyle(color: textColor, fontSize: 11),
+                        ),
                         const SizedBox(height: 4),
                         Text(
                           'Amount Due: RM ${payAmount.toStringAsFixed(2)}',
-                          style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryOrange, fontSize: 14),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primaryOrange,
+                            fontSize: 14,
+                          ),
                         ),
                       ],
                     ),
@@ -1070,7 +1274,11 @@ class _BookingScreenState extends State<BookingScreen> {
                   const SizedBox(height: 16),
                   Text(
                     'Please select a payment outcome to simulate:',
-                    style: TextStyle(color: textColor, fontSize: 11, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: textColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                 ],
@@ -1083,7 +1291,9 @@ class _BookingScreenState extends State<BookingScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                       onPressed: () {
                         Navigator.of(dialogCtx).pop();
@@ -1092,7 +1302,8 @@ class _BookingScreenState extends State<BookingScreen> {
                         final autoTime = timeFormat.format(now);
                         _processBooking(
                           status: 'Approved',
-                          txId: 'FPX-${_selectedBank?.substring(0, 3).toUpperCase()}-${DateTime.now().millisecondsSinceEpoch}',
+                          txId:
+                              'FPX-${_selectedBank?.substring(0, 3).toUpperCase()}-${DateTime.now().millisecondsSinceEpoch}',
                           amount: payAmount,
                           paymentDate: now,
                           paymentTime: autoTime,
@@ -1105,13 +1316,17 @@ class _BookingScreenState extends State<BookingScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.redAccent,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                       onPressed: () {
                         Navigator.of(dialogCtx).pop();
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Payment failed: Card declined or insufficient funds.'),
+                            content: Text(
+                              'Payment failed: Card declined or insufficient funds.',
+                            ),
                             backgroundColor: Colors.redAccent,
                           ),
                         );
@@ -1123,13 +1338,17 @@ class _BookingScreenState extends State<BookingScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.orange,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                       onPressed: () {
                         Navigator.of(dialogCtx).pop();
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Simulated Network Outage: Connection closed.'),
+                            content: Text(
+                              'Simulated Network Outage: Connection closed.',
+                            ),
                             backgroundColor: Colors.orange,
                           ),
                         );
@@ -1149,7 +1368,9 @@ class _BookingScreenState extends State<BookingScreen> {
                       },
                       child: Text(
                         'Simulate Cancel (Back to Merchant)',
-                        style: TextStyle(color: isDark ? Colors.white60 : Colors.black87),
+                        style: TextStyle(
+                          color: isDark ? Colors.white60 : Colors.black87,
+                        ),
                       ),
                     ),
                   ],
@@ -2032,8 +2253,17 @@ class _BookingScreenState extends State<BookingScreen> {
         if (_pickupTime == null) {
           throw 'Please select a pickup time.';
         }
-        if (_pickupDate!.isBefore(todayStart)) {
-          throw 'Pickup date cannot be in the past.';
+        final selectedPickupDay = DateTime(
+          _pickupDate!.year,
+          _pickupDate!.month,
+          _pickupDate!.day,
+        );
+        if (!selectedPickupDay.isAfter(todayStart)) {
+          throw 'Pickup date must be after today.';
+        }
+        final pickupDateTime = _composePickupDateTime();
+        if (pickupDateTime == null || !pickupDateTime.isAfter(DateTime.now())) {
+          throw 'Pickup date and time must be later than the current time.';
         }
         if (!_isOpenRental) {
           if (_returnDate == null) {
@@ -2091,7 +2321,8 @@ class _BookingScreenState extends State<BookingScreen> {
             for (var entry in paymentsMap.entries) {
               final pVal = entry.value as Map;
               final pStatus = pVal['status'] as String?;
-              if (pStatus == 'Pending Verification' || pStatus == 'Pending Payment') {
+              if (pStatus == 'Pending Verification' ||
+                  pStatus == 'Pending Payment') {
                 paymentId = entry.key.toString();
                 break;
               }
@@ -2150,10 +2381,17 @@ class _BookingScreenState extends State<BookingScreen> {
           }
 
           // Award reward points automatically
-          final rewardsEnabled = CompanySettingsProvider().getField('rewardsEnabled', defaultValue: true) as bool;
+          final rewardsEnabled =
+              CompanySettingsProvider().getField(
+                    'rewardsEnabled',
+                    defaultValue: true,
+                  )
+                  as bool;
           if (rewardsEnabled) {
             try {
-              await RewardPointsService().awardPointsForBooking(widget.existingBooking!.id);
+              await RewardPointsService().awardPointsForBooking(
+                widget.existingBooking!.id,
+              );
             } catch (rewardErr) {
               debugPrint('Error awarding reward points: $rewardErr');
             }
@@ -2161,18 +2399,23 @@ class _BookingScreenState extends State<BookingScreen> {
 
           // Trigger automatic receipt check
           try {
-            await ReceiptService().triggerAutomaticReceiptCheck(widget.existingBooking!.id);
+            await ReceiptService().triggerAutomaticReceiptCheck(
+              widget.existingBooking!.id,
+            );
           } catch (receiptErr) {
             debugPrint('Error generating receipt: $receiptErr');
           }
         } catch (lifecycleErr) {
-          debugPrint('Error executing final payment lifecycle updates: $lifecycleErr');
+          debugPrint(
+            'Error executing final payment lifecycle updates: $lifecycleErr',
+          );
         }
 
         // Notify Admin of Final Payment Submission
         await NotificationService().notifyAllAdmins(
           title: "Customer Completed Payment",
-          message: "${widget.existingBooking!.userName} completed payment for final invoice of Booking #${widget.existingBooking!.id.substring(0, 5).toUpperCase()}.",
+          message:
+              "${widget.existingBooking!.userName} completed payment for final invoice of Booking #${widget.existingBooking!.id.substring(0, 5).toUpperCase()}.",
           type: 'payment',
           icon: '✅',
           color: '0xFF10B981',
@@ -2183,7 +2426,9 @@ class _BookingScreenState extends State<BookingScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Final payment submitted and booking completed successfully.'),
+            content: Text(
+              'Final payment submitted and booking completed successfully.',
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -2317,18 +2562,32 @@ class _BookingScreenState extends State<BookingScreen> {
       }
 
       if (!mounted) return;
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => BookingConfirmationScreen(
-            booking: booking,
-            vehicle: widget.vehicle,
-            paymentMethod: _paymentMethod,
-            paymentStatus: 'Paid',
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Payment successful. Your ongoing car is now in History > Ongoing.',
           ),
+          backgroundColor: Colors.green,
         ),
       );
+
+      final shell = CustomerResponsiveShell.of(context);
+      if (shell != null) {
+        shell.setIndex(5);
+        shell.showCustomBody(const HistoryScreen(initialTabIndex: 0));
+        Navigator.pop(context);
+      } else {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const CustomerResponsiveShell(
+              initialIndex: 5,
+              customBody: HistoryScreen(initialTabIndex: 0),
+            ),
+          ),
+          (route) => false,
+        );
+      }
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -2657,7 +2916,9 @@ class _BookingScreenState extends State<BookingScreen> {
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.amber[200] : const Color(0xFF92400E),
+                          color: isDark
+                              ? Colors.amber[200]
+                              : const Color(0xFF92400E),
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -2665,7 +2926,9 @@ class _BookingScreenState extends State<BookingScreen> {
                         _formatBlockedDatesSummary(_blockedDates),
                         style: TextStyle(
                           fontSize: 11,
-                          color: isDark ? Colors.amber[100] : const Color(0xFFB45309),
+                          color: isDark
+                              ? Colors.amber[100]
+                              : const Color(0xFFB45309),
                         ),
                       ),
                     ],
@@ -2764,7 +3027,7 @@ class _BookingScreenState extends State<BookingScreen> {
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
                     ),
-                    items: _generateTimeSlots().map((time) {
+                    items: _availablePickupTimeSlots().map((time) {
                       return DropdownMenuItem(value: time, child: Text(time));
                     }).toList(),
                     onChanged: (val) {
@@ -3251,7 +3514,8 @@ class _BookingScreenState extends State<BookingScreen> {
             onPressed:
                 (_pickupDate != null &&
                     (_isOpenRental || _returnDate != null) &&
-                    (widget.vehicle.status.toLowerCase() == 'available' || _isFinalPayment))
+                    (widget.vehicle.status.toLowerCase() == 'available' ||
+                        _isFinalPayment))
                 ? () {
                     if (_isOpenRental) {
                       _showOpenRentalConfirmationDialog();
@@ -3284,7 +3548,8 @@ class _BookingScreenState extends State<BookingScreen> {
     final textMuted = isDark ? const Color(0xFF94A3B8) : Colors.grey[500]!;
 
     final safePickupDate = _pickupDate ?? DateTime.now();
-    final safeReturnDate = _returnDate ?? safePickupDate.add(const Duration(days: 1));
+    final safeReturnDate =
+        _returnDate ?? safePickupDate.add(const Duration(days: 1));
 
     final pickupDateStr = DateFormat('dd MMM yyyy').format(safePickupDate);
     final returnDateStr = _isOpenRental
@@ -3543,11 +3808,17 @@ class _BookingScreenState extends State<BookingScreen> {
                     decoration: BoxDecoration(
                       color: Colors.green.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                      border: Border.all(
+                        color: Colors.green.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.local_offer, color: Colors.green, size: 22),
+                        const Icon(
+                          Icons.local_offer,
+                          color: Colors.green,
+                          size: 22,
+                        ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
@@ -3566,7 +3837,9 @@ class _BookingScreenState extends State<BookingScreen> {
                                   'Code: ${_appliedPromotion!.promoCode}',
                                   style: TextStyle(
                                     fontSize: 11,
-                                    color: isDark ? Colors.white70 : Colors.black87,
+                                    color: isDark
+                                        ? Colors.white70
+                                        : Colors.black87,
                                   ),
                                 ),
                               Text(
@@ -3581,7 +3854,11 @@ class _BookingScreenState extends State<BookingScreen> {
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.close_rounded, color: Colors.grey, size: 20),
+                          icon: const Icon(
+                            Icons.close_rounded,
+                            color: Colors.grey,
+                            size: 20,
+                          ),
                           onPressed: _removeAppliedPromotion,
                           tooltip: 'Remove promotion',
                         ),
@@ -3590,9 +3867,16 @@ class _BookingScreenState extends State<BookingScreen> {
                   ),
                   const SizedBox(height: 12),
                 ],
-                Row(
-                  children: [
-                    Expanded(
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final hasLargeText =
+                        MediaQuery.of(context).textScaler.scale(1.0) > 1.15;
+                    final stacked = constraints.maxWidth < 420 || hasLargeText;
+
+                    final input = SizedBox(
+                      width: stacked
+                          ? constraints.maxWidth
+                          : constraints.maxWidth - 110,
                       child: TextField(
                         controller: _promoCodeController,
                         textCapitalization: TextCapitalization.characters,
@@ -3608,35 +3892,61 @@ class _BookingScreenState extends State<BookingScreen> {
                             fontSize: 12,
                           ),
                           filled: true,
-                          fillColor: isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          fillColor: isDark
+                              ? const Color(0xFF0F172A)
+                              : AppColors.lightGray,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
                             borderSide: BorderSide.none,
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryOrange,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                    );
+
+                    final button = SizedBox(
+                      width: stacked ? constraints.maxWidth : null,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryOrange,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        onPressed: _isEvaluatingPromo ? null : _applyPromoCode,
+                        child: _isEvaluatingPromo
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'APPLY',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
                       ),
-                      onPressed: _isEvaluatingPromo ? null : _applyPromoCode,
-                      child: _isEvaluatingPromo
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Text('APPLY', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                    ),
-                  ],
+                    );
+
+                    return Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [input, button],
+                    );
+                  },
                 ),
                 if (_promoCodeMessage != null) ...[
                   const SizedBox(height: 8),
@@ -3645,7 +3955,9 @@ class _BookingScreenState extends State<BookingScreen> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: _promoCodeSuccess ? Colors.green : Colors.redAccent,
+                      color: _promoCodeSuccess
+                          ? Colors.green
+                          : Colors.redAccent,
                     ),
                   ),
                 ],
@@ -3656,7 +3968,10 @@ class _BookingScreenState extends State<BookingScreen> {
         ],
 
         // 3. Price Breakdown Card
-        Text(_isFinalPayment ? 'Final Invoice Breakdown' : 'Price Breakdown', style: headingStyle),
+        Text(
+          _isFinalPayment ? 'Final Invoice Breakdown' : 'Price Breakdown',
+          style: headingStyle,
+        ),
         const SizedBox(height: 10),
         Container(
           padding: const EdgeInsets.all(16),
@@ -3668,11 +3983,13 @@ class _BookingScreenState extends State<BookingScreen> {
           child: Column(
             children: [
               if (_isFinalPayment) ...[
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Column(
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final hasLargeText =
+                        MediaQuery.of(context).textScaler.scale(1.0) > 1.15;
+                    final stacked = constraints.maxWidth < 420 || hasLargeText;
+
+                    final details = Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
@@ -3680,12 +3997,17 @@ class _BookingScreenState extends State<BookingScreen> {
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
-                            color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
+                            color: isDark
+                                ? const Color(0xFFF8FAFC)
+                                : AppColors.secondaryBlue,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: _isOnlinePayment
                                 ? Colors.green.withValues(alpha: 0.15)
@@ -3696,27 +4018,37 @@ class _BookingScreenState extends State<BookingScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                _isOnlinePayment ? Icons.check_circle : Icons.schedule,
-                                color: _isOnlinePayment ? Colors.green : Colors.orange,
+                                _isOnlinePayment
+                                    ? Icons.check_circle
+                                    : Icons.schedule,
+                                color: _isOnlinePayment
+                                    ? Colors.green
+                                    : Colors.orange,
                                 size: 12,
                               ),
                               const SizedBox(width: 4),
-                              Text(
-                                _isOnlinePayment
-                                    ? '✓ Paid via ${widget.existingBooking?.paymentMethod ?? "FPX"}'
-                                    : 'Pending (Cash)',
-                                style: TextStyle(
-                                  color: _isOnlinePayment ? Colors.green : Colors.orange,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
+                              Flexible(
+                                child: Text(
+                                  _isOnlinePayment
+                                      ? '✓ Paid via ${widget.existingBooking?.paymentMethod ?? "FPX"}'
+                                      : 'Pending (Cash)',
+                                  style: TextStyle(
+                                    color: _isOnlinePayment
+                                        ? Colors.green
+                                        : Colors.orange,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  softWrap: true,
                                 ),
                               ),
                             ],
                           ),
                         ),
                       ],
-                    ),
-                    Text(
+                    );
+
+                    final amount = Text(
                       'RM ${widget.existingBooking!.totalPrice.toStringAsFixed(2)}',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
@@ -3728,8 +4060,27 @@ class _BookingScreenState extends State<BookingScreen> {
                             ? TextDecoration.lineThrough
                             : TextDecoration.none,
                       ),
-                    ),
-                  ],
+                    );
+
+                    return stacked
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              details,
+                              const SizedBox(height: 8),
+                              amount,
+                            ],
+                          )
+                        : Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(child: details),
+                              const SizedBox(width: 10),
+                              amount,
+                            ],
+                          );
+                  },
                 ),
                 if (widget.existingBooking!.lateFees > 0) ...[
                   const SizedBox(height: 12),
@@ -3741,7 +4092,9 @@ class _BookingScreenState extends State<BookingScreen> {
                     isDark: isDark,
                   ),
                 ],
-                if ((widget.existingBooking!.returnInspection?['damageFee'] ?? 0.0) > 0) ...[
+                if ((widget.existingBooking!.returnInspection?['damageFee'] ??
+                        0.0) >
+                    0) ...[
                   const SizedBox(height: 6),
                   _buildPriceRow(
                     'Damage Fee',
@@ -3751,7 +4104,9 @@ class _BookingScreenState extends State<BookingScreen> {
                     isDark: isDark,
                   ),
                 ],
-                if ((widget.existingBooking!.returnInspection?['cleaningFee'] ?? 0.0) > 0) ...[
+                if ((widget.existingBooking!.returnInspection?['cleaningFee'] ??
+                        0.0) >
+                    0) ...[
                   const SizedBox(height: 6),
                   _buildPriceRow(
                     'Cleaning Fee',
@@ -3760,7 +4115,11 @@ class _BookingScreenState extends State<BookingScreen> {
                     isDark: isDark,
                   ),
                 ],
-                if ((widget.existingBooking!.returnInspection?['extraCharges'] ?? 0.0) > 0) ...[
+                if ((widget
+                            .existingBooking!
+                            .returnInspection?['extraCharges'] ??
+                        0.0) >
+                    0) ...[
                   const SizedBox(height: 6),
                   _buildPriceRow(
                     'Extra Fee',
@@ -3837,7 +4196,9 @@ class _BookingScreenState extends State<BookingScreen> {
                     ),
                   ],
                 ),
-                if (_paymentOption == 'Deposit' && !widget.isExtension && !_isFinalPayment) ...[
+                if (_paymentOption == 'Deposit' &&
+                    !widget.isExtension &&
+                    !_isFinalPayment) ...[
                   const SizedBox(height: 8),
                   _buildPriceRow(
                     'Deposit Due Now',
@@ -3971,42 +4332,71 @@ class _BookingScreenState extends State<BookingScreen> {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: borderColor),
           ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.verified_user_rounded,
-                color: isDark ? Colors.greenAccent : Colors.green,
-                size: 20,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Secure & Trusted',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 11,
-                        color: isDark ? Colors.white : AppColors.secondaryBlue,
-                      ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final hasLargeText =
+                  MediaQuery.of(context).textScaler.scale(1.0) > 1.15;
+              final stacked = constraints.maxWidth < 470 || hasLargeText;
+
+              final intro = Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.verified_user_rounded,
+                    color: isDark ? Colors.greenAccent : Colors.green,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Secure & Trusted',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                            color: isDark
+                                ? Colors.white
+                                : AppColors.secondaryBlue,
+                          ),
+                        ),
+                        Text(
+                          'Your payment is encrypted and secure.',
+                          style: TextStyle(fontSize: 10, color: textMuted),
+                        ),
+                      ],
                     ),
-                    Text(
-                      'Your payment is encrypted and secure.',
-                      style: TextStyle(fontSize: 10, color: textMuted),
-                    ),
-                  ],
-                ),
-              ),
-              Wrap(
+                  ),
+                ],
+              );
+
+              final badges = Wrap(
                 spacing: 6,
+                runSpacing: 6,
                 children: [
                   _badgeChip('PCI DSS', isDark),
                   _badgeChip('SSL', isDark),
                   _badgeChip('FPX', isDark),
                 ],
-              ),
-            ],
+              );
+
+              if (stacked) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [intro, const SizedBox(height: 10), badges],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(child: intro),
+                  const SizedBox(width: 10),
+                  badges,
+                ],
+              );
+            },
           ),
         ),
         const SizedBox(height: 16),
@@ -4078,24 +4468,65 @@ class _BookingScreenState extends State<BookingScreen> {
                         widget.vehicle.status.toLowerCase() == 'available'))
                 ? _triggerPaymentFlow
                 : null,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.lock, size: 16),
-                const SizedBox(width: 8),
-                const Text(
-                  'Pay Now',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                ),
-                const Spacer(),
-                Text(
-                  'RM ${payAmount.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final hasLargeText =
+                    MediaQuery.of(context).textScaler.scale(1.0) > 1.15;
+                final stacked = constraints.maxWidth < 260 || hasLargeText;
+
+                if (stacked) {
+                  return Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.lock, size: 16),
+                          SizedBox(width: 8),
+                          Text(
+                            'Pay Now',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'RM ${payAmount.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  );
+                }
+
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.lock, size: 16),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Pay Now',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      'RM ${payAmount.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ),
@@ -4237,15 +4668,33 @@ class _BookingScreenState extends State<BookingScreen> {
       color:
           color ?? (isDark ? const Color(0xFFCBD5E1) : AppColors.secondaryBlue),
     );
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: style),
-          Text(value, style: style),
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final hasLargeText =
+            MediaQuery.of(context).textScaler.scale(1.0) > 1.15;
+        final stacked = constraints.maxWidth < 360 || hasLargeText;
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: stacked
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label, style: style, softWrap: true),
+                    const SizedBox(height: 2),
+                    Text(value, style: style),
+                  ],
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(child: Text(label, style: style, softWrap: true)),
+                    const SizedBox(width: 8),
+                    Text(value, style: style),
+                  ],
+                ),
+        );
+      },
     );
   }
 }

@@ -768,7 +768,10 @@ class _PaymentsViewState extends State<PaymentsView> {
               }
               Navigator.pop(ctx, true);
             },
-            child: const Text('Reject', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text(
+              'Reject',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -803,6 +806,7 @@ class _PaymentsViewState extends State<PaymentsView> {
       }
     }
   }
+
   Widget _buildDetailRow(String label, String value) {
     final isCompact = _isPhoneLayout();
     final labelSize = _rf(12, min: 10);
@@ -1541,7 +1545,8 @@ class _PaymentsViewState extends State<PaymentsView> {
           statusText = 'Refunded';
         }
 
-        final dateFormat = DateFormat('yyyy-MM-dd HH:mm');
+        final dateOnlyFormat = DateFormat('yyyy-MM-dd');
+        final timeOnlyFormat = DateFormat('HH:mm');
         final booking = bookingMap[p.bookingId];
         final customerName =
             _userNames[p.userId] ?? booking?.userName ?? 'Unknown';
@@ -1556,6 +1561,10 @@ class _PaymentsViewState extends State<PaymentsView> {
           ),
           elevation: 0,
           child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 10,
+            ),
             leading: GestureDetector(
               onTap: () => _openReceiptLightbox(p),
               child: Container(
@@ -1596,39 +1605,112 @@ class _PaymentsViewState extends State<PaymentsView> {
             ),
             title: Text(
               customerName,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: textPrimary,
+              ),
             ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const SizedBox(height: 8),
                 Text(
-                  'Vehicle: $vehicleName',
-                  style: const TextStyle(fontSize: 12),
+                  'Vehicle',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 Text(
-                  'Amount: RM ${p.amount.toStringAsFixed(2)} | Mode: ${p.paymentMethod}',
-                  style: const TextStyle(fontSize: 12),
+                  vehicleName,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Amount',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 Text(
-                  'Date: ${dateFormat.format(p.paymentDate)}',
-                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  'RM ${p.amount.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Mode',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  p.paymentMethod,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Date',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  dateOnlyFormat.format(p.paymentDate),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  timeOnlyFormat.format(p.paymentDate),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    statusText.toUpperCase(),
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
                 ),
               ],
-            ),
-            trailing: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                statusText.toUpperCase(),
-                style: TextStyle(
-                  color: statusColor,
-                  fontSize: 9,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
             ),
             onTap: () => _showPaymentDetails(p),
           ),

@@ -33,10 +33,14 @@ class BookingConfirmationScreen extends StatelessWidget {
     final int days = booking.rentalDays <= 0 ? 1 : booking.rentalDays;
     final int pointsEarned = (booking.totalPrice / 10).floor();
 
-    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue;
+    final textPrimary = isDark
+        ? const Color(0xFFF8FAFC)
+        : AppColors.secondaryBlue;
     final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey[600]!;
     final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final borderTheme = isDark ? const Color(0xFF334155) : AppColors.borderGray.withValues(alpha: 0.8);
+    final borderTheme = isDark
+        ? const Color(0xFF334155)
+        : AppColors.borderGray.withValues(alpha: 0.8);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -44,7 +48,11 @@ class BookingConfirmationScreen extends StatelessWidget {
         backgroundColor: isDark ? const Color(0xFF1B2436) : Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded, color: textPrimary, size: 20),
+          icon: Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: textPrimary,
+            size: 20,
+          ),
           onPressed: () {
             final shell = CustomerResponsiveShell.of(context);
             if (shell != null) {
@@ -68,7 +76,10 @@ class BookingConfirmationScreen extends StatelessWidget {
             Center(
               child: Container(
                 constraints: const BoxConstraints(maxWidth: 900),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 32,
+                ),
                 child: Column(
                   children: [
                     // SUCCESS HEADER WITH MICRO-ANIMATED CHECK
@@ -85,7 +96,7 @@ class BookingConfirmationScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Your vehicle reservation is confirmed and ready.',
+                      'Your vehicle reservation is confirmed and ready. Check the History page to monitor your ongoing car status.',
                       style: TextStyle(
                         color: textSecondary,
                         fontSize: 14,
@@ -131,15 +142,27 @@ class BookingConfirmationScreen extends StatelessWidget {
                                               fit: BoxFit.cover,
                                               placeholder: Container(
                                                 height: 180,
-                                                color: isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
-                                                child: const Icon(Icons.car_rental, size: 60, color: Colors.grey),
+                                                color: isDark
+                                                    ? const Color(0xFF0F172A)
+                                                    : AppColors.lightGray,
+                                                child: const Icon(
+                                                  Icons.car_rental,
+                                                  size: 60,
+                                                  color: Colors.grey,
+                                                ),
                                               ),
                                             )
                                           : Container(
                                               height: 180,
                                               width: double.infinity,
-                                              color: isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
-                                              child: const Icon(Icons.directions_car, size: 80, color: Colors.grey),
+                                              color: isDark
+                                                  ? const Color(0xFF0F172A)
+                                                  : AppColors.lightGray,
+                                              child: const Icon(
+                                                Icons.directions_car,
+                                                size: 80,
+                                                color: Colors.grey,
+                                              ),
                                             ),
                                     ),
                                     const SizedBox(height: 20),
@@ -154,7 +177,11 @@ class BookingConfirmationScreen extends StatelessWidget {
                                     const SizedBox(height: 8),
                                     Row(
                                       children: [
-                                        const Icon(Icons.tag_rounded, size: 14, color: AppColors.primaryOrange),
+                                        const Icon(
+                                          Icons.tag_rounded,
+                                          size: 14,
+                                          color: AppColors.primaryOrange,
+                                        ),
                                         const SizedBox(width: 4),
                                         Text(
                                           vehicle.plateNumber.toUpperCase(),
@@ -166,18 +193,32 @@ class BookingConfirmationScreen extends StatelessWidget {
                                           ),
                                         ),
                                         const SizedBox(width: 16),
-                                        const Icon(Icons.color_lens_outlined, size: 14, color: Colors.grey),
+                                        const Icon(
+                                          Icons.color_lens_outlined,
+                                          size: 14,
+                                          color: Colors.grey,
+                                        ),
                                         const SizedBox(width: 4),
                                         Text(
                                           vehicle.color,
-                                          style: TextStyle(color: textSecondary, fontSize: 13),
+                                          style: TextStyle(
+                                            color: textSecondary,
+                                            fontSize: 13,
+                                          ),
                                         ),
                                       ],
                                     ),
                                     const SizedBox(height: 16),
                                     const Divider(color: Colors.white10),
                                     const SizedBox(height: 16),
-                                    _infoBlock(Icons.my_location, 'Pick Up & Return Hub', vehicle.branchName.isNotEmpty ? vehicle.branchName : 'HQ Central Branch', isDark),
+                                    _infoBlock(
+                                      Icons.my_location,
+                                      'Pick Up & Return Hub',
+                                      vehicle.branchName.isNotEmpty
+                                          ? vehicle.branchName
+                                          : 'HQ Central Branch',
+                                      isDark,
+                                    ),
                                   ],
                                 );
 
@@ -194,11 +235,39 @@ class BookingConfirmationScreen extends StatelessWidget {
                                       ),
                                     ),
                                     const SizedBox(height: 16),
-                                    _detailRow('Booking Reference', booking.id.toUpperCase(), isDark, isCode: true),
-                                    _detailRow('Status', booking.status, isDark, highlightValue: true),
-                                    _detailRow('Check-in Date', dateTimeFormat.format(booking.pickUpDate), isDark),
-                                    _detailRow('Check-out Date', booking.isOpenRental ? 'Open Rental' : (booking.returnDate != null ? dateTimeFormat.format(booking.returnDate!) : ""), isDark),
-                                    _detailRow('Rental Duration', '$days Day${days == 1 ? '' : 's'}', isDark),
+                                    _detailRow(
+                                      'Booking Reference',
+                                      booking.id.toUpperCase(),
+                                      isDark,
+                                      isCode: true,
+                                    ),
+                                    _detailRow(
+                                      'Status',
+                                      booking.status,
+                                      isDark,
+                                      highlightValue: true,
+                                    ),
+                                    _detailRow(
+                                      'Check-in Date',
+                                      dateTimeFormat.format(booking.pickUpDate),
+                                      isDark,
+                                    ),
+                                    _detailRow(
+                                      'Check-out Date',
+                                      booking.isOpenRental
+                                          ? 'Open Rental'
+                                          : (booking.returnDate != null
+                                                ? dateTimeFormat.format(
+                                                    booking.returnDate!,
+                                                  )
+                                                : ""),
+                                      isDark,
+                                    ),
+                                    _detailRow(
+                                      'Rental Duration',
+                                      '$days Day${days == 1 ? '' : 's'}',
+                                      isDark,
+                                    ),
                                     const SizedBox(height: 16),
                                     const Divider(color: Colors.white10),
                                     const SizedBox(height: 16),
@@ -212,29 +281,58 @@ class BookingConfirmationScreen extends StatelessWidget {
                                       ),
                                     ),
                                     const SizedBox(height: 16),
-                                    _detailRow('Payment Method', paymentMethod, isDark),
+                                    _detailRow(
+                                      'Payment Method',
+                                      paymentMethod,
+                                      isDark,
+                                    ),
                                     if (booking.promotionDiscountAmount > 0)
-                                      _detailRow('Promotion (${booking.promotionCode ?? booking.promotionName ?? "Applied"})', '- RM ${booking.promotionDiscountAmount.toStringAsFixed(2)}', isDark, highlightValue: true),
-                                    _detailRow('Points Redeemed', '${booking.pointsRedeemed} Points', isDark, isPoints: booking.pointsRedeemed > 0),
-                                    _detailRow('Total Rent Price', 'RM ${booking.totalPrice.toStringAsFixed(2)}', isDark, isPrice: true),
+                                      _detailRow(
+                                        'Promotion (${booking.promotionCode ?? booking.promotionName ?? "Applied"})',
+                                        '- RM ${booking.promotionDiscountAmount.toStringAsFixed(2)}',
+                                        isDark,
+                                        highlightValue: true,
+                                      ),
+                                    _detailRow(
+                                      'Points Redeemed',
+                                      '${booking.pointsRedeemed} Points',
+                                      isDark,
+                                      isPoints: booking.pointsRedeemed > 0,
+                                    ),
+                                    _detailRow(
+                                      'Total Rent Price',
+                                      'RM ${booking.totalPrice.toStringAsFixed(2)}',
+                                      isDark,
+                                      isPrice: true,
+                                    ),
                                     if (booking.depositAmount > 0)
-                                      _detailRow('Deposit Paid', 'RM ${booking.depositAmount.toStringAsFixed(2)}', isDark, highlightValue: true),
+                                      _detailRow(
+                                        'Deposit Paid',
+                                        'RM ${booking.depositAmount.toStringAsFixed(2)}',
+                                        isDark,
+                                        highlightValue: true,
+                                      ),
                                   ],
                                 );
 
                                 return Flex(
-                                  direction: isDesktop ? Axis.horizontal : Axis.vertical,
+                                  direction: isDesktop
+                                      ? Axis.horizontal
+                                      : Axis.vertical,
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     isDesktop
-                                        ? Expanded(
-                                            flex: 5,
-                                            child: leftPanel,
-                                          )
+                                        ? Expanded(flex: 5, child: leftPanel)
                                         : leftPanel,
                                     if (isDesktop) ...[
                                       const SizedBox(width: 40),
-                                      Container(width: 1, height: 320, color: isDark ? const Color(0xFF334155) : AppColors.borderGray),
+                                      Container(
+                                        width: 1,
+                                        height: 320,
+                                        color: isDark
+                                            ? const Color(0xFF334155)
+                                            : AppColors.borderGray,
+                                      ),
                                       const SizedBox(width: 40),
                                     ] else ...[
                                       const SizedBox(height: 24),
@@ -242,10 +340,7 @@ class BookingConfirmationScreen extends StatelessWidget {
                                       const SizedBox(height: 24),
                                     ],
                                     isDesktop
-                                        ? Expanded(
-                                            flex: 6,
-                                            child: rightPanel,
-                                          )
+                                        ? Expanded(flex: 6, child: rightPanel)
                                         : rightPanel,
                                   ],
                                 );
@@ -253,47 +348,94 @@ class BookingConfirmationScreen extends StatelessWidget {
                             ),
                             // Action Panel at bottom of details card
                             Container(
-                              color: isDark ? const Color(0xFF0F172A) : AppColors.lightGray.withValues(alpha: 0.5),
-                              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                              color: isDark
+                                  ? const Color(0xFF0F172A)
+                                  : AppColors.lightGray.withValues(alpha: 0.5),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 28,
+                                vertical: 20,
+                              ),
                               child: () {
                                 final textWidget = RichText(
-                                  textAlign: isDesktop ? TextAlign.start : TextAlign.center,
+                                  textAlign: isDesktop
+                                      ? TextAlign.start
+                                      : TextAlign.center,
                                   text: TextSpan(
-                                    style: TextStyle(color: isDark ? const Color(0xFFCBD5E1) : AppColors.secondaryBlue, fontSize: 13, height: 1.4),
+                                    style: TextStyle(
+                                      color: isDark
+                                          ? const Color(0xFFCBD5E1)
+                                          : AppColors.secondaryBlue,
+                                      fontSize: 13,
+                                      height: 1.4,
+                                    ),
                                     children: [
-                                      const TextSpan(text: 'Congratulations! You earned '),
+                                      const TextSpan(
+                                        text: 'Congratulations! You earned ',
+                                      ),
                                       TextSpan(
                                         text: '$pointsEarned loyalty points',
-                                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.green,
+                                        ),
                                       ),
-                                      const TextSpan(text: ' from this reservation transaction.'),
+                                      const TextSpan(
+                                        text:
+                                            ' from this reservation transaction.',
+                                      ),
                                     ],
                                   ),
                                 );
 
                                 return Flex(
-                                  direction: isDesktop ? Axis.horizontal : Axis.vertical,
+                                  direction: isDesktop
+                                      ? Axis.horizontal
+                                      : Axis.vertical,
                                   children: [
-                                    const Icon(Icons.stars_rounded, color: Colors.amber, size: 24),
+                                    const Icon(
+                                      Icons.stars_rounded,
+                                      color: Colors.amber,
+                                      size: 24,
+                                    ),
                                     const SizedBox(width: 12, height: 8),
                                     isDesktop
-                                        ? Expanded(
-                                            child: textWidget,
-                                          )
+                                        ? Expanded(child: textWidget)
                                         : textWidget,
                                     if (!isDesktop) const SizedBox(height: 16),
                                     OutlinedButton.icon(
                                       style: OutlinedButton.styleFrom(
-                                        side: const BorderSide(color: AppColors.primaryOrange),
-                                        foregroundColor: AppColors.primaryOrange,
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                        side: const BorderSide(
+                                          color: AppColors.primaryOrange,
+                                        ),
+                                        foregroundColor:
+                                            AppColors.primaryOrange,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 12,
+                                        ),
                                       ),
                                       onPressed: () {
-                                        ReceiptService().viewReceipt(context, booking.id);
+                                        ReceiptService().viewReceipt(
+                                          context,
+                                          booking.id,
+                                        );
                                       },
-                                      icon: const Icon(Icons.receipt_long_outlined, size: 18),
-                                      label: const Text('Digital Invoice', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                      icon: const Icon(
+                                        Icons.receipt_long_outlined,
+                                        size: 18,
+                                      ),
+                                      label: const Text(
+                                        'Digital Invoice',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 );
@@ -315,8 +457,13 @@ class BookingConfirmationScreen extends StatelessWidget {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primaryOrange,
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 14,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                             elevation: 0,
                           ),
                           onPressed: () {
@@ -327,14 +474,25 @@ class BookingConfirmationScreen extends StatelessWidget {
                             Navigator.pop(context);
                           },
                           icon: const Icon(Icons.home_outlined),
-                          label: const Text('Return Home', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          label: const Text(
+                            'Return Home',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
                         ),
                         OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
                             side: BorderSide(color: textPrimary),
                             foregroundColor: textPrimary,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 14,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                           onPressed: () {
                             final shell = CustomerResponsiveShell.of(context);
@@ -344,7 +502,13 @@ class BookingConfirmationScreen extends StatelessWidget {
                             Navigator.pop(context);
                           },
                           icon: const Icon(Icons.calendar_month_outlined),
-                          label: const Text('My Bookings', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          label: const Text(
+                            'My Bookings',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -390,7 +554,9 @@ class BookingConfirmationScreen extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
-                  color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
+                  color: isDark
+                      ? const Color(0xFFF8FAFC)
+                      : AppColors.secondaryBlue,
                 ),
               ),
             ],
@@ -400,7 +566,15 @@ class BookingConfirmationScreen extends StatelessWidget {
     );
   }
 
-  Widget _detailRow(String label, String value, bool isDark, {bool isCode = false, bool isPrice = false, bool isPoints = false, bool highlightValue = false}) {
+  Widget _detailRow(
+    String label,
+    String value,
+    bool isDark, {
+    bool isCode = false,
+    bool isPrice = false,
+    bool isPoints = false,
+    bool highlightValue = false,
+  }) {
     TextStyle valueStyle = TextStyle(
       fontWeight: FontWeight.w700,
       color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
@@ -411,7 +585,9 @@ class BookingConfirmationScreen extends StatelessWidget {
       valueStyle = TextStyle(
         fontFamily: 'monospace',
         fontWeight: FontWeight.bold,
-        color: isDark ? const Color(0xFFCBD5E1) : AppColors.secondaryBlue.withValues(alpha: 0.8),
+        color: isDark
+            ? const Color(0xFFCBD5E1)
+            : AppColors.secondaryBlue.withValues(alpha: 0.8),
         fontSize: 12,
       );
     } else if (isPrice) {
@@ -479,18 +655,27 @@ class BookingConfirmationScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Column(
-                crossAxisAlignment: isDesktop ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+                crossAxisAlignment: isDesktop
+                    ? CrossAxisAlignment.start
+                    : CrossAxisAlignment.center,
                 children: [
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      AppLogo(size: 16, fallbackColor: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue),
+                      AppLogo(
+                        size: 16,
+                        fallbackColor: isDark
+                            ? const Color(0xFFF8FAFC)
+                            : AppColors.secondaryBlue,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         CompanySettingsProvider().companyName.toUpperCase(),
                         style: TextStyle(
                           fontWeight: FontWeight.w900,
-                          color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
+                          color: isDark
+                              ? const Color(0xFFF8FAFC)
+                              : AppColors.secondaryBlue,
                           fontSize: 14,
                           letterSpacing: 1,
                         ),
@@ -545,7 +730,8 @@ class AnimatedCheckIcon extends StatefulWidget {
   State<AnimatedCheckIcon> createState() => _AnimatedCheckIconState();
 }
 
-class _AnimatedCheckIconState extends State<AnimatedCheckIcon> with SingleTickerProviderStateMixin {
+class _AnimatedCheckIconState extends State<AnimatedCheckIcon>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
 
@@ -578,7 +764,10 @@ class _AnimatedCheckIconState extends State<AnimatedCheckIcon> with SingleTicker
         decoration: BoxDecoration(
           color: Colors.green.withValues(alpha: 0.1),
           shape: BoxShape.circle,
-          border: Border.all(color: Colors.green.withValues(alpha: 0.2), width: 4),
+          border: Border.all(
+            color: Colors.green.withValues(alpha: 0.2),
+            width: 4,
+          ),
         ),
         child: const Icon(
           Icons.check_circle_rounded,

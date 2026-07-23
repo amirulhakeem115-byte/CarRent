@@ -11,11 +11,7 @@ class VehicleCard extends StatelessWidget {
   final VehicleModel vehicle;
   final VoidCallback? onTap;
 
-  const VehicleCard({
-    super.key,
-    required this.vehicle,
-    this.onTap,
-  });
+  const VehicleCard({super.key, required this.vehicle, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -34,17 +30,20 @@ class VehicleCard extends StatelessWidget {
       child: InkWell(
         onTap: isAvailable
             ? (onTap ??
-                () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => CustomerResponsiveShell(
-                        initialIndex: 1,
-                        customBody: VehicleDetailsScreen(vehicle: vehicle, hideAppBar: true),
+                  () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => CustomerResponsiveShell(
+                          initialIndex: 1,
+                          customBody: VehicleDetailsScreen(
+                            vehicle: vehicle,
+                            hideAppBar: true,
+                          ),
+                        ),
                       ),
-                    ),
-                  );
-                })
+                    );
+                  })
             : null,
         borderRadius: BorderRadius.circular(20),
         child: Column(
@@ -54,7 +53,9 @@ class VehicleCard extends StatelessWidget {
             Stack(
               children: [
                 ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(20),
+                  ),
                   child: AppImage(
                     imageSrc: vehicle.mainImage,
                     height: 160,
@@ -71,14 +72,17 @@ class VehicleCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                
+
                 // Status Overlay Over Vehicle Image
                 if (isAvailable)
                   Positioned(
                     top: 12,
                     left: 12,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFF2ECC71), // Green Badge
                         borderRadius: BorderRadius.circular(30),
@@ -112,7 +116,9 @@ class VehicleCard extends StatelessWidget {
                   // Dark overlay
                   Positioned.fill(
                     child: ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(20),
+                      ),
                       child: Container(
                         color: Colors.black.withValues(alpha: 0.4),
                       ),
@@ -124,9 +130,15 @@ class VehicleCard extends StatelessWidget {
                       child: Transform.rotate(
                         angle: -0.2, // diagonal angle
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
-                            border: Border.all(color: const Color(0xFFE74C3C), width: 3),
+                            border: Border.all(
+                              color: const Color(0xFFE74C3C),
+                              width: 3,
+                            ),
                             borderRadius: BorderRadius.circular(8),
                             color: Colors.black.withValues(alpha: 0.6),
                           ),
@@ -134,8 +146,8 @@ class VehicleCard extends StatelessWidget {
                             isBooked
                                 ? 'BOOKED'
                                 : isMaintenance
-                                    ? 'UNDER MAINTENANCE'
-                                    : 'NOT AVAILABLE',
+                                ? 'UNDER MAINTENANCE'
+                                : 'NOT AVAILABLE',
                             textAlign: TextAlign.center,
                             style: const TextStyle(
                               color: Color(0xFFE74C3C),
@@ -170,11 +182,17 @@ class VehicleCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(Icons.location_on, size: 12, color: AppColors.primaryOrange),
+                      const Icon(
+                        Icons.location_on,
+                        size: 12,
+                        color: AppColors.primaryOrange,
+                      ),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          vehicle.branchName.isNotEmpty ? vehicle.branchName : 'Unknown Location',
+                          vehicle.branchName.isNotEmpty
+                              ? vehicle.branchName
+                              : 'Unknown Location',
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppColors.lightText,
@@ -186,11 +204,15 @@ class VehicleCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  // Specifications Row
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  // Specifications row uses Wrap so translated/long labels do not overflow.
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
-                      _buildSpecItem(Icons.airline_seat_recline_normal, '${vehicle.seats} Seats'),
+                      _buildSpecItem(
+                        Icons.airline_seat_recline_normal,
+                        '${vehicle.seats} Seats',
+                      ),
                       _buildSpecItem(Icons.settings, vehicle.transmission),
                       _buildSpecItem(Icons.local_gas_station, vehicle.fuelType),
                     ],
@@ -224,24 +246,33 @@ class VehicleCard extends StatelessWidget {
                         ],
                       ),
                       ElevatedButton(
-                        onPressed: isAvailable ? () {
-                           Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => CustomerResponsiveShell(
-                                initialIndex: 1,
-                                customBody: VehicleDetailsScreen(vehicle: vehicle, hideAppBar: true),
-                              ),
-                            ),
-                          );
-                        } : null,
+                        onPressed: isAvailable
+                            ? () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        CustomerResponsiveShell(
+                                          initialIndex: 1,
+                                          customBody: VehicleDetailsScreen(
+                                            vehicle: vehicle,
+                                            hideAppBar: true,
+                                          ),
+                                        ),
+                                  ),
+                                );
+                              }
+                            : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primaryOrange,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
                           elevation: 0,
                         ),
                         child: const Text(

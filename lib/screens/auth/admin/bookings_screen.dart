@@ -319,7 +319,8 @@ class _BookingsViewState extends State<BookingsView> {
                         ),
                       ],
                       if (booking.status.toLowerCase() == 'return requested' ||
-                          booking.status.toLowerCase() == 'awaiting return inspection' ||
+                          booking.status.toLowerCase() ==
+                              'awaiting return inspection' ||
                           booking.status == 'ongoing' ||
                           booking.status.toLowerCase() == 'active' ||
                           booking.status.toLowerCase() == 'overdue') ...[
@@ -432,43 +433,73 @@ class _BookingsViewState extends State<BookingsView> {
     Color? textColor,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isCompactMobile = MediaQuery.of(context).size.width < 420;
+    final media = MediaQuery.of(context);
+    final isCompactMobile = media.size.width < 420;
+    final hasLargeText = media.textScaler.scale(1.0) > 1.15;
     final textPrimary =
         textColor ??
         (isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue);
     final textSecondary = isDark ? const Color(0xFFCBD5E1) : Colors.grey;
+
+    final stackedLayout = isCompactMobile || hasLargeText;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 3,
-            child: Text(
-              label,
-              style: TextStyle(
-                color: textSecondary,
-                fontSize: isCompactMobile ? 11.5 : 13,
-                fontWeight: FontWeight.w500,
-              ),
+      child: stackedLayout
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: textSecondary,
+                    fontSize: isCompactMobile ? 11.5 : 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  softWrap: true,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: isCompactMobile ? 11.5 : 13,
+                    fontStyle: isItalic ? FontStyle.italic : FontStyle.normal,
+                    color: textPrimary,
+                  ),
+                ),
+              ],
+            )
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: textSecondary,
+                      fontSize: isCompactMobile ? 11.5 : 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 7,
+                  child: Text(
+                    value,
+                    softWrap: true,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: isCompactMobile ? 11.5 : 13,
+                      fontStyle: isItalic ? FontStyle.italic : FontStyle.normal,
+                      color: textPrimary,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
-          Expanded(
-            flex: 7,
-            child: Text(
-              value,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: isCompactMobile ? 11.5 : 13,
-                fontStyle: isItalic ? FontStyle.italic : FontStyle.normal,
-                color: textPrimary,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -1107,25 +1138,28 @@ class _BookingsViewState extends State<BookingsView> {
                         color: AppColors.primaryOrange,
                       ),
                     ),
-                  ],
-                ),
-                trailing: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    b.status.toUpperCase(),
-                    style: TextStyle(
-                      color: statusColor,
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        b.status.toUpperCase(),
+                        maxLines: 2,
+                        softWrap: true,
+                        style: TextStyle(
+                          color: statusColor,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
                 onTap: () => _showBookingDetails(b),
               ),
@@ -1252,7 +1286,9 @@ class _BookingsViewState extends State<BookingsView> {
         backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
-          booking.isOpenRental ? 'Return Car Inspection' : 'Return Vehicle Inspection',
+          booking.isOpenRental
+              ? 'Return Car Inspection'
+              : 'Return Vehicle Inspection',
           style: TextStyle(fontWeight: FontWeight.bold, color: textColor),
         ),
         content: StatefulBuilder(

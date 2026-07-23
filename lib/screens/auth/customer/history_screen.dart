@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:carrent_system/screens/auth/customer/ongoing_status.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../constants/colors.dart';
@@ -10,7 +11,9 @@ import '../../../models/payment_model.dart';
 import '../../../services/receipt_service.dart';
 
 class HistoryScreen extends StatefulWidget {
-  const HistoryScreen({super.key});
+  final int initialTabIndex;
+
+  const HistoryScreen({super.key, this.initialTabIndex = 0});
 
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
@@ -32,16 +35,24 @@ class _HistoryScreenState extends State<HistoryScreen>
 
   late TabController _tabController;
   List<BookingModel> _bookings = [];
+  List<BookingModel> _ongoingBookings = [];
   List<BookingModel> _allUserBookings = [];
   List<PaymentModel> _payments = [];
   bool _loading = true;
   String? _error;
   String? _paymentsError;
 
+  static const Set<String> _closedStatuses = {'completed', 'cancelled'};
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    final safeInitialTab = widget.initialTabIndex.clamp(0, 2);
+    _tabController = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: safeInitialTab,
+    );
     _loadData();
   }
 
@@ -86,12 +97,10 @@ class _HistoryScreenState extends State<HistoryScreen>
       if (mounted) {
         setState(() {
           _bookings = allUserBookings
-              .where(
-                (b) =>
-                    b.status == 'Completed' ||
-                    b.status == 'Cancelled' ||
-                    b.status == 'cancelled',
-              )
+              .where((b) => _closedStatuses.contains(b.status.toLowerCase()))
+              .toList();
+          _ongoingBookings = allUserBookings
+              .where((b) => !_closedStatuses.contains(b.status.toLowerCase()))
               .toList();
           _allUserBookings = allUserBookings;
           _payments = payments;
@@ -281,6 +290,75 @@ class _HistoryScreenState extends State<HistoryScreen>
     );
   }
 
+  double _trackingProgress(BookingModel b) {
+    final now = DateTime.now();
+    if (now.isBefore(b.pickUpDate)) return 0.33;
+    if (b.isOpenRental || b.returnDate == null) return 0.66;
+    final total = b.returnDate!.difference(b.pickUpDate).inMinutes;
+    final elapsed = now.difference(b.pickUpDate).inMinutes;
+    final fraction = total > 0 ? (elapsed / total).clamp(0.0, 1.0) : 0.0;
+    return 0.5 + (fraction * 0.33);
+  }
+
+  String _trackingStageLabel(BookingModel b) {
+    return DateTime.now().isBefore(b.pickUpDate) ? 'Confirmed' : 'on the way';
+  }
+
+  List<TrackingEvent> _trackingEvents(BookingModel b) {
+    final fmt = DateFormat('dd MMM, hh:mm a');
+    final pickedUp = !DateTime.now().isBefore(b.pickUpDate);
+    return [
+      if (pickedUp)
+        TrackingEvent(
+          title: 'Car picked up, trip in progress',
+          timestamp: fmt.format(b.pickUpDate),
+          isActive: true,
+        ),
+      TrackingEvent(
+        title: 'Booking confirmed, ready for pickup',
+        timestamp: fmt.format(b.createdAt),
+        isActive: !pickedUp,
+      ),
+      TrackingEvent(
+        title: 'Payment received',
+        timestamp: fmt.format(b.createdAt),
+      ),
+    ];
+  }
+
+  Widget _buildOngoingBookingsList() {
+    if (_ongoingBookings.isEmpty) {
+      return _buildEmptyState(
+        icon: Icons.directions_car_filled_rounded,
+        title: 'No Ongoing Bookings',
+        subtitle:
+            'Bookings you have coming up or currently on rent will appear here.',
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.all(20),
+      itemCount: _ongoingBookings.length,
+      itemBuilder: (context, index) {
+        final b = _ongoingBookings[index];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: BookingTrackingCard(
+            vehicleName: b.vehicleName,
+            progress: _trackingProgress(b),
+            currentStageLabel: _trackingStageLabel(b),
+            stageLabels: const [
+              'Booked',
+              'Confirmed',
+              'On the way',
+              'Returned',
+            ],
+            events: _trackingEvents(b),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildBookingsList() {
     if (_bookings.isEmpty) {
       return _buildEmptyState(
@@ -406,10 +484,13 @@ class _HistoryScreenState extends State<HistoryScreen>
                   ],
                 ),
                 const SizedBox(height: 14),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final hasLargeText =
+                        MediaQuery.of(context).textScaler.scale(1.0) > 1.15;
+                    final stacked = constraints.maxWidth < 480 || hasLargeText;
+
+                    final amountBlock = Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
@@ -429,8 +510,9 @@ class _HistoryScreenState extends State<HistoryScreen>
                           ),
                         ),
                       ],
-                    ),
-                    Builder(
+                    );
+
+                    final receiptAction = Builder(
                       builder: (context) {
                         final paymentList = _payments
                             .where((p) => p.bookingId == b.id)
@@ -480,8 +562,25 @@ class _HistoryScreenState extends State<HistoryScreen>
                         }
                         return const SizedBox.shrink();
                       },
-                    ),
-                  ],
+                    );
+
+                    if (stacked) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          amountBlock,
+                          const SizedBox(height: 10),
+                          receiptAction,
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [amountBlock, receiptAction],
+                    );
+                  },
                 ),
               ],
             ),
@@ -734,10 +833,13 @@ class _HistoryScreenState extends State<HistoryScreen>
                 const SizedBox(height: 14),
                 Divider(height: 1, color: _borderColor),
                 const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final hasLargeText =
+                        MediaQuery.of(context).textScaler.scale(1.0) > 1.15;
+                    final stacked = constraints.maxWidth < 520 || hasLargeText;
+
+                    final amountBlock = Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
@@ -757,37 +859,60 @@ class _HistoryScreenState extends State<HistoryScreen>
                           ),
                         ),
                       ],
-                    ),
-                    if (p.receiptImage != null && p.receiptImage!.isNotEmpty)
-                      OutlinedButton.icon(
-                        onPressed: () => _openReceiptLightbox(p),
-                        icon: const Icon(
-                          Icons.receipt_rounded,
-                          size: 12,
-                          color: AppColors.primaryOrange,
-                        ),
-                        label: const Text(
-                          'View Uploaded Receipt',
-                          style: TextStyle(
-                            color: AppColors.primaryOrange,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(
-                            color: AppColors.primaryOrange,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                        ),
-                      ),
-                  ],
+                    );
+
+                    final receiptButton =
+                        (p.receiptImage != null && p.receiptImage!.isNotEmpty)
+                        ? OutlinedButton.icon(
+                            onPressed: () => _openReceiptLightbox(p),
+                            icon: const Icon(
+                              Icons.receipt_rounded,
+                              size: 12,
+                              color: AppColors.primaryOrange,
+                            ),
+                            label: const Text(
+                              'View Uploaded Receipt',
+                              style: TextStyle(
+                                color: AppColors.primaryOrange,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(
+                                color: AppColors.primaryOrange,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                            ),
+                          )
+                        : const SizedBox.shrink();
+
+                    if (stacked) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          amountBlock,
+                          if (p.receiptImage != null &&
+                              p.receiptImage!.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            receiptButton,
+                          ],
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [amountBlock, receiptButton],
+                    );
+                  },
                 ),
                 if (p.rejectionReason != null && p.rejectionReason!.isNotEmpty)
                   Padding(
@@ -924,6 +1049,37 @@ class _HistoryScreenState extends State<HistoryScreen>
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
+                    const Icon(Icons.directions_car_filled_rounded, size: 16),
+                    const SizedBox(width: 6),
+                    const Text('Ongoing'),
+                    if (_ongoingBookings.isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryOrange,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${_ongoingBookings.length}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Tab(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
                     const Icon(Icons.history_rounded, size: 16),
                     const SizedBox(width: 6),
                     const Text('Past Bookings'),
@@ -997,7 +1153,11 @@ class _HistoryScreenState extends State<HistoryScreen>
               ? _buildLoadErrorView(_error!)
               : TabBarView(
                   controller: _tabController,
-                  children: [_buildBookingsList(), _buildPaymentsList()],
+                  children: [
+                    _buildOngoingBookingsList(),
+                    _buildBookingsList(),
+                    _buildPaymentsList(),
+                  ],
                 ),
         ),
       ],

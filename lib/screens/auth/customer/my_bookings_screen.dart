@@ -66,8 +66,8 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
   @override
   void initState() {
     super.initState();
-    // 5-tab controller: Pay Now, Upcoming, Ongoing, Completed, Cancelled
-    _tabController = TabController(length: 5, vsync: this);
+    // 3-tab controller: Upcoming, Completed, Cancelled
+    _tabController = TabController(length: 3, vsync: this);
 
     // Mark the initial tab as viewed
     _viewedTabs.add(0);
@@ -211,31 +211,12 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
   void _updateCounts() {
     final now = DateTime.now();
 
-    final pendingPaymentCount = _bookings.where((b) {
-      final s = b.status.toLowerCase();
-      return s == 'pending payment' || s == 'waiting for payment';
-    }).length;
-
     final upcomingCount = _bookings.where((b) {
       final s = b.status.toLowerCase();
       return (s == 'pending' || s == 'approved' || s == 'confirmed') &&
           b.pickUpDate.isAfter(now) &&
           s != 'pending payment' &&
           s != 'waiting for payment';
-    }).length;
-
-    final ongoingCount = _bookings.where((b) {
-      final s = b.status.toLowerCase();
-      return (s == 'active' || s == 'ongoing') ||
-          s == 'awaiting return inspection' ||
-          s == 'awaiting final payment' ||
-          s == 'return requested' ||
-          ((s == 'approved' || s == 'confirmed') &&
-              b.pickUpDate.isBefore(now) &&
-              (b.returnDate == null || b.returnDate!.isAfter(now)) &&
-              s != 'waiting for payment' &&
-              s != 'pending payment') ||
-          s == 'overdue';
     }).length;
 
     final completedCount = _bookings
@@ -247,13 +228,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
       return s == 'cancelled' || s == 'rejected';
     }).length;
 
-    _currentCounts = {
-      0: pendingPaymentCount,
-      1: upcomingCount,
-      2: ongoingCount,
-      3: completedCount,
-      4: cancelledCount,
-    };
+    _currentCounts = {0: upcomingCount, 1: completedCount, 2: cancelledCount};
   }
 
   bool _shouldShowBadge(int tabIndex) {
@@ -273,7 +248,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     final dateFormat = DateFormat('dd MMM yyyy');
     double pricePerDay = 100.0;
     try {
-      pricePerDay = _vehicles.firstWhere((v) => v.id == booking.vehicleId).pricePerDay;
+      pricePerDay = _vehicles
+          .firstWhere((v) => v.id == booking.vehicleId)
+          .pricePerDay;
     } catch (_) {}
     final overdue = BookingService.getOverdueDetails(booking, pricePerDay);
 
@@ -425,36 +402,46 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
             const SizedBox(height: 12),
             Divider(height: 1, color: _borderColor),
             const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final hasLargeText =
+                    MediaQuery.of(context).textScaler.scale(1.0) > 1.15;
+                final stacked = constraints.maxWidth < 640 || hasLargeText;
+
+                final amountInfo = Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      overdue['isOverdue'] == true ? 'CURRENT TOTAL AMOUNT' : 'TOTAL COST',
+                      overdue['isOverdue'] == true
+                          ? 'CURRENT TOTAL AMOUNT'
+                          : 'TOTAL COST',
                       style: TextStyle(
                         fontSize: 8,
                         color: _subColor,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    Row(
+                    const SizedBox(height: 2),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Text(
                           booking.status == 'Awaiting Final Payment'
                               ? 'RM ${booking.finalAmount.toStringAsFixed(2)}'
                               : (booking.isOpenRental && _isOngoing(booking)
-                                  ? 'RM ${(_getDynamicPrice(booking) + (overdue['charges'] as num)).toStringAsFixed(2)}'
-                                  : 'RM ${(booking.totalPrice + (overdue['charges'] as num)).toStringAsFixed(2)}'),
+                                    ? 'RM ${(_getDynamicPrice(booking) + (overdue['charges'] as num)).toStringAsFixed(2)}'
+                                    : 'RM ${(booking.totalPrice + (overdue['charges'] as num)).toStringAsFixed(2)}'),
                           style: TextStyle(
                             fontWeight: FontWeight.w900,
                             fontSize: 14,
-                            color: overdue['isOverdue'] == true ? Colors.redAccent : AppColors.primaryOrange,
+                            color: overdue['isOverdue'] == true
+                                ? Colors.redAccent
+                                : AppColors.primaryOrange,
                           ),
                         ),
-                        if (booking.isOpenRental && _isOngoing(booking)) ...[
-                          const SizedBox(width: 8),
+                        if (booking.isOpenRental && _isOngoing(booking))
                           Text(
                             '(Est. for ${_getElapsedDays(booking)} days)',
                             style: TextStyle(
@@ -463,9 +450,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                               color: _subColor,
                             ),
                           ),
-                        ],
-                        if (booking.discountAmount > 0) ...[
-                          const SizedBox(width: 8),
+                        if (booking.discountAmount > 0)
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 6,
@@ -476,6 +461,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 const Icon(
                                   Icons.stars_rounded,
@@ -494,7 +480,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                               ],
                             ),
                           ),
-                        ],
                       ],
                     ),
                     if (booking.isOpenRental && _isOngoing(booking)) ...[
@@ -511,194 +496,215 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                     if (overdue['isOverdue'] == true) ...[
                       const SizedBox(height: 4),
                       Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 11),
+                          const Icon(
+                            Icons.warning_amber_rounded,
+                            color: Colors.redAccent,
+                            size: 11,
+                          ),
                           const SizedBox(width: 4),
-                          Text(
-                            'Overdue: ${overdue['days']}d ${overdue['hours']}h (+RM ${overdue['charges'].toStringAsFixed(2)})',
-                            style: const TextStyle(
-                              color: Colors.redAccent,
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.bold,
+                          Flexible(
+                            child: Text(
+                              'Overdue: ${overdue['days']}d ${overdue['hours']}h (+RM ${overdue['charges'].toStringAsFixed(2)})',
+                              style: const TextStyle(
+                                color: Colors.redAccent,
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ],
                   ],
-                ),
-                Row(
+                );
+
+                final showReceiptAction =
+                    booking.status.toLowerCase() == 'completed' ||
+                    (payment != null &&
+                        (payment.paymentStatus?.toLowerCase() == 'approved' ||
+                            payment.status.toLowerCase() == 'approved' ||
+                            payment.paymentStatus?.toLowerCase() == 'paid' ||
+                            payment.status.toLowerCase() == 'paid'));
+
+                final primaryActionButtons = Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.start,
                   children: [
-                    if (booking.status == 'Awaiting Final Payment') ...[
-                      ElevatedButton.icon(
+                    if (booking.status == 'Awaiting Final Payment')
+                      _buildActionButton(
                         onPressed: () => _payNowExistingBooking(booking),
-                        icon: const Icon(
-                          Icons.payment_rounded,
-                          size: 12,
-                          color: Colors.white,
-                        ),
-                        label: const Text(
-                          'Pay Final Invoice',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                        ),
+                        icon: Icons.payment_rounded,
+                        label: 'Pay Final Invoice',
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
                       ),
-                      const SizedBox(width: 8),
-                    ],
-                    if (isWaitingPayment) ...[
-                      ElevatedButton.icon(
+                    if (isWaitingPayment)
+                      _buildActionButton(
                         onPressed: () => _payNowExistingBooking(booking),
-                        icon: const Icon(
-                          Icons.payment_rounded,
-                          size: 12,
-                          color: Colors.white,
-                        ),
-                        label: const Text(
-                          'Pay Now',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primaryOrange,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                        ),
+                        icon: Icons.payment_rounded,
+                        label: 'Pay Now',
+                        backgroundColor: AppColors.primaryOrange,
+                        foregroundColor: Colors.white,
                       ),
-                      const SizedBox(width: 8),
-                    ],
                     if (canCancel)
-                      OutlinedButton.icon(
+                      _buildActionButton(
                         onPressed: () => _confirmCancelBooking(booking),
-                        icon: const Icon(
-                          Icons.close,
-                          size: 12,
-                          color: Colors.redAccent,
-                        ),
-                        label: const Text(
-                          'Cancel Request',
-                          style: TextStyle(
-                            color: Colors.redAccent,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Colors.redAccent),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                        ),
+                        icon: Icons.close,
+                        label: 'Cancel Request',
+                        backgroundColor: null,
+                        foregroundColor: Colors.redAccent,
+                        outlinedColor: Colors.redAccent,
                       ),
-                    // Self-service panel is rendered as a sibling of this actions row to prevent rendering constraint errors.
                     if (bStatus == 'completed' &&
-                        !_reviewedBookingIds.contains(booking.id)) ...[
-                      ElevatedButton.icon(
+                        !_reviewedBookingIds.contains(booking.id))
+                      _buildActionButton(
                         onPressed: () => _submitReview(booking),
-                        icon: const Icon(
-                          Icons.star_rounded,
-                          size: 12,
-                          color: Colors.white,
-                        ),
-                        label: const Text(
-                          'Submit Review',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primaryOrange,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                        ),
+                        icon: Icons.star_rounded,
+                        label: 'Submit Review',
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
                       ),
-                    ],
-                    if (booking.status.toLowerCase() == 'completed' ||
-                        (payment != null &&
-                            (payment.paymentStatus?.toLowerCase() ==
-                                     'approved' ||
-                                 payment.status.toLowerCase() == 'approved' ||
-                                 payment.paymentStatus?.toLowerCase() ==
-                                     'paid' ||
-                                 payment.status.toLowerCase() == 'paid'))) ...[
-                      const SizedBox(width: 8),
-                      OutlinedButton.icon(
-                        onPressed: () => _showReceiptOptions(booking),
-                        icon: const Icon(
-                          Icons.receipt_long_rounded,
-                          size: 12,
-                          color: AppColors.primaryOrange,
-                        ),
-                        label: const Text(
-                          'Receipt',
-                          style: TextStyle(
-                            color: AppColors.primaryOrange,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(
-                            color: AppColors.primaryOrange,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                        ),
-                      ),
-                    ],
                   ],
-                ),
-              ],
+                );
+
+                final receiptAction = showReceiptAction
+                    ? _buildActionButton(
+                        onPressed: () => _showReceiptOptions(booking),
+                        icon: Icons.receipt_long_rounded,
+                        label: 'Receipt',
+                        backgroundColor: null,
+                        foregroundColor: AppColors.primaryOrange,
+                        outlinedColor: AppColors.primaryOrange,
+                        reverseOutlined: true,
+                      )
+                    : null;
+
+                if (stacked) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      amountInfo,
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        alignment: WrapAlignment.start,
+                        children: [
+                          ...primaryActionButtons.children,
+                          ?receiptAction,
+                        ],
+                      ),
+                    ],
+                  );
+                }
+
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: amountInfo),
+                    const SizedBox(width: 12),
+                    Flexible(
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          alignment: WrapAlignment.end,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            ...primaryActionButtons.children,
+                            ?receiptAction,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
             if ((bStatus == 'active' ||
-                    bStatus == 'ongoing' ||
-                    bStatus == 'overdue' ||
-                    bStatus == 'return requested' ||
-                    bStatus == 'awaiting return inspection' ||
-                    bStatus == 'awaiting final payment')) ...[
+                bStatus == 'ongoing' ||
+                bStatus == 'overdue' ||
+                bStatus == 'return requested' ||
+                bStatus == 'awaiting return inspection' ||
+                bStatus == 'awaiting final payment')) ...[
               _buildSelfServicePanel(booking, _isDark),
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildActionButton({
+    required VoidCallback onPressed,
+    required IconData icon,
+    required String label,
+    Color? backgroundColor,
+    required Color foregroundColor,
+    Color? outlinedColor,
+    bool reverseOutlined = false,
+  }) {
+    final commonPadding = const EdgeInsets.symmetric(
+      horizontal: 12,
+      vertical: 8,
+    );
+    final textStyle = const TextStyle(
+      fontSize: 11,
+      fontWeight: FontWeight.bold,
+    );
+
+    if (outlinedColor != null) {
+      if (reverseOutlined) {
+        final reversedForeground = foregroundColor == outlinedColor
+            ? Colors.white
+            : foregroundColor;
+
+        return ElevatedButton.icon(
+          onPressed: onPressed,
+          icon: Icon(icon, size: 12, color: reversedForeground),
+          label: Text(
+            label,
+            style: textStyle.copyWith(color: reversedForeground),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: outlinedColor,
+            foregroundColor: reversedForeground,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            padding: commonPadding,
+          ),
+        );
+      }
+
+      return OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 12, color: foregroundColor),
+        label: Text(label, style: textStyle.copyWith(color: foregroundColor)),
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(color: outlinedColor),
+          foregroundColor: foregroundColor,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          padding: commonPadding,
+        ),
+      );
+    }
+
+    return ElevatedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 12, color: foregroundColor),
+      label: Text(label, style: textStyle),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: backgroundColor,
+        foregroundColor: foregroundColor,
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        padding: commonPadding,
       ),
     );
   }
@@ -808,8 +814,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     }
   }
 
-
-
   Future<void> _payNowExistingBooking(BookingModel booking) async {
     if (mounted) {
       await BookingScreen.navigateToPayment(
@@ -825,31 +829,12 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     final bool isDesktop = MediaQuery.of(context).size.width > 900;
     final now = DateTime.now();
 
-    final pendingPaymentList = _bookings.where((b) {
-      final s = b.status.toLowerCase();
-      return s == 'pending payment' || s == 'waiting for payment';
-    }).toList();
-
     final upcomingList = _bookings.where((b) {
       final s = b.status.toLowerCase();
       return (s == 'pending' || s == 'approved' || s == 'confirmed') &&
           b.pickUpDate.isAfter(now) &&
           s != 'pending payment' &&
           s != 'waiting for payment';
-    }).toList();
-
-    final ongoingList = _bookings.where((b) {
-      final s = b.status.toLowerCase();
-      return (s == 'active' || s == 'ongoing') ||
-          s == 'awaiting return inspection' ||
-          s == 'awaiting final payment' ||
-          s == 'return requested' ||
-          ((s == 'approved' || s == 'confirmed') &&
-              b.pickUpDate.isBefore(now) &&
-              (b.returnDate == null || b.returnDate!.isAfter(now)) &&
-              s != 'waiting for payment' &&
-              s != 'pending payment') ||
-          s == 'overdue';
     }).toList();
 
     final completedList = _bookings
@@ -888,11 +873,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
               fontSize: 13,
             ),
             tabs: [
-              _buildTabItem('Pay Now', 0, pendingPaymentList.length),
-              _buildTabItem('Upcoming', 1, upcomingList.length),
-              _buildTabItem('Ongoing', 2, ongoingList.length),
-              _buildTabItem('Completed', 3, completedList.length),
-              _buildTabItem('Cancelled', 4, cancelledList.length),
+              _buildTabItem('Upcoming', 0, upcomingList.length),
+              _buildTabItem('Completed', 1, completedList.length),
+              _buildTabItem('Cancelled', 2, cancelledList.length),
             ],
           ),
         ),
@@ -903,15 +886,23 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
               controller: _tabController,
               children: [
                 _buildTabList(
-                  pendingPaymentList,
-                  'No pending payments.',
+                  upcomingList,
+                  'No upcoming bookings.',
                   isDesktop,
                   0,
                 ),
-                _buildTabList(upcomingList, 'No upcoming bookings.', isDesktop, 1),
-                _buildTabList(ongoingList, 'No ongoing rentals.', isDesktop, 2),
-                _buildTabList(completedList, 'No completed bookings.', isDesktop, 3),
-                _buildTabList(cancelledList, 'No cancelled reservations.', isDesktop, 4),
+                _buildTabList(
+                  completedList,
+                  'No completed bookings.',
+                  isDesktop,
+                  1,
+                ),
+                _buildTabList(
+                  cancelledList,
+                  'No cancelled reservations.',
+                  isDesktop,
+                  2,
+                ),
               ],
             ),
           ),
@@ -992,9 +983,14 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(
-                'Ready for your next trip? Discover our available premium vehicles.',
-                style: TextStyle(fontSize: 11, color: _subColor),
+                'After payment, track your ongoing car in the History page.',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primaryOrange,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
@@ -1108,7 +1104,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
       try {
         final currentUser = _authService.currentUser;
         if (currentUser == null) return;
-        
+
         final review = ReviewModel(
           id: '',
           bookingId: booking.id,
@@ -1133,7 +1129,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to submit review: ${e.toString().replaceAll('Exception: ', '')}'),
+              content: Text(
+                'Failed to submit review: ${e.toString().replaceAll('Exception: ', '')}',
+              ),
               backgroundColor: Colors.redAccent,
             ),
           );
@@ -1196,9 +1194,13 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
   }
 
   Widget _buildSelfServicePanel(BookingModel booking, bool isDark) {
-    final hasPendingExt = booking.extensionRequest != null &&
+    final hasPendingExt =
+        booking.extensionRequest != null &&
         booking.extensionRequest!['status'] == 'pending';
-    final isReturnRequested = booking.status == 'Return Requested' || booking.status == 'Awaiting Return Inspection' || booking.status == 'Awaiting Final Payment';
+    final isReturnRequested =
+        booking.status == 'Return Requested' ||
+        booking.status == 'Awaiting Return Inspection' ||
+        booking.status == 'Awaiting Final Payment';
     final isOnMyWay = booking.customerStatus == 'on_my_way';
 
     return Column(
@@ -1226,12 +1228,20 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
             ),
             child: Row(
               children: [
-                const Icon(Icons.hourglass_empty, color: Colors.orange, size: 14),
+                const Icon(
+                  Icons.hourglass_empty,
+                  color: Colors.orange,
+                  size: 14,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'Extension request pending approval until ${DateFormat('dd MMM yyyy hh:mm a').format(DateTime.parse(booking.extensionRequest!['newReturnDate']))}',
-                    style: const TextStyle(color: Colors.orange, fontSize: 10, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      color: Colors.orange,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
@@ -1255,9 +1265,13 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                     booking.status == 'Awaiting Return Inspection'
                         ? 'Return request submitted. Please wait for the Admin to inspect the vehicle.'
                         : (booking.status == 'Awaiting Final Payment'
-                            ? 'Inspection completed. Awaiting final payment.'
-                            : 'Return request submitted. Awaiting Admin inspection & completion.'),
-                    style: const TextStyle(color: Colors.blue, fontSize: 10, fontWeight: FontWeight.bold),
+                              ? 'Inspection completed. Awaiting final payment.'
+                              : 'Return request submitted. Awaiting Admin inspection & completion.'),
+                    style: const TextStyle(
+                      color: Colors.blue,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
@@ -1271,59 +1285,106 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
           children: [
             if (!booking.isOpenRental)
               ElevatedButton.icon(
-                onPressed: hasPendingExt || isReturnRequested ? null : () => _showExtensionSheet(booking),
+                onPressed: hasPendingExt || isReturnRequested
+                    ? null
+                    : () => _showExtensionSheet(booking),
                 icon: const Icon(Icons.add_alarm, size: 12),
-                label: const Text('Extend Booking', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                label: const Text(
+                  'Extend Booking',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryOrange,
                   foregroundColor: Colors.white,
                   disabledBackgroundColor: Colors.grey.withValues(alpha: 0.2),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
               ),
             ElevatedButton.icon(
-              onPressed: isReturnRequested ? null : () => _confirmReturnVehicle(booking),
+              onPressed: isReturnRequested
+                  ? null
+                  : () => _confirmReturnVehicle(booking),
               icon: const Icon(Icons.keyboard_return, size: 12),
-              label: Text(booking.isOpenRental ? 'Return Car' : 'Return Vehicle', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              label: Text(
+                booking.isOpenRental ? 'Return Car' : 'Return Vehicle',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.teal,
                 foregroundColor: Colors.white,
                 disabledBackgroundColor: Colors.grey.withValues(alpha: 0.2),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
             ElevatedButton.icon(
-              onPressed: isOnMyWay || isReturnRequested ? null : () => _markOnMyWay(booking),
+              onPressed: isOnMyWay || isReturnRequested
+                  ? null
+                  : () => _markOnMyWay(booking),
               icon: const Icon(Icons.directions_run, size: 12),
-              label: Text(isOnMyWay ? 'On My Way!' : "I'm On My Way", style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              label: Text(
+                isOnMyWay ? 'On My Way!' : "I'm On My Way",
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: isOnMyWay ? Colors.green : Colors.indigo,
                 foregroundColor: Colors.white,
                 disabledBackgroundColor: Colors.grey.withValues(alpha: 0.2),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
-            OutlinedButton.icon(
+            ElevatedButton.icon(
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const ContactSupportScreen()),
+                  MaterialPageRoute(
+                    builder: (_) => const ContactSupportScreen(),
+                  ),
                 );
               },
               icon: const Icon(Icons.chat_bubble_outline, size: 12),
-              label: const Text('Support', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: AppColors.primaryOrange),
-                foregroundColor: AppColors.primaryOrange,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              label: const Text(
+                'Support',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryOrange,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
           ],
-        )
+        ),
       ],
     );
   }
@@ -1338,7 +1399,11 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     double pricePerDay = 120.0;
 
     try {
-      final snap = await FirebaseDatabase.instance.ref().child('vehicles').child(booking.vehicleId).get();
+      final snap = await FirebaseDatabase.instance
+          .ref()
+          .child('vehicles')
+          .child(booking.vehicleId)
+          .get();
       if (snap.exists) {
         pricePerDay = ((snap.value as Map)['pricePerDay'] ?? 120.0).toDouble();
       }
@@ -1350,7 +1415,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
       context: context,
       isScrollControlled: true,
       backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (ctx) {
         final textSec = isDark ? const Color(0xFF94A3B8) : AppColors.lightText;
         final textPrim = isDark ? Colors.white : AppColors.darkText;
@@ -1388,27 +1455,43 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
 
             return Padding(
               padding: EdgeInsets.only(
-                top: 24, left: 24, right: 24,
+                top: 24,
+                left: 24,
+                right: 24,
                 bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('Request Extension', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrim)),
+                  Text(
+                    'Request Extension',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: textPrim,
+                    ),
+                  ),
                   const SizedBox(height: 4),
-                  Text('Current Return: ${booking.returnDate != null ? DateFormat('dd MMM yyyy hh:mm a').format(booking.returnDate!) : "Open Rental"}', style: TextStyle(fontSize: 11, color: textSec)),
+                  Text(
+                    'Current Return: ${booking.returnDate != null ? DateFormat('dd MMM yyyy hh:mm a').format(booking.returnDate!) : "Open Rental"}',
+                    style: TextStyle(fontSize: 11, color: textSec),
+                  ),
                   const SizedBox(height: 16),
                   Row(
                     children: [
                       Expanded(
-                        child: OutlinedButton.icon(
+                        child: ElevatedButton.icon(
                           onPressed: () async {
                             final picked = await showDatePicker(
                               context: context,
-                              initialDate: newDate.isBefore(fallbackReturn) ? fallbackReturn.add(const Duration(days: 1)) : newDate,
+                              initialDate: newDate.isBefore(fallbackReturn)
+                                  ? fallbackReturn.add(const Duration(days: 1))
+                                  : newDate,
                               firstDate: fallbackReturn,
-                              lastDate: fallbackReturn.add(const Duration(days: 30)),
+                              lastDate: fallbackReturn.add(
+                                const Duration(days: 30),
+                              ),
                             );
                             if (picked != null) {
                               setStateSheet(() => newDate = picked);
@@ -1416,12 +1499,20 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                             }
                           },
                           icon: const Icon(Icons.calendar_today, size: 14),
-                          label: Text(DateFormat('dd MMM yyyy').format(newDate), style: const TextStyle(fontSize: 12)),
+                          label: Text(
+                            DateFormat('dd MMM yyyy').format(newDate),
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryOrange,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: OutlinedButton.icon(
+                        child: ElevatedButton.icon(
                           onPressed: () async {
                             final picked = await showTimePicker(
                               context: context,
@@ -1433,7 +1524,15 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                             }
                           },
                           icon: const Icon(Icons.access_time, size: 14),
-                          label: Text(newTime.format(context), style: const TextStyle(fontSize: 12)),
+                          label: Text(
+                            newTime.format(context),
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryOrange,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                          ),
                         ),
                       ),
                     ],
@@ -1441,7 +1540,11 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                   const SizedBox(height: 16),
 
                   if (isChecking) ...[
-                    const Center(child: CircularProgressIndicator(color: AppColors.primaryOrange)),
+                    const Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.primaryOrange,
+                      ),
+                    ),
                     const SizedBox(height: 16),
                   ] else ...[
                     if (!isAvailable) ...[
@@ -1453,12 +1556,20 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                         ),
                         child: const Row(
                           children: [
-                            Icon(Icons.error_outline, color: Colors.redAccent, size: 14),
+                            Icon(
+                              Icons.error_outline,
+                              color: Colors.redAccent,
+                              size: 14,
+                            ),
                             SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 'Vehicle is not available for this period. Please try another date/time.',
-                                style: TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                  color: Colors.redAccent,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ],
@@ -1469,7 +1580,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
+                          color: isDark
+                              ? const Color(0xFF0F172A)
+                              : AppColors.lightGray,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Column(
@@ -1477,24 +1590,63 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text('Additional Duration', style: TextStyle(fontSize: 12, color: textSec)),
-                                Text('$addDays Days ($hours Hours)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textPrim)),
+                                Text(
+                                  'Additional Duration',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: textSec,
+                                  ),
+                                ),
+                                Text(
+                                  '$addDays Days ($hours Hours)',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: textPrim,
+                                  ),
+                                ),
                               ],
                             ),
                             const SizedBox(height: 6),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text('Daily Rate', style: TextStyle(fontSize: 12, color: textSec)),
-                                Text('RM ${pricePerDay.toStringAsFixed(2)}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textPrim)),
+                                Text(
+                                  'Daily Rate',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: textSec,
+                                  ),
+                                ),
+                                Text(
+                                  'RM ${pricePerDay.toStringAsFixed(2)}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: textPrim,
+                                  ),
+                                ),
                               ],
                             ),
                             const Divider(),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text('Additional Cost', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                Text('RM ${addCost.toStringAsFixed(2)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: AppColors.primaryOrange)),
+                                Text(
+                                  'Additional Cost',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  'RM ${addCost.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w900,
+                                    color: AppColors.primaryOrange,
+                                  ),
+                                ),
                               ],
                             ),
                           ],
@@ -1502,24 +1654,33 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                       ),
                       const SizedBox(height: 20),
                       ElevatedButton(
-                        onPressed: addCost <= 0 ? null : () async {
-                          Navigator.pop(ctx);
-                          await BookingScreen.navigateToPayment(
-                            context,
-                            booking,
-                            addCost,
-                            returnDateTime,
-                          );
-                        },
+                        onPressed: addCost <= 0
+                            ? null
+                            : () async {
+                                Navigator.pop(ctx);
+                                await BookingScreen.navigateToPayment(
+                                  context,
+                                  booking,
+                                  addCost,
+                                  returnDateTime,
+                                );
+                              },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primaryOrange,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
                         child: Text(
-                          addCost > 0 ? 'Proceed to Payment (RM ${addCost.toStringAsFixed(2)})' : 'Select a valid extension date',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          addCost > 0
+                              ? 'Proceed to Payment (RM ${addCost.toStringAsFixed(2)})'
+                              : 'Select a valid extension date',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
                     ],
@@ -1602,12 +1763,18 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
 
   Future<void> _markOnMyWay(BookingModel booking) async {
     try {
-      debugPrint('[STEP 1] Customer clicked I\'m On My Way (Booking ID: ${booking.id})');
+      debugPrint(
+        '[STEP 1] Customer clicked I\'m On My Way (Booking ID: ${booking.id})',
+      );
       final currentUser = _authService.currentUser;
       final uid = currentUser?.uid ?? 'unauthenticated';
-      final role = currentUser != null ? await UserRoleCache.getRole(currentUser.uid) : 'customer';
+      final role = currentUser != null
+          ? await UserRoleCache.getRole(currentUser.uid)
+          : 'customer';
 
-      final effectiveUserId = uid.isNotEmpty && uid != 'unauthenticated' ? uid : booking.userId;
+      final effectiveUserId = uid.isNotEmpty && uid != 'unauthenticated'
+          ? uid
+          : booking.userId;
 
       debugPrint('=== BOOKING STATUS UPDATE TRACE ===');
       debugPrint('Current UID: $uid');
@@ -1623,24 +1790,29 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
           .child('bookings')
           .child(booking.id)
           .update({
-        'customerStatus': 'on_my_way',
-        'userId': effectiveUserId,
-        'updatedAt': DateTime.now().toIso8601String(),
-      });
+            'customerStatus': 'on_my_way',
+            'userId': effectiveUserId,
+            'updatedAt': DateTime.now().toIso8601String(),
+          });
 
-      debugPrint('[STEP 2] Booking status updated successfully (Booking ID: ${booking.id})');
+      debugPrint(
+        '[STEP 2] Booking status updated successfully (Booking ID: ${booking.id})',
+      );
 
       // Safely perform notification write without blocking or failing status update
       try {
         final notificationService = NotificationService();
-        final bool isPickup = booking.status.toLowerCase() != 'active' &&
-                              booking.status.toLowerCase() != 'ongoing' &&
-                              booking.status.toLowerCase() != 'overdue';
+        final bool isPickup =
+            booking.status.toLowerCase() != 'active' &&
+            booking.status.toLowerCase() != 'ongoing' &&
+            booking.status.toLowerCase() != 'overdue';
         final String actionMsg = isPickup ? "pick up" : "return";
 
         // 1. Notify Admin directly via centralized service
         await notificationService.notifyOpenRentalEvent(
-          eventName: isPickup ? "Customer On The Way for Pickup 🚗" : "Customer On The Way for Return 🚗",
+          eventName: isPickup
+              ? "Customer On The Way for Pickup 🚗"
+              : "Customer On The Way for Return 🚗",
           customerName: booking.userName,
           vehicleName: booking.vehicleName,
           bookingId: booking.id,
@@ -1656,7 +1828,8 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
         await notificationService.createNotification(
           userId: effectiveUserId,
           title: "Status Updated: On My Way",
-          message: "You have notified the Admin that you are on your way to $actionMsg ${booking.vehicleName}.",
+          message:
+              "You have notified the Admin that you are on your way to $actionMsg ${booking.vehicleName}.",
           type: 'booking',
           category: 'Open Rental',
           customerName: booking.userName,
@@ -1668,7 +1841,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
           actionRoute: 'Dashboard',
         );
       } catch (notifErr) {
-        debugPrint('[MyBookingsScreen] Warning: notification creation failed: $notifErr');
+        debugPrint(
+          '[MyBookingsScreen] Warning: notification creation failed: $notifErr',
+        );
       }
 
       _loadBookings();
@@ -1706,7 +1881,12 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
 
   bool _isOngoing(BookingModel booking) {
     final s = booking.status.toLowerCase();
-    return s == 'active' || s == 'ongoing' || s == 'overdue' || s == 'return requested' || s == 'awaiting return inspection' || s == 'awaiting final payment';
+    return s == 'active' ||
+        s == 'ongoing' ||
+        s == 'overdue' ||
+        s == 'return requested' ||
+        s == 'awaiting return inspection' ||
+        s == 'awaiting final payment';
   }
 
   double _getDynamicPrice(BookingModel booking) {

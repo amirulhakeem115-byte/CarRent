@@ -12,15 +12,17 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   const CustomAppBar({super.key});
 
   @override
-  Size get preferredSize => const Size.fromHeight(80);
+  Size get preferredSize => const Size.fromHeight(96);
 
   @override
   Widget build(BuildContext context) {
     final double width = MediaQuery.of(context).size.width;
-    final bool isDesktop = width > 750;
+    final textScale = MediaQuery.of(context).textScaler.scale(1.0);
+    final bool isDesktop = width > 750 && textScale <= 1.15;
+    final double barHeight = textScale > 1.2 ? 96 : 80;
 
     return Container(
-      height: 80,
+      height: barHeight,
       decoration: const BoxDecoration(
         color: AppColors.primaryOrange,
         boxShadow: [
@@ -59,7 +61,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                             context
                                 .watch<CompanySettingsProvider>()
                                 .companyName,
-                            maxLines: 1,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: AppColors.secondaryBlue,
@@ -187,8 +189,8 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                 );
               },
               child: Container(
-                width: 44,
-                height: 44,
+                width: textScale > 1.2 ? 40 : 44,
+                height: textScale > 1.2 ? 40 : 44,
                 decoration: BoxDecoration(
                   color: Colors.grey[300],
                   shape: BoxShape.circle,

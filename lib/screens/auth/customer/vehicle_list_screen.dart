@@ -9,7 +9,6 @@ import 'vehicle_details_screen.dart';
 import 'customer_responsive_shell.dart';
 import '../../../widgets/app_image.dart';
 
-
 class VehicleListScreen extends StatefulWidget {
   const VehicleListScreen({super.key});
 
@@ -121,19 +120,6 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
     if (_priceBudget < 1000.0) count++;
     return count;
   }
-
-  void _resetFilters() {
-    setState(() {
-      _searchController.clear();
-      _selectedTransmission = null;
-      _selectedCategory = null;
-      _selectedBranch = null;
-      _selectedAvailability = null;
-      _priceBudget = 1000.0;
-      _sortBy = 'recommended';
-    });
-  }
-
 
   @override
   Widget build(BuildContext context) {
@@ -353,6 +339,16 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
             fontSize: 13,
           ),
           prefixIcon: Icon(Icons.search, size: 20, color: _subColor),
+          suffixIcon: _searchController.text.isNotEmpty
+              ? IconButton(
+                  tooltip: 'Clear search',
+                  onPressed: () {
+                    _searchController.clear();
+                    FocusScope.of(context).unfocus();
+                  },
+                  icon: Icon(Icons.close_rounded, size: 18, color: _subColor),
+                )
+              : null,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 12,
@@ -517,18 +513,6 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                   color: AppColors.secondaryBlue,
                 ),
               ),
-              if (_activeFiltersCount > 0)
-                TextButton(
-                  onPressed: _resetFilters,
-                  child: const Text(
-                    'Clear All',
-                    style: TextStyle(
-                      color: Colors.redAccent,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
             ],
           ),
           const SizedBox(height: 0),
@@ -700,19 +684,6 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                               color: _textColor,
                             ),
                           ),
-                          TextButton(
-                            onPressed: () {
-                              _resetFilters();
-                              setSheetState(() {});
-                            },
-                            child: const Text(
-                              'Reset All',
-                              style: TextStyle(
-                                color: Colors.redAccent,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
                         ],
                       ),
                       const SizedBox(height: 16),
@@ -738,6 +709,24 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                               size: 18,
                               color: _subColor,
                             ),
+                            suffixIcon: _searchController.text.isNotEmpty
+                                ? IconButton(
+                                    tooltip: 'Clear search',
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() {
+                                        _searchQuery = '';
+                                      });
+                                      setSheetState(() {});
+                                      FocusScope.of(context).unfocus();
+                                    },
+                                    icon: Icon(
+                                      Icons.close_rounded,
+                                      size: 18,
+                                      color: _subColor,
+                                    ),
+                                  )
+                                : null,
                             border: InputBorder.none,
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 12,
@@ -987,26 +976,10 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Try adjusting your filter terms or click reset to start over.',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+              Text(
+                'Try adjusting your filters or clear search to view the full fleet again.',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _resetFilters,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryOrange,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text(
-                  'Reset Filters',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                ),
               ),
             ],
           ),
@@ -1156,7 +1129,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                     Expanded(
                       child: Text(
                         '${vehicle.brand} ${vehicle.model}',
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
@@ -1215,8 +1188,9 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                   ],
                 ),
                 const SizedBox(height: 10),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
                     _buildSpecTag(
                       Icons.airline_seat_recline_normal,
@@ -1367,14 +1341,16 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final bool useHorizontal = constraints.maxWidth > 550;
+        final hasLargeText =
+            MediaQuery.of(context).textScaler.scale(1.0) > 1.15;
+        final bool useHorizontal = constraints.maxWidth > 650 && !hasLargeText;
 
         if (!useHorizontal) {
           return _buildGridCard(vehicle);
         }
 
         return Container(
-          height: 140,
+          constraints: const BoxConstraints(minHeight: 140),
           decoration: BoxDecoration(
             color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(16),
@@ -1470,6 +1446,8 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                           children: [
                             Text(
                               '${vehicle.brand} ${vehicle.model}',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 15,
@@ -1501,18 +1479,18 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                               ],
                             ),
                             const SizedBox(height: 10),
-                            Row(
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
                               children: [
                                 _buildSpecTag(
                                   Icons.airline_seat_recline_normal,
                                   '${vehicle.seats} Seats',
                                 ),
-                                const SizedBox(width: 8),
                                 _buildSpecTag(
                                   Icons.settings_input_component,
                                   vehicle.transmission,
                                 ),
-                                const SizedBox(width: 8),
                                 _buildSpecTag(
                                   Icons.local_gas_station,
                                   vehicle.fuelType,
@@ -1617,6 +1595,8 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
           const SizedBox(width: 4),
           Text(
             text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 9,
               color: _subColor,
