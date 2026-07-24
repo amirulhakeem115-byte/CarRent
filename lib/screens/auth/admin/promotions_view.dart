@@ -19,19 +19,44 @@ class PromotionsView extends StatefulWidget {
 class _PromotionsViewState extends State<PromotionsView> {
   final PromotionService _promotionService = PromotionService();
   final VehicleService _vehicleService = VehicleService();
+  final ScrollController _promotionsTableScrollController = ScrollController();
 
   List<PromotionModel> _promotions = [];
   List<VehicleModel> _vehicles = [];
   bool _loading = true;
   String? _error;
+  bool _showScrollRightHint = false;
 
   String _searchQuery = '';
-  String _selectedStatusFilter = 'All'; // All, Active, Inactive, Expired, Scheduled
+  String _selectedStatusFilter =
+      'All'; // All, Active, Inactive, Expired, Scheduled
 
   @override
   void initState() {
     super.initState();
+    _promotionsTableScrollController.addListener(_updateTableScrollHint);
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _promotionsTableScrollController
+      ..removeListener(_updateTableScrollHint)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _updateTableScrollHint() {
+    if (!mounted || !_promotionsTableScrollController.hasClients) return;
+    final position = _promotionsTableScrollController.position;
+    final canScrollRight = position.maxScrollExtent > 0;
+    final isAtRightEdge = position.pixels >= (position.maxScrollExtent - 4.0);
+    final shouldShow = canScrollRight && !isAtRightEdge;
+    if (_showScrollRightHint != shouldShow) {
+      setState(() {
+        _showScrollRightHint = shouldShow;
+      });
+    }
   }
 
   Future<void> _loadData() async {
@@ -53,6 +78,9 @@ class _PromotionsViewState extends State<PromotionsView> {
           _vehicles = results[1] as List<VehicleModel>;
           _loading = false;
         });
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _updateTableScrollHint();
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -64,14 +92,16 @@ class _PromotionsViewState extends State<PromotionsView> {
     }
   }
 
-  int get _activeCount =>
-      _promotions.where((p) => p.isCurrentlyActive).length;
+  int get _activeCount => _promotions.where((p) => p.isCurrentlyActive).length;
 
   int get _totalViews => _promotions.fold(0, (sum, p) => sum + p.viewsCount);
   int get _totalClicks => _promotions.fold(0, (sum, p) => sum + p.clicksCount);
-  int get _totalBookings => _promotions.fold(0, (sum, p) => sum + p.bookingsCount);
-  double get _totalRevenue => _promotions.fold(0.0, (sum, p) => sum + p.revenueGenerated);
-  double get _totalDiscount => _promotions.fold(0.0, (sum, p) => sum + p.totalDiscountGiven);
+  int get _totalBookings =>
+      _promotions.fold(0, (sum, p) => sum + p.bookingsCount);
+  double get _totalRevenue =>
+      _promotions.fold(0.0, (sum, p) => sum + p.revenueGenerated);
+  double get _totalDiscount =>
+      _promotions.fold(0.0, (sum, p) => sum + p.totalDiscountGiven);
 
   List<PromotionModel> get _filteredPromotions {
     return _promotions.where((p) {
@@ -212,7 +242,8 @@ class _PromotionsViewState extends State<PromotionsView> {
             _buildStatCard(
               title: 'Revenue Generated',
               value: 'RM ${_totalRevenue.toStringAsFixed(0)}',
-              subtitle: 'RM ${_totalDiscount.toStringAsFixed(0)} discounts saved',
+              subtitle:
+                  'RM ${_totalDiscount.toStringAsFixed(0)} discounts saved',
               icon: Icons.payments_rounded,
               color: const Color(0xFF3B82F6),
               isDark: isDark,
@@ -377,18 +408,19 @@ class _PromotionsViewState extends State<PromotionsView> {
                         fontWeight: FontWeight.bold,
                         color: isDark ? Colors.white : AppColors.secondaryBlue,
                       ),
-                      items: [
-                        'All',
-                        'Active',
-                        'Inactive',
-                        'Scheduled',
-                        'Expired',
-                      ].map((status) {
-                        return DropdownMenuItem(
-                          value: status,
-                          child: Text('Filter: $status'),
-                        );
-                      }).toList(),
+                      items:
+                          [
+                            'All',
+                            'Active',
+                            'Inactive',
+                            'Scheduled',
+                            'Expired',
+                          ].map((status) {
+                            return DropdownMenuItem(
+                              value: status,
+                              child: Text('Filter: $status'),
+                            );
+                          }).toList(),
                       onChanged: (val) {
                         if (val != null) {
                           setState(() {
@@ -478,6 +510,7 @@ class _PromotionsViewState extends State<PromotionsView> {
   Widget _buildPromotionsTable(bool isDark) {
     return Container(
       width: double.infinity,
+      padding: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -485,65 +518,136 @@ class _PromotionsViewState extends State<PromotionsView> {
           color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
         ),
       ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: DataTable(
-          headingRowColor: WidgetStateProperty.all(
-            isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            child: _showScrollRightHint
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+                    child: Row(
+                      key: const ValueKey('promo-scroll-hint'),
+                      children: [
+                        Icon(
+                          Icons.swipe_right_alt_rounded,
+                          size: 16,
+                          color: isDark
+                              ? const Color(0xFFCBD5E1)
+                              : const Color(0xFF64748B),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Scroll right to see more columns',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: isDark
+                                ? const Color(0xFFCBD5E1)
+                                : const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : const SizedBox.shrink(),
           ),
-          dataRowMinHeight: 70,
-          dataRowMaxHeight: 85,
-          columns: const [
-            DataColumn(
-              label: Text(
-                'PROMOTION NAME',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+          Scrollbar(
+            controller: _promotionsTableScrollController,
+            thumbVisibility: true,
+            trackVisibility: true,
+            interactive: true,
+            radius: const Radius.circular(12),
+            thickness: 7,
+            child: NotificationListener<ScrollMetricsNotification>(
+              onNotification: (_) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  _updateTableScrollHint();
+                });
+                return false;
+              },
+              child: SingleChildScrollView(
+                controller: _promotionsTableScrollController,
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  headingRowColor: WidgetStateProperty.all(
+                    isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
+                  ),
+                  dataRowMinHeight: 70,
+                  dataRowMaxHeight: 85,
+                  columns: const [
+                    DataColumn(
+                      label: Text(
+                        'PROMOTION NAME',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    DataColumn(
+                      label: Text(
+                        'DISCOUNT VALUE',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    DataColumn(
+                      label: Text(
+                        'VALIDITY PERIOD',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    DataColumn(
+                      label: Text(
+                        'STATUS',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    DataColumn(
+                      label: Text(
+                        'CREATED / UPDATED',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    DataColumn(
+                      label: Text(
+                        'ACTIONS',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                  rows: _filteredPromotions.map((promo) {
+                    return DataRow(
+                      cells: [
+                        DataCell(_buildNameCell(promo, isDark)),
+                        DataCell(_buildDiscountCell(promo, isDark)),
+                        DataCell(_buildValidityCell(promo, isDark)),
+                        DataCell(_buildStatusBadge(promo)),
+                        DataCell(_buildDateCell(promo, isDark)),
+                        DataCell(_buildActionsCell(promo, isDark)),
+                      ],
+                    );
+                  }).toList(),
+                ),
               ),
             ),
-            DataColumn(
-              label: Text(
-                'DISCOUNT VALUE',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-              ),
-            ),
-            DataColumn(
-              label: Text(
-                'VALIDITY PERIOD',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-              ),
-            ),
-            DataColumn(
-              label: Text(
-                'STATUS',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-              ),
-            ),
-            DataColumn(
-              label: Text(
-                'CREATED / UPDATED',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-              ),
-            ),
-            DataColumn(
-              label: Text(
-                'ACTIONS',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-              ),
-            ),
-          ],
-          rows: _filteredPromotions.map((promo) {
-            return DataRow(
-              cells: [
-                DataCell(_buildNameCell(promo, isDark)),
-                DataCell(_buildDiscountCell(promo, isDark)),
-                DataCell(_buildValidityCell(promo, isDark)),
-                DataCell(_buildStatusBadge(promo)),
-                DataCell(_buildDateCell(promo, isDark)),
-                DataCell(_buildActionsCell(promo, isDark)),
-              ],
-            );
-          }).toList(),
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -633,7 +737,8 @@ class _PromotionsViewState extends State<PromotionsView> {
               color: isDark ? Colors.white60 : Colors.grey[600],
             ),
           ),
-        if (promo.minimumBookingAmount != null && promo.minimumBookingAmount! > 0)
+        if (promo.minimumBookingAmount != null &&
+            promo.minimumBookingAmount! > 0)
           Text(
             'Min spend: RM ${promo.minimumBookingAmount!.toStringAsFixed(2)}',
             style: TextStyle(
@@ -771,7 +876,11 @@ class _PromotionsViewState extends State<PromotionsView> {
           tooltip: 'Edit Promotion',
         ),
         IconButton(
-          icon: const Icon(Icons.delete_outline, size: 20, color: Colors.redAccent),
+          icon: const Icon(
+            Icons.delete_outline,
+            size: 20,
+            color: Colors.redAccent,
+          ),
           onPressed: () => _confirmDeletePromotion(promo),
           tooltip: 'Delete Promotion',
         ),
@@ -843,7 +952,8 @@ class _PromotionsViewState extends State<PromotionsView> {
                           fontSize: 14,
                         ),
                       ),
-                      if (promo.promoCode != null && promo.promoCode!.isNotEmpty)
+                      if (promo.promoCode != null &&
+                          promo.promoCode!.isNotEmpty)
                         Text(
                           'Code: ${promo.promoCode}',
                           style: const TextStyle(
@@ -870,7 +980,10 @@ class _PromotionsViewState extends State<PromotionsView> {
                         onChanged: (val) async {
                           final messenger = ScaffoldMessenger.of(context);
                           try {
-                            await _promotionService.togglePromotionActive(promo.id, val);
+                            await _promotionService.togglePromotionActive(
+                              promo.id,
+                              val,
+                            );
                           } catch (e) {
                             if (mounted) {
                               messenger.showSnackBar(
@@ -884,11 +997,19 @@ class _PromotionsViewState extends State<PromotionsView> {
                         },
                       ),
                       IconButton(
-                        icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
+                        icon: const Icon(
+                          Icons.edit,
+                          color: Colors.blue,
+                          size: 20,
+                        ),
                         onPressed: () => _openPromotionDialog(existing: promo),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.redAccent, size: 20),
+                        icon: const Icon(
+                          Icons.delete,
+                          color: Colors.redAccent,
+                          size: 20,
+                        ),
                         onPressed: () => _confirmDeletePromotion(promo),
                       ),
                     ],
@@ -908,14 +1029,18 @@ class _PromotionsViewState extends State<PromotionsView> {
       builder: (ctx) {
         return AlertDialog(
           title: const Text('Delete Promotion'),
-          content: Text('Are you sure you want to delete "${promo.name}"? This action cannot be undone.'),
+          content: Text(
+            'Are you sure you want to delete "${promo.name}"? This action cannot be undone.',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+              ),
               onPressed: () async {
                 final messenger = ScaffoldMessenger.of(context);
                 Navigator.pop(ctx);
@@ -923,7 +1048,9 @@ class _PromotionsViewState extends State<PromotionsView> {
                   await _promotionService.deletePromotion(promo.id);
                   if (mounted) {
                     messenger.showSnackBar(
-                      const SnackBar(content: Text('Promotion deleted successfully.')),
+                      const SnackBar(
+                        content: Text('Promotion deleted successfully.'),
+                      ),
                     );
                   }
                 } catch (e) {
@@ -937,7 +1064,10 @@ class _PromotionsViewState extends State<PromotionsView> {
                   }
                 }
               },
-              child: const Text('Delete', style: TextStyle(color: Colors.white)),
+              child: const Text(
+                'Delete',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         );
@@ -1034,13 +1164,17 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
       text: p != null ? p.discountValue.toString() : '',
     );
     _minBookingController = TextEditingController(
-      text: p?.minimumBookingAmount != null ? p!.minimumBookingAmount.toString() : '',
+      text: p?.minimumBookingAmount != null
+          ? p!.minimumBookingAmount.toString()
+          : '',
     );
     _maxDiscountController = TextEditingController(
       text: p?.maximumDiscount != null ? p!.maximumDiscount.toString() : '',
     );
     _promoCodeController = TextEditingController(text: p?.promoCode ?? '');
-    _termsController = TextEditingController(text: p?.termsAndConditions.join('\n') ?? '');
+    _termsController = TextEditingController(
+      text: p?.termsAndConditions.join('\n') ?? '',
+    );
 
     _discountType = p?.discountType ?? 'percentage';
     _active = p?.active ?? true;
@@ -1080,7 +1214,10 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
       );
       if (file != null) {
         final bytes = await file.readAsBytes();
-        final url = await widget.promotionService.uploadPromotionBanner(bytes, file.name);
+        final url = await widget.promotionService.uploadPromotionBanner(
+          bytes,
+          file.name,
+        );
         setState(() {
           _bannerUrlController.text = url;
         });
@@ -1100,7 +1237,8 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
       _discountValController.text = preset.discountValue.toString();
       _promoCodeController.text = preset.promoCode ?? '';
       _autoApply = preset.autoApply;
-      _minBookingController.text = preset.minimumBookingAmount?.toString() ?? '';
+      _minBookingController.text =
+          preset.minimumBookingAmount?.toString() ?? '';
       _maxDiscountController.text = preset.maximumDiscount?.toString() ?? '';
       _termsController.text = preset.termsAndConditions.join('\n');
       _selectedApplicableCategories = List.from(preset.applicableCategories);
@@ -1148,7 +1286,9 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
       return;
     }
 
-    final double? discountVal = double.tryParse(_discountValController.text.trim());
+    final double? discountVal = double.tryParse(
+      _discountValController.text.trim(),
+    );
     if (discountVal == null || discountVal <= 0) {
       setState(() {
         _formError = 'Discount value must be greater than zero.';
@@ -1171,7 +1311,8 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
       );
       if (!isUnique) {
         setState(() {
-          _formError = 'Promo code "$promoCodeText" is already in use by another promotion.';
+          _formError =
+              'Promo code "$promoCodeText" is already in use by another promotion.';
         });
         return;
       }
@@ -1206,7 +1347,9 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
         vehicleIds: _selectedVehicleIds,
         applicableCategories: _selectedApplicableCategories,
         termsAndConditions: termsList,
-        minimumBookingAmount: double.tryParse(_minBookingController.text.trim()),
+        minimumBookingAmount: double.tryParse(
+          _minBookingController.text.trim(),
+        ),
         maximumDiscount: double.tryParse(_maxDiscountController.text.trim()),
         promoCode: promoCodeText.isNotEmpty ? promoCodeText : null,
         autoApply: _autoApply,
@@ -1249,8 +1392,12 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
   }
 
   Widget _buildLiveBannerPreview(bool isDark) {
-    final name = _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : 'PROMOTION BANNER TITLE';
-    final subtitle = _subtitleController.text.trim().isNotEmpty ? _subtitleController.text.trim() : 'Exclusive holiday promotional offer subtitle';
+    final name = _nameController.text.trim().isNotEmpty
+        ? _nameController.text.trim()
+        : 'PROMOTION BANNER TITLE';
+    final subtitle = _subtitleController.text.trim().isNotEmpty
+        ? _subtitleController.text.trim()
+        : 'Exclusive holiday promotional offer subtitle';
     final valStr = double.tryParse(_discountValController.text.trim()) ?? 0.0;
     final discountLabel = _discountType == 'percentage'
         ? '${valStr.toStringAsFixed(0)}% OFF'
@@ -1280,7 +1427,11 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
               ),
               child: const Text(
                 'Customer App Preview',
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.primaryOrange),
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primaryOrange,
+                ),
               ),
             ),
           ],
@@ -1305,7 +1456,10 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
               children: [
                 Positioned.fill(
                   child: _bannerUrlController.text.isNotEmpty
-                      ? AppImage(imageSrc: _bannerUrlController.text, fit: BoxFit.cover)
+                      ? AppImage(
+                          imageSrc: _bannerUrlController.text,
+                          fit: BoxFit.cover,
+                        )
                       : Container(
                           decoration: const BoxDecoration(
                             gradient: LinearGradient(
@@ -1315,7 +1469,11 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                             ),
                           ),
                           child: const Center(
-                            child: Icon(Icons.image_outlined, color: Colors.white38, size: 48),
+                            child: Icon(
+                              Icons.image_outlined,
+                              color: Colors.white38,
+                              size: 48,
+                            ),
                           ),
                         ),
                 ),
@@ -1344,33 +1502,60 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: AppColors.primaryOrange,
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
                               discountLabel,
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 12,
+                              ),
                             ),
                           ),
                           if (_autoApply)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFF10B981),
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: const Text('AUTO-APPLY', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                              child: const Text(
+                                'AUTO-APPLY',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             )
                           else if (promoCode.isNotEmpty)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.white24,
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: Text('CODE: $promoCode', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                              child: Text(
+                                'CODE: $promoCode',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
                         ],
                       ),
@@ -1381,14 +1566,21 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                             name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             subtitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Colors.white70, fontSize: 11),
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 11,
+                            ),
                           ),
                         ],
                       ),
@@ -1397,15 +1589,28 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                         children: [
                           Text(
                             'Valid: ${DateFormat('dd MMM').format(_startDate)} - ${DateFormat('dd MMM yyyy').format(_endDate)}',
-                            style: const TextStyle(color: Colors.white60, fontSize: 10),
+                            style: const TextStyle(
+                              color: Colors.white60,
+                              fontSize: 10,
+                            ),
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Text('View Offer', style: TextStyle(color: AppColors.secondaryBlue, fontSize: 10, fontWeight: FontWeight.bold)),
+                            child: const Text(
+                              'View Offer',
+                              style: TextStyle(
+                                color: AppColors.secondaryBlue,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -1434,7 +1639,9 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
           const Icon(Icons.local_offer, color: AppColors.primaryOrange),
           const SizedBox(width: 10),
           Text(
-            widget.existing != null ? 'Edit Promotion & Banner' : 'Create New Promotion Banner',
+            widget.existing != null
+                ? 'Edit Promotion & Banner'
+                : 'Create New Promotion Banner',
             style: TextStyle(
               fontWeight: FontWeight.bold,
               color: isDark ? Colors.white : AppColors.secondaryBlue,
@@ -1462,12 +1669,19 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.error, color: Colors.redAccent, size: 20),
+                        const Icon(
+                          Icons.error,
+                          color: Colors.redAccent,
+                          size: 20,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             _formError!,
-                            style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                            style: const TextStyle(
+                              color: Colors.redAccent,
+                              fontSize: 13,
+                            ),
                           ),
                         ),
                       ],
@@ -1479,7 +1693,11 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                 if (widget.existing == null) ...[
                   const Text(
                     'Quick Presets & High-Res Templates',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primaryOrange),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primaryOrange,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   SingleChildScrollView(
@@ -1489,8 +1707,15 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                         return Padding(
                           padding: const EdgeInsets.only(right: 8),
                           child: ActionChip(
-                            avatar: const Icon(Icons.flash_on, size: 14, color: AppColors.primaryOrange),
-                            label: Text(p.name, style: const TextStyle(fontSize: 11)),
+                            avatar: const Icon(
+                              Icons.flash_on,
+                              size: 14,
+                              color: AppColors.primaryOrange,
+                            ),
+                            label: Text(
+                              p.name,
+                              style: const TextStyle(fontSize: 11),
+                            ),
                             onPressed: () => _applyPresetTemplate(p),
                           ),
                         );
@@ -1509,8 +1734,9 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                     hintText: 'e.g., EID MEGA CELEBRATION SALE',
                     border: OutlineInputBorder(),
                   ),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Please enter promotion name' : null,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Please enter promotion name'
+                      : null,
                 ),
                 const SizedBox(height: 14),
 
@@ -1519,7 +1745,8 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                   onChanged: (_) => setState(() {}),
                   decoration: const InputDecoration(
                     labelText: 'Banner Subtitle (Optional)',
-                    hintText: 'e.g., Enjoy 20% OFF all vehicle rentals across Malaysia!',
+                    hintText:
+                        'e.g., Enjoy 20% OFF all vehicle rentals across Malaysia!',
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -1534,7 +1761,8 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                         onChanged: (_) => setState(() {}),
                         decoration: const InputDecoration(
                           labelText: 'Banner Image URL or Base64 *',
-                          hintText: 'https://images.unsplash.com/... or upload image file',
+                          hintText:
+                              'https://images.unsplash.com/... or upload image file',
                           border: OutlineInputBorder(),
                           suffixIcon: Icon(Icons.image),
                         ),
@@ -1546,7 +1774,10 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryOrange,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 18,
+                        ),
                       ),
                       icon: const Icon(Icons.cloud_upload_rounded, size: 18),
                       label: const Text('Upload'),
@@ -1565,11 +1796,13 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                   maxLines: 2,
                   decoration: const InputDecoration(
                     labelText: 'Full Description *',
-                    hintText: 'e.g., Celebrate the festive season with family road trips! Get 20% off all fleet rentals.',
+                    hintText:
+                        'e.g., Celebrate the festive season with family road trips! Get 20% off all fleet rentals.',
                     border: OutlineInputBorder(),
                   ),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Please enter description' : null,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Please enter description'
+                      : null,
                 ),
                 const SizedBox(height: 16),
 
@@ -1608,15 +1841,22 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                       flex: 1,
                       child: TextFormField(
                         controller: _discountValController,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                         decoration: InputDecoration(
                           labelText: 'Discount Value *',
-                          hintText: _discountType == 'percentage' ? '15.0' : '50.00',
-                          suffixText: _discountType == 'percentage' ? '%' : 'RM',
+                          hintText: _discountType == 'percentage'
+                              ? '15.0'
+                              : '50.00',
+                          suffixText: _discountType == 'percentage'
+                              ? '%'
+                              : 'RM',
                           border: const OutlineInputBorder(),
                         ),
                         validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'Enter value';
+                          if (v == null || v.trim().isEmpty)
+                            return 'Enter value';
                           final val = double.tryParse(v.trim());
                           if (val == null || val <= 0) return 'Invalid number';
                           if (_discountType == 'percentage' && val > 100) {
@@ -1669,8 +1909,14 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                   children: [
                     Expanded(
                       child: SwitchListTile(
-                        title: const Text('Active Status', style: TextStyle(fontSize: 14)),
-                        subtitle: Text(_active ? 'Active' : 'Inactive', style: const TextStyle(fontSize: 12)),
+                        title: const Text(
+                          'Active Status',
+                          style: TextStyle(fontSize: 14),
+                        ),
+                        subtitle: Text(
+                          _active ? 'Active' : 'Inactive',
+                          style: const TextStyle(fontSize: 12),
+                        ),
                         value: _active,
                         activeThumbColor: AppColors.primaryOrange,
                         onChanged: (val) => setState(() => _active = val),
@@ -1678,8 +1924,14 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                     ),
                     Expanded(
                       child: SwitchListTile(
-                        title: const Text('Auto Apply', style: TextStyle(fontSize: 14)),
-                        subtitle: const Text('Auto apply to eligible bookings', style: TextStyle(fontSize: 11)),
+                        title: const Text(
+                          'Auto Apply',
+                          style: TextStyle(fontSize: 14),
+                        ),
+                        subtitle: const Text(
+                          'Auto apply to eligible bookings',
+                          style: TextStyle(fontSize: 11),
+                        ),
                         value: _autoApply,
                         activeThumbColor: AppColors.primaryOrange,
                         onChanged: (val) => setState(() => _autoApply = val),
@@ -1697,7 +1949,8 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                     labelText: 'Promotion Code (Optional)',
                     hintText: 'e.g., SUMMER2026',
                     border: OutlineInputBorder(),
-                    helperText: 'Leave empty for auto-apply promotions without promo code requirement.',
+                    helperText:
+                        'Leave empty for auto-apply promotions without promo code requirement.',
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -1708,7 +1961,9 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                     Expanded(
                       child: TextFormField(
                         controller: _minBookingController,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                         decoration: const InputDecoration(
                           labelText: 'Min Booking (RM)',
                           hintText: 'e.g. 150.00',
@@ -1720,7 +1975,9 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                     Expanded(
                       child: TextFormField(
                         controller: _maxDiscountController,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                         decoration: const InputDecoration(
                           labelText: 'Max Discount Cap (RM)',
                           hintText: 'e.g. 50.00',
@@ -1746,7 +2003,9 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                     return FilterChip(
                       label: Text(type),
                       selected: isSelected,
-                      selectedColor: AppColors.primaryOrange.withValues(alpha: 0.2),
+                      selectedColor: AppColors.primaryOrange.withValues(
+                        alpha: 0.2,
+                      ),
                       checkmarkColor: AppColors.primaryOrange,
                       onSelected: (selected) {
                         setState(() {
@@ -1776,7 +2035,9 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                     return FilterChip(
                       label: Text(brand),
                       selected: isSelected,
-                      selectedColor: AppColors.primaryOrange.withValues(alpha: 0.2),
+                      selectedColor: AppColors.primaryOrange.withValues(
+                        alpha: 0.2,
+                      ),
                       checkmarkColor: AppColors.primaryOrange,
                       onSelected: (selected) {
                         setState(() {
@@ -1811,7 +2072,9 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                         final isSelected = _selectedVehicleIds.contains(v.id);
                         return CheckboxListTile(
                           dense: true,
-                          title: Text('${v.brand} ${v.model} (${v.plateNumber})'),
+                          title: Text(
+                            '${v.brand} ${v.model} (${v.plateNumber})',
+                          ),
                           value: isSelected,
                           activeColor: AppColors.primaryOrange,
                           onChanged: (selected) {
@@ -1836,7 +2099,8 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                   maxLines: 3,
                   decoration: const InputDecoration(
                     labelText: 'Terms & Conditions (One per line)',
-                    hintText: 'e.g.,\nValid for registered users.\nApplicable on rentals 2+ days.\nCannot combine with other offers.',
+                    hintText:
+                        'e.g.,\nValid for registered users.\nApplicable on rentals 2+ days.\nCannot combine with other offers.',
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -1867,7 +2131,9 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                     color: Colors.white,
                   ),
                 )
-              : Text(widget.existing != null ? 'Save Changes' : 'Create Promotion'),
+              : Text(
+                  widget.existing != null ? 'Save Changes' : 'Create Promotion',
+                ),
         ),
       ],
     );

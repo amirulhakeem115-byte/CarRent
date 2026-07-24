@@ -49,6 +49,40 @@ class _PaymentsViewState extends State<PaymentsView> {
     return size;
   }
 
+  bool _isCancelledOrRefunded(PaymentModel payment) {
+    final status = payment.status.toLowerCase();
+    final paymentStatus = (payment.paymentStatus ?? '').toLowerCase();
+    return status == 'cancelled' ||
+        status == 'refunded' ||
+        paymentStatus == 'cancelled' ||
+        paymentStatus == 'refunded';
+  }
+
+  Color _paymentStatusColor(PaymentModel payment) {
+    if (payment.paymentStatus == 'Approved' || payment.status == 'paid') {
+      return Colors.green;
+    }
+    if (payment.paymentStatus == 'Rejected' ||
+        payment.status == 'failed' ||
+        _isCancelledOrRefunded(payment)) {
+      return Colors.redAccent;
+    }
+    return Colors.orange;
+  }
+
+  String _paymentStatusText(PaymentModel payment) {
+    if (payment.paymentStatus == 'Approved' || payment.status == 'paid') {
+      return 'Approved';
+    }
+    if (payment.paymentStatus == 'Rejected' || payment.status == 'failed') {
+      return 'Rejected';
+    }
+    if (_isCancelledOrRefunded(payment)) {
+      return 'Cancelled/Refunded';
+    }
+    return 'Pending Verification';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -432,16 +466,7 @@ class _PaymentsViewState extends State<PaymentsView> {
     showDialog(
       context: context,
       builder: (context) {
-        Color statusColor = Colors.orange;
-        if (payment.paymentStatus == 'Approved' || payment.status == 'paid') {
-          statusColor = Colors.green;
-        }
-        if (payment.paymentStatus == 'Rejected' || payment.status == 'failed') {
-          statusColor = Colors.redAccent;
-        }
-        if (payment.status == 'refunded') {
-          statusColor = Colors.purple;
-        }
+        final statusColor = _paymentStatusColor(payment);
 
         final bookingMap = {for (var b in _bookings) b.id: b};
         final booking = bookingMap[payment.bookingId];
@@ -586,8 +611,7 @@ class _PaymentsViewState extends State<PaymentsView> {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          (payment.paymentStatus ?? payment.status)
-                              .toUpperCase(),
+                          _paymentStatusText(payment).toUpperCase(),
                           style: TextStyle(
                             color: statusColor,
                             fontSize: _rf(10, min: 9),
@@ -919,7 +943,7 @@ class _PaymentsViewState extends State<PaymentsView> {
         pendingCount++;
       } else if (p.paymentStatus == 'Rejected' ||
           p.status == 'failed' ||
-          p.status == 'refunded') {
+          _isCancelledOrRefunded(p)) {
         failedCount++;
       }
     }
@@ -1385,18 +1409,8 @@ class _PaymentsViewState extends State<PaymentsView> {
           ),
         ],
         rows: payments.map((p) {
-          Color statusColor = Colors.orange;
-          String statusText = 'Pending Verification';
-          if (p.paymentStatus == 'Approved' || p.status == 'paid') {
-            statusColor = Colors.green;
-            statusText = 'Approved';
-          } else if (p.paymentStatus == 'Rejected' || p.status == 'failed') {
-            statusColor = Colors.redAccent;
-            statusText = 'Rejected';
-          } else if (p.status == 'refunded') {
-            statusColor = Colors.purple;
-            statusText = 'Refunded';
-          }
+          final statusColor = _paymentStatusColor(p);
+          final statusText = _paymentStatusText(p);
 
           final dateFormat = DateFormat('yyyy-MM-dd HH:mm');
           final booking = bookingMap[p.bookingId];
@@ -1532,18 +1546,8 @@ class _PaymentsViewState extends State<PaymentsView> {
       itemCount: payments.length,
       itemBuilder: (context, index) {
         final p = payments[index];
-        Color statusColor = Colors.orange;
-        String statusText = 'Pending Verification';
-        if (p.paymentStatus == 'Approved' || p.status == 'paid') {
-          statusColor = Colors.green;
-          statusText = 'Approved';
-        } else if (p.paymentStatus == 'Rejected' || p.status == 'failed') {
-          statusColor = Colors.redAccent;
-          statusText = 'Rejected';
-        } else if (p.status == 'refunded') {
-          statusColor = Colors.purple;
-          statusText = 'Refunded';
-        }
+        final statusColor = _paymentStatusColor(p);
+        final statusText = _paymentStatusText(p);
 
         final dateOnlyFormat = DateFormat('yyyy-MM-dd');
         final timeOnlyFormat = DateFormat('HH:mm');

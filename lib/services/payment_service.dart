@@ -74,7 +74,9 @@ class PaymentService {
         debugPrint('Error getting booking info for payment notification: $e');
       }
 
-      if (isApproved && currentBookingStatus == 'Awaiting Final Payment' && vehicleId != null) {
+      if (isApproved &&
+          currentBookingStatus == 'Awaiting Final Payment' &&
+          vehicleId != null) {
         try {
           final bookingService = BookingService();
           await bookingService.updateBookingStatus(
@@ -84,7 +86,7 @@ class PaymentService {
             vehicleId,
             vehicleName,
           );
-          
+
           try {
             await FirebaseDatabase.instance
                 .ref()
@@ -92,24 +94,39 @@ class PaymentService {
                 .child(vehicleId)
                 .update({'status': 'Available'});
           } catch (vErr) {
-            debugPrint('Error updating vehicle to Available on final payment creation: $vErr');
+            debugPrint(
+              'Error updating vehicle to Available on final payment creation: $vErr',
+            );
           }
 
           // Award reward points automatically if enabled
-          final rewardsEnabled = CompanySettingsProvider().getField('rewardsEnabled', defaultValue: true) as bool;
+          final rewardsEnabled =
+              CompanySettingsProvider().getField(
+                    'rewardsEnabled',
+                    defaultValue: true,
+                  )
+                  as bool;
           if (rewardsEnabled) {
             try {
-              await RewardPointsService().awardPointsForBooking(payment.bookingId);
+              await RewardPointsService().awardPointsForBooking(
+                payment.bookingId,
+              );
             } catch (rewardErr) {
-              debugPrint('Error awarding reward points on final invoice clearance: $rewardErr');
+              debugPrint(
+                'Error awarding reward points on final invoice clearance: $rewardErr',
+              );
             }
           }
 
           // Trigger automatic receipt check
           try {
-            await ReceiptService().triggerAutomaticReceiptCheck(payment.bookingId);
+            await ReceiptService().triggerAutomaticReceiptCheck(
+              payment.bookingId,
+            );
           } catch (receiptErr) {
-            debugPrint('Error generating receipt on final invoice clearance: $receiptErr');
+            debugPrint(
+              'Error generating receipt on final invoice clearance: $receiptErr',
+            );
           }
         } catch (e) {
           debugPrint('Error processing final payment booking update: $e');
@@ -543,7 +560,8 @@ class PaymentService {
       final payAmount = (paySnap.value as Map)['amount'] != null
           ? ((paySnap.value as Map)['amount'] as num).toDouble()
           : 0.0;
-      final bookingIdStr = (paySnap.value as Map)['bookingId']?.toString() ?? '';
+      final bookingIdStr =
+          (paySnap.value as Map)['bookingId']?.toString() ?? '';
 
       // Notify admins
       await _notificationService.notifyPaymentEvent(
@@ -571,17 +589,24 @@ class PaymentService {
     double amount,
   ) async {
     try {
+      final nowIso = DateTime.now().toIso8601String();
       await _db
           .child(paymentId)
           .update({
             'status': 'refunded',
-            'refundDate': DateTime.now().toIso8601String(),
+            'paymentStatus': 'Refunded',
+            'refundDate': nowIso,
           })
           .timeout(const Duration(seconds: 10));
 
       String customerName = 'Customer';
       try {
-        final uSnap = await FirebaseDatabase.instance.ref().child('users').child(userId).child('fullName').get();
+        final uSnap = await FirebaseDatabase.instance
+            .ref()
+            .child('users')
+            .child(userId)
+            .child('fullName')
+            .get();
         if (uSnap.exists) {
           customerName = uSnap.value.toString();
         }
@@ -610,13 +635,72 @@ class PaymentService {
         }
       } catch (_) {}
 
+      // A full refund means this booking should no longer remain ongoing.
+      if (bookingIdStr.isNotEmpty) {
+        try {
+          final bookingRef = FirebaseDatabase.instance
+              .ref()
+              .child('bookings')
+              .child(bookingIdStr);
+          final bookingSnap = await bookingRef.get();
+
+          if (bookingSnap.exists && bookingSnap.value is Map) {
+            final bookingData = Map<dynamic, dynamic>.from(
+              bookingSnap.value as Map,
+            );
+
+            final bookingStatus = (bookingData['status'] ?? '')
+                .toString()
+                .toLowerCase();
+            final bookingUserId = (bookingData['userId'] ?? userId).toString();
+            final vehicleId = (bookingData['vehicleId'] ?? '').toString();
+            final vehicleName = (bookingData['vehicleName'] ?? 'Vehicle')
+                .toString();
+
+            final shouldCancel =
+                bookingStatus != 'completed' &&
+                bookingStatus != 'cancelled' &&
+                bookingStatus != 'rejected';
+
+            if (shouldCancel) {
+              if (vehicleId.isNotEmpty) {
+                await BookingService().updateBookingStatus(
+                  bookingIdStr,
+                  'cancelled',
+                  bookingUserId,
+                  vehicleId,
+                  vehicleName,
+                  isAutomatic: true,
+                );
+              } else {
+                await bookingRef.update({
+                  'status': 'cancelled',
+                  'updatedAt': nowIso,
+                });
+              }
+
+              await bookingRef.update({
+                'customerStatus': 'cancelled',
+                'refundLinkedPaymentId': paymentId,
+                'refundTimestamp': nowIso,
+              });
+            }
+          }
+        } catch (bookingErr) {
+          debugPrint(
+            'Warning: refund processed but booking cancellation sync failed: $bookingErr',
+          );
+        }
+      }
+
       await _notificationService.notifyPaymentEvent(
         eventName: 'Refund Processed',
         customerName: customerName,
         bookingId: bookingIdStr,
         paymentId: paymentId,
         amount: amount,
-        details: 'refund of RM ${amount.toStringAsFixed(2)} processed for Booking #${bookingIdStr.toUpperCase()}.',
+        details:
+            'refund of RM ${amount.toStringAsFixed(2)} processed for Booking #${bookingIdStr.toUpperCase()}.',
         priority: 'high',
         icon: '💳',
         color: '0xFF3B82F6',

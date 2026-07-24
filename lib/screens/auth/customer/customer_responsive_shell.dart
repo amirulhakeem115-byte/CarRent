@@ -18,8 +18,8 @@ import '../../../widgets/app_image.dart';
 import '../../../widgets/app_logo.dart';
 import '../../../ai/services/ai_service.dart';
 import '../../../ai/models/ai_intent.dart';
-import '../../../ai/widgets/ai_floating_button.dart';
 import '../../../ai/widgets/ai_chat_panel.dart';
+import '../../../ai/widgets/movable_ai_floating_button_overlay.dart';
 import '../../../models/booking_model.dart';
 import 'booking_screen.dart';
 
@@ -144,6 +144,53 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
     });
   }
 
+  int? _mapNotificationToCustomerIndex({String? actionRoute, String? type}) {
+    final route = (actionRoute ?? '').trim().toLowerCase();
+    final notifType = (type ?? '').trim().toLowerCase();
+
+    if (route == 'dashboard') return 0;
+    if (route == 'search cars' || route == 'cars' || route == 'vehicles') {
+      return 1;
+    }
+    if (route == 'bookings') return 2;
+    if (route == 'locations' || route == 'branches' || route == 'rental hubs') {
+      return 3;
+    }
+    if (route == 'loyalty rewards' ||
+        route == 'reward points' ||
+        route == 'rewards') {
+      return 4;
+    }
+    if (route == 'payments' ||
+        route == 'history' ||
+        route == 'payments ledger') {
+      return 5;
+    }
+    if (route == 'profile' || route == 'my profile') return 6;
+    if (route == 'support inbox' ||
+        route == 'support' ||
+        route == 'support desk') {
+      return 7;
+    }
+
+    if (notifType == 'booking') return 2;
+    if (notifType == 'payment') return 5;
+    if (notifType == 'support') return 7;
+    if (notifType == 'reward') return 4;
+
+    return null;
+  }
+
+  void _navigateFromNotification({String? actionRoute, String? type}) {
+    final targetIndex = _mapNotificationToCustomerIndex(
+      actionRoute: actionRoute,
+      type: type,
+    );
+    if (targetIndex != null) {
+      setIndex(targetIndex);
+    }
+  }
+
   @override
   void dispose() {
     _notificationsSubscription?.cancel();
@@ -203,7 +250,9 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
     final currentUser = _authService.currentUser;
     if (currentUser != null) {
       try {
-        final userModel = await UserSession().fetchAndCacheUserModel(currentUser.uid);
+        final userModel = await UserSession().fetchAndCacheUserModel(
+          currentUser.uid,
+        );
         if (mounted) {
           setState(() {
             _user = userModel;
@@ -368,20 +417,10 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                       notif.id,
                     );
                   }
-                  if (notif.actionRoute == 'Bookings' ||
-                      notif.type == 'booking') {
-                    setIndex(2);
-                  } else if (notif.actionRoute == 'Payments' ||
-                      notif.type == 'payment') {
-                    setIndex(5);
-                  } else if (notif.actionRoute == 'Support Inbox' ||
-                      notif.actionRoute == 'Support' ||
-                      notif.type == 'support') {
-                    setIndex(7);
-                  } else if (notif.actionRoute == 'Loyalty Rewards' ||
-                      notif.type == 'reward') {
-                    setIndex(4);
-                  }
+                  _navigateFromNotification(
+                    actionRoute: notif.actionRoute,
+                    type: notif.type,
+                  );
                 },
                 child: const Text(
                   'View',
@@ -507,10 +546,14 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
 
   @override
   Widget build(BuildContext context) {
-    final double width = MediaQuery.of(context).size.width;
+    final media = MediaQuery.of(context);
+    final double width = media.size.width;
     final bool isDesktop = width > 950;
     final bool showMobileBottomNav = !isDesktop;
     final bool isCompactMobile = showMobileBottomNav && width < 380;
+    final double mobileBottomNavClearance = showMobileBottomNav
+        ? (kBottomNavigationBarHeight + media.viewPadding.bottom + 12)
+        : 0;
     final unreadCount = _notifications.where((n) => !n.isRead).length;
 
     // Mapping for Bottom Navigation Items (matches indices: 0, 1, 2, 5)
@@ -576,40 +619,104 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
               )
             : null,
         drawer: showMobileBottomNav ? _buildDrawer() : null,
-        body: SafeArea(
-          top: true,
-          bottom: true,
-          child: Row(
-            children: [
-              if (isDesktop) _buildSidebar(),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (isDesktop) _buildHeader(unreadCount),
-                    Expanded(
-                      child: Container(
-                        color: Theme.of(context).scaffoldBackgroundColor,
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            final double maxWidth = isDesktop
-                                ? 1500
-                                : constraints.maxWidth;
-                            return Align(
-                              alignment: Alignment.topCenter,
-                              child: ConstrainedBox(
-                                constraints: BoxConstraints(maxWidth: maxWidth),
-                                child: _getActiveScreen(),
-                              ),
-                            );
-                          },
+        body: MovableAIFloatingButtonOverlay(
+          isOpen: false,
+          extraBottomPadding: showMobileBottomNav && _customBody == null
+              ? mobileBottomNavClearance
+              : 0,
+          onTap: () async {
+            final result = await showAIChatModal(context);
+            if (result != null && result is String) {
+              if (mounted) {
+                if (result == 'search_vehicles') {
+                  setIndex(1);
+                } else if (result == 'view_bookings' ||
+                    result == 'open_pending_bookings') {
+                  setIndex(2);
+                } else if (result == 'show_branches') {
+                  setIndex(3);
+                } else if (result == 'show_rewards') {
+                  setIndex(4);
+                } else if (result == 'view_history') {
+                  setIndex(5);
+                } else if (result == 'open_profile') {
+                  setIndex(6);
+                } else if (result == 'contact_support') {
+                  setIndex(7);
+                } else if (result == 'view_dashboard') {
+                  setIndex(0);
+                }
+              }
+              return;
+            }
+            if (result != null &&
+                result is Map &&
+                result['action'] == 'pay' &&
+                context.mounted) {
+              final bId = result['bookingId'];
+              final method = result['method'];
+              try {
+                final bSnap = await FirebaseDatabase.instance
+                    .ref()
+                    .child('bookings')
+                    .child(bId)
+                    .get();
+                if (bSnap.exists) {
+                  final bData = Map<dynamic, dynamic>.from(bSnap.value as Map);
+                  final booking = BookingModel.fromMap(bId, bData);
+                  if (context.mounted) {
+                    await BookingScreen.navigateToPayment(
+                      context,
+                      booking,
+                      method,
+                    );
+                  }
+                }
+              } catch (e) {
+                debugPrint(
+                  'Error routing to checkout from floating button: $e',
+                );
+              }
+            }
+          },
+          child: SafeArea(
+            top: true,
+            bottom: true,
+            maintainBottomViewPadding: true,
+            child: Row(
+              children: [
+                if (isDesktop) _buildSidebar(),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (isDesktop) _buildHeader(unreadCount),
+                      Expanded(
+                        child: Container(
+                          color: Theme.of(context).scaffoldBackgroundColor,
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              final double maxWidth = isDesktop
+                                  ? 1500
+                                  : constraints.maxWidth;
+                              return Align(
+                                alignment: Alignment.topCenter,
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    maxWidth: maxWidth,
+                                  ),
+                                  child: _getActiveScreen(),
+                                ),
+                              );
+                            },
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         bottomNavigationBar: showMobileBottomNav && _customBody == null
@@ -674,66 +781,6 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                 ),
               )
             : null,
-        floatingActionButton: AIFloatingButton(
-          onTap: () async {
-            final result = await showAIChatModal(context);
-            if (result != null && result is String) {
-              if (mounted) {
-                if (result == 'search_vehicles') {
-                  setIndex(1);
-                } else if (result == 'view_bookings' || result == 'open_pending_bookings') {
-                  setIndex(2);
-                } else if (result == 'show_branches') {
-                  setIndex(3);
-                } else if (result == 'show_rewards') {
-                  setIndex(4);
-                } else if (result == 'view_history') {
-                  setIndex(5);
-                } else if (result == 'open_profile') {
-                  setIndex(6);
-                } else if (result == 'contact_support') {
-                  setIndex(7);
-                } else if (result == 'view_dashboard') {
-                  setIndex(0);
-                }
-              }
-              return;
-            }
-            if (result != null &&
-                result is Map &&
-                result['action'] == 'pay' &&
-                context.mounted) {
-              final bId = result['bookingId'];
-              final method = result['method'];
-              try {
-                final bSnap = await FirebaseDatabase.instance
-                    .ref()
-                    .child('bookings')
-                    .child(bId)
-                    .get();
-                if (bSnap.exists) {
-                  final bData = Map<dynamic, dynamic>.from(bSnap.value as Map);
-                  final booking = BookingModel.fromMap(bId, bData);
-                  if (context.mounted) {
-                    await BookingScreen.navigateToPayment(
-                      context,
-                      booking,
-                      method,
-                    );
-                  }
-                }
-              } catch (e) {
-                debugPrint(
-                  'Error routing to checkout from floating button: $e',
-                );
-              }
-            }
-          },
-          isOpen: false,
-        ),
-        floatingActionButtonLocation: _currentIndex == 3
-            ? FloatingActionButtonLocation.startFloat
-            : FloatingActionButtonLocation.endFloat,
       ),
     );
   }
@@ -843,21 +890,10 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                                   notif.id,
                                 );
                               }
-                              if (notif.actionRoute == 'Bookings' ||
-                                  notif.type == 'booking') {
-                                setIndex(2);
-                              } else if (notif.actionRoute == 'Payments' ||
-                                  notif.type == 'payment') {
-                                setIndex(5);
-                              } else if (notif.actionRoute == 'Support Inbox' ||
-                                  notif.actionRoute == 'Support' ||
-                                  notif.type == 'support') {
-                                setIndex(7);
-                              } else if (notif.actionRoute ==
-                                      'Loyalty Rewards' ||
-                                  notif.type == 'reward') {
-                                setIndex(4);
-                              }
+                              _navigateFromNotification(
+                                actionRoute: notif.actionRoute,
+                                type: notif.type,
+                              );
                             },
                             child: Container(
                               color: notif.isRead
@@ -940,13 +976,7 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                         ),
                       ).then((route) {
                         if (route != null && route is String) {
-                          if (route == 'Bookings') {
-                            setIndex(2);
-                          } else if (route == 'Payments') {
-                            setIndex(5);
-                          } else if (route == 'Support') {
-                            setIndex(7);
-                          }
+                          _navigateFromNotification(actionRoute: route);
                         }
                       });
                     },

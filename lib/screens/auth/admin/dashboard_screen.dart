@@ -52,8 +52,8 @@ import 'package:provider/provider.dart';
 import '../../../ai/services/ai_service.dart';
 import '../../../ai/models/ai_intent.dart';
 import '../../../ai/admin/admin_ai_assistant_view.dart';
-import '../../../ai/widgets/ai_floating_button.dart';
 import '../../../ai/widgets/ai_chat_panel.dart';
+import '../../../ai/widgets/movable_ai_floating_button_overlay.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -148,6 +148,77 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         );
       }).toList();
     });
+  }
+
+  String? _mapAdminNotificationToTab({String? actionRoute, String? type}) {
+    final route = (actionRoute ?? '').trim().toLowerCase();
+    final notifType = (type ?? '').trim().toLowerCase();
+
+    if (route == 'dashboard') return 'Dashboard';
+    if (route == 'cars' || route == 'vehicles') return 'Cars';
+    if (route == 'bookings') return 'Bookings';
+    if (route == 'customers') return 'Customers';
+    if (route == 'payments') return 'Payments';
+    if (route == 'reward points' || route == 'loyalty rewards') {
+      return 'Reward Points';
+    }
+    if (route == 'promotions' || route == 'promotions & discounts') {
+      return 'Promotions & Discounts';
+    }
+    if (route == 'vehicle tracking') return 'Vehicle Tracking';
+    if (route == 'vehicle maintenance') return 'Vehicle Maintenance';
+    if (route == 'locations' || route == 'branches') return 'Locations';
+    if (route == 'reports') return 'Reports';
+    if (route == 'support' ||
+        route == 'support inbox' ||
+        route == 'support desk') {
+      return 'Support Inbox';
+    }
+    if (route == 'admin profile' || route == 'profile') return 'Admin Profile';
+    if (route == 'notifications') return 'Notifications';
+    if (route == 'ai assistant') return 'AI Assistant';
+
+    if (notifType == 'booking') return 'Bookings';
+    if (notifType == 'payment') return 'Payments';
+    if (notifType == 'customer') return 'Customers';
+    if (notifType == 'vehicle' || notifType == 'maintenance') return 'Cars';
+    if (notifType == 'promotion') return 'Promotions & Discounts';
+    if (notifType == 'support') return 'Support Inbox';
+
+    return null;
+  }
+
+  void _navigateFromAdminNotification({
+    String? actionRoute,
+    String? type,
+    String? relatedId,
+  }) {
+    final targetTab = _mapAdminNotificationToTab(
+      actionRoute: actionRoute,
+      type: type,
+    );
+    if (targetTab == null) {
+      return;
+    }
+
+    setState(() {
+      _activeTab = targetTab;
+    });
+
+    final id = (relatedId ?? '').trim();
+    if (id.isEmpty) return;
+
+    if (targetTab == 'Bookings') {
+      try {
+        final booking = _bookings.firstWhere((b) => b.id == id);
+        _showBookingDetailsDialog(booking);
+      } catch (_) {}
+    } else if (targetTab == 'Payments') {
+      try {
+        final payment = _payments.firstWhere((p) => p.id == id);
+        _showPaymentDetailsDialog(payment);
+      } catch (_) {}
+    }
   }
 
   // Real-time admin state and tracking properties
@@ -540,20 +611,30 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     int elapsedMs,
   ) {
     final currentUser = FirebaseAuth.instance.currentUser;
-    debugPrint('================================================================');
+    debugPrint(
+      '================================================================',
+    );
     debugPrint('[ADMIN DASHBOARD INITIALIZATION FAILURE TELEMETRY]');
     debugPrint('Stage: $stage');
-    debugPrint('Firebase App Initialized: ${Firebase.apps.isNotEmpty} (${Firebase.apps.map((a) => a.name).join(", ")})');
-    debugPrint('Authentication Status: ${currentUser != null ? "Authenticated" : "Unauthenticated"}');
+    debugPrint(
+      'Firebase App Initialized: ${Firebase.apps.isNotEmpty} (${Firebase.apps.map((a) => a.name).join(", ")})',
+    );
+    debugPrint(
+      'Authentication Status: ${currentUser != null ? "Authenticated" : "Unauthenticated"}',
+    );
     debugPrint('Current User UID: ${currentUser?.uid ?? "N/A"}');
     debugPrint('Current User Role: ${UserSession().currentRole ?? "Unknown"}');
-    debugPrint('Dashboard Services Status: DatabaseService(Ready), VehicleService(Ready), BookingService(Ready), PaymentService(Ready), MaintenanceService(Ready)');
+    debugPrint(
+      'Dashboard Services Status: DatabaseService(Ready), VehicleService(Ready), BookingService(Ready), PaymentService(Ready), MaintenanceService(Ready)',
+    );
     debugPrint('Exact Exception: $exception');
     if (stackTrace != null) {
       debugPrint('Stack Trace:\n$stackTrace');
     }
     debugPrint('Request Timing: $elapsedMs ms');
-    debugPrint('================================================================');
+    debugPrint(
+      '================================================================',
+    );
   }
 
   Future<void> _loadDashboardData() async {
@@ -591,7 +672,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
       if (currentUser == null) {
         final errStr = 'No authenticated user available. Please log in again.';
-        _logDiagnosticFailure('Auth User Check', errStr, StackTrace.current, stopwatch.elapsedMilliseconds);
+        _logDiagnosticFailure(
+          'Auth User Check',
+          errStr,
+          StackTrace.current,
+          stopwatch.elapsedMilliseconds,
+        );
         if (mounted) {
           setState(() {
             _error = errStr;
@@ -606,16 +692,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         final cachedUser = await UserSession()
             .fetchAndCacheUserModel(currentUser.uid)
             .timeout(const Duration(seconds: 10));
-        final role = UserSession().currentRole ??
+        final role =
+            UserSession().currentRole ??
             await UserSession()
                 .fetchAndCacheRole(currentUser.uid)
                 .timeout(const Duration(seconds: 10));
         if (cachedUser != null) {
           _adminUser = cachedUser;
         }
-        debugPrint('[AdminDashboard] Verified admin session: UID=${currentUser.uid}, Role=$role');
+        debugPrint(
+          '[AdminDashboard] Verified admin session: UID=${currentUser.uid}, Role=$role',
+        );
       } catch (roleErr) {
-        debugPrint('[AdminDashboard] Non-fatal role verification warning: $roleErr');
+        debugPrint(
+          '[AdminDashboard] Non-fatal role verification warning: $roleErr',
+        );
       }
 
       // 4. Query statistics with automatic retry loop (up to 3 attempts)
@@ -628,7 +719,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       while (attempt < maxAttempts && !success) {
         attempt++;
         try {
-          debugPrint('[AdminDashboard] Querying dashboard data (Attempt $attempt of $maxAttempts)...');
+          debugPrint(
+            '[AdminDashboard] Querying dashboard data (Attempt $attempt of $maxAttempts)...',
+          );
           final results = await Future.wait([
             _databaseService.getUsers(),
             _vehicleService.getVehicles(),
@@ -675,7 +768,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           for (var payment in _payments) {
             final status = payment.status.toLowerCase();
             final pStatus = (payment.paymentStatus ?? '').toLowerCase();
-            if (status == 'approved' || status == 'paid' || pStatus == 'approved') {
+            if (status == 'approved' ||
+                status == 'paid' ||
+                pStatus == 'approved') {
               final pDate = payment.paymentDate;
               if (pDate.year == now.year && pDate.month == now.month) {
                 monthlyRev += payment.amount;
@@ -686,7 +781,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
           _pendingPaymentsCount = _payments
               .where(
-                (p) => p.status == 'pending' || p.status == 'Pending Verification',
+                (p) =>
+                    p.status == 'pending' || p.status == 'Pending Verification',
               )
               .length;
 
@@ -694,7 +790,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         } catch (e, st) {
           lastException = e;
           lastStackTrace = st;
-          debugPrint('[AdminDashboard] Query attempt $attempt failed with error: $e');
+          debugPrint(
+            '[AdminDashboard] Query attempt $attempt failed with error: $e',
+          );
           if (attempt < maxAttempts) {
             await Future.delayed(Duration(milliseconds: 1000 * attempt));
           }
@@ -720,14 +818,20 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         );
         if (mounted) {
           setState(() {
-            _error = 'Failed to load dashboard statistics. Please check your connection and try again.';
+            _error =
+                'Failed to load dashboard statistics. Please check your connection and try again.';
             _loading = false;
           });
         }
       }
     } catch (fatalErr, fatalSt) {
       stopwatch.stop();
-      _logDiagnosticFailure('Fatal Initialization Flow', fatalErr, fatalSt, stopwatch.elapsedMilliseconds);
+      _logDiagnosticFailure(
+        'Fatal Initialization Flow',
+        fatalErr,
+        fatalSt,
+        stopwatch.elapsedMilliseconds,
+      );
       if (mounted) {
         setState(() {
           _error = 'Failed to load dashboard statistics. Please try again.';
@@ -793,7 +897,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Widget _buildDashboardSkeleton(bool isDesktop) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final shimmerBg = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final shimmerBg = isDark
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -938,7 +1044,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     color: cardBg,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: isDark ? const Color(0xFF334155) : Colors.grey[200]!,
+                      color: isDark
+                          ? const Color(0xFF334155)
+                          : Colors.grey[200]!,
                     ),
                   ),
                   child: Padding(
@@ -958,7 +1066,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         Expanded(
                           child: ListView.separated(
                             itemCount: 4,
-                            separatorBuilder: (context, index) => const SizedBox(height: 12),
+                            separatorBuilder: (context, index) =>
+                                const SizedBox(height: 12),
                             itemBuilder: (context, idx) => Container(
                               height: 45,
                               decoration: BoxDecoration(
@@ -983,7 +1092,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     color: cardBg,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: isDark ? const Color(0xFF334155) : Colors.grey[200]!,
+                      color: isDark
+                          ? const Color(0xFF334155)
+                          : Colors.grey[200]!,
                     ),
                   ),
                   child: Center(
@@ -1004,7 +1115,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         Text(
                           'Initializing Dashboard Statistics...',
                           style: TextStyle(
-                            color: isDark ? Colors.white70 : AppColors.secondaryBlue,
+                            color: isDark
+                                ? Colors.white70
+                                : AppColors.secondaryBlue,
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                           ),
@@ -1023,9 +1136,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final double width = MediaQuery.of(context).size.width;
+    final media = MediaQuery.of(context);
+    final double width = media.size.width;
     final bool isDesktop = width > 1100;
     final bool showMobileBottomNav = !isDesktop;
+    final double mobileBottomNavClearance = showMobileBottomNav
+        ? (kBottomNavigationBarHeight + media.viewPadding.bottom + 12)
+        : 0;
+    final bool showAIButton = _activeTab != 'AI Assistant';
 
     return Scaffold(
       key: _scaffoldKey,
@@ -1039,94 +1157,95 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ),
             )
           : null,
-      body: SafeArea(
-        top: true,
-        bottom: true,
-        child: Row(
-          children: [
-            if (isDesktop) _buildSidebar(context),
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final double maxWidth = isDesktop
-                      ? 1650
-                      : constraints.maxWidth;
-                  final Widget content = _loading
-                      ? _buildDashboardSkeleton(isDesktop)
-                      : _error != null
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.error_outline,
-                                size: 64,
-                                color: Colors.redAccent,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                _error!,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
+      body: MovableAIFloatingButtonOverlay(
+        isOpen: false,
+        isVisible: showAIButton,
+        extraBottomPadding: mobileBottomNavClearance,
+        onTap: () async {
+          final result = await showAIChatModal(context);
+          if (result != null && result is String && mounted) {
+            setState(() {
+              if (result == 'search_vehicles') {
+                _activeTab = 'Cars';
+              } else if (result == 'view_bookings') {
+                _activeTab = 'Bookings';
+              } else if (result == 'view_payments') {
+                _activeTab = 'Payments';
+              } else if (result == 'view_support') {
+                _activeTab = 'Support Inbox';
+              } else if (result == 'view_branches') {
+                _activeTab = 'Locations';
+              } else if (result == 'view_notifications') {
+                _activeTab = 'Notifications';
+              } else if (result == 'view_maintenance') {
+                _activeTab = 'Vehicle Maintenance';
+              } else if (result == 'view_reports') {
+                _activeTab = 'Reports';
+              } else if (result == 'view_customers') {
+                _activeTab = 'Customers';
+              } else if (result == 'view_dashboard') {
+                _activeTab = 'Dashboard';
+              }
+            });
+          }
+        },
+        child: SafeArea(
+          top: true,
+          bottom: true,
+          maintainBottomViewPadding: true,
+          child: Row(
+            children: [
+              if (isDesktop) _buildSidebar(context),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final double maxWidth = isDesktop
+                        ? 1650
+                        : constraints.maxWidth;
+                    final Widget content = _loading
+                        ? _buildDashboardSkeleton(isDesktop)
+                        : _error != null
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.error_outline,
+                                  size: 64,
+                                  color: Colors.redAccent,
                                 ),
-                              ),
-                              const SizedBox(height: 16),
-                              ElevatedButton(
-                                onPressed: _loadDashboardData,
-                                child: const Text('Retry'),
-                              ),
-                            ],
-                          ),
-                        )
-                      : _buildActiveBody(isDesktop);
+                                const SizedBox(height: 16),
+                                Text(
+                                  _error!,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                ElevatedButton(
+                                  onPressed: _loadDashboardData,
+                                  child: const Text('Retry'),
+                                ),
+                              ],
+                            ),
+                          )
+                        : _buildActiveBody(isDesktop);
 
-                  return Align(
-                    alignment: Alignment.topCenter,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: maxWidth),
-                      child: content,
-                    ),
-                  );
-                },
+                    return Align(
+                      alignment: Alignment.topCenter,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: maxWidth),
+                        child: content,
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-      floatingActionButton: _activeTab == 'AI Assistant'
-          ? null
-          : AIFloatingButton(
-              onTap: () async {
-                final result = await showAIChatModal(context);
-                if (result != null && result is String && mounted) {
-                  setState(() {
-                    if (result == 'search_vehicles') {
-                      _activeTab = 'Cars';
-                    } else if (result == 'view_bookings') {
-                      _activeTab = 'Bookings';
-                    } else if (result == 'view_payments') {
-                      _activeTab = 'Payments';
-                    } else if (result == 'view_support') {
-                      _activeTab = 'Support Inbox';
-                    } else if (result == 'view_branches') {
-                      _activeTab = 'Locations';
-                    } else if (result == 'view_notifications') {
-                      _activeTab = 'Notifications';
-                    } else if (result == 'view_maintenance') {
-                      _activeTab = 'Vehicle Maintenance';
-                    } else if (result == 'view_reports') {
-                      _activeTab = 'Reports';
-                    } else if (result == 'view_customers') {
-                      _activeTab = 'Customers';
-                    } else if (result == 'view_dashboard') {
-                      _activeTab = 'Dashboard';
-                    }
-                  });
-                }
-              },
-              isOpen: false,
-            ),
       bottomNavigationBar: showMobileBottomNav
           ? BottomNavigationBar(
               type: BottomNavigationBarType.fixed,
@@ -1253,31 +1372,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         tabContent = Expanded(
           child: AdminNotificationsView(
             onNavigateTab: (route, relatedId) {
-              String targetTab = route;
-              if (route == 'Promotions') targetTab = 'Promotions & Discounts';
-              if (route == 'Support') targetTab = 'Support Inbox';
-              if (route == 'Vehicles') targetTab = 'Cars';
-
-              setState(() {
-                _activeTab = targetTab;
-              });
-              if (relatedId != null && relatedId.isNotEmpty) {
-                if (targetTab == 'Bookings') {
-                  try {
-                    final booking = _bookings.firstWhere(
-                      (b) => b.id == relatedId,
-                    );
-                    _showBookingDetailsDialog(booking);
-                  } catch (_) {}
-                } else if (targetTab == 'Payments') {
-                  try {
-                    final payment = _payments.firstWhere(
-                      (p) => p.id == relatedId,
-                    );
-                    _showPaymentDetailsDialog(payment);
-                  } catch (_) {}
-                }
-              }
+              _navigateFromAdminNotification(
+                actionRoute: route,
+                relatedId: relatedId,
+              );
             },
           ),
         );
@@ -1805,41 +1903,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                             notif.id,
                                           );
                                         }
-                                        if (notif.actionRoute.isNotEmpty) {
-                                          setState(() {
-                                            _activeTab = notif.actionRoute;
-                                          });
-                                          // Open direct details if applicable
-                                          if (notif.relatedId.isNotEmpty) {
-                                            if (notif.actionRoute ==
-                                                'Bookings') {
-                                              try {
-                                                final booking = _bookings
-                                                    .firstWhere(
-                                                      (b) =>
-                                                          b.id ==
-                                                          notif.relatedId,
-                                                    );
-                                                _showBookingDetailsDialog(
-                                                  booking,
-                                                );
-                                              } catch (_) {}
-                                            } else if (notif.actionRoute ==
-                                                'Payments') {
-                                              try {
-                                                final payment = _payments
-                                                    .firstWhere(
-                                                      (p) =>
-                                                          p.id ==
-                                                          notif.relatedId,
-                                                    );
-                                                _showPaymentDetailsDialog(
-                                                  payment,
-                                                );
-                                              } catch (_) {}
-                                            }
-                                          }
-                                        }
+                                        _navigateFromAdminNotification(
+                                          actionRoute: notif.actionRoute,
+                                          type: notif.type,
+                                          relatedId: notif.relatedId,
+                                        );
                                       },
                                       child: Container(
                                         color: notif.isRead
