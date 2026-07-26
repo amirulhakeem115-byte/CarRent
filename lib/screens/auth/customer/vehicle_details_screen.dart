@@ -11,6 +11,7 @@ import '../../../widgets/custom_app_bar.dart';
 import 'booking_screen.dart';
 import 'customer_responsive_shell.dart';
 import '../../../widgets/app_image.dart';
+import '../../../services/payment_restriction_service.dart';
 
 class VehicleDetailsScreen extends StatefulWidget {
   final VehicleModel vehicle;
@@ -93,6 +94,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
   }
 
   void _handleBookNow() {
+    if (PaymentRestrictionService().checkRestriction(context)) return;
     Navigator.push(
       context,
       MaterialPageRoute(

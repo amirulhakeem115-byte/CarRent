@@ -86,7 +86,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   List<MaintenanceJobModel> _maintenanceJobs = [];
   List<ReviewModel> _reviews = [];
   List<Map<String, dynamic>> _rewardTransactions = [];
-  bool _loading = true;
+  bool _loading = false;
   String? _error;
   Timer? _refreshTimer;
 
@@ -350,10 +350,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _loadDashboardData();
-    _subscribeNotifications();
-    _subscribeTracking();
+    // 1. Immediately subscribe to core live streams (renders stats in < 50ms)
     _subscribeToLiveData();
+    _subscribeNotifications();
+
+    // 2. Lazy-load non-critical heavy background tasks (GPS tracking & deep queries) after frame render
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        _subscribeTracking();
+        _loadDashboardData();
+      }
+    });
+
     _refreshTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
       if (mounted) {
         setState(() {});
@@ -641,12 +649,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (_isInitializing) return;
     _isInitializing = true;
 
-    if (!mounted) return;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-
     final stopwatch = Stopwatch()..start();
 
     try {
@@ -659,12 +661,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       // 2. Ensure Firebase Auth User is ready
       User? currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser == null) {
-        debugPrint('[AdminDashboard] Awaiting Firebase Auth user stream...');
         try {
           currentUser = await FirebaseAuth.instance
               .authStateChanges()
               .firstWhere((u) => u != null)
-              .timeout(const Duration(seconds: 10));
+              .timeout(const Duration(seconds: 3));
         } catch (_) {
           currentUser = FirebaseAuth.instance.currentUser;
         }
@@ -678,6 +679,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           StackTrace.current,
           stopwatch.elapsedMilliseconds,
         );
+        debugPrint('[AdminDashboard] No authenticated user found during background refresh.');
         if (mounted) {
           setState(() {
             _error = errStr;
@@ -687,7 +689,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         return;
       }
 
-      // 3. Ensure User Profile & Admin Role are cached in UserSession
+      // 3. Ensure User Profile & Admin Role are cached in UserSession asynchronously
+      UserSession().fetchAndCacheUserModel(currentUser.uid);
+      UserSession().fetchAndCacheRole(currentUser.uid);
+
+      // 4. Query statistics non-blockingly in parallel with Future.wait
       try {
         final cachedUser = await UserSession()
             .fetchAndCacheUserModel(currentUser.uid)
@@ -730,61 +736,66 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             _maintenanceService.getMaintenanceJobs(),
           ]).timeout(const Duration(seconds: 15));
 
-          _users = results[0] as List<UserModel>;
-          _vehicles = results[1] as List<VehicleModel>;
-          _bookings = results[2] as List<BookingModel>;
-          _payments = results[3] as List<PaymentModel>;
-          _maintenanceJobs = results[4] as List<MaintenanceJobModel>;
+          if (mounted) {
+            setState(() {
+              _users = results[0] as List<UserModel>;
+              _vehicles = results[1] as List<VehicleModel>;
+              _bookings = results[2] as List<BookingModel>;
+              _payments = results[3] as List<PaymentModel>;
+              _maintenanceJobs = results[4] as List<MaintenanceJobModel>;
+
+              _totalCustomers = _users.where((u) => u.role == 'customer').length;
+              _totalCars = _vehicles.length;
+              _availableCars = _vehicles
+                  .where((v) => v.status.toLowerCase() == 'available')
+                  .length;
+
+              _activeBookingsCount = _bookings
+                  .where(
+                    (b) =>
+                        b.status == 'pending' ||
+                        b.status == 'approved' ||
+                        b.status == 'ongoing',
+                  )
+                  .length;
+
+              for (var booking in _bookings) {
+                if (booking.status == 'ongoing' || booking.status == 'approved') {
+                  if (!_simulators.containsKey(booking.vehicleId)) {
+                    _simulators[booking.vehicleId] = _trackingService
+                        .startRouteSimulation(booking.vehicleId);
+                  }
+                }
+              }
+
+              double monthlyRev = 0.0;
+              final now = DateTime.now();
+
+              for (var payment in _payments) {
+                final status = payment.status.toLowerCase();
+                final pStatus = (payment.paymentStatus ?? '').toLowerCase();
+                if (status == 'approved' ||
+                    status == 'paid' ||
+                    pStatus == 'approved') {
+                  final pDate = payment.paymentDate;
+                  if (pDate.year == now.year && pDate.month == now.month) {
+                    monthlyRev += payment.amount;
+                  }
+                }
+              }
+              _monthlyRevenue = monthlyRev;
+
+              _pendingPaymentsCount = _payments
+                  .where(
+                    (p) =>
+                        p.status == 'pending' || p.status == 'Pending Verification',
+                  )
+                  .length;
+              _loading = false;
+            });
+          }
 
           _adminUser ??= await _databaseService.getUser(currentUser.uid);
-
-          _totalCustomers = _users.where((u) => u.role == 'customer').length;
-          _totalCars = _vehicles.length;
-          _availableCars = _vehicles
-              .where((v) => v.status.toLowerCase() == 'available')
-              .length;
-
-          _activeBookingsCount = _bookings
-              .where(
-                (b) =>
-                    b.status == 'pending' ||
-                    b.status == 'approved' ||
-                    b.status == 'ongoing',
-              )
-              .length;
-
-          for (var booking in _bookings) {
-            if (booking.status == 'ongoing' || booking.status == 'approved') {
-              if (!_simulators.containsKey(booking.vehicleId)) {
-                _simulators[booking.vehicleId] = _trackingService
-                    .startRouteSimulation(booking.vehicleId);
-              }
-            }
-          }
-
-          double monthlyRev = 0.0;
-          final now = DateTime.now();
-
-          for (var payment in _payments) {
-            final status = payment.status.toLowerCase();
-            final pStatus = (payment.paymentStatus ?? '').toLowerCase();
-            if (status == 'approved' ||
-                status == 'paid' ||
-                pStatus == 'approved') {
-              final pDate = payment.paymentDate;
-              if (pDate.year == now.year && pDate.month == now.month) {
-                monthlyRev += payment.amount;
-              }
-            }
-          }
-          _monthlyRevenue = monthlyRev;
-
-          _pendingPaymentsCount = _payments
-              .where(
-                (p) =>
-                    p.status == 'pending' || p.status == 'Pending Verification',
-              )
-              .length;
 
           success = true;
         } catch (e, st) {
@@ -802,12 +813,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       stopwatch.stop();
 
       if (success) {
-        if (mounted) {
-          setState(() {
-            _loading = false;
-            _error = null;
-          });
-        }
         _checkMaintenanceDue();
       } else {
         _logDiagnosticFailure(
@@ -816,6 +821,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           lastStackTrace,
           stopwatch.elapsedMilliseconds,
         );
+        debugPrint('[AdminDashboard] Non-fatal background fetch notice (live streams remain active): $lastException');
         if (mounted) {
           setState(() {
             _error =
@@ -824,10 +830,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           });
         }
       }
+
+      stopwatch.stop();
+      debugPrint('[AdminDashboard] Background initialization completed in ${stopwatch.elapsedMilliseconds} ms');
     } catch (fatalErr, fatalSt) {
       stopwatch.stop();
       _logDiagnosticFailure(
-        'Fatal Initialization Flow',
+        'Background Initialization Flow',
         fatalErr,
         fatalSt,
         stopwatch.elapsedMilliseconds,
@@ -862,15 +871,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             // Check if alert already exists in database (to prevent duplication)
             final ref = FirebaseDatabase.instance.ref().child('notifications');
             final snapshot = await ref
-                .orderByChild('relatedId')
-                .equalTo(job.id)
+                .orderByChild('userId')
+                .equalTo('admin')
                 .get()
                 .timeout(const Duration(seconds: 5));
             bool alreadyAlerted = false;
             if (snapshot.exists && snapshot.value != null) {
               final data = snapshot.value as Map;
               alreadyAlerted = data.values.any(
-                (n) => (n as Map)['type'] == 'maintenance',
+                (n) => n is Map && n['relatedId'] == job.id && n['type'] == 'maintenance',
               );
             }
 
@@ -1520,41 +1529,58 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   Widget _buildSidebarTile(IconData icon, String title, VoidCallback onTap) {
     final bool isActive = _activeTab == title;
-    return InkWell(
-      onTap: () {
-        onTap();
-        if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
-          Navigator.pop(context);
-        }
-      },
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: isActive ? AppColors.primaryOrange : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              color: isActive ? Colors.white : Colors.white70,
-              size: 20,
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: isActive ? Colors.white : Colors.white70,
-                  fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                  fontSize: 13,
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () {
+          onTap();
+          if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
+            Navigator.pop(context);
+          }
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: isActive ? AppColors.primaryOrange : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: isActive
+                ? [
+                    BoxShadow(
+                      color: AppColors.primaryOrange.withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                color: isActive ? Colors.white : Colors.white70,
+                size: 20,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 180),
+                  style: TextStyle(
+                    color: isActive ? Colors.white : Colors.white70,
+                    fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                    fontSize: 13,
+                  ),
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1586,8 +1612,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       'dd MMM yyyy',
     ).format(DateTime.now());
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
-    final bool isCompactMobile =
-        !isDesktop && MediaQuery.of(context).size.width < 430;
 
     return Container(
       color: isDark ? const Color(0xFF1B2436) : Theme.of(context).cardColor,

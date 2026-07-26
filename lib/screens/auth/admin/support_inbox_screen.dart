@@ -4,6 +4,7 @@ import '../../../constants/colors.dart';
 import '../../../services/database_service.dart';
 import '../../../widgets/loading_widget.dart';
 import '../../../models/user_model.dart';
+import '../../../widgets/animated_widgets.dart';
 
 class SupportInboxView extends StatefulWidget {
   const SupportInboxView({super.key});
@@ -97,14 +98,29 @@ class _SupportInboxViewState extends State<SupportInboxView> {
   void _showTicketDetails(Map<String, dynamic> ticket) {
     final String id = ticket['id'] ?? '';
     final String subject = ticket['subject'] ?? 'No Subject';
+    final String customerId = (ticket['customerId'] ?? ticket['userId'] ?? ticket['customerUid'] ?? '').toString();
+    final bool isLegacyTicket = customerId.trim().isEmpty;
     final replyController = TextEditingController();
+    final scrollController = ScrollController();
 
     UserModel? customer;
     try {
       customer = _users.firstWhere((u) => u.id == ticket['customerId']);
     } catch (_) {}
-    final String name = customer?.fullName ?? 'Anonymous';
+    final String name = customer?.fullName ?? ticket['customerName'] ?? 'Customer';
     final String email = customer?.email ?? 'No Email';
+
+    void scrollToBottom() {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (scrollController.hasClients) {
+          scrollController.animateTo(
+            scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
 
     showDialog(
       context: context,
@@ -189,7 +205,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                             color: Colors.grey,
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 8),
                         Text(
                           'From: $name ($email)',
                           style: const TextStyle(
@@ -210,16 +226,69 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
+                        if (isLegacyTicket) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.amber.shade700),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.info_outline, color: Colors.amber.shade800, size: 18),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'This support ticket was created using an older version of the system.',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.amber.shade900,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                         const Divider(height: 20),
 
                         // Reply History section
-                        const Text(
-                          'Conversation History',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                            color: AppColors.secondaryBlue,
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Conversation History',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                                color: AppColors.secondaryBlue,
+                              ),
+                            ),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(
+                                    color: Colors.green,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Live Real-time Sync',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.green.shade700,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 8),
                         Expanded(
@@ -236,6 +305,17 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                                   ),
                                 );
                               }
+                              if (snapshot.hasError) {
+                                return Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12.0),
+                                    child: Text(
+                                      'Error loading messages: ${snapshot.error}',
+                                      style: const TextStyle(color: Colors.redAccent, fontSize: 11),
+                                    ),
+                                  ),
+                                );
+                              }
                               final messages = snapshot.data ?? [];
                               if (messages.isEmpty) {
                                 return Center(
@@ -248,13 +328,17 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                                   ),
                                 );
                               }
+                              scrollToBottom();
                               return ListView.builder(
-                                shrinkWrap: true,
+                                controller: scrollController,
                                 itemCount: messages.length,
                                 itemBuilder: (context, index) {
                                   final r = messages[index];
                                   final bool isAdmin =
                                       r['senderRole'] == 'admin';
+                                  final String senderName = r['senderName'] ??
+                                      (isAdmin ? 'Support Admin' : name);
+                                  final String senderRole = (r['senderRole'] ?? 'customer').toUpperCase();
                                   final String rTime = r['timestamp'] ?? '';
                                   String fRTime = '';
                                   if (rTime.isNotEmpty) {
@@ -262,7 +346,9 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                                       fRTime = DateFormat(
                                         'hh:mm a',
                                       ).format(DateTime.parse(rTime));
-                                    } catch (_) {}
+                                    } catch (_) {
+                                      fRTime = rTime;
+                                    }
                                   }
 
                                   return Align(
@@ -271,31 +357,39 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                                         : Alignment.centerLeft,
                                     child: Container(
                                       margin: const EdgeInsets.symmetric(
-                                        vertical: 4,
+                                        vertical: 5,
                                       ),
                                       padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 8,
+                                        horizontal: 14,
+                                        vertical: 10,
                                       ),
+                                      constraints: const BoxConstraints(maxWidth: 380),
                                       decoration: BoxDecoration(
                                         color: isAdmin
                                             ? AppColors.secondaryBlue
-                                            : Colors.white,
+                                            : const Color(0xFFF1F5F9),
                                         borderRadius: BorderRadius.only(
-                                          topLeft: const Radius.circular(12),
-                                          topRight: const Radius.circular(12),
+                                          topLeft: const Radius.circular(14),
+                                          topRight: const Radius.circular(14),
                                           bottomLeft: isAdmin
-                                              ? const Radius.circular(12)
+                                              ? const Radius.circular(14)
                                               : Radius.zero,
                                           bottomRight: isAdmin
                                               ? Radius.zero
-                                              : const Radius.circular(12),
+                                              : const Radius.circular(14),
                                         ),
                                         border: isAdmin
                                             ? null
                                             : Border.all(
-                                                color: Colors.grey[200]!,
+                                                color: Colors.grey[300]!,
                                               ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(alpha: 0.03),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
                                       ),
                                       child: Column(
                                         crossAxisAlignment: isAdmin
@@ -303,25 +397,67 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                                             : CrossAxisAlignment.start,
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                senderName,
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 10,
+                                                  color: isAdmin
+                                                      ? AppColors.primaryOrange
+                                                      : AppColors.secondaryBlue,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 4,
+                                                  vertical: 1,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: isAdmin
+                                                      ? AppColors.primaryOrange.withValues(alpha: 0.2)
+                                                      : AppColors.secondaryBlue.withValues(alpha: 0.1),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  senderRole,
+                                                  style: TextStyle(
+                                                    fontSize: 8,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: isAdmin
+                                                        ? AppColors.primaryOrange
+                                                        : AppColors.secondaryBlue,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
                                           Text(
                                             r['message'] ?? '',
                                             style: TextStyle(
                                               color: isAdmin
                                                   ? Colors.white
-                                                  : Colors.black,
-                                              fontSize: 12,
+                                                  : Colors.black87,
+                                              fontSize: 13,
+                                              height: 1.35,
                                             ),
                                           ),
-                                          if (fRTime.isNotEmpty)
+                                          if (fRTime.isNotEmpty) ...[
+                                            const SizedBox(height: 4),
                                             Text(
                                               fRTime,
                                               style: TextStyle(
                                                 color: isAdmin
-                                                    ? Colors.white60
-                                                    : Colors.grey,
-                                                fontSize: 8,
+                                                    ? Colors.white70
+                                                    : Colors.grey[600],
+                                                fontSize: 9,
                                               ),
                                             ),
+                                          ],
                                         ],
                                       ),
                                     ),
@@ -346,6 +482,13 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                                     vertical: 10,
                                   ),
                                 ),
+                                onSubmitted: (val) async {
+                                  final text = val.trim();
+                                  if (text.isEmpty) return;
+                                  replyController.clear();
+                                  await _sendReply(id, text);
+                                  scrollToBottom();
+                                },
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -357,8 +500,9 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                               onPressed: () async {
                                 final text = replyController.text.trim();
                                 if (text.isEmpty) return;
-                                await _sendReply(id, text);
                                 replyController.clear();
+                                await _sendReply(id, text);
+                                scrollToBottom();
                               },
                             ),
                           ],
@@ -414,7 +558,11 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                   ),
                   actions: [
                     TextButton(
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () {
+                        scrollController.dispose();
+                        replyController.dispose();
+                        Navigator.pop(context);
+                      },
                       child: const Text('Close'),
                     ),
                   ],
@@ -467,6 +615,36 @@ class _SupportInboxViewState extends State<SupportInboxView> {
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: _databaseService.getTicketsStream(),
       builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+          return const Center(
+            child: LoadingWidget(message: 'Connecting to live ticket stream...'),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 64),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error loading tickets: ${snapshot.error}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.redAccent,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
         final tickets = snapshot.data ?? [];
 
         // Calculations
@@ -492,21 +670,27 @@ class _SupportInboxViewState extends State<SupportInboxView> {
           try {
             cust = _users.firstWhere((u) => u.id == msg['customerId']);
           } catch (_) {}
-          final name = cust?.fullName ?? '';
-          final email = cust?.email ?? '';
+          final String name = (cust?.fullName != null && cust!.fullName.isNotEmpty)
+              ? cust.fullName
+              : (msg['customerName'] ?? 'Customer').toString();
+          final String email = (cust?.email != null && cust!.email.isNotEmpty)
+              ? cust.email
+              : (msg['customerEmail'] ?? '').toString();
 
-          final matchesSearch =
+          final String subject = (msg['subject'] ?? '').toString();
+          final String id = (msg['id'] ?? '').toString();
+
+          final matchesSearch = _searchQuery.isEmpty ||
               name.toLowerCase().contains(_searchQuery) ||
               email.toLowerCase().contains(_searchQuery) ||
-              (msg['subject'] ?? '').toString().toLowerCase().contains(
-                _searchQuery,
-              ) ||
-              (msg['id'] ?? '').toString().toLowerCase().contains(_searchQuery);
+              subject.toLowerCase().contains(_searchQuery) ||
+              id.toLowerCase().contains(_searchQuery);
 
-          final String status = msg['status'] ?? 'Open';
+          final String status = (msg['status'] ?? 'Open').toString();
           final matchesFilter =
               _selectedFilter == 'All' ||
-              status.toLowerCase() == _selectedFilter.toLowerCase();
+              status.toLowerCase() == _selectedFilter.toLowerCase() ||
+              (_selectedFilter.toLowerCase() == 'in progress' && status.toLowerCase() == 'pending');
 
           return matchesSearch && matchesFilter;
         }).toList();
@@ -778,28 +962,17 @@ class _SupportInboxViewState extends State<SupportInboxView> {
               // List / Table
               filteredTickets.isEmpty
                   ? Container(
-                      height: 200,
+                      padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
                         color: cardColor,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: borderColor),
                       ),
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.mail_outline_rounded,
-                              size: 64,
-                              color: textSecondary,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No support tickets found matching search query.',
-                              style: TextStyle(color: textSecondary),
-                            ),
-                          ],
-                        ),
+                      child: const AnimatedEmptyState(
+                        icon: Icons.mail_outline_rounded,
+                        title: 'No Support Tickets Found',
+                        subtitle:
+                            'No tickets match your search query or status filter.',
                       ),
                     )
                   : Container(
@@ -972,7 +1145,12 @@ class _SupportInboxViewState extends State<SupportInboxView> {
           try {
             cust = _users.firstWhere((u) => u.id == ticket['customerId']);
           } catch (_) {}
-          final String name = cust?.fullName ?? 'Anonymous';
+          final String name = (cust?.fullName != null && cust!.fullName.isNotEmpty)
+              ? cust.fullName
+              : (ticket['customerName'] ?? 'Customer').toString();
+          final String email = (cust?.email != null && cust!.email.isNotEmpty)
+              ? cust.email
+              : (ticket['customerEmail'] ?? 'No Email').toString();
 
           String createdStr = '';
           if (createdRaw.isNotEmpty) {
@@ -1000,18 +1178,58 @@ class _SupportInboxViewState extends State<SupportInboxView> {
             statusColor = Colors.green;
           }
 
+          final bool isUnread = (status.toLowerCase() == 'open');
+
           return DataRow(
             cells: [
               DataCell(
-                Text(
-                  id.substring(0, id.length > 8 ? 8 : id.length).toUpperCase(),
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: textPrimary,
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isUnread) ...[
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Colors.redAccent,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    Text(
+                      id.substring(0, id.length > 8 ? 8 : id.length).toUpperCase(),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: textPrimary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              DataCell(Text(name, style: TextStyle(color: textPrimary))),
+              DataCell(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      name,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        color: textPrimary,
+                      ),
+                    ),
+                    Text(
+                      email,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               DataCell(
                 Text(
                   subject,
@@ -1021,12 +1239,12 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                 ),
               ),
               DataCell(
-                Text(createdStr, style: TextStyle(color: textSecondary)),
+                Text(createdStr.isNotEmpty ? createdStr : 'N/A', style: TextStyle(color: textSecondary, fontSize: 11)),
               ),
               DataCell(
                 Text(
                   replyStr.isNotEmpty ? replyStr : 'N/A',
-                  style: TextStyle(color: textSecondary),
+                  style: TextStyle(color: textSecondary, fontSize: 11),
                 ),
               ),
               DataCell(
@@ -1080,22 +1298,33 @@ class _SupportInboxViewState extends State<SupportInboxView> {
       itemCount: ticketsList.length,
       itemBuilder: (context, index) {
         final ticket = ticketsList[index];
+        final String id = ticket['id'] ?? '';
         final String subject = ticket['subject'] ?? 'No Subject';
         final String status = ticket['status'] ?? 'Open';
+        final String createdRaw = ticket['createdAt'] ?? '';
         final String replyRaw = ticket['lastReplyAt'] ?? '';
 
         UserModel? cust;
         try {
           cust = _users.firstWhere((u) => u.id == ticket['customerId']);
         } catch (_) {}
-        final String name = cust?.fullName ?? 'Anonymous';
+        final String name = (cust?.fullName != null && cust!.fullName.isNotEmpty)
+            ? cust.fullName
+            : (ticket['customerName'] ?? 'Customer').toString();
+        final String email = (cust?.email != null && cust!.email.isNotEmpty)
+            ? cust.email
+            : (ticket['customerEmail'] ?? 'No Email').toString();
 
+        String createdStr = '';
+        if (createdRaw.isNotEmpty) {
+          try {
+            createdStr = DateFormat('yyyy-MM-dd HH:mm').format(DateTime.parse(createdRaw));
+          } catch (_) {}
+        }
         String replyStr = '';
         if (replyRaw.isNotEmpty) {
           try {
-            replyStr = DateFormat(
-              'yyyy-MM-dd HH:mm',
-            ).format(DateTime.parse(replyRaw));
+            replyStr = DateFormat('yyyy-MM-dd HH:mm').format(DateTime.parse(replyRaw));
           } catch (_) {}
         }
 
@@ -1108,7 +1337,19 @@ class _SupportInboxViewState extends State<SupportInboxView> {
           statusColor = Colors.green;
         }
 
+        final bool isUnread = (status.toLowerCase() == 'open');
+
         return ListTile(
+          leading: isUnread
+              ? Container(
+                  width: 10,
+                  height: 10,
+                  decoration: const BoxDecoration(
+                    color: Colors.redAccent,
+                    shape: BoxShape.circle,
+                  ),
+                )
+              : null,
           title: Text(
             subject,
             style: TextStyle(
@@ -1121,12 +1362,16 @@ class _SupportInboxViewState extends State<SupportInboxView> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'From: $name',
-                style: TextStyle(fontSize: 12, color: textSecondary),
+                'From: $name ($email)',
+                style: TextStyle(fontSize: 11, color: textSecondary),
               ),
               Text(
-                'Last Active: $replyStr',
-                style: TextStyle(fontSize: 11, color: textSecondary),
+                'ID: #${id.substring(0, id.length > 8 ? 8 : id.length).toUpperCase()} | Created: $createdStr',
+                style: TextStyle(fontSize: 10, color: textSecondary),
+              ),
+              Text(
+                'Last Active: ${replyStr.isNotEmpty ? replyStr : "N/A"}',
+                style: TextStyle(fontSize: 10, color: textSecondary),
               ),
             ],
           ),

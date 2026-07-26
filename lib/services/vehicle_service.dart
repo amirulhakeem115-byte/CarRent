@@ -17,7 +17,28 @@ class VehicleService {
   // Cache to track manually updated vehicles
   final Set<String> _manuallyUpdatedVehicleIds = {};
 
-  Future<List<VehicleModel>> getVehicles({bool applyStatusSync = false}) async {
+  List<VehicleModel>? _cachedVehicles;
+  DateTime? _vehiclesCacheTime;
+  static const Duration _cacheTtl = Duration(seconds: 30);
+
+  void invalidateCache() {
+    _cachedVehicles = null;
+    _vehiclesCacheTime = null;
+  }
+
+  Future<List<VehicleModel>> getVehicles({
+    bool applyStatusSync = false,
+    bool forceRefresh = false,
+  }) async {
+    if (!forceRefresh &&
+        !applyStatusSync &&
+        _cachedVehicles != null &&
+        _vehiclesCacheTime != null &&
+        DateTime.now().difference(_vehiclesCacheTime!) < _cacheTtl) {
+      debugPrint('[VehicleService] Returning warm cached vehicles (${_cachedVehicles!.length} items)');
+      return _cachedVehicles!;
+    }
+
     // Run lifecycle manager check asynchronously in the background
     BookingLifecycleManager().checkAndProcessLifecycle().catchError((lifecycleErr) {
       debugPrint(
@@ -31,10 +52,6 @@ class VehicleService {
     if (currentUid != null) {
       currentRole = await UserRoleCache.getRole(currentUid);
     }
-    debugPrint('[VehicleService] [getVehicles] Accessing path: vehicles');
-    debugPrint(
-      '[VehicleService] [getVehicles] Current UID: $currentUid, Current Role: $currentRole',
-    );
 
     try {
       final snapshot = await _db.get().timeout(const Duration(seconds: 8));
@@ -47,6 +64,9 @@ class VehicleService {
           }
         });
       }
+
+      _cachedVehicles = vehicles;
+      _vehiclesCacheTime = DateTime.now();
 
       if (applyStatusSync) {
         // Fetch bookings to determine dynamic availability
@@ -263,6 +283,7 @@ class VehicleService {
 
   Future<void> addVehicle(VehicleModel vehicle) async {
     try {
+      invalidateCache();
       final newRef = _db.push();
       final data = vehicle.toMap();
       data['id'] = newRef.key!;
@@ -287,6 +308,7 @@ class VehicleService {
 
   Future<void> updateVehicle(String id, Map<String, dynamic> data) async {
     try {
+      invalidateCache();
       await _db.child(id).update(data);
 
       final brand = data['brand'] ?? '';
@@ -314,6 +336,7 @@ class VehicleService {
 
   Future<void> deleteVehicle(String id) async {
     try {
+      invalidateCache();
       await _db.child(id).remove();
 
       final notificationService = NotificationService();
@@ -335,6 +358,7 @@ class VehicleService {
 
   Future<void> toggleAvailability(String id, bool isAvailable) async {
     try {
+      invalidateCache();
       // Mark as manually updated
       _manuallyUpdatedVehicleIds.add(id);
 
@@ -364,6 +388,7 @@ class VehicleService {
 
   Future<void> updateVehicleStatus(String id, String status) async {
     try {
+      invalidateCache();
       String normStatus = status;
       final statusLower = status.toLowerCase().replaceAll(RegExp(r'\s+'), '');
 

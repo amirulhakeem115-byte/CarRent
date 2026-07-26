@@ -961,8 +961,7 @@ class _CustomersViewState extends State<CustomersView> {
         final internalSpacing =
             (horizontalMargin * 2) + (columnSpacing * (columnCount - 1));
         final contentWidth =
-            (tableWidth - internalSpacing).clamp(620.0, double.infinity)
-                as double;
+            (tableWidth - internalSpacing).clamp(620.0, double.infinity);
 
         final nameWidth = contentWidth * 0.21;
         final emailWidth = contentWidth * 0.24;

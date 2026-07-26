@@ -22,6 +22,7 @@ import '../../../services/user_session.dart';
 import 'vehicle_list_screen.dart';
 import 'vehicle_details_screen.dart';
 import 'customer_responsive_shell.dart';
+import '../../../services/payment_restriction_service.dart';
 
 class CustomerHomeScreen extends StatefulWidget {
   const CustomerHomeScreen({super.key});
@@ -916,12 +917,15 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 ),
                 const SizedBox(height: 18),
                 ElevatedButton(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const VehicleListScreen(),
-                    ),
-                  ).then((_) => _loadData()),
+                  onPressed: () {
+                    if (PaymentRestrictionService().checkRestriction(context)) return;
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const VehicleListScreen(),
+                      ),
+                    ).then((_) => _loadData());
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryOrange,
                     foregroundColor: Colors.white,

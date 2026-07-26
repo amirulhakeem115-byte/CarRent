@@ -67,16 +67,24 @@
     },
 
     "support_tickets": {
+      ".read": "auth != null",
+      ".write": "auth != null",
       ".indexOn": ["customerId", "status", "lastReplyAt"],
       "$ticketId": {
-        ".read": "auth != null && (data.child('customerId').val() == auth.uid || root.child('users').child(auth.uid).child('role').val() == 'admin')",
-        ".write": "auth != null && ((!data.exists() && newData.child('customerId').val() == auth.uid) || data.child('customerId').val() == auth.uid || root.child('users').child(auth.uid).child('role').val() == 'admin')"
+        ".read": "auth != null && (data.child('customerId').val() == auth.uid || root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'Admin')",
+        ".write": "auth != null && ((!data.exists() && newData.child('customerId').val() == auth.uid) || data.child('customerId').val() == auth.uid || root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'Admin')"
       }
     },
 
     "support_messages": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      "$ticketId": {
+        ".read": "auth != null && (root.child('support_tickets').child($ticketId).child('customerId').val() == auth.uid || root.child('support_tickets').child($ticketId).child('userId').val() == auth.uid || root.child('support_tickets').child($ticketId).child('customerUid').val() == auth.uid || root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'Admin')",
+        ".write": "auth != null && (root.child('support_tickets').child($ticketId).child('customerId').val() == auth.uid || root.child('support_tickets').child($ticketId).child('userId').val() == auth.uid || root.child('support_tickets').child($ticketId).child('customerUid').val() == auth.uid || root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'Admin')",
+        "$messageId": {
+          ".read": "auth != null && (root.child('support_tickets').child($ticketId).child('customerId').val() == auth.uid || root.child('support_tickets').child($ticketId).child('userId').val() == auth.uid || root.child('support_tickets').child($ticketId).child('customerUid').val() == auth.uid || root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'Admin')",
+          ".write": "auth != null && (root.child('support_tickets').child($ticketId).child('customerId').val() == auth.uid || root.child('support_tickets').child($ticketId).child('userId').val() == auth.uid || root.child('support_tickets').child($ticketId).child('customerUid').val() == auth.uid || root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'Admin')"
+        }
+      }
     },
 
     "license_verifications": {

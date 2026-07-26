@@ -27,6 +27,7 @@ import '../../../services/company_settings_provider.dart';
 import '../../../services/receipt_service.dart';
 import 'customer_responsive_shell.dart';
 import 'history_screen.dart';
+import '../../../services/payment_restriction_service.dart';
 
 class BookingScreen extends StatefulWidget {
   final VehicleModel vehicle;
@@ -216,6 +217,13 @@ class _BookingScreenState extends State<BookingScreen> {
             builder: (context) => LoginScreen(onLoggedIn: () {}),
           ),
         );
+        return;
+      }
+      if (widget.existingBooking == null && mounted) {
+        if (PaymentRestrictionService().checkRestriction(context)) {
+          Navigator.of(context).pop();
+          return;
+        }
       }
     });
   }
@@ -310,6 +318,7 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   Future<void> _applyPromoCode() async {
+    if (PaymentRestrictionService().checkRestriction(context)) return;
     final code = _promoCodeController.text.trim();
     if (code.isEmpty) return;
 
@@ -913,7 +922,7 @@ class _BookingScreenState extends State<BookingScreen> {
     }
 
     if (_paymentMethod == 'DuitNow QR') {
-      _showPaymentDialog(isQr: true);
+      _showQrPaymentDialog();
     } else if (_paymentMethod == 'Online Bank Transfer') {
       _showPaymentDialog(isQr: false);
     } else if (_paymentMethod == 'FPX Online Banking') {
@@ -1434,6 +1443,404 @@ class _BookingScreenState extends State<BookingScreen> {
                 _processBooking(
                   status: 'Approved',
                   txId: 'CASH-BRANCH-${DateTime.now().millisecondsSinceEpoch}',
+                  amount: payAmount,
+                  paymentDate: now,
+                  paymentTime: autoTime,
+                );
+              },
+              child: const Text(
+                'CONFIRM',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showQrPaymentDialog() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final payAmount = _paymentOption == 'Deposit'
+        ? _depositAmount
+        : _discountedTotal;
+    final DateFormat dialogDateFormat = DateFormat('yyyy-MM-dd');
+    final titleColor = isDark
+        ? const Color(0xFFF8FAFC)
+        : AppColors.secondaryBlue;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(
+              color: isDark ? const Color(0xFF334155) : Colors.transparent,
+            ),
+          ),
+          title: Text(
+            'Pay via DuitNow QR',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: titleColor,
+            ),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF0F172A)
+                        : AppColors.lightGray,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isDark
+                          ? const Color(0xFF334155)
+                          : Colors.transparent,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'BOOKING SUMMARY',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Vehicle: ${widget.vehicle.brand} ${widget.vehicle.model}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: isDark
+                              ? const Color(0xFFF8FAFC)
+                              : AppColors.secondaryBlue,
+                        ),
+                      ),
+                      Text(
+                        'Dates: ${dialogDateFormat.format(_pickupDate!)} to ${_isOpenRental ? "Open Rental" : dialogDateFormat.format(_returnDate!)} ($_rentalDays days)',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark
+                              ? const Color(0xFFCBD5E1)
+                              : AppColors.secondaryBlue,
+                        ),
+                      ),
+                      const Divider(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Total Price:',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark
+                                  ? Colors.white70
+                                  : Colors.black87,
+                            ),
+                          ),
+                          Text(
+                            'RM ${_totalPrice.toStringAsFixed(2)}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : Colors.black,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Amount Due ($_paymentOption):',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.primaryOrange,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            'RM ${payAmount.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primaryOrange,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  'Scan the QR code below using your bank or e-wallet app to complete the payment.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: isDark
+                        ? const Color(0xFFCBD5E1)
+                        : Colors.black87,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                if (_qrCodeUrl != null && _qrCodeUrl!.isNotEmpty)
+                  Container(
+                    width: 200,
+                    height: 200,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(
+                        color: Colors.grey[200]!,
+                        width: 2,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      children: [
+                        Container(
+                          color: Colors.pink,
+                          width: double.infinity,
+                          height: 30,
+                          alignment: Alignment.center,
+                          child: const Text(
+                            'DuitNow QR',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: AppImage(
+                            imageSrc: _qrCodeUrl,
+                            fit: BoxFit.contain,
+                            placeholder: const Icon(
+                              Icons.qr_code_2,
+                              size: 120,
+                              color: Colors.black,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          'RM ${payAmount.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? const Color(0xFF0F172A)
+                          : Colors.grey[100],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.qr_code_2,
+                      size: 100,
+                      color: Colors.grey,
+                    ),
+                  ),
+                const SizedBox(height: 16),
+                if (_bankName != null && _bankName!.isNotEmpty) ...[
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Bank Name:',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_bankLogoUrl != null &&
+                              _bankLogoUrl!.isNotEmpty) ...[
+                            AppImage(
+                              imageSrc: _bankLogoUrl!,
+                              height: 18,
+                              placeholder: const SizedBox(),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                          Text(
+                            _bankName!,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: isDark
+                                  ? const Color(0xFFF8FAFC)
+                                  : AppColors.secondaryBlue,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Account Name:',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      Text(
+                        _accountName ?? '',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: isDark
+                              ? const Color(0xFFCBD5E1)
+                              : AppColors.secondaryBlue,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Account Number:',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      Text(
+                        _accountNumber ?? '',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: isDark
+                              ? const Color(0xFFCBD5E1)
+                              : AppColors.secondaryBlue,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Divider(),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(
+                'CANCEL',
+                style: TextStyle(
+                  color: isDark ? const Color(0xFF94A3B8) : Colors.grey,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryOrange,
+              ),
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _showQrConfirmationDialog(payAmount);
+              },
+              child: const Text(
+                'I Have Completed the Payment',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showQrConfirmationDialog(double payAmount) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final titleColor = isDark
+        ? const Color(0xFFF8FAFC)
+        : AppColors.secondaryBlue;
+    final textColor = isDark ? const Color(0xFFCBD5E1) : Colors.black87;
+    final DateFormat timeFormat = DateFormat('HH:mm:ss');
+    final now = DateTime.now();
+    final autoTime = timeFormat.format(now);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(
+              color: isDark ? const Color(0xFF334155) : Colors.transparent,
+            ),
+          ),
+          title: Text(
+            'Confirm QR Payment',
+            style: TextStyle(fontWeight: FontWeight.bold, color: titleColor),
+          ),
+          content: Text(
+            'Please confirm that you have scanned the QR code and completed the payment of RM ${payAmount.toStringAsFixed(2)}.',
+            style: TextStyle(color: textColor, fontSize: 13, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'CANCEL',
+                style: TextStyle(
+                  color: isDark ? const Color(0xFF94A3B8) : Colors.grey,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryOrange,
+              ),
+              onPressed: () {
+                Navigator.pop(context);
+                final txId = 'QR-${DateTime.now().millisecondsSinceEpoch}';
+                _processBooking(
+                  status: 'Approved',
+                  txId: txId,
                   amount: payAmount,
                   paymentDate: now,
                   paymentTime: autoTime,
@@ -2211,7 +2618,7 @@ class _BookingScreenState extends State<BookingScreen> {
           method.toLowerCase().contains('duitnow')) {
         _paymentMethod = 'DuitNow QR';
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _showPaymentDialog(isQr: true);
+          if (mounted) _showQrPaymentDialog();
         });
       } else {
         _paymentMethod = 'Cash';

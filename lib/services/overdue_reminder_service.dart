@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:intl/intl.dart';
 import '../models/booking_model.dart';
@@ -36,6 +37,8 @@ class OverdueReminderService {
   /// Evaluates all active, ongoing, and overdue rentals against server return timestamps
   Future<void> checkOverdueRentals() async {
     if (_isChecking) return;
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return;
     _isChecking = true;
 
     try {

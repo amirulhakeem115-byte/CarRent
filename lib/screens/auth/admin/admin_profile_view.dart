@@ -279,11 +279,11 @@ class _AdminProfileViewState extends State<AdminProfileView> {
 
     if (confirmed != true) return;
 
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     try {
       setState(() => _loading = true);
       await _databaseService.updateUser(_adminUser!.id, {'profileImage': ''});
-      scaffoldMessenger.showSnackBar(
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Profile photo removed'),
           backgroundColor: Colors.orange,
@@ -291,14 +291,18 @@ class _AdminProfileViewState extends State<AdminProfileView> {
       );
       await _loadProfileAndStats();
     } catch (e) {
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text('Failed to remove image: $e'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to remove image: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     } finally {
-      setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 

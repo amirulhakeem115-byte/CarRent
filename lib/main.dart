@@ -14,6 +14,8 @@ import 'services/user_session.dart';
 import 'services/overdue_reminder_service.dart';
 import 'services/admin_booking_observer_service.dart';
 
+import 'services/payment_restriction_service.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -62,6 +64,9 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => CompanySettingsProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => AIService()),
+        ChangeNotifierProvider(
+          create: (_) => PaymentRestrictionService()..initialize(),
+        ),
       ],
       child: const MyApp(),
     ),

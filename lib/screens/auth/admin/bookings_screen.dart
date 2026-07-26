@@ -109,6 +109,39 @@ class _BookingsViewState extends State<BookingsView> {
     _loadBookings();
   }
 
+  Color _getBookingStatusColor(String status, bool isDark) {
+    final s = status.trim().toLowerCase();
+    if (s == 'pending') {
+      return isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280); // Grey
+    }
+    if (s == 'approved' || s == 'confirmed') {
+      return const Color(0xFF10B981); // Green
+    }
+    if (s == 'on the way' || s == 'ontheway' || s == 'on_the_way') {
+      return const Color(0xFF3B82F6); // Blue
+    }
+    if (s == 'ongoing' || s == 'active' || s == 'rental active') {
+      return isDark ? const Color(0xFF22D3EE) : const Color(0xFF00ACC1); // Cyan
+    }
+    if (s == 'waiting for return approval' ||
+        s == 'return requested' ||
+        s == 'awaiting return inspection' ||
+        s == 'awaiting final payment' ||
+        s == 'return_requested') {
+      return isDark ? const Color(0xFFFB923C) : const Color(0xFFEA580C); // Orange / Deep Amber (High visibility)
+    }
+    if (s == 'completed') {
+      return isDark ? const Color(0xFF60A5FA) : const Color(0xFF1E3A8A); // Dark Blue
+    }
+    if (s == 'cancelled' || s == 'canceled' || s == 'rejected') {
+      return const Color(0xFFEF4444); // Red
+    }
+    if (s == 'overdue') {
+      return isDark ? const Color(0xFFF87171) : const Color(0xFFB91C1C); // Crimson Red
+    }
+    return isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280);
+  }
+
   void _showBookingDetails(BookingModel booking) {
     final dateFormat = DateFormat('dd MMM yyyy');
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -133,26 +166,11 @@ class _BookingsViewState extends State<BookingsView> {
       backgroundColor: sheetBg,
       builder: (context) {
         final isCompactMobile = MediaQuery.of(context).size.width < 420;
-        Color statusColor = Colors.orange;
         final bStat = booking.status.trim().toLowerCase();
         final isCompleted = bStat == 'completed';
         final isCancelled = bStat == 'cancelled' || bStat == 'canceled';
         final hideTransitionStateSection = isCompleted || isCancelled;
-        if (bStat == 'approved') {
-          statusColor = Colors.green;
-        }
-        if (bStat == 'ongoing' || bStat == 'active') {
-          statusColor = Colors.blue;
-        }
-        if (isCompleted) {
-          statusColor = Colors.indigo;
-        }
-        if (isCancelled || bStat == 'rejected') {
-          statusColor = Colors.redAccent;
-        }
-        if (bStat == 'overdue') {
-          statusColor = Colors.red;
-        }
+        final statusColor = _getBookingStatusColor(booking.status, isDark);
 
         return Padding(
           padding: EdgeInsets.only(
@@ -926,23 +944,8 @@ class _BookingsViewState extends State<BookingsView> {
           ),
         ],
         rows: bookings.map((b) {
-          Color statusColor = Colors.orange;
+          final Color statusColor = _getBookingStatusColor(b.status, isDark);
           final bStat = b.status.toLowerCase();
-          if (bStat == 'approved') {
-            statusColor = Colors.green;
-          }
-          if (bStat == 'ongoing' || bStat == 'active') {
-            statusColor = Colors.blue;
-          }
-          if (bStat == 'completed') {
-            statusColor = Colors.indigo;
-          }
-          if (bStat == 'cancelled' || bStat == 'rejected') {
-            statusColor = Colors.redAccent;
-          }
-          if (bStat == 'overdue') {
-            statusColor = Colors.red;
-          }
           final dateFormat = DateFormat('yyyy-MM-dd');
           return DataRow(
             cells: [
@@ -1073,23 +1076,8 @@ class _BookingsViewState extends State<BookingsView> {
       itemCount: bookings.length,
       itemBuilder: (context, index) {
         final b = bookings[index];
-        Color statusColor = Colors.orange;
+        final Color statusColor = _getBookingStatusColor(b.status, isDark);
         final bStat = b.status.toLowerCase();
-        if (bStat == 'approved') {
-          statusColor = Colors.green;
-        }
-        if (bStat == 'ongoing' || bStat == 'active') {
-          statusColor = Colors.blue;
-        }
-        if (bStat == 'completed') {
-          statusColor = Colors.indigo;
-        }
-        if (bStat == 'cancelled' || bStat == 'rejected') {
-          statusColor = Colors.redAccent;
-        }
-        if (bStat == 'overdue') {
-          statusColor = Colors.red;
-        }
         final dateFormat = DateFormat('yyyy-MM-dd');
         return Card(
           color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8F9FA),

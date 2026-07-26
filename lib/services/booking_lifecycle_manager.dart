@@ -6,7 +6,6 @@ import '../models/booking_model.dart';
 import 'booking_service.dart';
 import 'notification_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'user_session.dart';
 
 class BookingLifecycleManager {
   static final BookingLifecycleManager _instance = BookingLifecycleManager._internal();
@@ -39,8 +38,8 @@ class BookingLifecycleManager {
     if (Firebase.apps.isEmpty) {
       return;
     }
-    if (FirebaseAuth.instance.currentUser == null || !UserSession().isInitialized) {
-      debugPrint('[BookingLifecycleManager] Skipping check — user is not authenticated or role is not loaded.');
+    if (FirebaseAuth.instance.currentUser == null) {
+      debugPrint('[BookingLifecycleManager] Skipping check — user is not authenticated.');
       return;
     }
     if (_isProcessing) return;
@@ -72,7 +71,7 @@ class BookingLifecycleManager {
           final difference = booking.pickUpDate.difference(now);
           final bool pickupReminderSent = booking.pickupReminderSent;
           
-          if (!pickupReminderSent && difference.inMinutes > 0 && difference.inMinutes <= 60) {
+          if (!pickupReminderSent && difference.inMinutes >= 0 && difference.inMinutes <= 60) {
             debugPrint('[BookingLifecycleManager] Sending 1 hour pickup reminder for booking ${booking.id}');
             // Mark as sent in DB first to prevent duplicate sends
             await _db.child('bookings').child(booking.id).update({'pickupReminderSent': true});
@@ -83,6 +82,11 @@ class BookingLifecycleManager {
               title: "Pick-up Reminder 🚗",
               message: "Your vehicle pickup is in one hour.",
               type: 'pickup_reminder_customer',
+              category: 'Bookings',
+              customerName: booking.userName,
+              vehicleName: booking.vehicleName,
+              bookingId: booking.id,
+              priority: 'high',
               icon: '🚗',
               color: '0xFFF59E0B',
               relatedId: booking.id,
@@ -92,8 +96,13 @@ class BookingLifecycleManager {
             // Notify admin
             await _notificationService.notifyAllAdmins(
               title: "Customer Pick-up Scheduled 🚗",
-              message: "Customer pickup is scheduled in one hour.",
+              message: "Customer ${booking.userName} is scheduled to pick up ${booking.vehicleName} in one hour (Booking #${booking.id.toUpperCase().substring(0, booking.id.length > 8 ? 8 : booking.id.length)}).",
               type: 'pickup_reminder_admin',
+              category: 'Bookings',
+              customerName: booking.userName,
+              vehicleName: booking.vehicleName,
+              bookingId: booking.id,
+              priority: 'high',
               icon: '🚗',
               color: '0xFF3B82F6',
               relatedId: booking.id,
@@ -103,21 +112,33 @@ class BookingLifecycleManager {
         }
         
         // 2. Return Reminder (1 hour before return date/time)
-        if ((statusLower == 'active' || statusLower == 'ongoing') && !booking.isOpenRental) {
+        final bool isEligibleForReturnReminder = (statusLower == 'active' ||
+                statusLower == 'ongoing' ||
+                statusLower == 'confirmed' ||
+                statusLower == 'approved') &&
+            !booking.isOpenRental &&
+            booking.returnDate != null;
+
+        if (isEligibleForReturnReminder) {
           final difference = booking.returnDate!.difference(now);
           final bool returnReminderSent = booking.returnReminderSent;
           
-          if (!returnReminderSent && difference.inMinutes > 0 && difference.inMinutes <= 60) {
+          if (!returnReminderSent && difference.inMinutes >= 0 && difference.inMinutes <= 60) {
             debugPrint('[BookingLifecycleManager] Sending 1 hour return reminder for booking ${booking.id}');
-            // Mark as sent in DB
+            // Mark as sent in DB first to prevent duplicate sends
             await _db.child('bookings').child(booking.id).update({'returnReminderSent': true});
             
             // Notify customer
             await _notificationService.createNotification(
               userId: booking.userId,
               title: "Rental Ending Soon ⚠️",
-              message: "Your rental ends in one hour.",
+              message: "Your rental for ${booking.vehicleName} ends in one hour.",
               type: 'return_reminder_customer',
+              category: 'Bookings',
+              customerName: booking.userName,
+              vehicleName: booking.vehicleName,
+              bookingId: booking.id,
+              priority: 'high',
               icon: '⚠️',
               color: '0xFFEF4444',
               relatedId: booking.id,
@@ -127,8 +148,13 @@ class BookingLifecycleManager {
             // Notify admin
             await _notificationService.notifyAllAdmins(
               title: "Vehicle Return Due ⚠️",
-              message: "Vehicle return is due in one hour.",
+              message: "Vehicle ${booking.vehicleName} (Booking #${booking.id.toUpperCase().substring(0, booking.id.length > 8 ? 8 : booking.id.length)}) is expected to be returned by ${booking.userName} in one hour.",
               type: 'return_reminder_admin',
+              category: 'Open Rental',
+              customerName: booking.userName,
+              vehicleName: booking.vehicleName,
+              bookingId: booking.id,
+              priority: 'high',
               icon: '⚠️',
               color: '0xFFF59E0B',
               relatedId: booking.id,

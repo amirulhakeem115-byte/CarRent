@@ -31,6 +31,7 @@ import '../../../services/file_download_helper.dart'
 import '../login_screen.dart';
 import 'reward_history_screen.dart';
 import '../../../services/company_settings_provider.dart';
+import '../../../services/payment_restriction_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -581,6 +582,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _submitReview(BookingModel booking) {
+    if (PaymentRestrictionService().checkRestriction(context)) return;
     double selectedRating = 5.0;
     final commentController = TextEditingController();
 

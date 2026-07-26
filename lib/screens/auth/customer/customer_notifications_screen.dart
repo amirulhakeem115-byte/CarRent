@@ -7,10 +7,11 @@ import '../../../services/notification_service.dart';
 import '../../../models/notification_model.dart';
 import '../../../models/booking_model.dart';
 import '../../../models/payment_model.dart';
-import '../../../widgets/loading_widget.dart';
 import 'reward_history_screen.dart';
 import '../../../services/receipt_service.dart';
 import '../../../services/user_role_cache.dart';
+import '../../../widgets/animated_widgets.dart';
+import '../../../widgets/skeleton_loaders.dart';
 
 class CustomerNotificationsScreen extends StatefulWidget {
   const CustomerNotificationsScreen({super.key});
@@ -119,8 +120,10 @@ class _CustomerNotificationsScreenState
         stream: _notificationsStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: LoadingWidget(message: 'Syncing notifications...'),
+            return ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: 6,
+              itemBuilder: (context, index) => const NotificationItemSkeleton(),
             );
           }
 
@@ -265,7 +268,10 @@ class _CustomerNotificationsScreenState
                             SizedBox(height: _isPhone ? 10 : 12),
                         itemBuilder: (context, index) {
                           final notif = filteredNotifs[index];
-                          return _buildNotificationCard(notif, currentUser.uid);
+                          return FadeInUp(
+                            index: index,
+                            child: _buildNotificationCard(notif, currentUser.uid),
+                          );
                         },
                       ),
               ),
@@ -542,27 +548,10 @@ class _CustomerNotificationsScreenState
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.notifications_off_outlined,
-            size: 64,
-            color: _isDark ? const Color(0xFF334155) : Colors.grey[300],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No matching notifications',
-            style: TextStyle(fontWeight: FontWeight.bold, color: _textColor),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Try adjusting your search query or filters.',
-            style: TextStyle(color: _subColor, fontSize: 12),
-          ),
-        ],
-      ),
+    return const AnimatedEmptyState(
+      icon: Icons.notifications_off_outlined,
+      title: 'No Matching Notifications',
+      subtitle: 'Try adjusting your search query or category filters.',
     );
   }
 
@@ -1416,6 +1405,7 @@ class _CustomerNotificationsScreenState
         'customerStatus': 'on_my_way',
         'userId': effectiveUserId,
         'updatedAt': DateTime.now().toIso8601String(),
+        'notifiedEvents/on_my_way': true,
       });
 
       debugPrint('[STEP 2] Booking status updated successfully (Booking ID: $bookingId)');

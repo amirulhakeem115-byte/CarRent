@@ -8,6 +8,9 @@ import '../../../constants/colors.dart';
 import 'vehicle_details_screen.dart';
 import 'customer_responsive_shell.dart';
 import '../../../widgets/app_image.dart';
+import '../../../services/payment_restriction_service.dart';
+import '../../../widgets/animated_widgets.dart';
+import '../../../widgets/skeleton_loaders.dart';
 
 class VehicleListScreen extends StatefulWidget {
   const VehicleListScreen({super.key});
@@ -196,10 +199,22 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(
-                color: AppColors.primaryOrange,
-                strokeWidth: 2.5,
+          ? Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: isDesktop ? 60.0 : 20.0,
+                vertical: 24.0,
+              ),
+              child: GridView.builder(
+                itemCount: 6,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: isDesktop
+                      ? 3
+                      : (MediaQuery.of(context).size.width > 600 ? 2 : 1),
+                  crossAxisSpacing: 18,
+                  mainAxisSpacing: 18,
+                  childAspectRatio: isDesktop ? 0.68 : 0.72,
+                ),
+                itemBuilder: (context, index) => const VehicleCardSkeleton(),
               ),
             )
           : _error != null
@@ -947,7 +962,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
   Widget _buildResultsGridOrList(List<VehicleModel> vehicles, bool isDesktop) {
     if (vehicles.isEmpty) {
       return Container(
-        padding: const EdgeInsets.all(48),
+        padding: const EdgeInsets.all(32),
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
@@ -957,32 +972,11 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                 : Colors.grey[100]!,
           ),
         ),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.directions_car_filled_outlined,
-                size: 48,
-                color: Colors.grey[300],
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'No matching vehicles found',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  color: AppColors.secondaryBlue,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Try adjusting your filters or clear search to view the full fleet again.',
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
+        child: const AnimatedEmptyState(
+          icon: Icons.directions_car_filled_outlined,
+          title: 'No Matching Vehicles Found',
+          subtitle:
+              'Try adjusting your filters or clear search to view the full fleet again.',
         ),
       );
     }
@@ -1004,7 +998,10 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
               : (crossAxisCount == 1 ? 1.06 : 0.72),
         ),
         itemBuilder: (context, index) {
-          return _buildGridCard(vehicles[index]);
+          return FadeInUp(
+            index: index,
+            child: _buildGridCard(vehicles[index]),
+          );
         },
       );
     } else {
@@ -1014,7 +1011,10 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
         itemCount: vehicles.length,
         separatorBuilder: (context, index) => const SizedBox(height: 16),
         itemBuilder: (context, index) {
-          return _buildListCard(vehicles[index]);
+          return FadeInUp(
+            index: index,
+            child: _buildListCard(vehicles[index]),
+          );
         },
       );
     }
@@ -1236,6 +1236,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                       ElevatedButton(
                         onPressed: isAvailable
                             ? () {
+                                if (PaymentRestrictionService().checkRestriction(context)) return;
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
@@ -1282,6 +1283,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                         child: ElevatedButton(
                           onPressed: isAvailable
                               ? () {
+                                  if (PaymentRestrictionService().checkRestriction(context)) return;
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
@@ -1525,6 +1527,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                           ElevatedButton(
                             onPressed: isAvailable
                                 ? () {
+                                    if (PaymentRestrictionService().checkRestriction(context)) return;
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(

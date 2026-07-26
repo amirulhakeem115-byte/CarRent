@@ -4,6 +4,7 @@ import '../constants/colors.dart';
 import '../screens/auth/customer/vehicle_details_screen.dart';
 import '../screens/auth/customer/customer_responsive_shell.dart';
 import 'app_image.dart';
+import 'animated_widgets.dart';
 
 /// A card widget to display vehicle details such as brand, model, price, transmission,
 /// fuel type, seats, and availability status.
@@ -31,15 +32,13 @@ class VehicleCard extends StatelessWidget {
         onTap: isAvailable
             ? (onTap ??
                   () {
-                    Navigator.push(
+                    SmoothPageRoute.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (context) => CustomerResponsiveShell(
-                          initialIndex: 1,
-                          customBody: VehicleDetailsScreen(
-                            vehicle: vehicle,
-                            hideAppBar: true,
-                          ),
+                      CustomerResponsiveShell(
+                        initialIndex: 1,
+                        customBody: VehicleDetailsScreen(
+                          vehicle: vehicle,
+                          hideAppBar: true,
                         ),
                       ),
                     );
@@ -245,35 +244,24 @@ class VehicleCard extends StatelessWidget {
                           ),
                         ],
                       ),
-                      ElevatedButton(
+                      AnimatedButton(
                         onPressed: isAvailable
                             ? () {
-                                Navigator.push(
+                                SmoothPageRoute.push(
                                   context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        CustomerResponsiveShell(
-                                          initialIndex: 1,
-                                          customBody: VehicleDetailsScreen(
-                                            vehicle: vehicle,
-                                            hideAppBar: true,
-                                          ),
-                                        ),
+                                  CustomerResponsiveShell(
+                                    initialIndex: 1,
+                                    customBody: VehicleDetailsScreen(
+                                      vehicle: vehicle,
+                                      hideAppBar: true,
+                                    ),
                                   ),
                                 );
                               }
                             : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primaryOrange,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 10,
-                          ),
-                          elevation: 0,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
                         ),
                         child: const Text(
                           'DETAILS',

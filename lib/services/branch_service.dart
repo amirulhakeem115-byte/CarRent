@@ -6,7 +6,24 @@ import 'notification_service.dart';
 class BranchService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref().child('branches');
 
-  Future<List<BranchModel>> getBranches() async {
+  List<BranchModel>? _cachedBranches;
+  DateTime? _branchesCacheTime;
+  static const Duration _cacheTtl = Duration(seconds: 60);
+
+  void invalidateCache() {
+    _cachedBranches = null;
+    _branchesCacheTime = null;
+  }
+
+  Future<List<BranchModel>> getBranches({bool forceRefresh = false}) async {
+    if (!forceRefresh &&
+        _cachedBranches != null &&
+        _branchesCacheTime != null &&
+        DateTime.now().difference(_branchesCacheTime!) < _cacheTtl) {
+      debugPrint('[BranchService] Returning warm cached branches (${_cachedBranches!.length} items)');
+      return _cachedBranches!;
+    }
+
     List<BranchModel> branches = [];
     try {
       final snapshot = await _db.get().timeout(const Duration(seconds: 8));
@@ -18,6 +35,8 @@ class BranchService {
           }
         });
       }
+      _cachedBranches = branches;
+      _branchesCacheTime = DateTime.now();
     } catch (e) {
       debugPrint('Error getting branches from Realtime Database: $e');
     }
@@ -39,6 +58,7 @@ class BranchService {
 
   Future<void> addBranch(BranchModel branch) async {
     try {
+      invalidateCache();
       final newRef = _db.push();
       final data = branch.toMap();
       data['id'] = newRef.key!;
@@ -62,6 +82,7 @@ class BranchService {
 
   Future<void> updateBranch(String id, Map<String, dynamic> data) async {
     try {
+      invalidateCache();
       await _db.child(id).update(data);
       
       final name = data['branchName'] ?? '';
@@ -85,6 +106,7 @@ class BranchService {
 
   Future<void> deleteBranch(String id) async {
     try {
+      invalidateCache();
       await _db.child(id).remove();
 
       final notificationService = NotificationService();

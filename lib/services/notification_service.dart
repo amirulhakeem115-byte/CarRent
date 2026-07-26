@@ -130,61 +130,35 @@ class NotificationService {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) return notifications;
 
-    String targetUserId = userId;
-    if (userId != currentUser.uid) {
-      if (!includeAdminNotifications) {
-        targetUserId = currentUser.uid;
-      } else {
-        final currentRole = await UserRoleCache.getRole(currentUser.uid);
-        if (currentRole != 'admin') {
-          targetUserId = currentUser.uid;
-        }
-      }
-    }
+    final currentRole = await UserRoleCache.getRole(currentUser.uid);
+    final bool isAdmin = currentRole == 'admin';
 
     try {
-      Query query = _baseDb.orderByChild('userId').equalTo(targetUserId);
-      if (limit != null) {
-        query = query.limitToLast(limit);
+      final Set<String> targetIds = {userId, currentUser.uid};
+      if (isAdmin || userId == 'admin' || includeAdminNotifications) {
+        targetIds.add('admin');
       }
-      final snapshot = await query.get().timeout(const Duration(seconds: 10));
-      if (snapshot.exists) {
-        final Map<dynamic, dynamic> data =
-            snapshot.value as Map<dynamic, dynamic>;
-        data.forEach((key, value) {
-          notifications.add(
-            NotificationModel.fromMap(
-              key.toString(),
-              value as Map<dynamic, dynamic>,
-            ),
-          );
-        });
-      }
-    } catch (e) {
-      debugPrint(
-        '[NotificationService] Error getting notifications with query: $e. Using node fallback.',
-      );
-      try {
-        final fallbackSnapshot = await _baseDb.get().timeout(
-          const Duration(seconds: 10),
-        );
-        if (fallbackSnapshot.exists && fallbackSnapshot.value != null) {
-          final Map<dynamic, dynamic> data =
-              fallbackSnapshot.value as Map<dynamic, dynamic>;
+
+      final Map<String, NotificationModel> map = {};
+      for (final tId in targetIds) {
+        Query query = _baseDb.orderByChild('userId').equalTo(tId);
+        if (limit != null) {
+          query = query.limitToLast(limit);
+        }
+        final snapshot = await query.get().timeout(const Duration(seconds: 10));
+        if (snapshot.exists && snapshot.value != null) {
+          final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
           data.forEach((key, value) {
-            if (value is Map && value['userId']?.toString() == targetUserId) {
-              notifications.add(
-                NotificationModel.fromMap(key.toString(), value),
-              );
+            if (value is Map) {
+              final model = NotificationModel.fromMap(key.toString(), value);
+              map[model.id] = model;
             }
           });
         }
-      } catch (fallbackError) {
-        debugPrint(
-          '[NotificationService] Fallback notification load failed: $fallbackError',
-        );
-        rethrow;
       }
+      notifications = map.values.toList();
+    } catch (e) {
+      debugPrint('[NotificationService] Error getting notifications with query: $e');
     }
 
     notifications.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -202,108 +176,109 @@ class NotificationService {
     }
 
     final controller = StreamController<List<NotificationModel>>.broadcast();
-    StreamSubscription<DatabaseEvent>? personalSub;
+
+    // Query 1: User's own notifications (always queries orderByChild('userId').equalTo(currentUser.uid) to satisfy security rules)
+    final Query userQuery = _baseDb.orderByChild('userId').equalTo(currentUser.uid);
+
+    StreamSubscription<DatabaseEvent>? userSub;
     StreamSubscription<DatabaseEvent>? adminSub;
-    List<NotificationModel> personalList = [];
-    List<NotificationModel> adminList = [];
 
-    void emitMerged() {
+    List<NotificationModel> userNotifs = [];
+    List<NotificationModel> adminNotifs = [];
+
+    void emitCombined() {
       if (controller.isClosed) return;
-      final Map<String, NotificationModel> merged = {};
-      for (var n in personalList) {
-        merged[n.id] = n;
+      final Map<String, NotificationModel> map = {};
+      for (var n in userNotifs) {
+        map[n.id] = n;
       }
-      for (var n in adminList) {
-        merged[n.id] = n;
+      for (var n in adminNotifs) {
+        map[n.id] = n;
       }
-      final list = merged.values.toList();
-      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      final combined = map.values.toList();
+      combined.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       debugPrint(
-        '[TRACE STEP 8] Admin listener received notification update: Total count=${list.length}, Admin count=${adminList.length}',
+        '[NotificationService] Stream update: ${combined.length} notifications loaded for ${currentUser.uid}',
       );
-      if (limit != null && list.length > limit) {
-        controller.add(list.take(limit).toList());
+      if (limit != null && combined.length > limit) {
+        controller.add(combined.take(limit).toList());
       } else {
-        controller.add(list);
+        controller.add(combined);
       }
     }
 
-    // 1. Subscribe to personal notifications
-    Query personalQuery = _baseDb
-        .orderByChild('userId')
-        .equalTo(currentUser.uid);
-    if (limit != null) {
-      personalQuery = personalQuery.limitToLast(limit);
-    }
-    personalSub = personalQuery.onValue.listen(
+    userSub = userQuery.onValue.listen(
       (event) {
-        personalList = [];
+        userNotifs = [];
         if (event.snapshot.exists && event.snapshot.value != null) {
           try {
             final Map<dynamic, dynamic> data =
                 event.snapshot.value as Map<dynamic, dynamic>;
             data.forEach((key, value) {
-              personalList.add(
-                NotificationModel.fromMap(
-                  key.toString(),
-                  value as Map<dynamic, dynamic>,
-                ),
-              );
+              if (value is Map) {
+                userNotifs.add(
+                  NotificationModel.fromMap(key.toString(), value),
+                );
+              }
             });
           } catch (e) {
-            debugPrint('[NotificationService] Error parsing personal notifications: $e');
+            debugPrint(
+              '[NotificationService] Error parsing user notifications stream: $e',
+            );
           }
         }
-        emitMerged();
+        emitCombined();
       },
       onError: (e) {
-        debugPrint('[NotificationService] Error in personal notifications stream query: $e');
+        debugPrint(
+          '[NotificationService] Error in user notifications stream listener: $e',
+        );
         if (!controller.isClosed) {
           controller.addError(e);
         }
       },
     );
 
-    // 2. Subscribe to admin notifications if requested
-    if (includeAdminNotifications) {
-      Query adminQuery = _baseDb.orderByChild('userId').equalTo('admin');
-      if (limit != null) {
-        adminQuery = adminQuery.limitToLast(limit);
-      }
-      adminSub = adminQuery.onValue.listen(
-        (event) {
-          debugPrint('[STEP 7] Admin listener received notification from Firebase');
-          adminList = [];
-          if (event.snapshot.exists && event.snapshot.value != null) {
-            try {
-              final Map<dynamic, dynamic> data =
-                  event.snapshot.value as Map<dynamic, dynamic>;
-              data.forEach((key, value) {
-                adminList.add(
-                  NotificationModel.fromMap(
-                    key.toString(),
-                    value as Map<dynamic, dynamic>,
-                  ),
+    // Query 2: Admin notifications if target user or current user is Admin
+    UserRoleCache.getRole(currentUser.uid).then((role) {
+      final bool isUserAdmin = role == 'admin';
+      final bool isTargetAdmin = userId == 'admin' || isUserAdmin || includeAdminNotifications;
+
+      if (isTargetAdmin && !controller.isClosed) {
+        final Query adminQuery = _baseDb.orderByChild('userId').equalTo('admin');
+        adminSub = adminQuery.onValue.listen(
+          (event) {
+            adminNotifs = [];
+            if (event.snapshot.exists && event.snapshot.value != null) {
+              try {
+                final Map<dynamic, dynamic> data =
+                    event.snapshot.value as Map<dynamic, dynamic>;
+                data.forEach((key, value) {
+                  if (value is Map) {
+                    adminNotifs.add(
+                      NotificationModel.fromMap(key.toString(), value),
+                    );
+                  }
+                });
+              } catch (e) {
+                debugPrint(
+                  '[NotificationService] Error parsing admin notifications stream: $e',
                 );
-              });
-            } catch (e) {
-              debugPrint(
-                '[NotificationService] Error parsing admin notifications: $e',
-              );
+              }
             }
-          }
-          emitMerged();
-        },
-        onError: (e) {
-          debugPrint(
-            '[NotificationService] Error in admin notifications stream query: $e',
-          );
-        },
-      );
-    }
+            emitCombined();
+          },
+          onError: (e) {
+            debugPrint(
+              '[NotificationService] Error in admin notifications stream listener: $e',
+            );
+          },
+        );
+      }
+    });
 
     controller.onCancel = () {
-      personalSub?.cancel();
+      userSub?.cancel();
       adminSub?.cancel();
     };
 
@@ -612,6 +587,7 @@ class NotificationService {
     required String paymentId,
     required double amount,
     required String details,
+    String vehicleName = '',
     String priority = 'normal',
     String icon = '💳',
     String color = '0xFF10B981',
@@ -623,6 +599,7 @@ class NotificationService {
       type: 'payment',
       category: 'Payments',
       customerName: customerName,
+      vehicleName: vehicleName,
       bookingId: bookingId,
       paymentId: paymentId,
       priority: priority,

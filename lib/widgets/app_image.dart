@@ -58,11 +58,15 @@ class AppImage extends StatelessWidget {
       return placeholder ?? _defaultPlaceholder();
     }
     if (src.startsWith('http://') || src.startsWith('https://')) {
+      final int? cacheW = (width != null && width! > 0 && width! < 2000) ? (width! * 2).toInt() : null;
+      final int? cacheH = (height != null && height! > 0 && height! < 2000) ? (height! * 2).toInt() : null;
       return Image.network(
         src,
         width: width,
         height: height,
         fit: fit,
+        cacheWidth: cacheW,
+        cacheHeight: cacheH,
         errorBuilder: (context, error, stackTrace) => placeholder ?? _defaultPlaceholder(),
       );
     }

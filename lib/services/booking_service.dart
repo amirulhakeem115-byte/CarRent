@@ -157,9 +157,13 @@ class BookingService {
 
   Future<void> createBooking(BookingModel booking) async {
     try {
+      invalidateCache();
+      final bookingMap = booking.toMap();
+      bookingMap['notifiedEvents'] = {'new_booking': true};
+
       await _db
           .child(booking.id)
-          .set(booking.toMap())
+          .set(bookingMap)
           .timeout(const Duration(seconds: 10));
 
       // If promotion was used, record promotion analytics!
@@ -211,23 +215,51 @@ class BookingService {
         actionRoute: 'Dashboard',
       );
 
-      // Customer writes ONLY to user notification node. Admin notifications are handled automatically by AdminBookingObserverService.
+      // Create admin notification directly for real-time delivery to Admin
+      final bool isUpcoming = booking.pickUpDate.isAfter(DateTime.now().add(const Duration(days: 1)));
+      await _notificationService.notifyBookingEvent(
+        eventName: shouldMarkBooked
+            ? 'Booking Confirmed'
+            : (isUpcoming ? 'Upcoming Booking Created' : 'New Booking Received'),
+        customerName: booking.userName,
+        vehicleName: booking.vehicleName,
+        bookingId: booking.id,
+        details: 'created a booking for ${booking.vehicleName}.',
+        isUpcoming: isUpcoming,
+        priority: 'high',
+        icon: '📅',
+        color: shouldMarkBooked ? '0xFF10B981' : '0xFF3B82F6',
+        actionRoute: 'Bookings',
+      );
     } catch (e) {
       debugPrint('Error creating booking in Realtime Database: $e');
       rethrow;
     }
   }
 
-  Future<List<BookingModel>> getBookings() async {
+  List<BookingModel>? _cachedBookings;
+  DateTime? _bookingsCacheTime;
+  static const Duration _cacheTtl = Duration(seconds: 30);
+
+  void invalidateCache() {
+    _cachedBookings = null;
+    _bookingsCacheTime = null;
+  }
+
+  Future<List<BookingModel>> getBookings({bool forceRefresh = false}) async {
+    if (!forceRefresh &&
+        _cachedBookings != null &&
+        _bookingsCacheTime != null &&
+        DateTime.now().difference(_bookingsCacheTime!) < _cacheTtl) {
+      debugPrint('[BookingService] Returning warm cached bookings (${_cachedBookings!.length} items)');
+      return _cachedBookings!;
+    }
+
     List<BookingModel> bookings = [];
     final currentUid = FirebaseAuth.instance.currentUser?.uid;
     if (currentUid == null) return bookings;
 
     final currentRole = await UserRoleCache.getRole(currentUid);
-    debugPrint('[BookingService] [getBookings] Accessing path: bookings');
-    debugPrint(
-      '[BookingService] [getBookings] Current UID: $currentUid, Current Role: $currentRole',
-    );
 
     try {
       final DataSnapshot snapshot;
@@ -253,6 +285,9 @@ class BookingService {
           );
         });
       }
+
+      _cachedBookings = bookings;
+      _bookingsCacheTime = DateTime.now();
 
       debugPrint(
         '[BookingService] [getBookings] Bookings count loaded: ${bookings.length}',
@@ -356,6 +391,7 @@ class BookingService {
     bool isAutomatic = false,
   }) async {
     try {
+      invalidateCache();
       final String statusLower = status.toLowerCase();
 
       final Map<String, dynamic> updates = {
@@ -961,6 +997,7 @@ class BookingService {
             'status': newStatus,
             'userId': effectiveUserId,
             'updatedAt': DateTime.now().toIso8601String(),
+            'notifiedEvents/return_requested': true,
           })
           .timeout(const Duration(seconds: 10));
 

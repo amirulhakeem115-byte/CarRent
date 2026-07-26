@@ -483,6 +483,7 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
                                             color: textSecondary,
                                           ),
                                         ),
+                                        _buildMetadataChips(notif, isDark),
                                         if (notif.type ==
                                             'pickup_reminder_admin') ...[
                                           const SizedBox(height: 8),
@@ -1205,5 +1206,143 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
         ).showSnackBar(SnackBar(content: Text('Error updating status: $e')));
       }
     }
+  }
+
+  Widget _buildMetadataChips(NotificationModel notif, bool isDark) {
+    final chips = <Widget>[];
+
+    if (!notif.isRead) {
+      chips.add(
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: AppColors.primaryOrange.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: AppColors.primaryOrange.withValues(alpha: 0.5),
+            ),
+          ),
+          child: const Text(
+            'UNREAD',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+              color: AppColors.primaryOrange,
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (notif.customerName.isNotEmpty) {
+      chips.add(
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: isDark
+                ? const Color(0xFF334155)
+                : const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.person_outline,
+                size: 12,
+                color: isDark ? Colors.cyanAccent : AppColors.secondaryBlue,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                notif.customerName,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : AppColors.secondaryBlue,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (notif.vehicleName.isNotEmpty) {
+      chips.add(
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: isDark
+                ? const Color(0xFF334155)
+                : const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.directions_car_outlined,
+                size: 12,
+                color: isDark ? Colors.amberAccent : Colors.orange.shade800,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                notif.vehicleName,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : AppColors.secondaryBlue,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (notif.bookingId.isNotEmpty) {
+      chips.add(
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: isDark
+                ? const Color(0xFF334155)
+                : const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.confirmation_number_outlined,
+                size: 12,
+                color: isDark ? Colors.tealAccent : Colors.teal,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                '#${notif.bookingId.toUpperCase()}',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : AppColors.secondaryBlue,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (chips.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: chips,
+      ),
+    );
   }
 }

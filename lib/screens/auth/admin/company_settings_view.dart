@@ -727,10 +727,12 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
             prefixIcon: Icon(Icons.email_outlined),
           ),
           validator: (val) {
-            if (val == null || val.trim().isEmpty)
+            if (val == null || val.trim().isEmpty) {
               return 'Support email required';
-            if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val))
+            }
+            if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val)) {
               return 'Enter a valid email';
+            }
             return null;
           },
         ),
@@ -806,11 +808,13 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
             prefixIcon: Icon(Icons.verified_user_rounded),
           ),
           validator: (val) {
-            if (val == null || val.trim().isEmpty)
+            if (val == null || val.trim().isEmpty) {
               return 'Silver threshold is required';
+            }
             final parsed = int.tryParse(val);
-            if (parsed == null || parsed < 0)
+            if (parsed == null || parsed < 0) {
               return 'Must be a positive integer';
+            }
             return null;
           },
         ),
@@ -824,14 +828,17 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
             prefixIcon: Icon(Icons.stars_rounded),
           ),
           validator: (val) {
-            if (val == null || val.trim().isEmpty)
+            if (val == null || val.trim().isEmpty) {
               return 'Gold threshold is required';
+            }
             final parsed = int.tryParse(val);
-            if (parsed == null || parsed < 0)
+            if (parsed == null || parsed < 0) {
               return 'Must be a positive integer';
+            }
             final silverVal = int.tryParse(_silverThresholdController.text);
-            if (silverVal != null && parsed <= silverVal)
+            if (silverVal != null && parsed <= silverVal) {
               return 'Gold threshold must be higher than Silver';
+            }
             return null;
           },
         ),
@@ -845,14 +852,17 @@ class _CompanySettingsViewState extends State<CompanySettingsView>
             prefixIcon: Icon(Icons.military_tech_rounded),
           ),
           validator: (val) {
-            if (val == null || val.trim().isEmpty)
+            if (val == null || val.trim().isEmpty) {
               return 'Premium threshold is required';
+            }
             final parsed = int.tryParse(val);
-            if (parsed == null || parsed < 0)
+            if (parsed == null || parsed < 0) {
               return 'Must be a positive integer';
+            }
             final goldVal = int.tryParse(_goldThresholdController.text);
-            if (goldVal != null && parsed <= goldVal)
+            if (goldVal != null && parsed <= goldVal) {
               return 'Premium threshold must be higher than Gold';
+            }
             return null;
           },
         ),

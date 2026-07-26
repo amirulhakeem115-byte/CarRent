@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:carrent_system/screens/auth/customer/ongoing_status.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +10,17 @@ import '../../../services/payment_service.dart';
 import '../../../models/booking_model.dart';
 import '../../../models/payment_model.dart';
 import '../../../services/receipt_service.dart';
+import '../../../widgets/animated_widgets.dart';
+
+enum BookingTrackingState {
+  paymentAndConfirmed,
+  pickupScheduled,
+  customerOnWay,
+  rentalActive,
+  returnReminder,
+  waitingReturnApproval,
+  completed,
+}
 
 class HistoryScreen extends StatefulWidget {
   final int initialTabIndex;
@@ -41,6 +53,7 @@ class _HistoryScreenState extends State<HistoryScreen>
   bool _loading = true;
   String? _error;
   String? _paymentsError;
+  Timer? _refreshTimer;
 
   static const Set<String> _closedStatuses = {'completed', 'cancelled'};
 
@@ -54,10 +67,16 @@ class _HistoryScreenState extends State<HistoryScreen>
       initialIndex: safeInitialTab,
     );
     _loadData();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
   }
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _tabController.dispose();
     super.dispose();
   }
@@ -290,40 +309,178 @@ class _HistoryScreenState extends State<HistoryScreen>
     );
   }
 
-  double _trackingProgress(BookingModel b) {
+  BookingTrackingState _getTrackingState(BookingModel b) {
+    final status = b.status.toLowerCase();
     final now = DateTime.now();
-    if (now.isBefore(b.pickUpDate)) return 0.33;
-    if (b.isOpenRental || b.returnDate == null) return 0.66;
-    final total = b.returnDate!.difference(b.pickUpDate).inMinutes;
-    final elapsed = now.difference(b.pickUpDate).inMinutes;
-    final fraction = total > 0 ? (elapsed / total).clamp(0.0, 1.0) : 0.0;
-    return 0.5 + (fraction * 0.33);
+
+    // 8. Completed
+    if (status == 'completed') {
+      return BookingTrackingState.completed;
+    }
+
+    // 7. Waiting for Return Approval
+    if (status == 'return requested' ||
+        status == 'awaiting return inspection' ||
+        status == 'awaiting final payment') {
+      return BookingTrackingState.waitingReturnApproval;
+    }
+
+    // 5 & 6. Rental Active & Return Reminder
+    if (status == 'active' || status == 'ongoing' || status == 'overdue') {
+      if (b.returnDate != null) {
+        final returnReminderStart = b.returnDate!.subtract(const Duration(hours: 1));
+        if (!now.isBefore(returnReminderStart)) {
+          return BookingTrackingState.returnReminder;
+        }
+      }
+      return BookingTrackingState.rentalActive;
+    }
+
+    // 4. Customer On The Way (clicked "I'm On My Way")
+    if (b.customerStatus == 'on_my_way') {
+      return BookingTrackingState.customerOnWay;
+    }
+
+    // 1 - 3. Payment Received, Booking Confirmed & Pickup Scheduled
+    return BookingTrackingState.pickupScheduled;
+  }
+
+  double _trackingProgress(BookingModel b) {
+    final state = _getTrackingState(b);
+    switch (state) {
+      case BookingTrackingState.paymentAndConfirmed:
+        return 0.0;
+      case BookingTrackingState.pickupScheduled:
+        return 0.15;
+      case BookingTrackingState.customerOnWay:
+        return 0.33;
+      case BookingTrackingState.rentalActive:
+        if (b.returnDate == null || b.isOpenRental) {
+          return 0.66;
+        }
+        final total = b.returnDate!.difference(b.pickUpDate).inMinutes;
+        final elapsed = DateTime.now().difference(b.pickUpDate).inMinutes;
+        final fraction = total > 0 ? (elapsed / total).clamp(0.0, 1.0) : 0.0;
+        return 0.66 + (fraction * (0.75 - 0.66));
+      case BookingTrackingState.returnReminder:
+        return 0.75;
+      case BookingTrackingState.waitingReturnApproval:
+        return 0.85;
+      case BookingTrackingState.completed:
+        return 1.0;
+    }
   }
 
   String _trackingStageLabel(BookingModel b) {
-    return DateTime.now().isBefore(b.pickUpDate) ? 'Confirmed' : 'on the way';
+    final state = _getTrackingState(b);
+    switch (state) {
+      case BookingTrackingState.paymentAndConfirmed:
+        return 'Confirmed';
+      case BookingTrackingState.pickupScheduled:
+        return 'Scheduled for Pickup';
+      case BookingTrackingState.customerOnWay:
+        return 'On the way';
+      case BookingTrackingState.rentalActive:
+        return 'Active';
+      case BookingTrackingState.returnReminder:
+        return 'Due for Return Soon';
+      case BookingTrackingState.waitingReturnApproval:
+        return 'Waiting for Return Approval';
+      case BookingTrackingState.completed:
+        return 'Completed';
+    }
   }
 
   List<TrackingEvent> _trackingEvents(BookingModel b) {
     final fmt = DateFormat('dd MMM, hh:mm a');
-    final pickedUp = !DateTime.now().isBefore(b.pickUpDate);
-    return [
-      if (pickedUp)
-        TrackingEvent(
-          title: 'Car picked up, trip in progress',
-          timestamp: fmt.format(b.pickUpDate),
-          isActive: true,
-        ),
-      TrackingEvent(
-        title: 'Booking confirmed, ready for pickup',
-        timestamp: fmt.format(b.createdAt),
-        isActive: !pickedUp,
-      ),
-      TrackingEvent(
-        title: 'Payment received',
-        timestamp: fmt.format(b.createdAt),
-      ),
-    ];
+    final state = _getTrackingState(b);
+    final list = <TrackingEvent>[];
+
+    // 8. Completed
+    if (state == BookingTrackingState.completed) {
+      final completedTime = b.actualReturnTimestamp ?? b.updatedAt ?? DateTime.now();
+      list.add(TrackingEvent(
+        title: 'Completed',
+        timestamp: 'The rental has been completed successfully.\n${fmt.format(completedTime)}',
+        isActive: true,
+      ));
+    }
+
+    // 7. Waiting for Return Approval
+    if (state == BookingTrackingState.waitingReturnApproval ||
+        state == BookingTrackingState.completed) {
+      final isTop = state == BookingTrackingState.waitingReturnApproval;
+      final reqTime = b.updatedAt ?? DateTime.now();
+      list.add(TrackingEvent(
+        title: 'Waiting for Return Approval',
+        timestamp: 'The return request has been sent to the Admin.\n${fmt.format(reqTime)}',
+        isActive: isTop,
+      ));
+    }
+
+    // 6. Return Reminder
+    if (state == BookingTrackingState.returnReminder ||
+        state == BookingTrackingState.waitingReturnApproval ||
+        state == BookingTrackingState.completed) {
+      final isTop = state == BookingTrackingState.returnReminder;
+      list.add(TrackingEvent(
+        title: 'Return Reminder',
+        timestamp: 'Your vehicle should be returned within one hour.',
+        isActive: isTop,
+      ));
+    }
+
+    // 5. Rental Active
+    if (state == BookingTrackingState.rentalActive ||
+        state == BookingTrackingState.returnReminder ||
+        state == BookingTrackingState.waitingReturnApproval ||
+        state == BookingTrackingState.completed) {
+      final isTop = state == BookingTrackingState.rentalActive;
+      final activeTime = b.actualPickupTimestamp ?? b.pickUpDate;
+      list.add(TrackingEvent(
+        title: 'Rental Active',
+        timestamp: 'The rental has started.\n${fmt.format(activeTime)}',
+        isActive: isTop,
+      ));
+    }
+
+    // 4. Customer On The Way
+    if (state == BookingTrackingState.customerOnWay ||
+        ((state == BookingTrackingState.rentalActive ||
+          state == BookingTrackingState.returnReminder ||
+          state == BookingTrackingState.waitingReturnApproval ||
+          state == BookingTrackingState.completed) &&
+         b.customerStatus == 'on_my_way')) {
+      final isTop = state == BookingTrackingState.customerOnWay;
+      final onWayTime = b.updatedAt ?? DateTime.now();
+      list.add(TrackingEvent(
+        title: 'Customer On The Way',
+        timestamp: 'The customer is on the way to pick up the vehicle.\n${fmt.format(onWayTime)}',
+        isActive: isTop,
+      ));
+    }
+
+    // 3. Pickup Scheduled
+    final isTopPickup = state == BookingTrackingState.pickupScheduled;
+    list.add(TrackingEvent(
+      title: 'Pickup Scheduled',
+      timestamp: 'Pickup Date & Time: ${DateFormat('dd MMM yyyy, hh:mm a').format(b.pickUpDate)}\nStatus: Waiting for pickup time.',
+      isActive: isTopPickup,
+    ));
+
+    // 2. Booking Confirmed
+    list.add(TrackingEvent(
+      title: 'Booking Confirmed',
+      timestamp: 'Your booking has been confirmed successfully.\n${fmt.format(b.createdAt)}',
+    ));
+
+    // 1. Payment Received
+    list.add(TrackingEvent(
+      title: 'Payment Received',
+      timestamp: 'Your payment has been received successfully.\n${fmt.format(b.createdAt)}',
+    ));
+
+    return list;
   }
 
   Widget _buildOngoingBookingsList() {
@@ -340,19 +497,22 @@ class _HistoryScreenState extends State<HistoryScreen>
       itemCount: _ongoingBookings.length,
       itemBuilder: (context, index) {
         final b = _ongoingBookings[index];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 14),
-          child: BookingTrackingCard(
-            vehicleName: b.vehicleName,
-            progress: _trackingProgress(b),
-            currentStageLabel: _trackingStageLabel(b),
-            stageLabels: const [
-              'Booked',
-              'Confirmed',
-              'On the way',
-              'Returned',
-            ],
-            events: _trackingEvents(b),
+        return FadeInUp(
+          index: index,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: BookingTrackingCard(
+              vehicleName: b.vehicleName,
+              progress: _trackingProgress(b),
+              currentStageLabel: _trackingStageLabel(b),
+              stageLabels: const [
+                'Confirmed',
+                'On The Way',
+                'Active',
+                'Completed',
+              ],
+              events: _trackingEvents(b),
+            ),
           ),
         );
       },

@@ -91,6 +91,7 @@ class _LoginScreenState extends State<LoginScreen> {
     FocusScope.of(context).requestFocus(FocusNode());
     // Focus to password field after a short delay
     Future.delayed(const Duration(milliseconds: 100), () {
+      if (!mounted) return;
       FocusScope.of(context).nextFocus();
     });
   }
@@ -479,7 +480,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         );
-                      }).toList(),
+                      }),
                       Padding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,

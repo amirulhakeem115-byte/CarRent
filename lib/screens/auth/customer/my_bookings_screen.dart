@@ -18,6 +18,7 @@ import 'customer_responsive_shell.dart';
 import 'contact_support_screen.dart';
 import '../../../services/notification_service.dart';
 import '../../../services/user_role_cache.dart';
+import '../../../services/payment_restriction_service.dart';
 
 class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({super.key});
@@ -1032,6 +1033,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
   }
 
   Future<void> _submitReview(BookingModel booking) async {
+    if (PaymentRestrictionService().checkRestriction(context)) return;
     double rating = 5;
     final commentController = TextEditingController();
 
@@ -1390,6 +1392,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
   }
 
   Future<void> _showExtensionSheet(BookingModel booking) async {
+    if (PaymentRestrictionService().checkRestriction(context)) return;
     final isDark = _isDark;
     final fallbackReturn = booking.returnDate ?? booking.pickUpDate;
     DateTime newDate = fallbackReturn.add(const Duration(days: 1));
@@ -1793,6 +1796,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
             'customerStatus': 'on_my_way',
             'userId': effectiveUserId,
             'updatedAt': DateTime.now().toIso8601String(),
+            'notifiedEvents/on_my_way': true,
           });
 
       debugPrint(

@@ -22,6 +22,7 @@ import '../../../ai/widgets/ai_chat_panel.dart';
 import '../../../ai/widgets/movable_ai_floating_button_overlay.dart';
 import '../../../models/booking_model.dart';
 import 'booking_screen.dart';
+import '../../../services/payment_restriction_service.dart';
 
 // Import all screens to load them inside the shell
 import 'home_screen.dart';
@@ -625,6 +626,7 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
               ? mobileBottomNavClearance
               : 0,
           onTap: () async {
+            if (PaymentRestrictionService().checkRestriction(context)) return;
             final result = await showAIChatModal(context);
             if (result != null && result is String) {
               if (mounted) {

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../constants/colors.dart';
 import '../../../services/database_service.dart';
 import '../../../services/company_settings_provider.dart';
+import '../../../services/payment_restriction_service.dart';
 
 class ContactSupportScreen extends StatefulWidget {
   const ContactSupportScreen({super.key});
@@ -40,12 +41,15 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
   }
 
   Future<void> _submitForm() async {
+    if (PaymentRestrictionService().checkRestriction(context)) return;
     if (!_formKey.currentState!.validate()) return;
     setState(() => _submitting = true);
     try {
       await _databaseService.createTicket(
         _subjectController.text.trim(),
         _messageController.text.trim(),
+        senderName: _nameController.text.trim(),
+        senderEmail: _emailController.text.trim(),
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -710,7 +714,22 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
   void _showTicketDetailsChat(Map<String, dynamic> ticket) {
     final String id = ticket['id'] ?? '';
     final String subject = ticket['subject'] ?? 'No Subject';
+    final String customerId = (ticket['customerId'] ?? ticket['userId'] ?? ticket['customerUid'] ?? '').toString();
+    final bool isLegacyTicket = customerId.trim().isEmpty;
     final replyController = TextEditingController();
+    final scrollController = ScrollController();
+
+    void scrollToBottom() {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (scrollController.hasClients) {
+          scrollController.animateTo(
+            scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
 
     showDialog(
       context: context,
@@ -792,14 +811,67 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                   'Ticket ID: #${id.toUpperCase()}',
                   style: TextStyle(fontSize: 10, color: _subColor),
                 ),
-                const Divider(height: 24),
-                Text(
-                  'Conversation History',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                    color: _textColor,
+                if (isLegacyTicket) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.amber.shade700),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.amber.shade800, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'This support ticket was created using an older version of the system.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.amber.shade900,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
+                ],
+                const Divider(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Conversation History',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        color: _textColor,
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: Colors.green,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Live Real-time Sync',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.green.shade700,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 Expanded(
@@ -813,20 +885,36 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                           ),
                         );
                       }
+                      if (snapshot.hasError) {
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Text(
+                              'Error loading conversation: ${snapshot.error}',
+                              style: const TextStyle(color: Colors.redAccent, fontSize: 11),
+                            ),
+                          ),
+                        );
+                      }
                       final messages = snapshot.data ?? [];
                       if (messages.isEmpty) {
                         return Center(
                           child: Text(
-                            'No messages yet.',
+                            'No messages in this ticket yet.',
                             style: TextStyle(color: _subColor, fontSize: 11),
                           ),
                         );
                       }
+                      scrollToBottom();
                       return ListView.builder(
+                        controller: scrollController,
                         itemCount: messages.length,
                         itemBuilder: (context, index) {
                           final r = messages[index];
                           final bool isAdmin = r['senderRole'] == 'admin';
+                          final String senderName = r['senderName'] ??
+                              (isAdmin ? 'Support Admin' : 'You');
+                          final String senderRole = (r['senderRole'] ?? 'customer').toUpperCase();
                           final String rTime = r['timestamp'] ?? '';
                           String fRTime = '';
                           if (rTime.isNotEmpty) {
@@ -834,7 +922,9 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                               fRTime = DateFormat(
                                 'hh:mm a',
                               ).format(DateTime.parse(rTime));
-                            } catch (_) {}
+                            } catch (_) {
+                              fRTime = rTime;
+                            }
                           }
 
                           return Align(
@@ -842,30 +932,38 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                                 ? Alignment.centerLeft
                                 : Alignment.centerRight,
                             child: Container(
-                              margin: const EdgeInsets.symmetric(vertical: 4),
+                              margin: const EdgeInsets.symmetric(vertical: 5),
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
+                                horizontal: 14,
+                                vertical: 10,
                               ),
+                              constraints: const BoxConstraints(maxWidth: 360),
                               decoration: BoxDecoration(
                                 color: isAdmin
                                     ? (_isDark
                                           ? const Color(0xFF0F172A)
-                                          : Colors.white)
+                                          : const Color(0xFFF1F5F9))
                                     : AppColors.primaryOrange,
                                 borderRadius: BorderRadius.only(
-                                  topLeft: const Radius.circular(12),
-                                  topRight: const Radius.circular(12),
+                                  topLeft: const Radius.circular(14),
+                                  topRight: const Radius.circular(14),
                                   bottomLeft: isAdmin
                                       ? Radius.zero
-                                      : const Radius.circular(12),
+                                      : const Radius.circular(14),
                                   bottomRight: isAdmin
-                                      ? const Radius.circular(12)
+                                      ? const Radius.circular(14)
                                       : Radius.zero,
                                 ),
                                 border: isAdmin
                                     ? Border.all(color: _borderColor)
                                     : null,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.03),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
                               ),
                               child: Column(
                                 crossAxisAlignment: isAdmin
@@ -873,25 +971,67 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                                     : CrossAxisAlignment.end,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        senderName,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 10,
+                                          color: isAdmin
+                                              ? AppColors.primaryOrange
+                                              : Colors.white,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 4,
+                                          vertical: 1,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: isAdmin
+                                              ? AppColors.primaryOrange.withValues(alpha: 0.2)
+                                              : Colors.white24,
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          senderRole,
+                                          style: TextStyle(
+                                            fontSize: 8,
+                                            fontWeight: FontWeight.w800,
+                                            color: isAdmin
+                                                ? AppColors.primaryOrange
+                                                : Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
                                   Text(
                                     r['message'] ?? '',
                                     style: TextStyle(
                                       color: isAdmin
                                           ? _textColor
                                           : Colors.white,
-                                      fontSize: 12,
+                                      fontSize: 13,
+                                      height: 1.35,
                                     ),
                                   ),
-                                  if (fRTime.isNotEmpty)
+                                  if (fRTime.isNotEmpty) ...[
+                                    const SizedBox(height: 4),
                                     Text(
                                       fRTime,
                                       style: TextStyle(
                                         color: isAdmin
                                             ? _subColor
-                                            : Colors.white60,
-                                        fontSize: 8,
+                                            : Colors.white70,
+                                        fontSize: 9,
                                       ),
                                     ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -922,6 +1062,22 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                             borderSide: BorderSide(color: _borderColor),
                           ),
                         ),
+                        onSubmitted: (val) async {
+                          if (PaymentRestrictionService().checkRestriction(context)) return;
+                          final text = val.trim();
+                          if (text.isEmpty) return;
+                          replyController.clear();
+                          try {
+                            await _databaseService.sendTicketMessage(
+                              id,
+                              text,
+                              'customer',
+                            );
+                            scrollToBottom();
+                          } catch (e) {
+                            debugPrint('Failed to send reply: $e');
+                          }
+                        },
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -931,15 +1087,17 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                         color: AppColors.primaryOrange,
                       ),
                       onPressed: () async {
+                        if (PaymentRestrictionService().checkRestriction(context)) return;
                         final text = replyController.text.trim();
                         if (text.isEmpty) return;
+                        replyController.clear();
                         try {
                           await _databaseService.sendTicketMessage(
                             id,
                             text,
                             'customer',
                           );
-                          replyController.clear();
+                          scrollToBottom();
                         } catch (e) {
                           debugPrint('Failed to send reply: $e');
                         }
@@ -952,7 +1110,11 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () {
+                scrollController.dispose();
+                replyController.dispose();
+                Navigator.pop(context);
+              },
               child: Text(
                 'Close',
                 style: TextStyle(

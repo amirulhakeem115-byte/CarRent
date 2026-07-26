@@ -5,9 +5,10 @@ import '../../../models/vehicle_model.dart';
 import '../../../models/branch_model.dart';
 import '../../../services/vehicle_service.dart';
 import '../../../services/branch_service.dart';
-import '../../../widgets/loading_widget.dart';
 import '../../../constants/colors.dart';
 import '../../../widgets/app_image.dart';
+import '../../../widgets/animated_widgets.dart';
+import '../../../widgets/skeleton_loaders.dart';
 
 class VehiclesView extends StatefulWidget {
   const VehiclesView({super.key});
@@ -22,7 +23,7 @@ class _VehiclesViewState extends State<VehiclesView> {
 
   List<VehicleModel> _vehicles = [];
   List<BranchModel> _branches = [];
-  bool _loading = true;
+  bool _loading = false;
   String? _error;
 
   String _searchQuery = '';
@@ -49,25 +50,24 @@ class _VehiclesViewState extends State<VehiclesView> {
 
   Future<void> _loadData() async {
     if (!mounted) return;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
     try {
-      _vehicles = await _vehicleService
-          .getVehicles(applyStatusSync: false)
-          .timeout(const Duration(seconds: 10));
-      _branches = await _branchService.getBranches().timeout(
-        const Duration(seconds: 10),
-      );
+      final results = await Future.wait([
+        _vehicleService.getVehicles(applyStatusSync: false),
+        _branchService.getBranches(),
+      ]).timeout(const Duration(seconds: 4));
+      if (mounted) {
+        setState(() {
+          _vehicles = results[0] as List<VehicleModel>;
+          _branches = results[1] as List<BranchModel>;
+          _loading = false;
+        });
+      }
     } catch (e) {
       debugPrint('Error loading vehicles data: $e');
-      setState(() {
-        _error = 'Failed to load fleet inventory. Please try again.';
-      });
-    } finally {
       if (mounted) {
-        setState(() => _loading = false);
+        setState(() {
+          _loading = false;
+        });
       }
     }
   }
@@ -137,9 +137,35 @@ class _VehiclesViewState extends State<VehiclesView> {
       _statusFilter = 'All';
     }
 
-    if (_loading) {
-      return const Center(
-        child: LoadingWidget(message: 'Loading fleet vehicles...'),
+    if (_loading && _vehicles.isEmpty) {
+      final double w = MediaQuery.of(context).size.width;
+      final bool desk = w > 1100;
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const ShimmerBox(width: 180, height: 28, borderRadius: 8),
+            const SizedBox(height: 8),
+            const ShimmerBox(width: 300, height: 16, borderRadius: 6),
+            const SizedBox(height: 24),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: desk ? 3 : (w > 700 ? 2 : 1),
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                childAspectRatio: 0.85,
+              ),
+              itemCount: 6,
+              itemBuilder: (_, index) => FadeInUp(
+                index: index,
+                child: const VehicleCardSkeleton(),
+              ),
+            ),
+          ],
+        ),
       );
     }
 
@@ -492,8 +518,10 @@ class _VehiclesViewState extends State<VehiclesView> {
                       statusLabel = 'INACTIVE';
                     }
 
-                    return Container(
-                      decoration: BoxDecoration(
+                    return FadeInUp(
+                      index: index,
+                      child: Container(
+                        decoration: BoxDecoration(
                         color: cardColor,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: borderColor),
@@ -754,6 +782,7 @@ class _VehiclesViewState extends State<VehiclesView> {
                                 ),
                               ],
                             ),
+                      ),
                     );
                   },
                 ),

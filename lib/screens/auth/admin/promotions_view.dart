@@ -1855,8 +1855,9 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                           border: const OutlineInputBorder(),
                         ),
                         validator: (v) {
-                          if (v == null || v.trim().isEmpty)
+                          if (v == null || v.trim().isEmpty) {
                             return 'Enter value';
+                          }
                           final val = double.tryParse(v.trim());
                           if (val == null || val <= 0) return 'Invalid number';
                           if (_discountType == 'percentage' && val > 100) {
