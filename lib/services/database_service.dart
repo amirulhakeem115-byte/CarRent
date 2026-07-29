@@ -7,7 +7,6 @@ import 'notification_service.dart';
 import 'user_role_cache.dart';
 import 'user_session.dart';
 
-
 class DatabaseService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref();
 
@@ -19,8 +18,15 @@ class DatabaseService {
     String? userId,
   }) async {
     try {
-      debugPrint('[DatabaseService] [submitSupportMessage] Delegating to createTicket for subject: $subject');
-      await createTicket(subject, message, senderName: name, senderEmail: email);
+      debugPrint(
+        '[DatabaseService] [submitSupportMessage] Delegating to createTicket for subject: $subject',
+      );
+      await createTicket(
+        subject,
+        message,
+        senderName: name,
+        senderEmail: email,
+      );
     } catch (e) {
       debugPrint('Error saving support message to Realtime DB: $e');
       rethrow;
@@ -32,7 +38,9 @@ class DatabaseService {
     return UserRoleCache.getRole(uid);
   }
 
-  Future<List<Map<String, dynamic>>> getSupportMessages({String? ticketId}) async {
+  Future<List<Map<String, dynamic>>> getSupportMessages({
+    String? ticketId,
+  }) async {
     List<Map<String, dynamic>> messages = [];
     if (ticketId == null || ticketId.isEmpty) return messages;
     final path = 'support_messages/$ticketId';
@@ -130,7 +138,9 @@ class DatabaseService {
     final path = 'support_messages/$ticketId';
 
     debugPrint('================= DIAGNOSTIC TRACE START =================');
-    debugPrint('STEP 1: Firebase Reference: FirebaseDatabase.instance.ref("$path")');
+    debugPrint(
+      'STEP 1: Firebase Reference: FirebaseDatabase.instance.ref("$path")',
+    );
     debugPrint('STEP 2: Authenticated User (auth.uid): $uid');
 
     String role = 'NOT_FOUND';
@@ -152,25 +162,36 @@ class DatabaseService {
     String ticketStatus = 'NOT_FOUND';
     bool ticketExists = false;
     try {
-      final ticketSnap = await _db.child('support_tickets').child(ticketId).get();
+      final ticketSnap = await _db
+          .child('support_tickets')
+          .child(ticketId)
+          .get();
       if (ticketSnap.exists && ticketSnap.value is Map) {
         ticketExists = true;
         ticketObj = Map<String, dynamic>.from(ticketSnap.value as Map);
-        customerIdInDB = ticketObj['customerId']?.toString() ?? 'MISSING_CUSTOMERID_FIELD';
-        ticketStatus = ticketObj['status']?.toString() ?? 'MISSING_STATUS_FIELD';
+        customerIdInDB =
+            ticketObj['customerId']?.toString() ?? 'MISSING_CUSTOMERID_FIELD';
+        ticketStatus =
+            ticketObj['status']?.toString() ?? 'MISSING_STATUS_FIELD';
       }
     } catch (e) {
       debugPrint('Error reading ticket object: $e');
     }
 
-    debugPrint('STEP 4: Entire Ticket Object (support_tickets/$ticketId): ${ticketExists ? ticketObj : "TICKET_NODE_DOES_NOT_EXIST"}');
+    debugPrint(
+      'STEP 4: Entire Ticket Object (support_tickets/$ticketId): ${ticketExists ? ticketObj : "TICKET_NODE_DOES_NOT_EXIST"}',
+    );
     debugPrint('        customerId: "$customerIdInDB"');
     debugPrint('        status: "$ticketStatus"');
 
     final bool isOwnerMatch = (customerIdInDB == uid);
-    debugPrint('STEP 5: Rule Evaluation: root.child("support_tickets").child("$ticketId").child("customerId").val()');
+    debugPrint(
+      'STEP 5: Rule Evaluation: root.child("support_tickets").child("$ticketId").child("customerId").val()',
+    );
     debugPrint('        Value: "$customerIdInDB"');
-    debugPrint('        Compare (customerId == auth.uid): "$customerIdInDB" == "$uid" ? ${isOwnerMatch ? "TRUE" : "FALSE"}');
+    debugPrint(
+      '        Compare (customerId == auth.uid): "$customerIdInDB" == "$uid" ? ${isOwnerMatch ? "TRUE" : "FALSE"}',
+    );
 
     final bool isAdminRole = (role == 'admin' || role == 'Admin');
     debugPrint('STEP 6: Admin Role Check: users/$uid/role = "$role"');
@@ -182,20 +203,30 @@ class DatabaseService {
     debugPrint('        Current role: $role');
     debugPrint('        Current customerId in DB: $customerIdInDB');
     debugPrint('        Current Firebase path: $path');
-    debugPrint('        Evaluated Rule: root.child("support_tickets").child("$ticketId").child("customerId").val() == auth.uid');
+    debugPrint(
+      '        Evaluated Rule: root.child("support_tickets").child("$ticketId").child("customerId").val() == auth.uid',
+    );
     if (!ticketExists) {
-      debugPrint('        EXACT FAILING VALUE: Ticket node "support_tickets/$ticketId" DOES NOT EXIST in Realtime DB! Rule evaluation returned null.');
+      debugPrint(
+        '        EXACT FAILING VALUE: Ticket node "support_tickets/$ticketId" DOES NOT EXIST in Realtime DB! Rule evaluation returned null.',
+      );
     } else if (customerIdInDB != uid && !isAdminRole) {
-      debugPrint('        EXACT FAILING VALUE: Ticket customerId ("$customerIdInDB") does not equal auth.uid ("$uid") AND user role ("$role") is not admin/Admin.');
+      debugPrint(
+        '        EXACT FAILING VALUE: Ticket customerId ("$customerIdInDB") does not equal auth.uid ("$uid") AND user role ("$role") is not admin/Admin.',
+      );
     } else {
-      debugPrint('        Evaluation passes locally! If client still receives permission-denied, the cloud-deployed rules on Firebase Console have not been updated.');
+      debugPrint(
+        '        Evaluation passes locally! If client still receives permission-denied, the cloud-deployed rules on Firebase Console have not been updated.',
+      );
     }
     debugPrint('================= DIAGNOSTIC TRACE END ===================');
   }
 
   Stream<List<Map<String, dynamic>>> getTicketMessagesStream(String ticketId) {
     final path = 'support_messages/$ticketId';
-    debugPrint('[DatabaseService] [getTicketMessagesStream] Listening on path: $path');
+    debugPrint(
+      '[DatabaseService] [getTicketMessagesStream] Listening on path: $path',
+    );
     diagnoseTicketPermission(ticketId);
 
     return _db.child('support_messages').child(ticketId).onValue.map((event) {
@@ -235,18 +266,33 @@ class DatabaseService {
 
       // Requirement 3 & 4: Validation before saving. Verify customerId is never null or empty.
       if (customerId.trim().isEmpty) {
-        debugPrint('[DatabaseService] [createTicket] ERROR: customerId is missing/null! Aborting ticket creation.');
-        throw Exception('Support ticket creation failed: User must be authenticated with a valid customer ID.');
+        debugPrint(
+          '[DatabaseService] [createTicket] ERROR: customerId is missing/null! Aborting ticket creation.',
+        );
+        throw Exception(
+          'Support ticket creation failed: User must be authenticated with a valid customer ID.',
+        );
       }
 
       final now = DateTime.now().toIso8601String();
-      final name = senderName ?? UserSession().currentUserModel?.fullName ?? user?.displayName ?? user?.email ?? 'Customer';
-      final email = senderEmail ?? UserSession().currentUserModel?.email ?? user?.email ?? '';
+      final name =
+          senderName ??
+          UserSession().currentUserModel?.fullName ??
+          user?.displayName ??
+          user?.email ??
+          'Customer';
+      final email =
+          senderEmail ??
+          UserSession().currentUserModel?.email ??
+          user?.email ??
+          '';
 
       final ticketRef = _db.child('support_tickets').push();
       final ticketId = ticketRef.key!;
 
-      debugPrint('[DatabaseService] [createTicket] Path: support_tickets/$ticketId, Customer ID: $customerId, Name: $name, Email: $email');
+      debugPrint(
+        '[DatabaseService] [createTicket] Path: support_tickets/$ticketId, Customer ID: $customerId, Name: $name, Email: $email',
+      );
 
       // Requirement 1: Every newly created support ticket MUST save customerId, customerName, customerEmail
       await ticketRef.set({
@@ -282,7 +328,8 @@ class DatabaseService {
         final notificationService = NotificationService();
         await notificationService.notifyAllAdmins(
           title: 'New Support Ticket: $subject',
-          message: 'A new ticket has been submitted by $name ($email): "$initialMessage"',
+          message:
+              'A new ticket has been submitted by $name ($email): "$initialMessage"',
           type: 'support',
         );
       } catch (e) {
@@ -305,10 +352,16 @@ class DatabaseService {
       final senderId = user?.uid ?? '';
       final now = DateTime.now().toIso8601String();
 
-      final String name = senderName ??
+      final String name =
+          senderName ??
           (senderRole == 'admin'
-              ? (UserSession().currentUserModel?.fullName ?? user?.displayName ?? 'Support Admin')
-              : (UserSession().currentUserModel?.fullName ?? user?.displayName ?? user?.email ?? 'Customer'));
+              ? (UserSession().currentUserModel?.fullName ??
+                    user?.displayName ??
+                    'Support Admin')
+              : (UserSession().currentUserModel?.fullName ??
+                    user?.displayName ??
+                    user?.email ??
+                    'Customer'));
 
       final messageRef = _db.child('support_messages').child(ticketId).push();
       final messageId = messageRef.key!;
@@ -537,6 +590,7 @@ class DatabaseService {
 
   Future<void> updateUser(String uid, Map<String, dynamic> data) async {
     try {
+      invalidateUsersCache();
       await _db
           .child('users')
           .child(uid)
@@ -586,15 +640,24 @@ class DatabaseService {
 
   Future<void> deleteUser(String uid) async {
     try {
+      invalidateUsersCache();
       String customerName = 'Customer';
       try {
-        final uSnap = await _db.child('users').child(uid).child('fullName').get();
+        final uSnap = await _db
+            .child('users')
+            .child(uid)
+            .child('fullName')
+            .get();
         if (uSnap.exists && uSnap.value != null) {
           customerName = uSnap.value.toString();
         }
       } catch (_) {}
 
-      await _db.child('users').child(uid).remove().timeout(const Duration(seconds: 5));
+      await _db
+          .child('users')
+          .child(uid)
+          .remove()
+          .timeout(const Duration(seconds: 5));
 
       final notificationService = NotificationService();
       await notificationService.notifyCustomerEvent(
@@ -626,7 +689,9 @@ class DatabaseService {
         _cachedUsers != null &&
         _usersCacheTime != null &&
         DateTime.now().difference(_usersCacheTime!) < _cacheTtl) {
-      debugPrint('[DatabaseService] Returning warm cached users (${_cachedUsers!.length} items)');
+      debugPrint(
+        '[DatabaseService] Returning warm cached users (${_cachedUsers!.length} items)',
+      );
       return _cachedUsers!;
     }
 
@@ -699,6 +764,7 @@ class DatabaseService {
           (newLicenseStatus == 'approved' && newIdStatus == 'approved');
       updates['isVerified'] = finalIsVerified;
 
+      invalidateUsersCache();
       await _db
           .child('users')
           .child(uid)
@@ -739,7 +805,9 @@ class DatabaseService {
 
         final customerName = data['fullName'] ?? data['name'] ?? 'Customer';
         await notificationService.notifyAllAdmins(
-          title: isApproved ? 'Customer $docName Approved' : 'Customer $docName Rejected',
+          title: isApproved
+              ? 'Customer $docName Approved'
+              : 'Customer $docName Rejected',
           message: isApproved
               ? 'Customer $customerName\'s $docName has been approved.'
               : 'Customer $customerName\'s $docName was rejected. Reason: $reason',

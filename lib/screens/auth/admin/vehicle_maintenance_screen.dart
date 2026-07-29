@@ -51,12 +51,12 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
       _error = null;
     });
     try {
-      _jobs = await _maintenanceService.getMaintenanceJobs().timeout(
-        const Duration(seconds: 10),
-      );
-      _vehicles = await _vehicleService.getVehicles().timeout(
-        const Duration(seconds: 10),
-      );
+      _jobs = await _maintenanceService
+          .getMaintenanceJobs(forceRefresh: true)
+          .timeout(const Duration(seconds: 10));
+      _vehicles = await _vehicleService
+          .getVehicles(forceRefresh: true)
+          .timeout(const Duration(seconds: 10));
     } catch (e) {
       debugPrint('Error loading maintenance data: $e');
       setState(

@@ -4,6 +4,7 @@ import '../../../constants/colors.dart';
 import '../../../models/booking_model.dart';
 import '../../../models/vehicle_model.dart';
 import 'customer_responsive_shell.dart';
+import 'my_bookings_screen.dart';
 import '../../../widgets/app_image.dart';
 import '../../../services/receipt_service.dart';
 import '../../../services/company_settings_provider.dart';
@@ -22,6 +23,46 @@ class BookingConfirmationScreen extends StatelessWidget {
     this.paymentMethod = 'Online Bank Transfer',
     this.paymentStatus = 'Paid',
   });
+
+  void _goHome(BuildContext context) {
+    final shell = CustomerResponsiveShell.of(context);
+    if (shell != null) {
+      shell.clearCustomBody();
+      shell.setIndex(0);
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      return;
+    }
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const CustomerResponsiveShell(initialIndex: 0),
+      ),
+      (route) => false,
+    );
+  }
+
+  void _goToMyBookings(BuildContext context) {
+    final shell = CustomerResponsiveShell.of(context);
+    if (shell != null) {
+      shell.showCustomBody(const MyBookingsScreen(initialTabIndex: 0));
+      Navigator.pop(context);
+      return;
+    }
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const CustomerResponsiveShell(
+          initialIndex: 2,
+          customBody: MyBookingsScreen(initialTabIndex: 0),
+        ),
+      ),
+      (route) => false,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,13 +94,7 @@ class BookingConfirmationScreen extends StatelessWidget {
             color: textPrimary,
             size: 20,
           ),
-          onPressed: () {
-            final shell = CustomerResponsiveShell.of(context);
-            if (shell != null) {
-              shell.setIndex(0);
-            }
-            Navigator.pop(context);
-          },
+          onPressed: () => _goHome(context),
         ),
         title: Text(
           'Booking Confirmation',
@@ -96,7 +131,7 @@ class BookingConfirmationScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Your vehicle reservation is confirmed and ready. Check the History page to monitor your ongoing car status.',
+                      'Your vehicle reservation is confirmed and ready. Check My Bookings > Upcoming to monitor your rental status.',
                       style: TextStyle(
                         color: textSecondary,
                         fontSize: 14,
@@ -453,35 +488,6 @@ class BookingConfirmationScreen extends StatelessWidget {
                       spacing: 16,
                       runSpacing: 12,
                       children: [
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primaryOrange,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 14,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 0,
-                          ),
-                          onPressed: () {
-                            final shell = CustomerResponsiveShell.of(context);
-                            if (shell != null) {
-                              shell.setIndex(0);
-                            }
-                            Navigator.pop(context);
-                          },
-                          icon: const Icon(Icons.home_outlined),
-                          label: const Text(
-                            'Return Home',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
                         OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
                             side: BorderSide(color: textPrimary),
@@ -494,16 +500,10 @@ class BookingConfirmationScreen extends StatelessWidget {
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          onPressed: () {
-                            final shell = CustomerResponsiveShell.of(context);
-                            if (shell != null) {
-                              shell.setIndex(2); // Index of "My Bookings"
-                            }
-                            Navigator.pop(context);
-                          },
+                          onPressed: () => _goToMyBookings(context),
                           icon: const Icon(Icons.calendar_month_outlined),
                           label: const Text(
-                            'My Bookings',
+                            'View your bookings here',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 13,

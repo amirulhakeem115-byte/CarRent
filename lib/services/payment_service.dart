@@ -197,15 +197,17 @@ class PaymentService {
     }
   }
 
-  Future<List<PaymentModel>> getPayments() async {
+  Future<List<PaymentModel>> getPayments({bool forceRefresh = false}) async {
     List<PaymentModel> payments = [];
     final currentUid = FirebaseAuth.instance.currentUser?.uid;
     if (currentUid == null) return payments;
 
     final currentRole = await UserRoleCache.getRole(currentUid);
-    debugPrint('[PaymentService] [getPayments] Accessing path: payments');
     debugPrint(
-      '[PaymentService] [getPayments] Current UID: $currentUid, Current Role: $currentRole',
+      '[PaymentService] [getPayments${forceRefresh ? ' forceRefresh' : ''}] Accessing path: payments',
+    );
+    debugPrint(
+      '[PaymentService] [getPayments${forceRefresh ? ' forceRefresh' : ''}] Current UID: $currentUid, Current Role: $currentRole',
     );
 
     try {

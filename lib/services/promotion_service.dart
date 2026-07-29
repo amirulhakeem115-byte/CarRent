@@ -26,8 +26,13 @@ class PromotionService {
   factory PromotionService() => _instance;
   PromotionService._internal();
 
-  final DatabaseReference _primaryDb = FirebaseDatabase.instance.ref().child('promotions');
-  final DatabaseReference _fallbackDb = FirebaseDatabase.instance.ref().child('company_settings').child('promotions');
+  final DatabaseReference _primaryDb = FirebaseDatabase.instance.ref().child(
+    'promotions',
+  );
+  final DatabaseReference _fallbackDb = FirebaseDatabase.instance
+      .ref()
+      .child('company_settings')
+      .child('promotions');
 
   List<PromotionModel>? _cachedPromotions;
   DateTime? _lastFetchTime;
@@ -39,7 +44,10 @@ class PromotionService {
   }
 
   /// Verify authenticated Admin role before executing write operations
-  Future<void> _verifyAdminPermission(String operation, String targetPath) async {
+  Future<void> _verifyAdminPermission(
+    String operation,
+    String targetPath,
+  ) async {
     final user = FirebaseAuth.instance.currentUser;
     final String currentUid = user?.uid ?? 'unauthenticated';
     String currentRole = 'unauthenticated';
@@ -47,13 +55,21 @@ class PromotionService {
       currentRole = await UserRoleCache.getRole(user.uid);
     }
 
-    final isAuthorized = user != null &&
-        (currentRole.toLowerCase() == 'admin' || currentRole.toLowerCase() == 'super_admin');
+    final isAuthorized =
+        user != null &&
+        (currentRole.toLowerCase() == 'admin' ||
+            currentRole.toLowerCase() == 'super_admin');
 
     debugPrint('[PromotionService] [$operation] Target DB Path: $targetPath');
-    debugPrint('[PromotionService] [$operation] Current Authenticated UID: $currentUid');
-    debugPrint('[PromotionService] [$operation] Current User Role: $currentRole');
-    debugPrint('[PromotionService] [$operation] Admin Authorization Status: ${isAuthorized ? "AUTHORIZED" : "DENIED"}');
+    debugPrint(
+      '[PromotionService] [$operation] Current Authenticated UID: $currentUid',
+    );
+    debugPrint(
+      '[PromotionService] [$operation] Current User Role: $currentRole',
+    );
+    debugPrint(
+      '[PromotionService] [$operation] Admin Authorization Status: ${isAuthorized ? "AUTHORIZED" : "DENIED"}',
+    );
 
     if (!isAuthorized) {
       final errorMsg =
@@ -84,21 +100,79 @@ class PromotionService {
     return list;
   }
 
-  /// Get stream of all promotions in real-time
+  /// Get stream of all promotions in real-time, combining primary and fallback paths
   Stream<List<PromotionModel>> getPromotionsStream() {
     final user = FirebaseAuth.instance.currentUser;
     final uid = user?.uid ?? 'unauthenticated';
-    debugPrint('[FIREBASE TRACE] Screen="Promotions", Function="getPromotionsStream", Path="/promotions", Operation="ReadStream", UID="$uid"');
-    return _primaryDb.onValue.map((event) {
-      return _parseSnapshot(event.snapshot);
-    }).handleError((error) {
-      debugPrint('[PromotionService] [getPromotionsStream] Stream read exception on /promotions: $error. Returning empty list safely.');
-      return <PromotionModel>[];
-    });
+    debugPrint(
+      '[FIREBASE TRACE] Screen="Promotions", Function="getPromotionsStream", Path="/promotions", Operation="ReadStream", UID="$uid"',
+    );
+
+    final controller = StreamController<List<PromotionModel>>.broadcast();
+    StreamSubscription? primarySub;
+    StreamSubscription? fallbackSub;
+
+    List<PromotionModel> latestPrimary = [];
+    List<PromotionModel> latestFallback = [];
+
+    void emitMerged() {
+      if (controller.isClosed) return;
+      final map = <String, PromotionModel>{};
+
+      for (final promo in [...latestPrimary, ...latestFallback]) {
+        final key = promo.id.isNotEmpty
+            ? promo.id
+            : '${promo.name}_${promo.createdAt}';
+        if (!map.containsKey(key)) {
+          map[key] = promo;
+        } else if (promo.updatedAt.isAfter(map[key]!.updatedAt)) {
+          map[key] = promo;
+        }
+      }
+
+      final list = map.values.toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      controller.add(list);
+    }
+
+    primarySub = _primaryDb.onValue.listen(
+      (event) {
+        latestPrimary = _parseSnapshot(event.snapshot);
+        emitMerged();
+      },
+      onError: (error) {
+        debugPrint(
+          '[PromotionService] [getPromotionsStream] Stream read exception on /promotions: $error. Returning empty list safely.',
+        );
+        emitMerged();
+      },
+    );
+
+    fallbackSub = _fallbackDb.onValue.listen(
+      (event) {
+        latestFallback = _parseSnapshot(event.snapshot);
+        emitMerged();
+      },
+      onError: (error) {
+        debugPrint(
+          '[PromotionService] [getPromotionsStream] Stream read exception on company_settings/promotions: $error. Returning empty list safely.',
+        );
+        emitMerged();
+      },
+    );
+
+    controller.onCancel = () {
+      primarySub?.cancel();
+      fallbackSub?.cancel();
+    };
+
+    return controller.stream;
   }
 
   /// Get list of all promotions (uses cache if fresh within 30 seconds, with fallback path)
-  Future<List<PromotionModel>> getPromotions({bool forceRefresh = false}) async {
+  Future<List<PromotionModel>> getPromotions({
+    bool forceRefresh = false,
+  }) async {
     if (!forceRefresh &&
         _cachedPromotions != null &&
         _lastFetchTime != null &&
@@ -108,12 +182,18 @@ class PromotionService {
 
     final user = FirebaseAuth.instance.currentUser;
     final uid = user?.uid ?? 'unauthenticated';
-    final role = user != null ? await UserRoleCache.getRole(user.uid) : 'unauthenticated';
+    final role = user != null
+        ? await UserRoleCache.getRole(user.uid)
+        : 'unauthenticated';
 
-    debugPrint('[FIREBASE TRACE] Screen="Promotions", Function="getPromotions", Path="/promotions", Operation="Read", UID="$uid", Role="$role"');
+    debugPrint(
+      '[FIREBASE TRACE] Screen="Promotions", Function="getPromotions", Path="/promotions", Operation="Read", UID="$uid", Role="$role"',
+    );
 
     try {
-      final snapshot = await _primaryDb.get().timeout(const Duration(seconds: 5));
+      final snapshot = await _primaryDb.get().timeout(
+        const Duration(seconds: 5),
+      );
       if (snapshot.exists && snapshot.value != null) {
         final list = _parseSnapshot(snapshot);
         _cachedPromotions = list;
@@ -121,15 +201,21 @@ class PromotionService {
         return list;
       }
     } on FirebaseException catch (e) {
-      debugPrint('[PromotionService] Primary path "promotions" read warning: Code ${e.code}, Message: ${e.message}');
+      debugPrint(
+        '[PromotionService] Primary path "promotions" read warning: Code ${e.code}, Message: ${e.message}',
+      );
     } catch (e) {
       debugPrint('[PromotionService] Primary path read error: $e');
     }
 
     // Attempt fallback read path: company_settings/promotions
     try {
-      debugPrint('[FIREBASE TRACE] Screen="Promotions", Function="getPromotions", Path="company_settings/promotions", Operation="Read", UID="$uid", Role="$role"');
-      final snapshot = await _fallbackDb.get().timeout(const Duration(seconds: 5));
+      debugPrint(
+        '[FIREBASE TRACE] Screen="Promotions", Function="getPromotions", Path="company_settings/promotions", Operation="Read", UID="$uid", Role="$role"',
+      );
+      final snapshot = await _fallbackDb.get().timeout(
+        const Duration(seconds: 5),
+      );
       if (snapshot.exists && snapshot.value != null) {
         final list = _parseSnapshot(snapshot);
         _cachedPromotions = list;
@@ -149,14 +235,22 @@ class PromotionService {
 
     final user = FirebaseAuth.instance.currentUser;
     final uid = user?.uid ?? 'unauthenticated';
-    final role = user != null ? await UserRoleCache.getRole(user.uid) : 'unauthenticated';
+    final role = user != null
+        ? await UserRoleCache.getRole(user.uid)
+        : 'unauthenticated';
     final now = DateTime.now();
 
     // 1. Try primary path: promotions/
     try {
-      final ref = promo.id.isNotEmpty ? _primaryDb.child(promo.id) : _primaryDb.push();
+      final ref = promo.id.isNotEmpty
+          ? _primaryDb.child(promo.id)
+          : _primaryDb.push();
       final String promoId = promo.id.isNotEmpty ? promo.id : ref.key!;
-      final newPromo = promo.copyWith(id: promoId, createdAt: promo.createdAt, updatedAt: now);
+      final newPromo = promo.copyWith(
+        id: promoId,
+        createdAt: promo.createdAt,
+        updatedAt: now,
+      );
 
       await ref.set(newPromo.toMap()).timeout(const Duration(seconds: 8));
       clearCache();
@@ -170,41 +264,58 @@ class PromotionService {
         icon: '🏷️',
         color: '0xFF8B5CF6',
       );
-      debugPrint('[PromotionService] Successfully created promotion at primary path: promotions/$promoId');
+      debugPrint(
+        '[PromotionService] Successfully created promotion at primary path: promotions/$promoId',
+      );
       return;
     } on FirebaseException catch (e) {
-      debugPrint('[PromotionService] Primary path "promotions" write failed: Code ${e.code}, Message: ${e.message}. Attempting fallback path "company_settings/promotions"...');
+      debugPrint(
+        '[PromotionService] Primary path "promotions" write failed: Code ${e.code}, Message: ${e.message}. Attempting fallback path "company_settings/promotions"...',
+      );
     } catch (e) {
       debugPrint('[PromotionService] Primary path write error: $e');
     }
 
     // 2. Try fallback path: company_settings/promotions/
     try {
-      final ref = promo.id.isNotEmpty ? _fallbackDb.child(promo.id) : _fallbackDb.push();
+      final ref = promo.id.isNotEmpty
+          ? _fallbackDb.child(promo.id)
+          : _fallbackDb.push();
       final String promoId = promo.id.isNotEmpty ? promo.id : ref.key!;
-      final newPromo = promo.copyWith(id: promoId, createdAt: promo.createdAt, updatedAt: now);
+      final newPromo = promo.copyWith(
+        id: promoId,
+        createdAt: promo.createdAt,
+        updatedAt: now,
+      );
 
       await ref.set(newPromo.toMap()).timeout(const Duration(seconds: 8));
       clearCache();
       await NotificationService().notifyAllAdmins(
         title: 'Promotion Created 🏷️',
-        message: 'New promotion created: "${promo.name}" (${promo.promoCode ?? 'No Code'}).',
+        message:
+            'New promotion created: "${promo.name}" (${promo.promoCode ?? 'No Code'}).',
         type: 'promotion',
         icon: '🏷️',
         color: '0xFF8B5CF6',
         relatedId: promoId,
         actionRoute: 'Promotions & Discounts',
       );
-      debugPrint('[PromotionService] Successfully created promotion at fallback path: company_settings/promotions/$promoId');
+      debugPrint(
+        '[PromotionService] Successfully created promotion at fallback path: company_settings/promotions/$promoId',
+      );
       return;
     } on FirebaseException catch (e) {
-      debugPrint('[PromotionService] FIREBASE ERROR creating promotion (fallback failed):');
+      debugPrint(
+        '[PromotionService] FIREBASE ERROR creating promotion (fallback failed):',
+      );
       debugPrint('  - Target DB Path: company_settings/promotions');
       debugPrint('  - Current Authenticated UID: $uid');
       debugPrint('  - Current User Role: $role');
       debugPrint('  - Firebase Exception Code: ${e.code}');
       debugPrint('  - Firebase Exception Message: ${e.message}');
-      throw Exception('Failed to create promotion: ${e.message} (Code: ${e.code})');
+      throw Exception(
+        'Failed to create promotion: ${e.message} (Code: ${e.code})',
+      );
     } catch (e) {
       debugPrint('[PromotionService] Unexpected error creating promotion: $e');
       rethrow;
@@ -217,7 +328,9 @@ class PromotionService {
 
     final user = FirebaseAuth.instance.currentUser;
     final uid = user?.uid ?? 'unauthenticated';
-    final role = user != null ? await UserRoleCache.getRole(user.uid) : 'unauthenticated';
+    final role = user != null
+        ? await UserRoleCache.getRole(user.uid)
+        : 'unauthenticated';
     final updatedPromo = promo.copyWith(updatedAt: DateTime.now());
 
     // 1. Try primary path
@@ -227,10 +340,14 @@ class PromotionService {
           .update(updatedPromo.toMap())
           .timeout(const Duration(seconds: 8));
       clearCache();
-      debugPrint('[PromotionService] Successfully updated promotion at primary path: promotions/${promo.id}');
+      debugPrint(
+        '[PromotionService] Successfully updated promotion at primary path: promotions/${promo.id}',
+      );
       return;
     } on FirebaseException catch (e) {
-      debugPrint('[PromotionService] Primary update failed (Code ${e.code}). Trying fallback path...');
+      debugPrint(
+        '[PromotionService] Primary update failed (Code ${e.code}). Trying fallback path...',
+      );
     } catch (e) {
       debugPrint('[PromotionService] Primary update error: $e');
     }
@@ -242,7 +359,9 @@ class PromotionService {
           .update(updatedPromo.toMap())
           .timeout(const Duration(seconds: 8));
       clearCache();
-      debugPrint('[PromotionService] Successfully updated promotion at fallback path: company_settings/promotions/${promo.id}');
+      debugPrint(
+        '[PromotionService] Successfully updated promotion at fallback path: company_settings/promotions/${promo.id}',
+      );
       return;
     } on FirebaseException catch (e) {
       debugPrint('[PromotionService] FIREBASE ERROR updating promotion:');
@@ -251,7 +370,9 @@ class PromotionService {
       debugPrint('  - Current User Role: $role');
       debugPrint('  - Firebase Exception Code: ${e.code}');
       debugPrint('  - Firebase Exception Message: ${e.message}');
-      throw Exception('Failed to update promotion: ${e.message} (Code: ${e.code})');
+      throw Exception(
+        'Failed to update promotion: ${e.message} (Code: ${e.code})',
+      );
     } catch (e) {
       debugPrint('[PromotionService] Error updating promotion: $e');
       rethrow;
@@ -264,15 +385,21 @@ class PromotionService {
 
     final user = FirebaseAuth.instance.currentUser;
     final uid = user?.uid ?? 'unauthenticated';
-    final role = user != null ? await UserRoleCache.getRole(user.uid) : 'unauthenticated';
+    final role = user != null
+        ? await UserRoleCache.getRole(user.uid)
+        : 'unauthenticated';
 
     try {
       await _primaryDb.child(id).remove().timeout(const Duration(seconds: 8));
       clearCache();
-      debugPrint('[PromotionService] Successfully deleted promotion at primary path: promotions/$id');
+      debugPrint(
+        '[PromotionService] Successfully deleted promotion at primary path: promotions/$id',
+      );
       return;
     } on FirebaseException catch (e) {
-      debugPrint('[PromotionService] Primary delete failed (Code ${e.code}). Trying fallback path...');
+      debugPrint(
+        '[PromotionService] Primary delete failed (Code ${e.code}). Trying fallback path...',
+      );
     } catch (e) {
       debugPrint('[PromotionService] Primary delete error: $e');
     }
@@ -280,7 +407,9 @@ class PromotionService {
     try {
       await _fallbackDb.child(id).remove().timeout(const Duration(seconds: 8));
       clearCache();
-      debugPrint('[PromotionService] Successfully deleted promotion at fallback path: company_settings/promotions/$id');
+      debugPrint(
+        '[PromotionService] Successfully deleted promotion at fallback path: company_settings/promotions/$id',
+      );
       return;
     } on FirebaseException catch (e) {
       debugPrint('[PromotionService] FIREBASE ERROR deleting promotion:');
@@ -289,7 +418,9 @@ class PromotionService {
       debugPrint('  - Current User Role: $role');
       debugPrint('  - Firebase Exception Code: ${e.code}');
       debugPrint('  - Firebase Exception Message: ${e.message}');
-      throw Exception('Failed to delete promotion: ${e.message} (Code: ${e.code})');
+      throw Exception(
+        'Failed to delete promotion: ${e.message} (Code: ${e.code})',
+      );
     } catch (e) {
       debugPrint('[PromotionService] Error deleting promotion: $e');
       rethrow;
@@ -302,14 +433,19 @@ class PromotionService {
 
     final user = FirebaseAuth.instance.currentUser;
     final uid = user?.uid ?? 'unauthenticated';
-    final role = user != null ? await UserRoleCache.getRole(user.uid) : 'unauthenticated';
+    final role = user != null
+        ? await UserRoleCache.getRole(user.uid)
+        : 'unauthenticated';
     final updateData = {
       'active': active,
       'updatedAt': DateTime.now().toIso8601String(),
     };
 
     try {
-      await _primaryDb.child(id).update(updateData).timeout(const Duration(seconds: 8));
+      await _primaryDb
+          .child(id)
+          .update(updateData)
+          .timeout(const Duration(seconds: 8));
       clearCache();
       await NotificationService().notifyPromotionEvent(
         eventName: active ? 'Promotion Activated' : 'Promotion Deactivated',
@@ -321,18 +457,27 @@ class PromotionService {
         icon: active ? '✅' : '⏸️',
         color: active ? '0xFF10B981' : '0xFFEF4444',
       );
-      debugPrint('[PromotionService] Successfully toggled active=$active at primary path: promotions/$id');
+      debugPrint(
+        '[PromotionService] Successfully toggled active=$active at primary path: promotions/$id',
+      );
       return;
     } on FirebaseException catch (e) {
-      debugPrint('[PromotionService] Primary toggle active failed (Code ${e.code}). Trying fallback path...');
+      debugPrint(
+        '[PromotionService] Primary toggle active failed (Code ${e.code}). Trying fallback path...',
+      );
     } catch (e) {
       debugPrint('[PromotionService] Primary toggle active error: $e');
     }
 
     try {
-      await _fallbackDb.child(id).update(updateData).timeout(const Duration(seconds: 8));
+      await _fallbackDb
+          .child(id)
+          .update(updateData)
+          .timeout(const Duration(seconds: 8));
       clearCache();
-      debugPrint('[PromotionService] Successfully toggled active=$active at fallback path: company_settings/promotions/$id');
+      debugPrint(
+        '[PromotionService] Successfully toggled active=$active at fallback path: company_settings/promotions/$id',
+      );
       return;
     } on FirebaseException catch (e) {
       debugPrint('[PromotionService] FIREBASE ERROR toggling active status:');
@@ -341,7 +486,9 @@ class PromotionService {
       debugPrint('  - Current User Role: $role');
       debugPrint('  - Firebase Exception Code: ${e.code}');
       debugPrint('  - Firebase Exception Message: ${e.message}');
-      throw Exception('Failed to toggle active status: ${e.message} (Code: ${e.code})');
+      throw Exception(
+        'Failed to toggle active status: ${e.message} (Code: ${e.code})',
+      );
     } catch (e) {
       debugPrint('[PromotionService] Error toggling active status: $e');
       rethrow;
@@ -568,7 +715,8 @@ class PromotionService {
     if (user == null) return;
     try {
       final role = await UserRoleCache.getRole(user.uid);
-      if (role.toLowerCase() != 'admin' && role.toLowerCase() != 'super_admin') {
+      if (role.toLowerCase() != 'admin' &&
+          role.toLowerCase() != 'super_admin') {
         return; // Analytics transactions on /promotions restricted to Admin
       }
       final ref = _primaryDb.child(promoId).child('viewsCount');
@@ -588,7 +736,8 @@ class PromotionService {
     if (user == null) return;
     try {
       final role = await UserRoleCache.getRole(user.uid);
-      if (role.toLowerCase() != 'admin' && role.toLowerCase() != 'super_admin') {
+      if (role.toLowerCase() != 'admin' &&
+          role.toLowerCase() != 'super_admin') {
         return; // Analytics transactions on /promotions restricted to Admin
       }
       final ref = _primaryDb.child(promoId).child('clicksCount');
@@ -602,13 +751,18 @@ class PromotionService {
   }
 
   /// Record a completed booking using promotion
-  Future<void> recordBooking(String promoId, double revenue, double discountGiven) async {
+  Future<void> recordBooking(
+    String promoId,
+    double revenue,
+    double discountGiven,
+  ) async {
     if (promoId.isEmpty) return;
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     try {
       final role = await UserRoleCache.getRole(user.uid);
-      if (role.toLowerCase() != 'admin' && role.toLowerCase() != 'super_admin') {
+      if (role.toLowerCase() != 'admin' &&
+          role.toLowerCase() != 'super_admin') {
         return; // Analytics transactions on /promotions restricted to Admin
       }
       final promoRef = _primaryDb.child(promoId);
@@ -617,9 +771,15 @@ class PromotionService {
           return Transaction.abort();
         }
         final map = Map<String, dynamic>.from(currentData);
-        final currentBookings = (map['bookingsCount'] ?? 0) is num ? (map['bookingsCount'] as num).toInt() : 0;
-        final currentRev = (map['revenueGenerated'] ?? 0.0) is num ? (map['revenueGenerated'] as num).toDouble() : 0.0;
-        final currentDiscount = (map['totalDiscountGiven'] ?? 0.0) is num ? (map['totalDiscountGiven'] as num).toDouble() : 0.0;
+        final currentBookings = (map['bookingsCount'] ?? 0) is num
+            ? (map['bookingsCount'] as num).toInt()
+            : 0;
+        final currentRev = (map['revenueGenerated'] ?? 0.0) is num
+            ? (map['revenueGenerated'] as num).toDouble()
+            : 0.0;
+        final currentDiscount = (map['totalDiscountGiven'] ?? 0.0) is num
+            ? (map['totalDiscountGiven'] as num).toDouble()
+            : 0.0;
 
         map['bookingsCount'] = currentBookings + 1;
         map['revenueGenerated'] = currentRev + revenue;
@@ -639,11 +799,13 @@ class PromotionService {
       final String mimeType = filename.toLowerCase().endsWith('.png')
           ? 'image/png'
           : filename.toLowerCase().endsWith('.webp')
-              ? 'image/webp'
-              : 'image/jpeg';
+          ? 'image/webp'
+          : 'image/jpeg';
       return 'data:$mimeType;base64,$base64Str';
     } catch (e) {
-      debugPrint('[PromotionService] Error uploading promotion banner image: $e');
+      debugPrint(
+        '[PromotionService] Error uploading promotion banner image: $e',
+      );
       rethrow;
     }
   }
@@ -673,13 +835,15 @@ class PromotionService {
         id: 'preset_eid_sale',
         name: 'EID MEGA CELEBRATION SALE',
         subtitle: 'Enjoy 20% OFF all vehicle rentals across Malaysia!',
-        description: 'Celebrate the festive season with family road trips! Get an automatic 20% discount on all sedan, MPV, and luxury fleet rentals.',
+        description:
+            'Celebrate the festive season with family road trips! Get an automatic 20% discount on all sedan, MPV, and luxury fleet rentals.',
         discountType: 'percentage',
         discountValue: 20.0,
         startDate: now,
         endDate: nextMonth,
         active: true,
-        bannerUrl: 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&q=80&w=1200',
+        bannerUrl:
+            'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&q=80&w=1200',
         promoCode: 'EIDSALE',
         autoApply: true,
         minimumBookingAmount: 100.0,
@@ -687,7 +851,7 @@ class PromotionService {
         termsAndConditions: [
           'Valid for all registered users.',
           'Applicable on rentals 2 days and above.',
-          'Cannot be combined with other promo codes.'
+          'Cannot be combined with other promo codes.',
         ],
         createdAt: now,
         updatedAt: now,
@@ -696,20 +860,22 @@ class PromotionService {
         id: 'preset_weekend_deal',
         name: 'WEEKEND ESCAPE DEAL',
         subtitle: 'Flat RM 30.00 Instant Rebate on Weekend SUV Rentals!',
-        description: 'Planning a weekend getaway? Take RM30 OFF any SUV or Crossover rental pick-ups from Friday to Sunday.',
+        description:
+            'Planning a weekend getaway? Take RM30 OFF any SUV or Crossover rental pick-ups from Friday to Sunday.',
         discountType: 'fixed',
         discountValue: 30.0,
         startDate: now,
         endDate: nextMonth,
         active: true,
-        bannerUrl: 'https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&q=80&w=1200',
+        bannerUrl:
+            'https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&q=80&w=1200',
         promoCode: 'WEEKEND30',
         applicableCategories: ['SUV'],
         autoApply: false,
         minimumBookingAmount: 150.0,
         termsAndConditions: [
           'Valid on SUV vehicle categories only.',
-          'Requires promo code WEEKEND30 at checkout.'
+          'Requires promo code WEEKEND30 at checkout.',
         ],
         createdAt: now,
         updatedAt: now,
@@ -718,19 +884,21 @@ class PromotionService {
         id: 'preset_welcome_offer',
         name: 'NEW USER WELCOME GIFT',
         subtitle: 'Get RM 50.00 OFF your very first luxury car booking!',
-        description: 'Welcome to CARRENT! Enjoy a massive RM50 discount on your inaugural rental booking with us.',
+        description:
+            'Welcome to CARRENT! Enjoy a massive RM50 discount on your inaugural rental booking with us.',
         discountType: 'fixed',
         discountValue: 50.0,
         startDate: now,
         endDate: nextMonth,
         active: true,
-        bannerUrl: 'https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&q=80&w=1200',
+        bannerUrl:
+            'https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&q=80&w=1200',
         promoCode: 'WELCOME50',
         autoApply: true,
         minimumBookingAmount: 200.0,
         termsAndConditions: [
           'Valid for first-time customer bookings.',
-          'Minimum booking total of RM 200.00.'
+          'Minimum booking total of RM 200.00.',
         ],
         createdAt: now,
         updatedAt: now,
@@ -739,20 +907,22 @@ class PromotionService {
         id: 'preset_long_trip',
         name: 'LONG TRIP ROAD EXPLORER',
         subtitle: 'Save 15% on long-distance road trips over 3 days!',
-        description: 'Going on an extended holiday or business trip? Enjoy 15% off when renting for 3 days or longer.',
+        description:
+            'Going on an extended holiday or business trip? Enjoy 15% off when renting for 3 days or longer.',
         discountType: 'percentage',
         discountValue: 15.0,
         startDate: now,
         endDate: nextMonth,
         active: true,
-        bannerUrl: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=1200',
+        bannerUrl:
+            'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=1200',
         promoCode: 'LONGTRIP15',
         autoApply: false,
         minimumBookingAmount: 250.0,
         maximumDiscount: 200.0,
         termsAndConditions: [
           'Minimum rental period 3 days.',
-          'Maximum discount capped at RM 200.00.'
+          'Maximum discount capped at RM 200.00.',
         ],
         createdAt: now,
         updatedAt: now,

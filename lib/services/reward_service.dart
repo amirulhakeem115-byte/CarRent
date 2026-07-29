@@ -15,6 +15,13 @@ class RewardPointsService {
     return (totalPrice / 10).floor();
   }
 
+  static int calculateCancellationPointsAdjustment({
+    required int earnedPoints,
+    required int redeemedPoints,
+  }) {
+    return earnedPoints + redeemedPoints;
+  }
+
   // Reusable points discount formula: 10 points = RM 1.00 (or 1 point = RM 0.10)
   double calculateDiscount(int points) {
     return points * 0.10;
@@ -23,7 +30,11 @@ class RewardPointsService {
   // Fetch current user reward points balance
   Future<int> getUserPoints(String userId) async {
     try {
-      final snap = await _db.child('users').child(userId).child('rewardPoints').get();
+      final snap = await _db
+          .child('users')
+          .child(userId)
+          .child('rewardPoints')
+          .get();
       if (snap.exists && snap.value != null) {
         return int.tryParse(snap.value.toString()) ?? 0;
       }
@@ -35,11 +46,7 @@ class RewardPointsService {
 
   // Stream of reward transactions for a user (defensive parsing)
   Stream<List<Map<String, dynamic>>> getUserTransactionsStream(String userId) {
-    return _db
-        .child('reward_transactions')
-        .child(userId)
-        .onValue
-        .map((event) {
+    return _db.child('reward_transactions').child(userId).onValue.map((event) {
       final List<Map<String, dynamic>> txs = [];
       try {
         if (event.snapshot.exists && event.snapshot.value != null) {
@@ -113,7 +120,9 @@ class RewardPointsService {
                         tx['userId'] = userKey.toString();
                         txs.add(tx);
                       } catch (e) {
-                        debugPrint('Error parsing transaction node in getAllTransactionsStream: $e');
+                        debugPrint(
+                          'Error parsing transaction node in getAllTransactionsStream: $e',
+                        );
                       }
                     }
                   });
@@ -127,7 +136,9 @@ class RewardPointsService {
                         tx['userId'] = userKey.toString();
                         txs.add(tx);
                       } catch (e) {
-                        debugPrint('Error parsing transaction list item in getAllTransactionsStream: $e');
+                        debugPrint(
+                          'Error parsing transaction list item in getAllTransactionsStream: $e',
+                        );
                       }
                     }
                   }
@@ -146,7 +157,9 @@ class RewardPointsService {
         return txs;
       });
     } else {
-      yield* _db.child('reward_transactions').child(currentUser.uid).onValue.map((event) {
+      yield* _db.child('reward_transactions').child(currentUser.uid).onValue.map((
+        event,
+      ) {
         final List<Map<String, dynamic>> txs = [];
         try {
           if (event.snapshot.exists && event.snapshot.value != null) {
@@ -186,7 +199,9 @@ class RewardPointsService {
             return bTime.compareTo(aTime);
           });
         } catch (e) {
-          debugPrint('Error processing getAllTransactionsStream (customer fallback): $e');
+          debugPrint(
+            'Error processing getAllTransactionsStream (customer fallback): $e',
+          );
         }
         return txs;
       });
@@ -202,7 +217,8 @@ class RewardPointsService {
   }) async {
     try {
       final int currentPoints = await getUserPoints(userId);
-      final isPremium = CompanySettingsProvider().determineLevel(currentPoints) == 'Premium';
+      final isPremium =
+          CompanySettingsProvider().determineLevel(currentPoints) == 'Premium';
       // Calculate earned points (1 point for every RM10 spent)
       final int basePoints = calculateEarnedPoints(paymentAmount);
       final int earned = isPremium ? (basePoints * 1.5).floor() : basePoints;
@@ -237,7 +253,8 @@ class RewardPointsService {
       await _notificationService.createNotification(
         userId: userId,
         title: 'Points Earned! ⭐',
-        message: 'You have earned $earned reward points for payment of RM ${paymentAmount.toStringAsFixed(2)}!',
+        message:
+            'You have earned $earned reward points for payment of RM ${paymentAmount.toStringAsFixed(2)}!',
         type: 'reward',
         icon: '⭐',
         color: '0xFFF97316',
@@ -284,12 +301,15 @@ class RewardPointsService {
       final booking = BookingModel.fromMap(bookingId, bookingMap);
 
       if (booking.rewardPointsAwarded) {
-        debugPrint('[RewardPointsService] Booking $bookingId already awarded points.');
+        debugPrint(
+          '[RewardPointsService] Booking $bookingId already awarded points.',
+        );
         return;
       }
 
       final int currentPoints = await getUserPoints(booking.userId);
-      final isPremium = CompanySettingsProvider().determineLevel(currentPoints) == 'Premium';
+      final isPremium =
+          CompanySettingsProvider().determineLevel(currentPoints) == 'Premium';
       // Calculate earned points
       final int basePoints = calculateEarnedPoints(booking.totalPrice);
       final int earned = isPremium ? (basePoints * 1.5).floor() : basePoints;
@@ -299,7 +319,10 @@ class RewardPointsService {
       final int balanceAfter = await _updateUserBalance(booking.userId, earned);
 
       // Create transaction log
-      final txRef = _db.child('reward_transactions').child(booking.userId).push();
+      final txRef = _db
+          .child('reward_transactions')
+          .child(booking.userId)
+          .push();
       final txData = {
         'userId': booking.userId,
         'bookingId': bookingId,
@@ -319,7 +342,8 @@ class RewardPointsService {
       await _notificationService.createNotification(
         userId: booking.userId,
         title: 'Points Earned! ⭐',
-        message: 'You have earned $earned reward points for completing rental ${booking.vehicleName}!',
+        message:
+            'You have earned $earned reward points for completing rental ${booking.vehicleName}!',
         type: 'reward',
         icon: '⭐',
         color: '0xFFF97316',
@@ -348,15 +372,23 @@ class RewardPointsService {
       if (booking.pointsRedeemed <= 0) return;
 
       if (booking.pointsRedeemedProcessed) {
-        debugPrint('[RewardPointsService] Redeemed points already processed for booking $bookingId.');
+        debugPrint(
+          '[RewardPointsService] Redeemed points already processed for booking $bookingId.',
+        );
         return;
       }
 
       // Update user points balance
-      final int balanceAfter = await _updateUserBalance(booking.userId, -booking.pointsRedeemed);
+      final int balanceAfter = await _updateUserBalance(
+        booking.userId,
+        -booking.pointsRedeemed,
+      );
 
       // Create transaction log
-      final txRef = _db.child('reward_transactions').child(booking.userId).push();
+      final txRef = _db
+          .child('reward_transactions')
+          .child(booking.userId)
+          .push();
       final txData = {
         'userId': booking.userId,
         'bookingId': bookingId,
@@ -376,7 +408,8 @@ class RewardPointsService {
       await _notificationService.createNotification(
         userId: booking.userId,
         title: 'Points Redeemed! 🛍️',
-        message: 'Successfully redeemed ${booking.pointsRedeemed} points (RM ${booking.discountAmount.toStringAsFixed(2)} discount) on your rental booking!',
+        message:
+            'Successfully redeemed ${booking.pointsRedeemed} points (RM ${booking.discountAmount.toStringAsFixed(2)} discount) on your rental booking!',
         type: 'reward',
         icon: '🛍️',
         color: '0xFF10B981',
@@ -384,13 +417,20 @@ class RewardPointsService {
         actionRoute: 'Dashboard',
       );
     } catch (e) {
-      debugPrint('[RewardPointsService] Error deducting points for booking: $e');
+      debugPrint(
+        '[RewardPointsService] Error deducting points for booking: $e',
+      );
       rethrow;
     }
   }
 
   // Manual admin points adjustment (Add or Deduct)
-  Future<void> adjustPoints(String userId, int pointsChange, String reason, {String? adminId}) async {
+  Future<void> adjustPoints(
+    String userId,
+    int pointsChange,
+    String reason, {
+    String? adminId,
+  }) async {
     try {
       // Update balance
       final int balanceAfter = await _updateUserBalance(userId, pointsChange);
@@ -413,7 +453,9 @@ class RewardPointsService {
       final isAddition = pointsChange >= 0;
       await _notificationService.createNotification(
         userId: userId,
-        title: isAddition ? 'Points Adjusted (Credited) 🎁' : 'Points Adjusted (Debited) ⚠️',
+        title: isAddition
+            ? 'Points Adjusted (Credited) 🎁'
+            : 'Points Adjusted (Debited) ⚠️',
         message: isAddition
             ? 'Administrator has credited your account with ${pointsChange.abs()} reward points. Reason: $reason'
             : 'Administrator has debited your account by ${pointsChange.abs()} reward points. Reason: $reason',
@@ -430,37 +472,85 @@ class RewardPointsService {
   }
 
   // Revert or refund reward points when a booking is cancelled or rejected
-  Future<void> refundOrCancelPointsForBooking(String bookingId, String userId) async {
+  Future<void> refundOrCancelPointsForBooking(
+    String bookingId,
+    String userId,
+  ) async {
     try {
-      debugPrint('[RewardPointsService] [refundOrCancelPointsForBooking] Reverting transactions for bookingId: $bookingId, userId: $userId');
+      debugPrint(
+        '[RewardPointsService] [refundOrCancelPointsForBooking] Reverting transactions for bookingId: $bookingId, userId: $userId',
+      );
+
+      final bookingSnap = await _db.child('bookings').child(bookingId).get();
+      BookingModel? booking;
+      if (bookingSnap.exists && bookingSnap.value != null) {
+        booking = BookingModel.fromMap(
+          bookingId,
+          bookingSnap.value as Map<dynamic, dynamic>,
+        );
+      }
+
+      bool foundMatchingTransaction = false;
       final snap = await _db.child('reward_transactions').child(userId).get();
-      if (!snap.exists || snap.value == null) return;
+      if (snap.exists && snap.value != null) {
+        final rawVal = snap.value;
+        if (rawVal is Map) {
+          final Map<dynamic, dynamic> data = rawVal;
+          for (var entry in data.entries) {
+            final txId = entry.key.toString();
+            final txData = entry.value as Map<dynamic, dynamic>;
+            final bId = txData['bookingId']?.toString() ?? '';
+            if (bId == bookingId) {
+              foundMatchingTransaction = true;
+              final type = txData['type']?.toString() ?? '';
+              final points =
+                  int.tryParse(txData['points']?.toString() ?? '0') ?? 0;
 
-      final rawVal = snap.value;
-      if (rawVal is Map) {
-        final Map<dynamic, dynamic> data = rawVal;
-        for (var entry in data.entries) {
-          final txId = entry.key.toString();
-          final txData = entry.value as Map<dynamic, dynamic>;
-          final bId = txData['bookingId']?.toString() ?? '';
-          if (bId == bookingId) {
-            final type = txData['type']?.toString() ?? '';
-            final points = int.tryParse(txData['points']?.toString() ?? '0') ?? 0;
+              debugPrint(
+                '[RewardPointsService] Reverting transaction: ID $txId, Type $type, Points $points',
+              );
 
-            debugPrint('[RewardPointsService] Reverting transaction: ID $txId, Type $type, Points $points');
-
-            if (type == 'Earn' || type == 'Earned') {
-              if (points > 0) {
-                await _updateUserBalance(userId, -points);
+              if (type == 'Earn' || type == 'Earned') {
+                if (points > 0) {
+                  await _updateUserBalance(userId, -points);
+                }
+              } else if (type == 'Redeem') {
+                if (points != 0) {
+                  await _updateUserBalance(userId, points.abs());
+                }
               }
-            } else if (type == 'Redeem') {
-              if (points != 0) {
-                await _updateUserBalance(userId, points.abs());
-              }
+
+              await _db
+                  .child('reward_transactions')
+                  .child(userId)
+                  .child(txId)
+                  .remove();
+              debugPrint(
+                '[RewardPointsService] Successfully removed transaction ID: $txId',
+              );
             }
+          }
+        }
+      }
 
-            await _db.child('reward_transactions').child(userId).child(txId).remove();
-            debugPrint('[RewardPointsService] Successfully removed transaction ID: $txId');
+      if (!foundMatchingTransaction && booking != null) {
+        final earnedPoints = booking.rewardPointsAwarded
+            ? calculateEarnedPoints(booking.totalPrice)
+            : 0;
+        final redeemedPoints = booking.pointsRedeemed;
+        final totalAdjustment = calculateCancellationPointsAdjustment(
+          earnedPoints: earnedPoints,
+          redeemedPoints: redeemedPoints,
+        );
+        if (totalAdjustment > 0) {
+          debugPrint(
+            '[RewardPointsService] Applying fallback cancellation reversal for booking $bookingId with earned=$earnedPoints redeemed=$redeemedPoints',
+          );
+          if (earnedPoints > 0) {
+            await _updateUserBalance(userId, -earnedPoints);
+          }
+          if (redeemedPoints > 0) {
+            await _updateUserBalance(userId, redeemedPoints);
           }
         }
       }

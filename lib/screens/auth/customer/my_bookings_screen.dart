@@ -18,10 +18,19 @@ import 'customer_responsive_shell.dart';
 import 'contact_support_screen.dart';
 import '../../../services/notification_service.dart';
 import '../../../services/user_role_cache.dart';
-import '../../../services/payment_restriction_service.dart';
+import '../../../services/reward_service.dart';
+
+/// Simple data holder for a step in the booking progress tracker.
+class _TrackerStep {
+  final String label;
+  final IconData icon;
+  const _TrackerStep(this.label, this.icon);
+}
 
 class MyBookingsScreen extends StatefulWidget {
-  const MyBookingsScreen({super.key});
+  final int initialTabIndex;
+
+  const MyBookingsScreen({super.key, this.initialTabIndex = 0});
 
   @override
   State<MyBookingsScreen> createState() => _MyBookingsScreenState();
@@ -67,8 +76,12 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
   @override
   void initState() {
     super.initState();
-    // 3-tab controller: Upcoming, Completed, Cancelled
-    _tabController = TabController(length: 3, vsync: this);
+    // 4-tab controller: Upcoming, Ongoing, Completed, Cancelled
+    _tabController = TabController(
+      length: 4,
+      vsync: this,
+      initialIndex: widget.initialTabIndex.clamp(0, 3),
+    );
 
     // Mark the initial tab as viewed
     _viewedTabs.add(0);
@@ -78,6 +91,12 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
         // Mark the tab as viewed when user switches to it
         _viewedTabs.add(_tabController.index);
         setState(() {});
+      }
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _tabController.animateTo(widget.initialTabIndex.clamp(0, 3));
       }
     });
 
@@ -220,6 +239,8 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
           s != 'waiting for payment';
     }).length;
 
+    final ongoingCount = _bookings.where((b) => _isOngoing(b)).length;
+
     final completedCount = _bookings
         .where((b) => b.status.toLowerCase() == 'completed')
         .length;
@@ -229,7 +250,12 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
       return s == 'cancelled' || s == 'rejected';
     }).length;
 
-    _currentCounts = {0: upcomingCount, 1: completedCount, 2: cancelledCount};
+    _currentCounts = {
+      0: upcomingCount,
+      1: ongoingCount,
+      2: completedCount,
+      3: cancelledCount,
+    };
   }
 
   bool _shouldShowBadge(int tabIndex) {
@@ -243,6 +269,143 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     final currentCount = _currentCounts[tabIndex] ?? 0;
     final previousCount = _previousCounts[tabIndex] ?? 0;
     return currentCount - previousCount;
+  }
+
+  /// Builds a Shopee-style horizontal progress tracker showing the
+  /// lifecycle of a booking: Booked -> Paid -> Ongoing -> Returned.
+  /// Returns an empty widget for cancelled/rejected bookings, since
+  /// those don't follow the normal lifecycle.
+  Widget _buildProgressTracker(BookingModel booking, PaymentModel? payment) {
+    final bStatus = booking.status.toLowerCase();
+    if (bStatus == 'cancelled' || bStatus == 'rejected') {
+      return const SizedBox.shrink();
+    }
+
+    final isPaid =
+        payment != null &&
+        (payment.paymentStatus?.toLowerCase() == 'approved' ||
+            payment.status.toLowerCase() == 'approved' ||
+            payment.paymentStatus?.toLowerCase() == 'paid' ||
+            payment.status.toLowerCase() == 'paid');
+
+    final isOngoingPhase = _isOngoing(booking);
+    final isCompleted = bStatus == 'completed';
+
+    // Determine which stage (0-3) the booking is currently at.
+    int stageIndex;
+    if (isCompleted) {
+      stageIndex = 3;
+    } else if (isOngoingPhase) {
+      stageIndex = 2;
+    } else if (isPaid) {
+      stageIndex = 1;
+    } else {
+      stageIndex = 0;
+    }
+
+    const steps = [
+      _TrackerStep('Booked', Icons.event_available_rounded),
+      _TrackerStep('Paid', Icons.payments_rounded),
+      _TrackerStep('Ongoing', Icons.directions_car_filled_rounded),
+      _TrackerStep('Returned', Icons.flag_circle_rounded),
+    ];
+
+    const doneColor = Color(0xFF10B981);
+    final currentColor = AppColors.primaryOrange;
+    final pendingCircleColor = _isDark
+        ? const Color(0xFF334155)
+        : Colors.grey.shade300;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: List.generate(steps.length * 2 - 1, (i) {
+          // Odd indices are the connecting lines between circles.
+          if (i.isOdd) {
+            final leftStepIndex = (i - 1) ~/ 2;
+            final lineDone =
+                leftStepIndex < stageIndex ||
+                (isCompleted && leftStepIndex == 2);
+            return Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 22),
+                child: Container(
+                  height: 2,
+                  color: lineDone ? doneColor : _borderColor,
+                ),
+              ),
+            );
+          }
+
+          final stepIndex = i ~/ 2;
+          final step = steps[stepIndex];
+          final isDone =
+              stepIndex < stageIndex ||
+              (isCompleted && stepIndex == 3) ||
+              (isCompleted && stepIndex < 3);
+          final isCurrent = stepIndex == stageIndex && !isDone;
+
+          Color circleColor;
+          Color iconColor;
+          Color labelColor;
+          if (isDone) {
+            circleColor = doneColor;
+            iconColor = Colors.white;
+            labelColor = doneColor;
+          } else if (isCurrent) {
+            circleColor = currentColor;
+            iconColor = Colors.white;
+            labelColor = currentColor;
+          } else {
+            circleColor = pendingCircleColor;
+            iconColor = _subColor;
+            labelColor = _subColor;
+          }
+
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: circleColor,
+                  shape: BoxShape.circle,
+                  boxShadow: isCurrent
+                      ? [
+                          BoxShadow(
+                            color: currentColor.withValues(alpha: 0.35),
+                            blurRadius: 8,
+                            spreadRadius: 1,
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Icon(
+                  isDone ? Icons.check_rounded : step.icon,
+                  size: 16,
+                  color: iconColor,
+                ),
+              ),
+              const SizedBox(height: 6),
+              SizedBox(
+                width: 64,
+                child: Text(
+                  step.label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                    color: labelColor,
+                  ),
+                ),
+              ),
+            ],
+          );
+        }),
+      ),
+    );
   }
 
   Widget _buildBookingCard(BookingModel booking, bool isDesktop) {
@@ -286,6 +449,8 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
           'waiting for payment',
         ].contains(bStatus) &&
         booking.pickUpDate.isAfter(DateTime.now());
+
+    final bool showTracker = bStatus != 'cancelled' && bStatus != 'rejected';
 
     return Container(
       decoration: BoxDecoration(
@@ -402,6 +567,10 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
             ),
             const SizedBox(height: 12),
             Divider(height: 1, color: _borderColor),
+            if (showTracker) ...[
+              _buildProgressTracker(booking, payment),
+              Divider(height: 1, color: _borderColor),
+            ],
             const SizedBox(height: 12),
             LayoutBuilder(
               builder: (context, constraints) {
@@ -544,7 +713,10 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                       ),
                     if (isWaitingPayment)
                       _buildActionButton(
-                        onPressed: () => _payNowExistingBooking(booking),
+                        onPressed: () => _handleBookingActionRestriction(
+                          booking,
+                          () => _payNowExistingBooking(booking),
+                        ),
                         icon: Icons.payment_rounded,
                         label: 'Pay Now',
                         backgroundColor: AppColors.primaryOrange,
@@ -552,7 +724,10 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                       ),
                     if (canCancel)
                       _buildActionButton(
-                        onPressed: () => _confirmCancelBooking(booking),
+                        onPressed: () => _handleBookingActionRestriction(
+                          booking,
+                          () => _confirmCancelBooking(booking),
+                        ),
                         icon: Icons.close,
                         label: 'Cancel Request',
                         backgroundColor: null,
@@ -743,7 +918,56 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     );
   }
 
+  Future<void> _handleBookingActionRestriction(
+    BookingModel booking,
+    VoidCallback action,
+  ) async {
+    final accountStatus = await _getCurrentAccountStatus();
+    if (BookingService.isAccountRestricted(accountStatus)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              BookingService.getAccountRestrictionMessage(accountStatus),
+            ),
+            backgroundColor: accountStatus.trim().toLowerCase() == 'suspended'
+                ? Colors.redAccent
+                : Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+    action();
+  }
+
+  Future<String> _getCurrentAccountStatus() async {
+    final uid = _authService.currentUser?.uid;
+    if (uid == null || uid.isEmpty) return 'Active';
+    try {
+      final snap = await FirebaseDatabase.instance
+          .ref()
+          .child('users')
+          .child(uid)
+          .child('accountStatus')
+          .get();
+      if (snap.exists && snap.value != null) {
+        return snap.value.toString();
+      }
+    } catch (e) {
+      debugPrint('Error fetching account status: $e');
+    }
+    return 'Active';
+  }
+
   Future<void> _confirmCancelBooking(BookingModel booking) async {
+    final rewardService = RewardPointsService();
+    final pointsToLose =
+        RewardPointsService.calculateCancellationPointsAdjustment(
+          earnedPoints: rewardService.calculateEarnedPoints(booking.totalPrice),
+          redeemedPoints: booking.pointsRedeemed,
+        );
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -757,7 +981,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
           style: TextStyle(fontWeight: FontWeight.bold, color: _textColor),
         ),
         content: Text(
-          'Are you sure you want to cancel this booking? This action cannot be undone.',
+          'Are you sure you want to cancel this booking? This will result in a loss of $pointsToLose loyalty points and cannot be undone.',
           style: TextStyle(color: _textColor),
         ),
         actions: [
@@ -795,9 +1019,18 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
         );
         _loadBookings();
         if (mounted) {
+          final pointsDeducted =
+              RewardPointsService.calculateCancellationPointsAdjustment(
+                earnedPoints: RewardPointsService().calculateEarnedPoints(
+                  booking.totalPrice,
+                ),
+                redeemedPoints: booking.pointsRedeemed,
+              );
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Booking request has been cancelled successfully.'),
+            SnackBar(
+              content: Text(
+                'Booking cancelled successfully. $pointsDeducted loyalty points deducted.',
+              ),
               backgroundColor: Colors.green,
             ),
           );
@@ -838,6 +1071,8 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
           s != 'waiting for payment';
     }).toList();
 
+    final ongoingList = _bookings.where((b) => _isOngoing(b)).toList();
+
     final completedList = _bookings
         .where((b) => b.status.toLowerCase() == 'completed')
         .toList();
@@ -875,8 +1110,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
             ),
             tabs: [
               _buildTabItem('Upcoming', 0, upcomingList.length),
-              _buildTabItem('Completed', 1, completedList.length),
-              _buildTabItem('Cancelled', 2, cancelledList.length),
+              _buildTabItem('Ongoing', 1, ongoingList.length),
+              _buildTabItem('Completed', 2, completedList.length),
+              _buildTabItem('Cancelled', 3, cancelledList.length),
             ],
           ),
         ),
@@ -893,16 +1129,22 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                   0,
                 ),
                 _buildTabList(
+                  ongoingList,
+                  'No ongoing bookings.',
+                  isDesktop,
+                  1,
+                ),
+                _buildTabList(
                   completedList,
                   'No completed bookings.',
                   isDesktop,
-                  1,
+                  2,
                 ),
                 _buildTabList(
                   cancelledList,
                   'No cancelled reservations.',
                   isDesktop,
-                  2,
+                  3,
                 ),
               ],
             ),
@@ -985,16 +1227,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
               ),
               const SizedBox(height: 8),
               const SizedBox(height: 6),
-              Text(
-                'After payment, track your ongoing car in the History page.',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primaryOrange,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () {
                   CustomerResponsiveShell.of(context)?.setIndex(1);
@@ -1033,7 +1265,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
   }
 
   Future<void> _submitReview(BookingModel booking) async {
-    if (PaymentRestrictionService().checkRestriction(context)) return;
     double rating = 5;
     final commentController = TextEditingController();
 
@@ -1392,7 +1623,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
   }
 
   Future<void> _showExtensionSheet(BookingModel booking) async {
-    if (PaymentRestrictionService().checkRestriction(context)) return;
     final isDark = _isDark;
     final fallbackReturn = booking.returnDate ?? booking.pickUpDate;
     DateTime newDate = fallbackReturn.add(const Duration(days: 1));
@@ -1796,7 +2026,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
             'customerStatus': 'on_my_way',
             'userId': effectiveUserId,
             'updatedAt': DateTime.now().toIso8601String(),
-            'notifiedEvents/on_my_way': true,
           });
 
       debugPrint(

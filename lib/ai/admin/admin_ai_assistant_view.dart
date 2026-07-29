@@ -369,6 +369,7 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
       ),
       child: isNarrow
           ? SingleChildScrollView(
+              primary: false,
               scrollDirection: Axis.horizontal,
               child: Row(children: statsChildren),
             )
@@ -440,6 +441,7 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
         if (messages.length <= 1) {
           // Show welcome / suggested actions
           return SingleChildScrollView(
+            primary: false,
             padding: const EdgeInsets.all(24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -574,6 +576,7 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
         }
 
         return ListView.builder(
+          primary: false,
           controller: _scrollController,
           physics: const ClampingScrollPhysics(),
           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -625,6 +628,7 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
         border: Border(top: BorderSide(color: borderCol)),
       ),
       child: SingleChildScrollView(
+        primary: false,
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(

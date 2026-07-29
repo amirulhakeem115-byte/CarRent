@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
@@ -8,6 +10,7 @@ import '../../../services/promotion_service.dart';
 import '../../../services/vehicle_service.dart';
 import '../../../widgets/loading_widget.dart';
 import '../../../widgets/app_image.dart';
+import '../../../widgets/mouse_scroll_translator.dart';
 
 class PromotionsView extends StatefulWidget {
   const PromotionsView({super.key});
@@ -26,6 +29,7 @@ class _PromotionsViewState extends State<PromotionsView> {
   bool _loading = true;
   String? _error;
   bool _showScrollRightHint = false;
+  StreamSubscription<List<PromotionModel>>? _promotionsSubscription;
 
   String _searchQuery = '';
   String _selectedStatusFilter =
@@ -35,15 +39,41 @@ class _PromotionsViewState extends State<PromotionsView> {
   void initState() {
     super.initState();
     _promotionsTableScrollController.addListener(_updateTableScrollHint);
+    _subscribePromotions();
     _loadData();
   }
 
   @override
   void dispose() {
+    _promotionsSubscription?.cancel();
     _promotionsTableScrollController
       ..removeListener(_updateTableScrollHint)
       ..dispose();
     super.dispose();
+  }
+
+  void _subscribePromotions() {
+    _promotionsSubscription?.cancel();
+    _promotionsSubscription = _promotionService.getPromotionsStream().listen(
+      (promos) {
+        if (!mounted) return;
+        setState(() {
+          _promotions = promos;
+          _loading = false;
+          _error = null;
+        });
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _updateTableScrollHint();
+        });
+      },
+      onError: (error) {
+        if (!mounted) return;
+        setState(() {
+          _error = 'Failed to sync promotions: $error';
+          _loading = false;
+        });
+      },
+    );
   }
 
   void _updateTableScrollHint() {
@@ -137,71 +167,65 @@ class _PromotionsViewState extends State<PromotionsView> {
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final bool isDesktop = MediaQuery.of(context).size.width > 900;
 
-    return StreamBuilder<List<PromotionModel>>(
-      stream: _promotionService.getPromotionsStream(),
-      builder: (context, snapshot) {
-        if (snapshot.hasData) {
-          _promotions = snapshot.data!;
-        }
-
-        return Container(
-          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-          child: Column(
-            children: [
-              Expanded(
-                child: _loading
-                    ? const Center(
-                        child: LoadingWidget(
-                          message: 'Loading promotions & discounts...',
+    return Container(
+      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+      child: Column(
+        children: [
+          Expanded(
+            child: _loading
+                ? const Center(
+                    child: LoadingWidget(
+                      message: 'Loading promotions & discounts...',
+                    ),
+                  )
+                : _error != null
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.error_outline,
+                          color: Colors.redAccent,
+                          size: 48,
                         ),
-                      )
-                    : _error != null
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.error_outline,
-                              color: Colors.redAccent,
-                              size: 48,
-                            ),
-                            const SizedBox(height: 12),
-                            Text(_error!),
-                            const SizedBox(height: 12),
-                            ElevatedButton(
-                              onPressed: _loadData,
-                              child: const Text('Retry'),
-                            ),
-                          ],
+                        const SizedBox(height: 12),
+                        Text(_error!),
+                        const SizedBox(height: 12),
+                        ElevatedButton(
+                          onPressed: _loadData,
+                          child: const Text('Retry'),
                         ),
-                      )
-                    : SingleChildScrollView(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // 1. Dashboard Header Cards
-                            _buildDashboardHeaderGrid(isDesktop, isDark),
-                            const SizedBox(height: 24),
+                      ],
+                    ),
+                  )
+                : SingleChildScrollView(
+                    physics: const ClampingScrollPhysics(
+                      parent: AlwaysScrollableScrollPhysics(),
+                    ),
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 1. Dashboard Header Cards
+                        _buildDashboardHeaderGrid(isDesktop, isDark),
+                        const SizedBox(height: 24),
 
-                            // 2. Action Bar & Controls
-                            _buildActionBar(isDesktop, isDark),
-                            const SizedBox(height: 20),
+                        // 2. Action Bar & Controls
+                        _buildActionBar(isDesktop, isDark),
+                        const SizedBox(height: 20),
 
-                            // 3. Promotions List / Table
-                            _filteredPromotions.isEmpty
-                                ? _buildEmptyState(isDark)
-                                : isDesktop
-                                ? _buildPromotionsTable(isDark)
-                                : _buildPromotionsCardList(isDark),
-                          ],
-                        ),
-                      ),
-              ),
-            ],
+                        // 3. Promotions List / Table
+                        _filteredPromotions.isEmpty
+                            ? _buildEmptyState(isDark)
+                            : isDesktop
+                            ? _buildPromotionsTable(isDark)
+                            : _buildPromotionsCardList(isDark),
+                      ],
+                    ),
+                  ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 
@@ -552,100 +576,105 @@ class _PromotionsViewState extends State<PromotionsView> {
                   )
                 : const SizedBox.shrink(),
           ),
-          Scrollbar(
+          MouseScrollTranslator(
             controller: _promotionsTableScrollController,
-            thumbVisibility: true,
-            trackVisibility: true,
-            interactive: true,
-            radius: const Radius.circular(12),
-            thickness: 7,
-            child: NotificationListener<ScrollMetricsNotification>(
-              onNotification: (_) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  _updateTableScrollHint();
-                });
-                return false;
-              },
-              child: SingleChildScrollView(
-                controller: _promotionsTableScrollController,
-                scrollDirection: Axis.horizontal,
-                child: DataTable(
-                  headingRowColor: WidgetStateProperty.all(
-                    isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
-                  ),
-                  dataRowMinHeight: 70,
-                  dataRowMaxHeight: 85,
-                  columns: const [
-                    DataColumn(
-                      label: Text(
-                        'PROMOTION NAME',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
+            builder: (context, controller) {
+              return Scrollbar(
+                controller: controller,
+                thumbVisibility: true,
+                trackVisibility: true,
+                interactive: true,
+                radius: const Radius.circular(12),
+                thickness: 7,
+                child: NotificationListener<ScrollMetricsNotification>(
+                  onNotification: (_) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      _updateTableScrollHint();
+                    });
+                    return false;
+                  },
+                  child: SingleChildScrollView(
+                    controller: controller,
+                    scrollDirection: Axis.horizontal,
+                    child: DataTable(
+                      headingRowColor: WidgetStateProperty.all(
+                        isDark ? const Color(0xFF0F172A) : AppColors.lightGray,
                       ),
-                    ),
-                    DataColumn(
-                      label: Text(
-                        'DISCOUNT VALUE',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
+                      dataRowMinHeight: 70,
+                      dataRowMaxHeight: 85,
+                      columns: const [
+                        DataColumn(
+                          label: Text(
+                            'PROMOTION NAME',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    DataColumn(
-                      label: Text(
-                        'VALIDITY PERIOD',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
+                        DataColumn(
+                          label: Text(
+                            'DISCOUNT VALUE',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    DataColumn(
-                      label: Text(
-                        'STATUS',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
+                        DataColumn(
+                          label: Text(
+                            'VALIDITY PERIOD',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    DataColumn(
-                      label: Text(
-                        'CREATED / UPDATED',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
+                        DataColumn(
+                          label: Text(
+                            'STATUS',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    DataColumn(
-                      label: Text(
-                        'ACTIONS',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
+                        DataColumn(
+                          label: Text(
+                            'CREATED / UPDATED',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
-                  rows: _filteredPromotions.map((promo) {
-                    return DataRow(
-                      cells: [
-                        DataCell(_buildNameCell(promo, isDark)),
-                        DataCell(_buildDiscountCell(promo, isDark)),
-                        DataCell(_buildValidityCell(promo, isDark)),
-                        DataCell(_buildStatusBadge(promo)),
-                        DataCell(_buildDateCell(promo, isDark)),
-                        DataCell(_buildActionsCell(promo, isDark)),
+                        DataColumn(
+                          label: Text(
+                            'ACTIONS',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
                       ],
-                    );
-                  }).toList(),
+                      rows: _filteredPromotions.map((promo) {
+                        return DataRow(
+                          cells: [
+                            DataCell(_buildNameCell(promo, isDark)),
+                            DataCell(_buildDiscountCell(promo, isDark)),
+                            DataCell(_buildValidityCell(promo, isDark)),
+                            DataCell(_buildStatusBadge(promo)),
+                            DataCell(_buildDateCell(promo, isDark)),
+                            DataCell(_buildActionsCell(promo, isDark)),
+                          ],
+                        );
+                      }).toList(),
+                    ),
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ],
       ),
@@ -984,6 +1013,9 @@ class _PromotionsViewState extends State<PromotionsView> {
                               promo.id,
                               val,
                             );
+                            if (mounted) {
+                              await _loadData();
+                            }
                           } catch (e) {
                             if (mounted) {
                               messenger.showSnackBar(
@@ -1047,6 +1079,7 @@ class _PromotionsViewState extends State<PromotionsView> {
                 try {
                   await _promotionService.deletePromotion(promo.id);
                   if (mounted) {
+                    await _loadData();
                     messenger.showSnackBar(
                       const SnackBar(
                         content: Text('Promotion deleted successfully.'),
@@ -1084,6 +1117,9 @@ class _PromotionsViewState extends State<PromotionsView> {
           existing: existing,
           vehicles: _vehicles,
           promotionService: _promotionService,
+          onSaved: () async {
+            await _loadData();
+          },
         );
       },
     );
@@ -1094,12 +1130,14 @@ class PromotionFormDialog extends StatefulWidget {
   final PromotionModel? existing;
   final List<VehicleModel> vehicles;
   final PromotionService promotionService;
+  final Future<void> Function()? onSaved;
 
   const PromotionFormDialog({
     super.key,
     this.existing,
     required this.vehicles,
     required this.promotionService,
+    this.onSaved,
   });
 
   @override
@@ -1369,8 +1407,11 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
       }
 
       if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
+        final navigator = Navigator.of(context);
+        final messenger = ScaffoldMessenger.of(context);
+        await widget.onSaved?.call();
+        navigator.pop();
+        messenger.showSnackBar(
           SnackBar(
             content: Text(
               widget.existing != null

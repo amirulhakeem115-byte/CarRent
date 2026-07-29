@@ -16,10 +16,10 @@ class VehicleModel {
   final String createdAt;
   final String branchId;
   final String branchName;
-  
+
   final String category;
   final int mileage;
-  
+
   // Custom specs for high-fidelity UI references
   final String engine;
   final String condition;
@@ -58,14 +58,13 @@ class VehicleModel {
     this.maintenance = const [],
   });
 
-  factory VehicleModel.fromMap(
-    String id,
-    Map<dynamic, dynamic> data,
-  ) {
+  factory VehicleModel.fromMap(String id, Map<dynamic, dynamic> data) {
     // Determine vehicle type for smart defaults
-    final isCoupe = (data['model'] ?? '').toString().toLowerCase().contains('coupe');
+    final isCoupe = (data['model'] ?? '').toString().toLowerCase().contains(
+      'coupe',
+    );
     final defaultEngine = isCoupe ? 'M177' : 'M280';
-    
+
     // Parse gallery
     List<String> parsedGallery = [];
     if (data['gallery'] != null) {
@@ -98,7 +97,14 @@ class VehicleModel {
       }
     }
     if (parsedEquipment.isEmpty) {
-      parsedEquipment = ['ABS', 'All Bags', 'Cruise Control', 'Extra Tyre', 'Tools', 'First Aid'];
+      parsedEquipment = [
+        'ABS',
+        'All Bags',
+        'Cruise Control',
+        'Extra Tyre',
+        'Tools',
+        'First Aid',
+      ];
     }
 
     // Parse maintenance history
@@ -118,21 +124,48 @@ class VehicleModel {
       parsedMaintenance = [];
     }
 
-
-    // Normalize status to capitalized version
-    String rawStatus = (data['status'] ?? (data['isAvailable'] == false ? 'Booked' : 'Available')).toString();
-    final statusLower = rawStatus.toLowerCase().replaceAll(RegExp(r'\s+'), '');
+    // Normalize status to a canonical value used by customer/admin UI.
+    String rawStatus =
+        (data['status'] ??
+                (data['isAvailable'] == false ? 'Booked' : 'Available'))
+            .toString();
+    final statusLower = rawStatus.toLowerCase().replaceAll(
+      RegExp(r'[\s_-]+'),
+      '',
+    );
+    final bool hasAvailabilityFlag = data['isAvailable'] is bool;
+    final bool availabilityFlag = data['isAvailable'] == true;
     String parsedStatus = 'Available';
     if (statusLower == 'available') {
       parsedStatus = 'Available';
-    } else if (statusLower == 'booked' || statusLower == 'reserved' || statusLower == 'rented' || statusLower == 'activebooked' || statusLower == 'bookedvehicle') {
+    } else if (statusLower == 'booked' ||
+        statusLower == 'reserved' ||
+        statusLower == 'rented' ||
+        statusLower == 'activebooked' ||
+        statusLower == 'bookedvehicle') {
+      parsedStatus = 'Booked';
+    } else if (statusLower == 'inspectioncompleted' ||
+        statusLower == 'awaitingfinalpayment' ||
+        statusLower == 'pendingpickup' ||
+        statusLower == 'pickedup' ||
+        statusLower == 'inuse') {
       parsedStatus = 'Booked';
     } else if (statusLower == 'maintenance') {
+      parsedStatus = 'Maintenance';
+    } else if (statusLower == 'undermaintenance' ||
+        statusLower == 'inservice' ||
+        statusLower == 'servicing') {
       parsedStatus = 'Maintenance';
     } else if (statusLower == 'inactive') {
       parsedStatus = 'Inactive';
     } else {
-      parsedStatus = 'Available';
+      // Respect explicit isAvailable from database when status is unknown.
+      if (hasAvailabilityFlag) {
+        parsedStatus = availabilityFlag ? 'Available' : 'Inactive';
+      } else {
+        // Unknown status without explicit availability should be treated as unavailable.
+        parsedStatus = 'Inactive';
+      }
     }
 
     return VehicleModel(
@@ -158,7 +191,8 @@ class VehicleModel {
       engine: data['engine'] ?? defaultEngine,
       condition: data['condition'] ?? 'Excellent',
       ac: data['ac'] ?? true,
-      rentalDemand: (data['rentalDemand'] ?? (isCoupe ? 78.0 : 92.0)).toDouble(),
+      rentalDemand: (data['rentalDemand'] ?? (isCoupe ? 78.0 : 92.0))
+          .toDouble(),
       gallery: parsedGallery,
       equipment: parsedEquipment,
       maintenance: parsedMaintenance,
@@ -195,10 +229,7 @@ class VehicleModel {
     };
   }
 
-  VehicleModel copyWith({
-    bool? isAvailable,
-    String? status,
-  }) {
+  VehicleModel copyWith({bool? isAvailable, String? status}) {
     return VehicleModel(
       id: id,
       brand: brand,

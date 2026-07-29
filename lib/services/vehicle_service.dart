@@ -35,12 +35,16 @@ class VehicleService {
         _cachedVehicles != null &&
         _vehiclesCacheTime != null &&
         DateTime.now().difference(_vehiclesCacheTime!) < _cacheTtl) {
-      debugPrint('[VehicleService] Returning warm cached vehicles (${_cachedVehicles!.length} items)');
+      debugPrint(
+        '[VehicleService] Returning warm cached vehicles (${_cachedVehicles!.length} items)',
+      );
       return _cachedVehicles!;
     }
 
     // Run lifecycle manager check asynchronously in the background
-    BookingLifecycleManager().checkAndProcessLifecycle().catchError((lifecycleErr) {
+    BookingLifecycleManager().checkAndProcessLifecycle().catchError((
+      lifecycleErr,
+    ) {
       debugPrint(
         '[VehicleService] Warning: background lifecycle check failed: $lifecycleErr',
       );
@@ -169,74 +173,18 @@ class VehicleService {
   }
 
   Stream<List<VehicleModel>> getVehiclesStream() {
-    final bookingsDb = FirebaseDatabase.instance.ref().child('bookings');
     final controller = StreamController<List<VehicleModel>>.broadcast();
 
     StreamSubscription? vehiclesSub;
-    StreamSubscription? bookingsSub;
 
     Map<String, VehicleModel> latestVehicles = {};
-    Map<String, BookingModel> latestBookings = {};
 
     void updateAndEmit() {
       if (controller.isClosed) return;
 
-      final now = DateTime.now();
-      final List<VehicleModel> syncedVehicles = [];
-      latestVehicles.forEach((vehicleId, vehicle) {
-        // CRITICAL: Skip ALL auto-sync for manually updated vehicles
-        if (_manuallyUpdatedVehicleIds.contains(vehicleId)) {
-          debugPrint(
-            '[VehicleService] Stream skipping ALL auto-sync for manually updated vehicle: $vehicleId (Status: ${vehicle.status})',
-          );
-          syncedVehicles.add(vehicle);
-          return;
-        }
-
-        // Skip sync for special statuses
-        if (vehicle.status != 'Available' && vehicle.status != 'Booked') {
-          syncedVehicles.add(vehicle);
-          return;
-        }
-
-        final hasActiveBooking = latestBookings.values.any((booking) {
-          if (booking.vehicleId != vehicle.id) {
-            return false;
-          }
-          final s = booking.status.toLowerCase();
-          if (s == 'completed' || s == 'cancelled' || s == 'rejected') {
-            return false;
-          }
-
-          if (s == 'active' || s == 'ongoing' || s == 'overdue') {
-            return true;
-          }
-
-          return booking.pickUpDate.isBefore(
-                now.add(const Duration(hours: 12)),
-              ) &&
-              (booking.returnDate == null || now.isBefore(booking.returnDate!));
-        });
-        // Only perform safe cleanup: Booked -> Available if no active booking
-        String targetStatus = vehicle.status;
-        if (vehicle.status == 'Booked' && !hasActiveBooking) {
-          targetStatus = 'Available';
-        }
-        final bool isAvailable = (targetStatus == 'Available');
-
-        VehicleModel finalVehicle = vehicle;
-        if (vehicle.status != targetStatus ||
-            vehicle.isAvailable != isAvailable) {
-          finalVehicle = vehicle.copyWith(
-            status: targetStatus,
-            isAvailable: isAvailable,
-          );
-        }
-
-        syncedVehicles.add(finalVehicle);
-      });
-
-      controller.add(syncedVehicles);
+      // Emit vehicle statuses exactly as stored/normalized from database so
+      // list, details, and booking flows remain consistent.
+      controller.add(latestVehicles.values.toList());
     }
 
     vehiclesSub = _db.onValue.listen((event) {
@@ -256,26 +204,8 @@ class VehicleService {
       updateAndEmit();
     });
 
-    bookingsSub = bookingsDb.onValue.listen((event) {
-      latestBookings.clear();
-      if (event.snapshot.exists && event.snapshot.value != null) {
-        final Map<dynamic, dynamic> data =
-            event.snapshot.value as Map<dynamic, dynamic>;
-        data.forEach((key, value) {
-          if (value is Map) {
-            latestBookings[key.toString()] = BookingModel.fromMap(
-              key.toString(),
-              value,
-            );
-          }
-        });
-      }
-      updateAndEmit();
-    });
-
     controller.onCancel = () {
       vehiclesSub?.cancel();
-      bookingsSub?.cancel();
     };
 
     return controller.stream;
@@ -443,13 +373,17 @@ class VehicleService {
 
       final notificationService = NotificationService();
       await notificationService.notifyVehicleEvent(
-        eventName: normStatus == 'Available' ? 'Vehicle Became Available' : 'Vehicle Status Changed ($normStatus)',
+        eventName: normStatus == 'Available'
+            ? 'Vehicle Became Available'
+            : 'Vehicle Status Changed ($normStatus)',
         vehicleId: id,
         vehicleName: vName,
         details: 'status changed to "$normStatus".',
         priority: normStatus == 'Maintenance' ? 'high' : 'normal',
         icon: normStatus == 'Available' ? '✅' : '🚗',
-        color: normStatus == 'Available' ? '0xFF10B981' : (normStatus == 'Maintenance' ? '0xFFEF4444' : '0xFFF59E0B'),
+        color: normStatus == 'Available'
+            ? '0xFF10B981'
+            : (normStatus == 'Maintenance' ? '0xFFEF4444' : '0xFFF59E0B'),
       );
 
       debugPrint(

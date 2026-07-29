@@ -84,9 +84,9 @@ class _CustomersViewState extends State<CustomersView> {
       _error = null;
     });
     try {
-      final allUsers = await _databaseService.getUsers().timeout(
-        const Duration(seconds: 10),
-      );
+      final allUsers = await _databaseService
+          .getUsers(forceRefresh: true)
+          .timeout(const Duration(seconds: 10));
       final allBookings = await _bookingService.getBookings().timeout(
         const Duration(seconds: 10),
       );
@@ -134,6 +134,25 @@ class _CustomersViewState extends State<CustomersView> {
     }
   }
 
+  String _getDisplayAccountStatus(UserModel user) {
+    final rawStatus = (user.accountStatus).trim().toLowerCase();
+    if (rawStatus == 'disabled') return 'DISABLED';
+    if (rawStatus == 'suspended') return 'SUSPENDED';
+    if (rawStatus == 'active') return 'ACTIVE';
+    return user.isActive ? 'ACTIVE' : 'DISABLED';
+  }
+
+  bool _isUserAccountActive(UserModel user) {
+    final rawStatus = (user.accountStatus).trim().toLowerCase();
+    if (rawStatus == 'disabled' || rawStatus == 'suspended') {
+      return false;
+    }
+    if (rawStatus == 'active') {
+      return true;
+    }
+    return user.isActive;
+  }
+
   Future<void> _updateUserRoleAndStatus(
     String uid,
     String newRole,
@@ -160,6 +179,20 @@ class _CustomersViewState extends State<CustomersView> {
         'isActive': newIsActive,
         'accountStatus': accountStatus,
       });
+
+      if (accountStatus.toLowerCase() == 'disabled' ||
+          accountStatus.toLowerCase() == 'suspended') {
+        try {
+          final userBookings = await _bookingService.getUserBookings(uid);
+          await _bookingService.handleAccountStatusChange(
+            userId: uid,
+            accountStatus: accountStatus,
+            userBookings: userBookings,
+          );
+        } catch (e) {
+          debugPrint('[CustomersView] Booking status handling failed: $e');
+        }
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -270,7 +303,7 @@ class _CustomersViewState extends State<CustomersView> {
         TextCellValue(u.email),
         TextCellValue(u.phone.isNotEmpty ? u.phone : 'N/A'),
         TextCellValue(u.role.toUpperCase()),
-        TextCellValue(u.isActive ? 'ACTIVE' : 'DISABLED'),
+        TextCellValue(_getDisplayAccountStatus(u)),
         TextCellValue(u.licenseStatus.toUpperCase()),
         TextCellValue(_formatDate(u.createdAt)),
       ]);
@@ -306,7 +339,7 @@ class _CustomersViewState extends State<CustomersView> {
             u.email,
             u.phone.isNotEmpty ? u.phone : 'N/A',
             u.role.toUpperCase(),
-            u.isActive ? 'ACTIVE' : 'DISABLED',
+            _getDisplayAccountStatus(u),
             u.licenseStatus.toUpperCase(),
             _formatDateOnly(u.createdAt),
           ],
@@ -406,7 +439,7 @@ class _CustomersViewState extends State<CustomersView> {
       bool matchesStatus = true;
       if (_filterStatus != 'All') {
         final isActiveFilter = _filterStatus == 'Active';
-        matchesStatus = u.isActive == isActiveFilter;
+        matchesStatus = _isUserAccountActive(u) == isActiveFilter;
       }
 
       // License filter
@@ -459,8 +492,8 @@ class _CustomersViewState extends State<CustomersView> {
 
     // Statistics Calculations
     final totalUsers = _users.length;
-    final activeUsers = _users.where((u) => u.isActive).length;
-    final disabledUsers = _users.where((u) => !u.isActive).length;
+    final activeUsers = _users.where(_isUserAccountActive).length;
+    final disabledUsers = _users.where((u) => !_isUserAccountActive(u)).length;
     final pendingLicenses = _users
         .where((u) => u.licenseStatus == 'pending')
         .length;
@@ -960,8 +993,10 @@ class _CustomersViewState extends State<CustomersView> {
         const columnCount = 7;
         final internalSpacing =
             (horizontalMargin * 2) + (columnSpacing * (columnCount - 1));
-        final contentWidth =
-            (tableWidth - internalSpacing).clamp(620.0, double.infinity);
+        final contentWidth = (tableWidth - internalSpacing).clamp(
+          620.0,
+          double.infinity,
+        );
 
         final nameWidth = contentWidth * 0.21;
         final emailWidth = contentWidth * 0.24;
@@ -999,10 +1034,7 @@ class _CustomersViewState extends State<CustomersView> {
               ),
               columns: [
                 DataColumn(
-                  label: SizedBox(
-                    width: nameWidth,
-                    child: header('Full Name'),
-                  ),
+                  label: SizedBox(width: nameWidth, child: header('Full Name')),
                 ),
                 DataColumn(
                   label: SizedBox(
@@ -1041,7 +1073,7 @@ class _CustomersViewState extends State<CustomersView> {
                 if (u.licenseStatus == 'rejected') licenseColor = Colors.red;
                 if (u.licenseStatus == 'unprovided') licenseColor = Colors.grey;
 
-                final accountStatus = u.isActive ? 'ACTIVE' : 'DISABLED';
+                final accountStatus = _getDisplayAccountStatus(u);
 
                 return DataRow(
                   cells: [
@@ -1145,7 +1177,7 @@ class _CustomersViewState extends State<CustomersView> {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: u.isActive
+                              color: _isUserAccountActive(u)
                                   ? Colors.green.withValues(alpha: 0.15)
                                   : Colors.red.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(4),
@@ -1153,7 +1185,9 @@ class _CustomersViewState extends State<CustomersView> {
                             child: Text(
                               accountStatus,
                               style: TextStyle(
-                                color: u.isActive ? Colors.green : Colors.red,
+                                color: _isUserAccountActive(u)
+                                    ? Colors.green
+                                    : Colors.red,
                                 fontSize: 8,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -1300,13 +1334,13 @@ class _CustomersViewState extends State<CustomersView> {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: u.isActive
+                      color: _isUserAccountActive(u)
                           ? Colors.green.withValues(alpha: 0.15)
                           : Colors.red.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      u.isActive ? 'ACTIVE' : 'DISABLED',
+                      _getDisplayAccountStatus(u),
                       style: TextStyle(
                         color: u.isActive ? Colors.green : Colors.red,
                         fontSize: _fs(8, min: 7),
@@ -1656,7 +1690,8 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
                       foregroundColor: Colors.white,
                     ),
                     onPressed: () {
-                      final isActive = _selectedStatus == 'Active';
+                      final isActive =
+                          _selectedStatus.toLowerCase() == 'active';
                       widget.onSaveSettings(
                         _selectedRole,
                         isActive,
@@ -2312,7 +2347,11 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
       itemBuilder: (context, index) {
         final b = bookings[index];
         Color statusColor = Colors.orange;
-        if (['approved', 'active', 'ongoing'].contains(b.status.toLowerCase())) {
+        if ([
+          'approved',
+          'active',
+          'ongoing',
+        ].contains(b.status.toLowerCase())) {
           statusColor = Colors.blue;
         }
         if (b.status.toLowerCase() == 'completed') {

@@ -307,9 +307,6 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final double width = MediaQuery.of(context).size.width;
-    final bool isDesktop = width > 900;
-
     if (_loading) {
       return Scaffold(
         appBar: branchesAppBar,
@@ -365,44 +362,17 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: branchesAppBar,
-      body: isDesktop ? _buildDesktopLayout() : _buildMobileLayout(),
+      body: _buildMobileLayout(),
     );
   }
 
-  // --- DESKTOP LAYOUT (SPLIT SCREEN) ---
-  Widget _buildDesktopLayout() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Side search & listing panel
-        Expanded(
-          flex: 4,
-          child: Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
-              border: Border(right: BorderSide(color: _borderColor, width: 1)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildSearchHeader(isDesktop: true),
-                Expanded(
-                  child: _selectedBranch != null && !_isSearchFocused
-                      ? _buildSelectedBranchDetailPanel()
-                      : _buildBranchListWidget(isDesktop: true),
-                ),
-              ],
-            ),
-          ),
-        ),
-        // Map Panel
-        Expanded(flex: 8, child: _buildMapWidget()),
-      ],
-    );
-  }
+  // --- DESKTOP LAYOUT (REMOVED) ---
 
   // --- MOBILE LAYOUT (FULL SCREEN STACK) ---
   Widget _buildMobileLayout() {
+    final double width = MediaQuery.of(context).size.width;
+    final bool isDesktop = width > 900;
+
     return Stack(
       children: [
         // Map fills entire background
@@ -412,7 +382,8 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
         Positioned(
           top: 16,
           left: 16,
-          right: 16,
+          right: isDesktop ? null : 16,
+          width: isDesktop ? 380 : null,
           child: Column(
             children: [
               _buildFloatingSearchCard(),
@@ -421,8 +392,9 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
                   margin: const EdgeInsets.only(top: 4),
                   constraints: const BoxConstraints(maxHeight: 300),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: _isDark ? const Color(0xFF1E293B) : Colors.white,
                     borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: _borderColor),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.1),
@@ -433,7 +405,7 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
-                    child: _buildBranchListWidget(isDesktop: false),
+                    child: _buildBranchListWidget(isDesktop: isDesktop),
                   ),
                 ),
             ],
@@ -443,7 +415,7 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
         // Floating Action Buttons Row (Right Side)
         Positioned(
           right: 16,
-          bottom: _selectedBranch != null ? 240 : 20,
+          bottom: _selectedBranch != null ? (isDesktop ? 20 : 240) : 20,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -472,8 +444,8 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
               // Current User Location Pin Locator Button
               FloatingActionButton.small(
                 heroTag: 'current_loc_btn',
-                backgroundColor: Colors.white,
-                foregroundColor: AppColors.secondaryBlue,
+                backgroundColor: _isDark ? const Color(0xFF1E293B) : Colors.white,
+                foregroundColor: _isDark ? Colors.white : AppColors.secondaryBlue,
                 onPressed: _zoomToUserLocation,
                 tooltip: 'My Location',
                 child: const Icon(Icons.gps_fixed),
@@ -486,7 +458,8 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
         if (_selectedBranch != null)
           Positioned(
             left: 16,
-            right: 16,
+            right: isDesktop ? null : 16,
+            width: isDesktop ? 380 : null,
             bottom: 20,
             child: Card(
               color: Theme.of(context).cardColor,
@@ -859,37 +832,45 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
   // --- FLOATING SEARCH BAR (MOBILE) ---
   Widget _buildFloatingSearchCard() {
     return Card(
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: _isDark ? const Color(0xFF1E293B) : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: _borderColor),
+      ),
       elevation: 6,
       shadowColor: Colors.black.withValues(alpha: 0.08),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         child: Row(
           children: [
-            const Icon(Icons.search, color: AppColors.lightText),
+            Icon(Icons.search, color: _subColor),
             const SizedBox(width: 10),
             Expanded(
               child: TextField(
                 controller: _searchController,
+                style: TextStyle(color: _textColor, fontSize: 13),
                 onTap: () {
                   setState(() {
                     _isSearchFocused = true;
                   });
                 },
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: 'Search rental hub by name...',
+                  hintStyle: TextStyle(
+                    color: _isDark ? Colors.white30 : Colors.grey,
+                    fontSize: 13,
+                  ),
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,
                   filled: false,
-                  contentPadding: EdgeInsets.symmetric(vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
             ),
             if (_searchQuery.isNotEmpty)
               IconButton(
-                icon: const Icon(Icons.clear, color: Colors.grey),
+                icon: Icon(Icons.clear, color: _subColor),
                 onPressed: () {
                   _searchController.clear();
                   setState(() {
@@ -904,135 +885,7 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
     );
   }
 
-  // --- SIDEBAR SEARCH HEADER (DESKTOP) ---
-  Widget _buildSearchHeader({required bool isDesktop}) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              if (Navigator.canPop(context)) ...[
-                IconButton(
-                  icon: Icon(
-                    Icons.arrow_back_ios_new_rounded,
-                    color: _textColor,
-                    size: 18,
-                  ),
-                  onPressed: () => Navigator.pop(context),
-                ),
-                const SizedBox(width: 4),
-              ],
-              Expanded(
-                child: Text(
-                  'Branches & Hubs',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                    color: _textColor,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Locate and request route navigation to our official service centers across Malaysia.',
-            style: TextStyle(fontSize: 12, color: _subColor, height: 1.4),
-          ),
-          const SizedBox(height: 20),
-          TextField(
-            controller: _searchController,
-            style: TextStyle(color: _textColor, fontSize: 13),
-            decoration: InputDecoration(
-              hintText: 'Search rental hubs by name...',
-              hintStyle: TextStyle(
-                color: _isDark ? Colors.white30 : Colors.grey,
-                fontSize: 13,
-              ),
-              prefixIcon: Icon(Icons.search, color: _subColor),
-              filled: true,
-              fillColor: _isDark
-                  ? const Color(0xFF0F172A)
-                  : AppColors.lightGray,
-              contentPadding: const EdgeInsets.symmetric(
-                vertical: 14,
-                horizontal: 16,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: _borderColor),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: _borderColor),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                  color: AppColors.primaryOrange,
-                  width: 1.5,
-                ),
-              ),
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: Icon(Icons.clear, color: _subColor),
-                      onPressed: () {
-                        _searchController.clear();
-                        setState(() {
-                          _searchQuery = '';
-                          _filterBranches();
-                        });
-                      },
-                    )
-                  : null,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryOrange,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    elevation: 0,
-                  ),
-                  onPressed: _findNearestBranch,
-                  icon: const Icon(Icons.my_location, size: 16),
-                  label: const Text(
-                    'Find Nearest',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              IconButton(
-                style: IconButton.styleFrom(
-                  backgroundColor: AppColors.lightGray,
-                  padding: const EdgeInsets.all(14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                onPressed: _zoomToUserLocation,
-                icon: const Icon(
-                  Icons.gps_fixed,
-                  color: AppColors.secondaryBlue,
-                ),
-                tooltip: 'My Location',
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+
 
   // --- BRANCH LIST WIDGET PANEL ---
   Widget _buildBranchListWidget({required bool isDesktop}) {
@@ -1240,171 +1093,5 @@ class _BranchesMapScreenState extends State<BranchesMapScreen> {
     );
   }
 
-  // --- DESKTOP SIDEBAR DETAIL VIEW (REMOVED BACK BUTTON) ---
-  Widget _buildSelectedBranchDetailPanel() {
-    if (_selectedBranch == null) return const SizedBox.shrink();
 
-    final branch = _selectedBranch!;
-    final isValid = _isValidLatLng(branch.latitude, branch.longitude);
-
-    double distance = 0;
-    if (isValid) {
-      distance = _calculateDistance(
-        _currentUserLocation.latitude,
-        _currentUserLocation.longitude,
-        branch.latitude,
-        branch.longitude,
-      );
-    }
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // REMOVED THE BACK BUTTON - no more 2nd App Bar
-          const SizedBox(height: 8),
-          Text(
-            branch.branchName,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-              color: _textColor,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.green.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: const Text(
-              'ACTIVE SERVICE HUB',
-              style: TextStyle(
-                color: Colors.green,
-                fontSize: 9,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'ADDRESS',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              color: _subColor,
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            branch.address,
-            style: TextStyle(
-              fontSize: 13,
-              color: _textColor,
-              height: 1.4,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            'CONTACT INFORMATION',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              color: _subColor,
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Icon(Icons.phone_outlined, size: 16, color: _subColor),
-              const SizedBox(width: 8),
-              Text(
-                branch.phone,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: _textColor,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Text(
-            'OPERATING HOURS',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              color: _subColor,
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Icon(Icons.access_time_outlined, size: 16, color: _subColor),
-              const SizedBox(width: 8),
-              Text(
-                branch.operatingHours,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontStyle: FontStyle.italic,
-                  color: _textColor,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          if (isValid) ...[
-            Text(
-              'LOCATION ANALYSIS',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: _subColor,
-                letterSpacing: 0.5,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Approx. Straight-line distance: ${distance.toStringAsFixed(1)} km away',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: _textColor,
-              ),
-            ),
-          ],
-          Divider(height: 40, color: _borderColor),
-          // REMOVED "Show Directions on Map" button - only kept "Open in Google Maps"
-          OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(
-              foregroundColor: _textColor,
-              side: BorderSide(color: _borderColor),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              minimumSize: const Size.fromHeight(48),
-            ),
-            onPressed: () {
-              download_helper.openUrl(
-                'https://www.google.com/maps/search/?api=1&query=${branch.latitude},${branch.longitude}',
-              );
-            },
-            icon: const Icon(Icons.map_outlined, size: 18),
-            label: const Text(
-              'Open in Google Maps',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }

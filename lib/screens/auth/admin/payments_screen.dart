@@ -107,8 +107,8 @@ class _PaymentsViewState extends State<PaymentsView> {
       _error = null;
     });
     try {
-      final paymentsFuture = _paymentService.getPayments();
-      final bookingsFuture = _bookingService.getBookings();
+      final paymentsFuture = _paymentService.getPayments(forceRefresh: true);
+      final bookingsFuture = _bookingService.getBookings(forceRefresh: true);
       final usersSnap = await FirebaseDatabase.instance
           .ref()
           .child('users')

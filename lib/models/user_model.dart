@@ -10,9 +10,10 @@ class UserModel {
   final String licenseImage;
   final bool isVerified;
   final bool isActive;
+  final String accountStatus;
   final String licenseStatus; // 'unprovided', 'pending', 'approved', 'rejected'
   final String licenseRejectionReason;
-  
+
   // High fidelity visual fields
   final String address;
   final String licenseClass;
@@ -48,6 +49,7 @@ class UserModel {
     this.licenseImage = '',
     this.isVerified = false,
     this.isActive = true,
+    this.accountStatus = 'Active',
     this.licenseStatus = 'unprovided',
     this.licenseRejectionReason = '',
     this.address = '4521 Oakwood Avenue, Suite 300, Los Angeles, CA 90024',
@@ -67,10 +69,12 @@ class UserModel {
     this.idReviewedDate = '',
   });
 
-  factory UserModel.fromMap(
-    String id,
-    Map<dynamic, dynamic> data,
-  ) {
+  factory UserModel.fromMap(String id, Map<dynamic, dynamic> data) {
+    final String parsedAccountStatus = (data['accountStatus'] ?? '')
+        .toString()
+        .trim();
+    final bool parsedIsActive =
+        data['isActive'] ?? (parsedAccountStatus.toLowerCase() != 'suspended');
     return UserModel(
       id: id,
       fullName: data['fullName'] ?? data['name'] ?? 'User',
@@ -82,13 +86,20 @@ class UserModel {
       licenseNumber: data['licenseNumber'],
       licenseImage: data['licenseImage'] ?? '',
       isVerified: data['isVerified'] ?? false,
-      isActive: data['isActive'] ?? true,
-      licenseStatus: data['licenseStatus'] ?? 
-          ((data['licenseImage'] != null && (data['licenseImage'] as String).trim().isNotEmpty)
+      isActive: parsedIsActive,
+      accountStatus: parsedAccountStatus.isNotEmpty
+          ? parsedAccountStatus
+          : (parsedIsActive ? 'Active' : 'Disabled'),
+      licenseStatus:
+          data['licenseStatus'] ??
+          ((data['licenseImage'] != null &&
+                  (data['licenseImage'] as String).trim().isNotEmpty)
               ? (data['isVerified'] == true ? 'approved' : 'pending')
               : 'unprovided'),
       licenseRejectionReason: data['licenseRejectionReason'] ?? '',
-      address: data['address'] ?? '4521 Oakwood Avenue, Suite 300, Los Angeles, CA 90024',
+      address:
+          data['address'] ??
+          '4521 Oakwood Avenue, Suite 300, Los Angeles, CA 90024',
       licenseClass: data['licenseClass'] ?? 'Class DA',
       licenseExpiry: data['licenseExpiry'] ?? '12 / 2028',
       rewardPoints: data['rewardPoints'] is int
@@ -120,6 +131,7 @@ class UserModel {
       'licenseImage': licenseImage,
       'isVerified': isVerified,
       'isActive': isActive,
+      'accountStatus': accountStatus,
       'licenseStatus': licenseStatus,
       'licenseRejectionReason': licenseRejectionReason,
       'address': address,

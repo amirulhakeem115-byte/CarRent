@@ -94,9 +94,9 @@ class _AdminProfileViewState extends State<AdminProfileView> {
 
         // Fetch Stats
         final results = await Future.wait([
-          _vehicleService.getVehicles(),
-          _bookingService.getBookings(),
-          _paymentService.getPayments(),
+          _vehicleService.getVehicles(forceRefresh: true),
+          _bookingService.getBookings(forceRefresh: true),
+          _paymentService.getPayments(forceRefresh: true),
         ]).timeout(const Duration(seconds: 15));
 
         final vehiclesList = results[0] as List;

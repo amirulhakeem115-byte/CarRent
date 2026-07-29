@@ -1189,6 +1189,7 @@ class _ReportsViewState extends State<ReportsView> {
     final kpis = _calculateKPIs();
 
     return SingleChildScrollView(
+      primary: false,
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

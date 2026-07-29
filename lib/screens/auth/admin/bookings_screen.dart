@@ -82,9 +82,9 @@ class _BookingsViewState extends State<BookingsView> {
       _error = null;
     });
     try {
-      _bookings = await _bookingService.getBookings().timeout(
-        const Duration(seconds: 10),
-      );
+      _bookings = await _bookingService
+          .getBookings(forceRefresh: true)
+          .timeout(const Duration(seconds: 10));
       _bookings.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     } catch (e) {
       debugPrint('Error loading bookings: $e');
@@ -128,16 +128,22 @@ class _BookingsViewState extends State<BookingsView> {
         s == 'awaiting return inspection' ||
         s == 'awaiting final payment' ||
         s == 'return_requested') {
-      return isDark ? const Color(0xFFFB923C) : const Color(0xFFEA580C); // Orange / Deep Amber (High visibility)
+      return isDark
+          ? const Color(0xFFFB923C)
+          : const Color(0xFFEA580C); // Orange / Deep Amber (High visibility)
     }
     if (s == 'completed') {
-      return isDark ? const Color(0xFF60A5FA) : const Color(0xFF1E3A8A); // Dark Blue
+      return isDark
+          ? const Color(0xFF60A5FA)
+          : const Color(0xFF1E3A8A); // Dark Blue
     }
     if (s == 'cancelled' || s == 'canceled' || s == 'rejected') {
       return const Color(0xFFEF4444); // Red
     }
     if (s == 'overdue') {
-      return isDark ? const Color(0xFFF87171) : const Color(0xFFB91C1C); // Crimson Red
+      return isDark
+          ? const Color(0xFFF87171)
+          : const Color(0xFFB91C1C); // Crimson Red
     }
     return isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280);
   }

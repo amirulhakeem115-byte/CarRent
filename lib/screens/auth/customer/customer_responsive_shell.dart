@@ -23,6 +23,7 @@ import '../../../ai/widgets/movable_ai_floating_button_overlay.dart';
 import '../../../models/booking_model.dart';
 import 'booking_screen.dart';
 import '../../../services/payment_restriction_service.dart';
+import '../login_screen.dart';
 
 // Import all screens to load them inside the shell
 import 'home_screen.dart';
@@ -66,6 +67,7 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
   StreamSubscription<List<NotificationModel>>? _notificationsSubscription;
   StreamSubscription<DatabaseEvent>? _userProfileSubscription;
   final Set<String> _playedNotificationIds = {};
+  String? _lastAccountAlertStatus;
 
   void _markNotificationLocallyRead(String notificationId) {
     setState(() {
@@ -283,9 +285,55 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
           try {
             final raw = event.snapshot.value as Map<dynamic, dynamic>;
             final updatedUser = UserModel.fromMap(userId, raw);
+            final previousStatus = (_user?.accountStatus ?? '')
+                .trim()
+                .toLowerCase();
+            final nextStatus = (updatedUser.accountStatus).trim().toLowerCase();
             setState(() {
               _user = updatedUser;
             });
+            if (mounted &&
+                nextStatus != 'active' &&
+                previousStatus != nextStatus &&
+                _lastAccountAlertStatus != nextStatus) {
+              _lastAccountAlertStatus = nextStatus;
+              ScaffoldMessenger.of(context).clearSnackBars();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    nextStatus == 'suspended'
+                        ? 'Your account has been suspended. Please contact support.'
+                        : 'Your account is disabled. Some features are currently unavailable.',
+                  ),
+                  backgroundColor: nextStatus == 'suspended'
+                      ? Colors.redAccent
+                      : Colors.orange,
+                  duration: const Duration(seconds: 4),
+                ),
+              );
+            }
+
+            if (nextStatus == 'suspended') {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).clearSnackBars();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Your account has been suspended. Access is blocked until an admin reactivates it.',
+                    ),
+                    backgroundColor: Colors.redAccent,
+                    duration: Duration(seconds: 4),
+                  ),
+                );
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (context) => LoginScreen(onLoggedIn: () {}),
+                  ),
+                  (route) => false,
+                );
+              });
+            }
           } catch (e) {
             debugPrint('Error parsing realtime user profile: $e');
           }

@@ -52,8 +52,8 @@ class _VehiclesViewState extends State<VehiclesView> {
     if (!mounted) return;
     try {
       final results = await Future.wait([
-        _vehicleService.getVehicles(applyStatusSync: false),
-        _branchService.getBranches(),
+        _vehicleService.getVehicles(applyStatusSync: false, forceRefresh: true),
+        _branchService.getBranches(forceRefresh: true),
       ]).timeout(const Duration(seconds: 4));
       if (mounted) {
         setState(() {
@@ -159,10 +159,8 @@ class _VehiclesViewState extends State<VehiclesView> {
                 childAspectRatio: 0.85,
               ),
               itemCount: 6,
-              itemBuilder: (_, index) => FadeInUp(
-                index: index,
-                child: const VehicleCardSkeleton(),
-              ),
+              itemBuilder: (_, index) =>
+                  FadeInUp(index: index, child: const VehicleCardSkeleton()),
             ),
           ],
         ),
@@ -522,95 +520,225 @@ class _VehiclesViewState extends State<VehiclesView> {
                       index: index,
                       child: Container(
                         decoration: BoxDecoration(
-                        color: cardColor,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: borderColor),
-                      ),
-                      margin: const EdgeInsets.only(bottom: 16),
-                      padding: const EdgeInsets.all(16),
-                      child: isDesktop
-                          ? Row(
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: AppImage(
-                                    imageSrc: vehicle.mainImage,
-                                    height: 80,
-                                    width: 110,
-                                    fit: BoxFit.cover,
-                                    placeholder: Container(
+                          color: cardColor,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: borderColor),
+                        ),
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(16),
+                        child: isDesktop
+                            ? Row(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: AppImage(
+                                      imageSrc: vehicle.mainImage,
                                       height: 80,
                                       width: 110,
-                                      color: surfaceColor,
-                                      child: Icon(
-                                        Icons.directions_car,
-                                        color: textSecondary,
+                                      fit: BoxFit.cover,
+                                      placeholder: Container(
+                                        height: 80,
+                                        width: 110,
+                                        color: surfaceColor,
+                                        child: Icon(
+                                          Icons.directions_car,
+                                          color: textSecondary,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Text(
+                                              '${vehicle.brand} ${vehicle.model}',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 16,
+                                                color: textPrimary,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 2,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: statusColor.withValues(
+                                                  alpha: 0.15,
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                statusLabel,
+                                                style: TextStyle(
+                                                  color: statusColor,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 9,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Plate: ${vehicle.plateNumber} | Category: ${vehicle.category} | Hub: ${vehicle.branchName.isNotEmpty ? vehicle.branchName : "General Hub"}',
+                                          style: TextStyle(
+                                            color: textSecondary,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          children: [
+                                            Text(
+                                              'RM ${vehicle.pricePerDay.toStringAsFixed(0)} / day',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: AppColors.primaryOrange,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 24),
+                                            Text(
+                                              'Change Status:',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: textSecondary,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            _buildChangeStatusDropdown(
+                                              vehicle,
+                                              isDark: isDark,
+                                              cardColor: surfaceColor,
+                                              textPrimary: textPrimary,
+                                              borderColor: borderColor,
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Column(
+                                    children: [
+                                      IconButton(
+                                        icon: Icon(
+                                          Icons.edit_outlined,
+                                          color: textPrimary,
+                                          size: 20,
+                                        ),
+                                        onPressed: () =>
+                                            _showAddEditVehicleDialog(
+                                              vehicle: vehicle,
+                                            ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.delete_outline_rounded,
+                                          color: Colors.redAccent,
+                                          size: 20,
+                                        ),
+                                        onPressed: () =>
+                                            _deleteVehicle(vehicle.id),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              )
+                            : Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: AppImage(
+                                      imageSrc: vehicle.mainImage,
+                                      height: 150,
+                                      width: double.infinity,
+                                      fit: BoxFit.cover,
+                                      placeholder: Container(
+                                        height: 150,
+                                        width: double.infinity,
+                                        color: surfaceColor,
+                                        child: Icon(
+                                          Icons.directions_car,
+                                          color: textSecondary,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        '${vehicle.brand} ${vehicle.model}',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                          color: textPrimary,
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: statusColor.withValues(
+                                            alpha: 0.15,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          statusLabel,
+                                          style: TextStyle(
+                                            color: statusColor,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 9,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Plate: ${vehicle.plateNumber} | Category: ${vehicle.category}\nHub: ${vehicle.branchName.isNotEmpty ? vehicle.branchName : "General Hub"}',
+                                    style: TextStyle(
+                                      color: textSecondary,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'RM ${vehicle.pricePerDay.toStringAsFixed(0)} / day',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.primaryOrange,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                  Divider(height: 20, color: borderColor),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       Row(
                                         children: [
                                           Text(
-                                            '${vehicle.brand} ${vehicle.model}',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 16,
-                                              color: textPrimary,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                              vertical: 2,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: statusColor.withValues(
-                                                alpha: 0.15,
-                                              ),
-                                              borderRadius:
-                                                  BorderRadius.circular(6),
-                                            ),
-                                            child: Text(
-                                              statusLabel,
-                                              style: TextStyle(
-                                                color: statusColor,
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 9,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'Plate: ${vehicle.plateNumber} | Category: ${vehicle.category} | Hub: ${vehicle.branchName.isNotEmpty ? vehicle.branchName : "General Hub"}',
-                                        style: TextStyle(
-                                          color: textSecondary,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        children: [
-                                          Text(
-                                            'RM ${vehicle.pricePerDay.toStringAsFixed(0)} / day',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              color: AppColors.primaryOrange,
-                                              fontSize: 14,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 24),
-                                          Text(
-                                            'Change Status:',
+                                            'Status:',
                                             style: TextStyle(
                                               fontSize: 11,
                                               color: textSecondary,
@@ -627,161 +755,34 @@ class _VehiclesViewState extends State<VehiclesView> {
                                           ),
                                         ],
                                       ),
+                                      Row(
+                                        children: [
+                                          IconButton(
+                                            icon: Icon(
+                                              Icons.edit_outlined,
+                                              color: textPrimary,
+                                              size: 20,
+                                            ),
+                                            onPressed: () =>
+                                                _showAddEditVehicleDialog(
+                                                  vehicle: vehicle,
+                                                ),
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.delete_outline_rounded,
+                                              color: Colors.redAccent,
+                                              size: 20,
+                                            ),
+                                            onPressed: () =>
+                                                _deleteVehicle(vehicle.id),
+                                          ),
+                                        ],
+                                      ),
                                     ],
                                   ),
-                                ),
-                                Column(
-                                  children: [
-                                    IconButton(
-                                      icon: Icon(
-                                        Icons.edit_outlined,
-                                        color: textPrimary,
-                                        size: 20,
-                                      ),
-                                      onPressed: () =>
-                                          _showAddEditVehicleDialog(
-                                            vehicle: vehicle,
-                                          ),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.delete_outline_rounded,
-                                        color: Colors.redAccent,
-                                        size: 20,
-                                      ),
-                                      onPressed: () =>
-                                          _deleteVehicle(vehicle.id),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            )
-                          : Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: AppImage(
-                                    imageSrc: vehicle.mainImage,
-                                    height: 150,
-                                    width: double.infinity,
-                                    fit: BoxFit.cover,
-                                    placeholder: Container(
-                                      height: 150,
-                                      width: double.infinity,
-                                      color: surfaceColor,
-                                      child: Icon(
-                                        Icons.directions_car,
-                                        color: textSecondary,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      '${vehicle.brand} ${vehicle.model}',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                        color: textPrimary,
-                                      ),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 2,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: statusColor.withValues(
-                                          alpha: 0.15,
-                                        ),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Text(
-                                        statusLabel,
-                                        style: TextStyle(
-                                          color: statusColor,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 9,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Plate: ${vehicle.plateNumber} | Category: ${vehicle.category}\nHub: ${vehicle.branchName.isNotEmpty ? vehicle.branchName : "General Hub"}',
-                                  style: TextStyle(
-                                    color: textSecondary,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'RM ${vehicle.pricePerDay.toStringAsFixed(0)} / day',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.primaryOrange,
-                                    fontSize: 15,
-                                  ),
-                                ),
-                                Divider(height: 20, color: borderColor),
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Text(
-                                          'Status:',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: textSecondary,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        _buildChangeStatusDropdown(
-                                          vehicle,
-                                          isDark: isDark,
-                                          cardColor: surfaceColor,
-                                          textPrimary: textPrimary,
-                                          borderColor: borderColor,
-                                        ),
-                                      ],
-                                    ),
-                                    Row(
-                                      children: [
-                                        IconButton(
-                                          icon: Icon(
-                                            Icons.edit_outlined,
-                                            color: textPrimary,
-                                            size: 20,
-                                          ),
-                                          onPressed: () =>
-                                              _showAddEditVehicleDialog(
-                                                vehicle: vehicle,
-                                              ),
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(
-                                            Icons.delete_outline_rounded,
-                                            color: Colors.redAccent,
-                                            size: 20,
-                                          ),
-                                          onPressed: () =>
-                                              _deleteVehicle(vehicle.id),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
+                                ],
+                              ),
                       ),
                     );
                   },

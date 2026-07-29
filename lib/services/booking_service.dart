@@ -16,6 +16,93 @@ class BookingService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref().child(
     'bookings',
   );
+
+  static bool shouldDeferAccountStatusAction(String? status) {
+    final normalized = (status ?? '').trim().toLowerCase();
+    return normalized == 'active' ||
+        normalized == 'ongoing' ||
+        normalized == 'overdue' ||
+        normalized == 'return requested' ||
+        normalized == 'awaiting return' ||
+        normalized == 'awaiting return inspection' ||
+        normalized == 'awaiting final payment';
+  }
+
+  static bool isAccountRestricted(String? accountStatus) {
+    final normalized = (accountStatus ?? '').trim().toLowerCase();
+    return normalized == 'disabled' || normalized == 'suspended';
+  }
+
+  static bool shouldAutoCancelBookingsOnStatusChange(String? accountStatus) {
+    final normalized = (accountStatus ?? '').trim().toLowerCase();
+    return normalized == 'active';
+  }
+
+  static String getAccountRestrictionMessage(String? accountStatus) {
+    final normalized = (accountStatus ?? '').trim().toLowerCase();
+    if (normalized == 'suspended') {
+      return 'Your account has been suspended. Please contact support.';
+    }
+    if (normalized == 'disabled') {
+      return 'Your account is disabled. Please contact support to reactivate access.';
+    }
+    return 'Your account is currently restricted. Please contact support.';
+  }
+
+  Future<void> handleAccountStatusChange({
+    required String userId,
+    required String accountStatus,
+    required List<BookingModel> userBookings,
+  }) async {
+    if (userId.isEmpty) return;
+
+    final normalizedStatus = accountStatus.trim().toLowerCase();
+    if (normalizedStatus == 'active') return;
+
+    if (normalizedStatus == 'suspended' || normalizedStatus == 'disabled') {
+      // Do not auto-cancel bookings for suspended/disabled accounts.
+      // These accounts should be blocked from app access instead.
+      return;
+    }
+
+    final Iterable<BookingModel> pendingBookings = userBookings.where((
+      booking,
+    ) {
+      final statusLower = booking.status.toLowerCase();
+      if (statusLower == 'cancelled' ||
+          statusLower == 'rejected' ||
+          statusLower == 'completed') {
+        return false;
+      }
+      return !shouldDeferAccountStatusAction(booking.status);
+    });
+
+    for (final booking in pendingBookings) {
+      try {
+        await cancelBooking(
+          booking.id,
+          booking.userId,
+          booking.vehicleId,
+          booking.vehicleName,
+        );
+      } catch (e) {
+        debugPrint(
+          '[BookingService] Failed to cancel booking ${booking.id} after account status change: $e',
+        );
+      }
+    }
+
+    if (normalizedStatus == 'disabled') {
+      await FirebaseDatabase.instance.ref().child('users').child(userId).update(
+        {'accountStatus': 'Disabled'},
+      );
+    } else if (normalizedStatus == 'suspended') {
+      await FirebaseDatabase.instance.ref().child('users').child(userId).update(
+        {'accountStatus': 'Suspended'},
+      );
+    }
+  }
+
   final VehicleService _vehicleService = VehicleService();
   final NotificationService _notificationService = NotificationService();
 
@@ -216,11 +303,15 @@ class BookingService {
       );
 
       // Create admin notification directly for real-time delivery to Admin
-      final bool isUpcoming = booking.pickUpDate.isAfter(DateTime.now().add(const Duration(days: 1)));
+      final bool isUpcoming = booking.pickUpDate.isAfter(
+        DateTime.now().add(const Duration(days: 1)),
+      );
       await _notificationService.notifyBookingEvent(
         eventName: shouldMarkBooked
             ? 'Booking Confirmed'
-            : (isUpcoming ? 'Upcoming Booking Created' : 'New Booking Received'),
+            : (isUpcoming
+                  ? 'Upcoming Booking Created'
+                  : 'New Booking Received'),
         customerName: booking.userName,
         vehicleName: booking.vehicleName,
         bookingId: booking.id,
@@ -251,7 +342,9 @@ class BookingService {
         _cachedBookings != null &&
         _bookingsCacheTime != null &&
         DateTime.now().difference(_bookingsCacheTime!) < _cacheTtl) {
-      debugPrint('[BookingService] Returning warm cached bookings (${_cachedBookings!.length} items)');
+      debugPrint(
+        '[BookingService] Returning warm cached bookings (${_cachedBookings!.length} items)',
+      );
       return _cachedBookings!;
     }
 

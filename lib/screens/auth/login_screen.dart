@@ -126,7 +126,18 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      if (!userModel.isActive) {
+      final String accountStatus =
+          (userModel.toMap()['accountStatus'] ?? 'Active').toString().trim();
+      if (accountStatus.toLowerCase() == 'suspended') {
+        setState(() {
+          _error = 'Your account has been suspended. Please contact support.';
+          _loading = false;
+        });
+        await _authService.logout();
+        return;
+      }
+
+      if (!userModel.isActive && accountStatus.toLowerCase() != 'disabled') {
         setState(() {
           _error =
               'Your account has been disabled or suspended. Please contact support.';
@@ -134,6 +145,17 @@ class _LoginScreenState extends State<LoginScreen> {
         });
         await _authService.logout();
         return;
+      }
+
+      if (accountStatus.toLowerCase() == 'disabled') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Your account is disabled. Some features are currently unavailable.',
+            ),
+            backgroundColor: Colors.orange,
+          ),
+        );
       }
 
       // Save email locally
@@ -222,7 +244,18 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      if (!userModel.isActive) {
+      final String accountStatus =
+          (userModel.toMap()['accountStatus'] ?? 'Active').toString().trim();
+      if (accountStatus.toLowerCase() == 'suspended') {
+        setState(() {
+          _error = 'Your account has been suspended. Please contact support.';
+          _googleLoading = false;
+        });
+        await _authService.logout();
+        return;
+      }
+
+      if (!userModel.isActive && accountStatus.toLowerCase() != 'disabled') {
         setState(() {
           _error =
               'Your account has been disabled or suspended. Please contact support.';
@@ -230,6 +263,17 @@ class _LoginScreenState extends State<LoginScreen> {
         });
         await _authService.logout();
         return;
+      }
+
+      if (accountStatus.toLowerCase() == 'disabled') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Your account is disabled. Some features are currently unavailable.',
+            ),
+            backgroundColor: Colors.orange,
+          ),
+        );
       }
 
       // Trigger booking lifecycle check on login

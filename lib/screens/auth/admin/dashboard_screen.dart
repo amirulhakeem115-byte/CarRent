@@ -679,7 +679,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           StackTrace.current,
           stopwatch.elapsedMilliseconds,
         );
-        debugPrint('[AdminDashboard] No authenticated user found during background refresh.');
+        debugPrint(
+          '[AdminDashboard] No authenticated user found during background refresh.',
+        );
         if (mounted) {
           setState(() {
             _error = errStr;
@@ -744,7 +746,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               _payments = results[3] as List<PaymentModel>;
               _maintenanceJobs = results[4] as List<MaintenanceJobModel>;
 
-              _totalCustomers = _users.where((u) => u.role == 'customer').length;
+              _totalCustomers = _users
+                  .where((u) => u.role == 'customer')
+                  .length;
               _totalCars = _vehicles.length;
               _availableCars = _vehicles
                   .where((v) => v.status.toLowerCase() == 'available')
@@ -760,7 +764,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   .length;
 
               for (var booking in _bookings) {
-                if (booking.status == 'ongoing' || booking.status == 'approved') {
+                if (booking.status == 'ongoing' ||
+                    booking.status == 'approved') {
                   if (!_simulators.containsKey(booking.vehicleId)) {
                     _simulators[booking.vehicleId] = _trackingService
                         .startRouteSimulation(booking.vehicleId);
@@ -788,7 +793,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               _pendingPaymentsCount = _payments
                   .where(
                     (p) =>
-                        p.status == 'pending' || p.status == 'Pending Verification',
+                        p.status == 'pending' ||
+                        p.status == 'Pending Verification',
                   )
                   .length;
               _loading = false;
@@ -821,7 +827,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           lastStackTrace,
           stopwatch.elapsedMilliseconds,
         );
-        debugPrint('[AdminDashboard] Non-fatal background fetch notice (live streams remain active): $lastException');
+        debugPrint(
+          '[AdminDashboard] Non-fatal background fetch notice (live streams remain active): $lastException',
+        );
         if (mounted) {
           setState(() {
             _error =
@@ -832,7 +840,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       }
 
       stopwatch.stop();
-      debugPrint('[AdminDashboard] Background initialization completed in ${stopwatch.elapsedMilliseconds} ms');
+      debugPrint(
+        '[AdminDashboard] Background initialization completed in ${stopwatch.elapsedMilliseconds} ms',
+      );
     } catch (fatalErr, fatalSt) {
       stopwatch.stop();
       _logDiagnosticFailure(
@@ -879,7 +889,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             if (snapshot.exists && snapshot.value != null) {
               final data = snapshot.value as Map;
               alreadyAlerted = data.values.any(
-                (n) => n is Map && n['relatedId'] == job.id && n['type'] == 'maintenance',
+                (n) =>
+                    n is Map &&
+                    n['relatedId'] == job.id &&
+                    n['type'] == 'maintenance',
               );
             }
 
@@ -911,6 +924,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         : const Color(0xFFE2E8F0);
 
     return SingleChildScrollView(
+      physics: const ClampingScrollPhysics(
+        parent: AlwaysScrollableScrollPhysics(),
+      ),
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1295,6 +1311,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       case 'Dashboard':
         tabContent = Expanded(
           child: SingleChildScrollView(
+            primary: false,
+            physics: const ClampingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
             padding: const EdgeInsets.all(24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1436,6 +1456,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           const Divider(color: Colors.white12, height: 1),
           Expanded(
             child: ListView(
+              primary: false,
               padding: EdgeInsets.fromLTRB(
                 0,
                 12,
