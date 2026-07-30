@@ -807,6 +807,34 @@ class _BookingScreenState extends State<BookingScreen> {
     return BookingService.isAccountRestricted(_accountStatus);
   }
 
+  bool _validateStep2DateTimeBeforeProceed() {
+    String? message;
+
+    if (_pickupDate == null && !_isOpenRental && _returnDate == null) {
+      message =
+          'Please fill in pick-up date, pick-up time, and return date/time before proceeding to payment.';
+    } else if (_pickupDate == null) {
+      message = 'Please fill in the pick-up date before proceeding to payment.';
+    } else if (_pickupTime == null) {
+      message = 'Please fill in the pick-up time before proceeding to payment.';
+    } else if (!_isOpenRental && _returnDate == null) {
+      message =
+          'Please fill in the return date and time before proceeding to payment.';
+    }
+
+    if (message == null) {
+      setState(() {
+        _step2ValidationMessage = null;
+      });
+      return true;
+    }
+
+    setState(() {
+      _step2ValidationMessage = message;
+    });
+    return false;
+  }
+
   void _triggerPaymentFlow() {
     if (_pickupDate == null ||
         _pickupTime == null ||
@@ -3827,35 +3855,9 @@ class _BookingScreenState extends State<BookingScreen> {
                 (widget.vehicle.status.toLowerCase() == 'available' ||
                     _isFinalPayment)
                 ? () {
-                    if (_pickupDate == null &&
-                        !_isOpenRental &&
-                        _returnDate == null) {
-                      setState(() {
-                        _step2ValidationMessage =
-                            'Please fill in the pick-up date and return date before proceeding to payment.';
-                      });
+                    if (!_validateStep2DateTimeBeforeProceed()) {
                       return;
                     }
-
-                    if (_pickupDate == null) {
-                      setState(() {
-                        _step2ValidationMessage =
-                            'Please fill in the pick-up date before proceeding to payment.';
-                      });
-                      return;
-                    }
-
-                    if (!_isOpenRental && _returnDate == null) {
-                      setState(() {
-                        _step2ValidationMessage =
-                            'Please fill in the return date before proceeding to payment.';
-                      });
-                      return;
-                    }
-
-                    setState(() {
-                      _step2ValidationMessage = null;
-                    });
 
                     if (_isOpenRental) {
                       _showOpenRentalConfirmationDialog();
