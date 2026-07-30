@@ -151,6 +151,10 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
     final route = (actionRoute ?? '').trim().toLowerCase();
     final notifType = (type ?? '').trim().toLowerCase();
 
+    if (route.contains('booking') || notifType.contains('booking')) {
+      return 2;
+    }
+
     if (route == 'dashboard') return 0;
     if (route == 'search cars' || route == 'cars' || route == 'vehicles') {
       return 1;
@@ -176,7 +180,6 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
       return 7;
     }
 
-    if (notifType == 'booking') return 2;
     if (notifType == 'payment') return 5;
     if (notifType == 'support') return 7;
     if (notifType == 'reward') return 4;
@@ -455,31 +458,6 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              TextButton(
-                onPressed: () async {
-                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                  if (!notif.isRead) {
-                    _markNotificationLocallyRead(notif.id);
-                    await _notificationService.markAsRead(
-                      notif.userId,
-                      notif.id,
-                    );
-                  }
-                  _navigateFromNotification(
-                    actionRoute: notif.actionRoute,
-                    type: notif.type,
-                  );
-                },
-                child: const Text(
-                  'View',
-                  style: TextStyle(
-                    color: AppColors.primaryOrange,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
             ],
           ),
         ),
@@ -601,7 +579,7 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
     final bool showMobileBottomNav = !isDesktop;
     final bool isCompactMobile = showMobileBottomNav && width < 380;
     final double mobileBottomNavClearance = showMobileBottomNav
-        ? (kBottomNavigationBarHeight + media.viewPadding.bottom + 12)
+        ? media.viewPadding.bottom
         : 0;
     final unreadCount = _notifications.where((n) => !n.isRead).length;
 

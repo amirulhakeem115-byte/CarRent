@@ -7,6 +7,7 @@ import '../../services/database_service.dart';
 import '../../services/company_settings_provider.dart';
 import '../../widgets/custom_textfield.dart';
 import '../../widgets/app_logo.dart';
+import '../home_screen.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
 import 'customer/customer_responsive_shell.dart';
@@ -864,186 +865,201 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: isDark ? Colors.white : AppColors.secondaryBlue,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          (route) => false,
+        );
+      },
+      child: Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: isDark ? Colors.white : AppColors.secondaryBlue,
+            ),
+            onPressed: () {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const HomeScreen()),
+                (route) => false,
+              );
+            },
           ),
-          onPressed: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const RegisterScreen()),
-            );
-          },
         ),
-      ),
-      body: isDesktop
-          ? Row(
-              children: [
-                // Left half: Branding
-                Expanded(
-                  flex: 5,
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [AppColors.secondaryBlue, Color(0xFF0F172A)],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
+        body: isDesktop
+            ? Row(
+                children: [
+                  // Left half: Branding
+                  Expanded(
+                    flex: 5,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [AppColors.secondaryBlue, Color(0xFF0F172A)],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                      ),
+                      child: Center(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.all(40),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _buildBrandLogo(context, isOnDark: true),
+                              const SizedBox(height: 8),
+                              const Text(
+                                'Drive Your Journey',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 16,
+                                  letterSpacing: 1.5,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 48),
+                              Container(
+                                padding: const EdgeInsets.all(24),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.05),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.shield_outlined,
+                                  size: 120,
+                                  color: AppColors.primaryOrange,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
+                  ),
+                  // Right half: Login Form
+                  Expanded(
+                    flex: 6,
                     child: Center(
                       child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(40),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _buildBrandLogo(context, isOnDark: true),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Drive Your Journey',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 16,
-                                letterSpacing: 1.5,
-                                fontWeight: FontWeight.w500,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 60,
+                          vertical: 40,
+                        ),
+                        child: Container(
+                          constraints: const BoxConstraints(maxWidth: 480),
+                          child: formContent,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : SingleChildScrollView(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewPadding.bottom + 24,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Curved Top Banner
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        ClipPath(
+                          clipper: HeaderCurveClipper(),
+                          child: Container(
+                            height: 240,
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  AppColors.secondaryBlue,
+                                  Color(0xFF0F172A),
+                                ],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
                               ),
                             ),
-                            const SizedBox(height: 48),
-                            Container(
-                              padding: const EdgeInsets.all(24),
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  _buildBrandLogo(context, isOnDark: true),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    'Drive Your Journey',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                      letterSpacing: 1.5,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: theme.scaffoldBackgroundColor,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Container(
+                              width: 76,
+                              height: 76,
                               decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.05),
+                                color: isDark
+                                    ? const Color(0xFF1E293B)
+                                    : Colors.white,
                                 shape: BoxShape.circle,
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Colors.black12,
+                                    blurRadius: 10,
+                                    offset: Offset(0, 4),
+                                  ),
+                                ],
+                                border: isDark
+                                    ? Border.all(
+                                        color: const Color(0xFF334155),
+                                        width: 1,
+                                      )
+                                    : null,
                               ),
                               child: const Icon(
-                                Icons.shield_outlined,
-                                size: 120,
+                                Icons.person,
+                                size: 40,
                                 color: AppColors.primaryOrange,
                               ),
                             ),
-                          ],
+                          ),
                         ),
-                      ),
+                      ],
                     ),
-                  ),
-                ),
-                // Right half: Login Form
-                Expanded(
-                  flex: 6,
-                  child: Center(
-                    child: SingleChildScrollView(
+                    const SizedBox(height: 24),
+                    Padding(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 60,
-                        vertical: 40,
+                        horizontal: 24,
+                        vertical: 16,
                       ),
-                      child: Container(
-                        constraints: const BoxConstraints(maxWidth: 480),
-                        child: formContent,
-                      ),
+                      child: formContent,
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            )
-          : SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Curved Top Banner
-                  Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      ClipPath(
-                        clipper: HeaderCurveClipper(),
-                        child: Container(
-                          height: 240,
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                AppColors.secondaryBlue,
-                                Color(0xFF0F172A),
-                              ],
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                            ),
-                          ),
-                          child: Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                _buildBrandLogo(context, isOnDark: true),
-                                const SizedBox(height: 4),
-                                const Text(
-                                  'Drive Your Journey',
-                                  style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 12,
-                                    letterSpacing: 1.5,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(height: 24),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: theme.scaffoldBackgroundColor,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Container(
-                            width: 76,
-                            height: 76,
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? const Color(0xFF1E293B)
-                                  : Colors.white,
-                              shape: BoxShape.circle,
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Colors.black12,
-                                  blurRadius: 10,
-                                  offset: Offset(0, 4),
-                                ),
-                              ],
-                              border: isDark
-                                  ? Border.all(
-                                      color: const Color(0xFF334155),
-                                      width: 1,
-                                    )
-                                  : null,
-                            ),
-                            child: const Icon(
-                              Icons.person,
-                              size: 40,
-                              color: AppColors.primaryOrange,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 16,
-                    ),
-                    child: formContent,
-                  ),
-                ],
               ),
-            ),
+      ),
     );
   }
 }

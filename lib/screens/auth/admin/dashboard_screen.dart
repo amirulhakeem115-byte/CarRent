@@ -1166,142 +1166,153 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final bool isDesktop = width > 1100;
     final bool showMobileBottomNav = !isDesktop;
     final double mobileBottomNavClearance = showMobileBottomNav
-        ? (kBottomNavigationBarHeight + media.viewPadding.bottom + 12)
+        ? media.viewPadding.bottom
         : 0;
     final bool showAIButton = _activeTab != 'AI Assistant';
 
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      drawer: !isDesktop
-          ? Drawer(
-              child: SafeArea(
-                top: true,
-                bottom: true,
-                child: _buildSidebar(context),
-              ),
-            )
-          : null,
-      body: MovableAIFloatingButtonOverlay(
-        isOpen: false,
-        isVisible: showAIButton,
-        extraBottomPadding: mobileBottomNavClearance,
-        onTap: () async {
-          final result = await showAIChatModal(context);
-          if (result != null && result is String && mounted) {
-            setState(() {
-              if (result == 'search_vehicles') {
-                _activeTab = 'Cars';
-              } else if (result == 'view_bookings') {
-                _activeTab = 'Bookings';
-              } else if (result == 'view_payments') {
-                _activeTab = 'Payments';
-              } else if (result == 'view_support') {
-                _activeTab = 'Support Inbox';
-              } else if (result == 'view_branches') {
-                _activeTab = 'Locations';
-              } else if (result == 'view_notifications') {
-                _activeTab = 'Notifications';
-              } else if (result == 'view_maintenance') {
-                _activeTab = 'Vehicle Maintenance';
-              } else if (result == 'view_reports') {
-                _activeTab = 'Reports';
-              } else if (result == 'view_customers') {
-                _activeTab = 'Customers';
-              } else if (result == 'view_dashboard') {
-                _activeTab = 'Dashboard';
-              }
-            });
-          }
-        },
-        child: SafeArea(
-          top: true,
-          bottom: true,
-          maintainBottomViewPadding: true,
-          child: Row(
-            children: [
-              if (isDesktop) _buildSidebar(context),
-              Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final double maxWidth = isDesktop
-                        ? 1650
-                        : constraints.maxWidth;
-                    final Widget content = _loading
-                        ? _buildDashboardSkeleton(isDesktop)
-                        : _error != null
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(
-                                  Icons.error_outline,
-                                  size: 64,
-                                  color: Colors.redAccent,
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  _error!,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_activeTab != 'Dashboard') {
+          setState(() {
+            _activeTab = 'Dashboard';
+          });
+        }
+      },
+      child: Scaffold(
+        key: _scaffoldKey,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        drawer: !isDesktop
+            ? Drawer(
+                child: SafeArea(
+                  top: true,
+                  bottom: true,
+                  child: _buildSidebar(context),
+                ),
+              )
+            : null,
+        body: MovableAIFloatingButtonOverlay(
+          isOpen: false,
+          isVisible: showAIButton,
+          extraBottomPadding: mobileBottomNavClearance,
+          onTap: () async {
+            final result = await showAIChatModal(context);
+            if (result != null && result is String && mounted) {
+              setState(() {
+                if (result == 'search_vehicles') {
+                  _activeTab = 'Cars';
+                } else if (result == 'view_bookings') {
+                  _activeTab = 'Bookings';
+                } else if (result == 'view_payments') {
+                  _activeTab = 'Payments';
+                } else if (result == 'view_support') {
+                  _activeTab = 'Support Inbox';
+                } else if (result == 'view_branches') {
+                  _activeTab = 'Locations';
+                } else if (result == 'view_notifications') {
+                  _activeTab = 'Notifications';
+                } else if (result == 'view_maintenance') {
+                  _activeTab = 'Vehicle Maintenance';
+                } else if (result == 'view_reports') {
+                  _activeTab = 'Reports';
+                } else if (result == 'view_customers') {
+                  _activeTab = 'Customers';
+                } else if (result == 'view_dashboard') {
+                  _activeTab = 'Dashboard';
+                }
+              });
+            }
+          },
+          child: SafeArea(
+            top: true,
+            bottom: true,
+            maintainBottomViewPadding: true,
+            child: Row(
+              children: [
+                if (isDesktop) _buildSidebar(context),
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final double maxWidth = isDesktop
+                          ? 1650
+                          : constraints.maxWidth;
+                      final Widget content = _loading
+                          ? _buildDashboardSkeleton(isDesktop)
+                          : _error != null
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.error_outline,
+                                    size: 64,
+                                    color: Colors.redAccent,
                                   ),
-                                ),
-                                const SizedBox(height: 16),
-                                ElevatedButton(
-                                  onPressed: _loadDashboardData,
-                                  child: const Text('Retry'),
-                                ),
-                              ],
-                            ),
-                          )
-                        : _buildActiveBody(isDesktop);
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    _error!,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  ElevatedButton(
+                                    onPressed: _loadDashboardData,
+                                    child: const Text('Retry'),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : _buildActiveBody(isDesktop);
 
-                    return Align(
-                      alignment: Alignment.topCenter,
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(maxWidth: maxWidth),
-                        child: content,
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      bottomNavigationBar: showMobileBottomNav
-          ? BottomNavigationBar(
-              type: BottomNavigationBarType.fixed,
-              currentIndex: _mobileNavIndexForActiveTab(),
-              selectedItemColor: AppColors.primaryOrange,
-              unselectedItemColor: Colors.grey,
-              onTap: (index) {
-                setState(() {
-                  _setActiveTabFromMobileIndex(index);
-                });
-              },
-              items: const [
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.home_rounded),
-                  label: 'Home',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.calendar_today_rounded),
-                  label: 'Bookings',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.notifications_rounded),
-                  label: 'Alerts',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.person_rounded),
-                  label: 'Profile',
+                      return Align(
+                        alignment: Alignment.topCenter,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: maxWidth),
+                          child: content,
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ],
-            )
-          : null,
+            ),
+          ),
+        ),
+        bottomNavigationBar: showMobileBottomNav
+            ? BottomNavigationBar(
+                type: BottomNavigationBarType.fixed,
+                currentIndex: _mobileNavIndexForActiveTab(),
+                selectedItemColor: AppColors.primaryOrange,
+                unselectedItemColor: Colors.grey,
+                onTap: (index) {
+                  setState(() {
+                    _setActiveTabFromMobileIndex(index);
+                  });
+                },
+                items: const [
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.home_rounded),
+                    label: 'Home',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.calendar_today_rounded),
+                    label: 'Bookings',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.notifications_rounded),
+                    label: 'Alerts',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.person_rounded),
+                    label: 'Profile',
+                  ),
+                ],
+              )
+            : null,
+      ),
     );
   }
 

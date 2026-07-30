@@ -21,7 +21,7 @@ class MovableAIFloatingButtonOverlay extends StatefulWidget {
     required this.onTap,
     required this.isOpen,
     this.isVisible = true,
-    this.margin = const EdgeInsets.all(20),
+    this.margin = const EdgeInsets.fromLTRB(20, 20, 20, 4),
     this.buttonSize = 64,
     this.extraBottomPadding = 0,
   });

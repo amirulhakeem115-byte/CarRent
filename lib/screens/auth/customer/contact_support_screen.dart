@@ -95,6 +95,9 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SingleChildScrollView(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewPadding.bottom + 24,
+        ),
         child: Column(
           children: [
             // Hero Header
@@ -714,7 +717,12 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
   void _showTicketDetailsChat(Map<String, dynamic> ticket) {
     final String id = ticket['id'] ?? '';
     final String subject = ticket['subject'] ?? 'No Subject';
-    final String customerId = (ticket['customerId'] ?? ticket['userId'] ?? ticket['customerUid'] ?? '').toString();
+    final String customerId =
+        (ticket['customerId'] ??
+                ticket['userId'] ??
+                ticket['customerUid'] ??
+                '')
+            .toString();
     final bool isLegacyTicket = customerId.trim().isEmpty;
     final replyController = TextEditingController();
     final scrollController = ScrollController();
@@ -822,7 +830,11 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.info_outline, color: Colors.amber.shade800, size: 18),
+                        Icon(
+                          Icons.info_outline,
+                          color: Colors.amber.shade800,
+                          size: 18,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -891,7 +903,10 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                             padding: const EdgeInsets.all(12.0),
                             child: Text(
                               'Error loading conversation: ${snapshot.error}',
-                              style: const TextStyle(color: Colors.redAccent, fontSize: 11),
+                              style: const TextStyle(
+                                color: Colors.redAccent,
+                                fontSize: 11,
+                              ),
                             ),
                           ),
                         );
@@ -912,9 +927,11 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                         itemBuilder: (context, index) {
                           final r = messages[index];
                           final bool isAdmin = r['senderRole'] == 'admin';
-                          final String senderName = r['senderName'] ??
+                          final String senderName =
+                              r['senderName'] ??
                               (isAdmin ? 'Support Admin' : 'You');
-                          final String senderRole = (r['senderRole'] ?? 'customer').toUpperCase();
+                          final String senderRole =
+                              (r['senderRole'] ?? 'customer').toUpperCase();
                           final String rTime = r['timestamp'] ?? '';
                           String fRTime = '';
                           if (rTime.isNotEmpty) {
@@ -992,9 +1009,12 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                                         ),
                                         decoration: BoxDecoration(
                                           color: isAdmin
-                                              ? AppColors.primaryOrange.withValues(alpha: 0.2)
+                                              ? AppColors.primaryOrange
+                                                    .withValues(alpha: 0.2)
                                               : Colors.white24,
-                                          borderRadius: BorderRadius.circular(4),
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
                                         ),
                                         child: Text(
                                           senderRole,
@@ -1063,7 +1083,10 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                           ),
                         ),
                         onSubmitted: (val) async {
-                          if (PaymentRestrictionService().checkRestriction(context)) return;
+                          if (PaymentRestrictionService().checkRestriction(
+                            context,
+                          ))
+                            return;
                           final text = val.trim();
                           if (text.isEmpty) return;
                           replyController.clear();
@@ -1087,7 +1110,10 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                         color: AppColors.primaryOrange,
                       ),
                       onPressed: () async {
-                        if (PaymentRestrictionService().checkRestriction(context)) return;
+                        if (PaymentRestrictionService().checkRestriction(
+                          context,
+                        ))
+                          return;
                         final text = replyController.text.trim();
                         if (text.isEmpty) return;
                         replyController.clear();

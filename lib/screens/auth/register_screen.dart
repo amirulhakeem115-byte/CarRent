@@ -748,69 +748,86 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
     );
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: isDark ? Colors.white : AppColors.secondaryBlue,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          (route) => false,
+        );
+      },
+      child: Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: isDark ? Colors.white : AppColors.secondaryBlue,
+            ),
+            onPressed: () {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const HomeScreen()),
+                (route) => false,
+              );
+            },
           ),
-          onPressed: () {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (context) => const HomeScreen()),
-              (route) => false,
-            );
-          },
         ),
-      ),
-      body: Container(
-        width: double.infinity,
-        decoration: isDesktop
-            ? BoxDecoration(
-                gradient: LinearGradient(
-                  colors: isDark
-                      ? [const Color(0xFF0B1220), const Color(0xFF111827)]
-                      : [const Color(0xFFF1F5F9), const Color(0xFFE2E8F0)],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
+        body: Container(
+          width: double.infinity,
+          decoration: isDesktop
+              ? BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: isDark
+                        ? [const Color(0xFF0B1220), const Color(0xFF111827)]
+                        : [const Color(0xFFF1F5F9), const Color(0xFFE2E8F0)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                )
+              : null,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding:
+                EdgeInsets.symmetric(
+                  horizontal: isDesktop ? 40 : 24,
+                  vertical: isDesktop ? 32 : 20,
+                ).copyWith(
+                  bottom:
+                      (isDesktop ? 32 : 20) +
+                      MediaQuery.of(context).viewPadding.bottom +
+                      24,
                 ),
-              )
-            : null,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.symmetric(
-            horizontal: isDesktop ? 40 : 24,
-            vertical: isDesktop ? 32 : 20,
-          ),
-          child: Center(
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 550),
-              padding: isDesktop ? const EdgeInsets.all(28) : EdgeInsets.zero,
-              decoration: isDesktop
-                  ? BoxDecoration(
-                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                        color: isDark
-                            ? Colors.white.withValues(alpha: 0.08)
-                            : AppColors.borderGray,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(
-                            alpha: isDark ? 0.22 : 0.08,
-                          ),
-                          blurRadius: 24,
-                          offset: const Offset(0, 8),
+            child: Center(
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 550),
+                padding: isDesktop ? const EdgeInsets.all(28) : EdgeInsets.zero,
+                decoration: isDesktop
+                    ? BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.08)
+                              : AppColors.borderGray,
                         ),
-                      ],
-                    )
-                  : null,
-              child: formContent,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(
+                              alpha: isDark ? 0.22 : 0.08,
+                            ),
+                            blurRadius: 24,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      )
+                    : null,
+                child: formContent,
+              ),
             ),
           ),
         ),

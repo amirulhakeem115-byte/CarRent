@@ -106,6 +106,9 @@ class BookingConfirmationScreen extends StatelessWidget {
         ),
       ),
       body: SingleChildScrollView(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewPadding.bottom + 24,
+        ),
         child: Column(
           children: [
             Center(

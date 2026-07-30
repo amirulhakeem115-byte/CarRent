@@ -270,7 +270,10 @@ class _CustomerNotificationsScreenState
                           final notif = filteredNotifs[index];
                           return FadeInUp(
                             index: index,
-                            child: _buildNotificationCard(notif, currentUser.uid),
+                            child: _buildNotificationCard(
+                              notif,
+                              currentUser.uid,
+                            ),
                           );
                         },
                       ),
@@ -820,7 +823,7 @@ class _CustomerNotificationsScreenState
     final typeLower = notif.type.toLowerCase();
 
     // 2. Perform redirection
-    if (typeLower == 'booking' && notif.relatedId.isNotEmpty) {
+    if (typeLower.contains('booking') && notif.relatedId.isNotEmpty) {
       _showBookingDetails(context, notif.relatedId);
     } else if (typeLower == 'payment' && notif.relatedId.isNotEmpty) {
       _showPaymentDetails(context, notif.relatedId);
@@ -1098,7 +1101,13 @@ class _CustomerNotificationsScreenState
                             ),
                             onPressed: () {
                               Navigator.pop(context);
-                              ReceiptService().viewReceipt(context, booking.id);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const CustomerNotificationsScreen(),
+                                ),
+                              );
                             },
                             icon: Icon(
                               Icons.visibility,
@@ -1374,9 +1383,13 @@ class _CustomerNotificationsScreenState
     try {
       final currentUser = _auth.currentUser;
       final uid = currentUser?.uid ?? 'unauthenticated';
-      final role = currentUser != null ? await UserRoleCache.getRole(currentUser.uid) : 'customer';
+      final role = currentUser != null
+          ? await UserRoleCache.getRole(currentUser.uid)
+          : 'customer';
 
-      debugPrint('[STEP 1] Customer clicked I\'m On My Way in notifications screen (Booking ID: $bookingId)');
+      debugPrint(
+        '[STEP 1] Customer clicked I\'m On My Way in notifications screen (Booking ID: $bookingId)',
+      );
       final snap = await FirebaseDatabase.instance
           .ref()
           .child('bookings')
@@ -1386,7 +1399,9 @@ class _CustomerNotificationsScreenState
       final data = Map<dynamic, dynamic>.from(snap.value as Map);
       final booking = BookingModel.fromMap(bookingId, data);
 
-      final effectiveUserId = uid.isNotEmpty && uid != 'unauthenticated' ? uid : booking.userId;
+      final effectiveUserId = uid.isNotEmpty && uid != 'unauthenticated'
+          ? uid
+          : booking.userId;
 
       debugPrint('=== BOOKING STATUS UPDATE TRACE ===');
       debugPrint('Current UID: $uid');
@@ -1402,20 +1417,23 @@ class _CustomerNotificationsScreenState
           .child('bookings')
           .child(bookingId)
           .update({
-        'customerStatus': 'on_my_way',
-        'userId': effectiveUserId,
-        'updatedAt': DateTime.now().toIso8601String(),
-        'notifiedEvents/on_my_way': true,
-      });
+            'customerStatus': 'on_my_way',
+            'userId': effectiveUserId,
+            'updatedAt': DateTime.now().toIso8601String(),
+            'notifiedEvents/on_my_way': true,
+          });
 
-      debugPrint('[STEP 2] Booking status updated successfully (Booking ID: $bookingId)');
+      debugPrint(
+        '[STEP 2] Booking status updated successfully (Booking ID: $bookingId)',
+      );
 
       // Safely perform notification write without blocking or failing status update
       try {
         final notificationService = NotificationService();
-        final bool isPickup = booking.status.toLowerCase() != 'active' &&
-                              booking.status.toLowerCase() != 'ongoing' &&
-                              booking.status.toLowerCase() != 'overdue';
+        final bool isPickup =
+            booking.status.toLowerCase() != 'active' &&
+            booking.status.toLowerCase() != 'ongoing' &&
+            booking.status.toLowerCase() != 'overdue';
         final String actionMsg = isPickup ? "pick up" : "return";
 
         await notificationService.notifyAllAdmins(
@@ -1433,7 +1451,8 @@ class _CustomerNotificationsScreenState
         await notificationService.createNotification(
           userId: effectiveUserId,
           title: "Status Updated: On My Way",
-          message: "You have notified the Admin that you are on your way to $actionMsg ${booking.vehicleName}.",
+          message:
+              "You have notified the Admin that you are on your way to $actionMsg ${booking.vehicleName}.",
           type: 'booking',
           icon: '🚗',
           color: '0xFF10B981',
@@ -1441,7 +1460,9 @@ class _CustomerNotificationsScreenState
           actionRoute: 'Dashboard',
         );
       } catch (notifErr) {
-        debugPrint('[CustomerNotificationsScreen] Warning: notification creation failed: $notifErr');
+        debugPrint(
+          '[CustomerNotificationsScreen] Warning: notification creation failed: $notifErr',
+        );
       }
 
       if (mounted) {
@@ -1454,9 +1475,12 @@ class _CustomerNotificationsScreenState
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Failed to send status: $e"), backgroundColor: Colors.redAccent));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Failed to send status: $e"),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
       }
     }
   }
