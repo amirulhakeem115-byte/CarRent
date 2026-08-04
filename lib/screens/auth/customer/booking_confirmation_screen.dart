@@ -693,17 +693,32 @@ class BookingConfirmationScreen extends StatelessWidget {
                 ],
               ),
               if (!isDesktop) const SizedBox(height: 24),
-              Wrap(
-                alignment: WrapAlignment.center,
-                spacing: 16,
-                runSpacing: 8,
-                children: [
-                  _buildFooterLink('Privacy Policy'),
-                  _buildFooterLink('Terms of Service'),
-                  _buildFooterLink('Fleet Management'),
-                  _buildFooterLink('Contact Us'),
-                ],
-              ),
+              isDesktop
+                  ? Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 16,
+                      runSpacing: 8,
+                      children: [
+                        _buildFooterLink('Privacy Policy'),
+                        _buildFooterLink('Terms of Service'),
+                        _buildFooterLink('Fleet Management'),
+                        _buildFooterLink('Contact Us'),
+                      ],
+                    )
+                  : GridView.count(
+                      crossAxisCount: 2,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      mainAxisSpacing: 8,
+                      crossAxisSpacing: 16,
+                      childAspectRatio: 3.5,
+                      children: [
+                        Center(child: _buildFooterLink('Privacy Policy')),
+                        Center(child: _buildFooterLink('Terms of Service')),
+                        Center(child: _buildFooterLink('Fleet Management')),
+                        Center(child: _buildFooterLink('Contact Us')),
+                      ],
+                    ),
             ],
           ),
         ],

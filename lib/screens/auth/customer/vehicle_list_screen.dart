@@ -12,6 +12,16 @@ import '../../../services/payment_restriction_service.dart';
 import '../../../widgets/animated_widgets.dart';
 import '../../../widgets/skeleton_loaders.dart';
 
+// DEV-ONLY PREVIEW TOGGLE
+// Chrome DevTools' device toolbar only changes viewport size — it does NOT
+// make Theme.of(context).platform report TargetPlatform.iOS (that reflects
+// the real host OS, e.g. Windows on a Lenovo). So the iOS-only layout below
+// can never trigger while testing that way. Flip this to `true` to preview
+// the iOS layout on your laptop. Set it back to `false` before shipping —
+// once that's done, real iPhones/iOS Simulator will detect correctly on
+// their own via TargetPlatform.iOS, no toggle needed there.
+const bool kPreviewIosLayout = true;
+
 class VehicleListScreen extends StatefulWidget {
   const VehicleListScreen({super.key});
 
@@ -204,17 +214,33 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                 horizontal: isDesktop ? 60.0 : 20.0,
                 vertical: 24.0,
               ),
-              child: GridView.builder(
-                itemCount: 6,
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: isDesktop
-                      ? 3
-                      : (MediaQuery.of(context).size.width > 600 ? 2 : 1),
-                  crossAxisSpacing: 18,
-                  mainAxisSpacing: 18,
-                  childAspectRatio: isDesktop ? 0.68 : 0.72,
-                ),
-                itemBuilder: (context, index) => const VehicleCardSkeleton(),
+              child: Builder(
+                builder: (context) {
+                  final double width = MediaQuery.of(context).size.width;
+                  final bool isIosDevice =
+                      kPreviewIosLayout ||
+                      Theme.of(context).platform == TargetPlatform.iOS;
+                  final int crossAxisCount = isDesktop ? 3 : 2;
+                  final double childAspectRatio = isDesktop
+                      ? 0.68
+                      : (width < 440
+                            ? (isIosDevice ? 1.32 : 0.48)
+                            : (width < 540
+                                  ? (isIosDevice ? 1.02 : 0.52)
+                                  : 0.60));
+
+                  return GridView.builder(
+                    itemCount: 6,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      crossAxisSpacing: 18,
+                      mainAxisSpacing: 18,
+                      childAspectRatio: childAspectRatio,
+                    ),
+                    itemBuilder: (context, index) =>
+                        const VehicleCardSkeleton(),
+                  );
+                },
               ),
             )
           : _error != null
@@ -303,16 +329,8 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
   }
 
   Widget _buildPageHeader(BuildContext context) {
-    final canPop = Navigator.canPop(context);
     return Row(
       children: [
-        if (canPop) ...[
-          IconButton(
-            icon: Icon(Icons.arrow_back_rounded, color: _textColor),
-            onPressed: () => Navigator.pop(context),
-          ),
-          const SizedBox(width: 8),
-        ],
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -982,26 +1000,56 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
     }
 
     if (_isGridView) {
-      final int crossAxisCount = isDesktop
-          ? 3
-          : (MediaQuery.of(context).size.width > 600 ? 2 : 1);
+      final double width = MediaQuery.of(context).size.width;
+      final bool isIosDevice =
+          kPreviewIosLayout || Theme.of(context).platform == TargetPlatform.iOS;
+      final bool isTabletWidth = width > 700 && width <= 950;
+      final int crossAxisCount = isDesktop ? 3 : 2;
+
+      // iOS phones: a fixed aspect-ratio grid cell leaves leftover space
+      // below the button whenever a card's real content is shorter than the
+      // box (e.g. a "Booked" card vs an "Available" one). Lay iOS phone
+      // cards out as two independent masonry columns instead: each card is
+      // sized purely by its own content, so nothing forces one card to
+      // match the height of the card next to it and no gap can appear.
+      if (isIosDevice && !isDesktop && !isTabletWidth) {
+        final List<Widget> leftColumn = [];
+        final List<Widget> rightColumn = [];
+        for (int index = 0; index < vehicles.length; index++) {
+          final card = FadeInUp(
+            index: index,
+            child: _buildGridCard(vehicles[index]),
+          );
+          final target = index.isEven ? leftColumn : rightColumn;
+          if (target.isNotEmpty) target.add(const SizedBox(height: 14));
+          target.add(card);
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: Column(children: leftColumn)),
+            const SizedBox(width: 14),
+            Expanded(child: Column(children: rightColumn)),
+          ],
+        );
+      }
+
+      final double childAspectRatio = isDesktop
+          ? 0.70
+          : (width < 440 ? 0.50 : (width < 540 ? 0.54 : 0.62));
+
       return GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         itemCount: vehicles.length,
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: crossAxisCount,
-          crossAxisSpacing: 18,
-          mainAxisSpacing: 18,
-          childAspectRatio: isDesktop
-              ? 0.68
-              : (crossAxisCount == 1 ? 1.06 : 0.72),
+          crossAxisSpacing: 14,
+          mainAxisSpacing: 14,
+          childAspectRatio: childAspectRatio,
         ),
         itemBuilder: (context, index) {
-          return FadeInUp(
-            index: index,
-            child: _buildGridCard(vehicles[index]),
-          );
+          return FadeInUp(index: index, child: _buildGridCard(vehicles[index]));
         },
       );
     } else {
@@ -1011,10 +1059,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
         itemCount: vehicles.length,
         separatorBuilder: (context, index) => const SizedBox(height: 16),
         itemBuilder: (context, index) {
-          return FadeInUp(
-            index: index,
-            child: _buildListCard(vehicles[index]),
-          );
+          return FadeInUp(index: index, child: _buildListCard(vehicles[index]));
         },
       );
     }
@@ -1028,8 +1073,20 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
         ? const Color(0xFFF59E0B)
         : const Color(0xFFEF4444);
     final bool isDesktop = MediaQuery.of(context).size.width > 950;
-    final double imageHeight = isDesktop ? 130 : 100;
-    final double contentPadding = isDesktop ? 12 : 10;
+    final bool isTablet =
+        MediaQuery.of(context).size.width > 700 &&
+        MediaQuery.of(context).size.width <= 950;
+    final bool isIosPhone =
+        (kPreviewIosLayout ||
+            Theme.of(context).platform == TargetPlatform.iOS) &&
+        !isDesktop &&
+        !isTablet;
+    final double imageHeight = isDesktop
+        ? 130
+        : (isTablet ? 96 : (isIosPhone ? 80 : 92));
+    final double contentPadding = isDesktop
+        ? 12
+        : (isTablet ? 10 : (isIosPhone ? 8 : 10));
 
     return Container(
       decoration: BoxDecoration(
@@ -1138,32 +1195,36 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                         ),
                       ),
                     ),
-                    if (!isDesktop)
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          const Text(
-                            'DAILY RATE',
-                            style: TextStyle(
-                              fontSize: 8,
-                              color: Colors.grey,
-                              fontWeight: FontWeight.bold,
+                    if (!isDesktop && !isIosPhone) ...[
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            const Text(
+                              'DAILY RATE',
+                              style: TextStyle(
+                                fontSize: 8,
+                                color: Colors.grey,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'RM ${vehicle.pricePerDay.toStringAsFixed(0)}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.primaryOrange,
+                            const SizedBox(height: 2),
+                            Text(
+                              'RM ${vehicle.pricePerDay.toStringAsFixed(0)}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primaryOrange,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
+                    ],
                   ],
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: isIosPhone ? 2 : 4),
                 Row(
                   children: [
                     const Icon(
@@ -1187,7 +1248,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                SizedBox(height: isIosPhone ? 6 : 10),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -1202,15 +1263,15 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: isIosPhone ? 6 : 12),
                 Divider(height: 1, color: _borderColor),
-                const SizedBox(height: 8),
+                SizedBox(height: isIosPhone ? 6 : 8),
                 Row(
-                  mainAxisAlignment: isDesktop
+                  mainAxisAlignment: (isDesktop || isIosPhone)
                       ? MainAxisAlignment.spaceBetween
                       : MainAxisAlignment.end,
                   children: [
-                    if (isDesktop)
+                    if (isDesktop || isIosPhone)
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -1232,11 +1293,13 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                           ),
                         ],
                       ),
-                    if (isDesktop)
+                    if (isDesktop || isIosPhone)
                       ElevatedButton(
                         onPressed: isAvailable
                             ? () {
-                                if (PaymentRestrictionService().checkRestriction(context)) return;
+                                if (PaymentRestrictionService()
+                                    .checkRestriction(context))
+                                  return;
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
@@ -1265,9 +1328,9 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 12,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isIosPhone ? 14 : 20,
+                            vertical: isIosPhone ? 10 : 12,
                           ),
                         ),
                         child: Text(
@@ -1283,7 +1346,10 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                         child: ElevatedButton(
                           onPressed: isAvailable
                               ? () {
-                                  if (PaymentRestrictionService().checkRestriction(context)) return;
+                                  if (PaymentRestrictionService()
+                                      .checkRestriction(context)) {
+                                    return;
+                                  }
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
@@ -1312,7 +1378,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            padding: const EdgeInsets.symmetric(vertical: 2),
                           ),
                           child: Text(
                             isAvailable ? 'Book Now' : 'Booked',
@@ -1527,7 +1593,9 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                           ElevatedButton(
                             onPressed: isAvailable
                                 ? () {
-                                    if (PaymentRestrictionService().checkRestriction(context)) return;
+                                    if (PaymentRestrictionService()
+                                        .checkRestriction(context))
+                                      return;
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(

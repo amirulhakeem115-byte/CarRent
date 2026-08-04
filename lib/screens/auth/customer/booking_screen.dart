@@ -26,7 +26,7 @@ import '../../../services/receipt_upload_helper.dart'
 import '../../../services/company_settings_provider.dart';
 import '../../../services/receipt_service.dart';
 import 'customer_responsive_shell.dart';
-import 'booking_confirmation_screen.dart';
+import 'my_bookings_screen.dart';
 import 'vehicle_details_screen.dart';
 import '../../../services/payment_restriction_service.dart';
 import 'booking_date_utils.dart';
@@ -608,11 +608,11 @@ class _BookingScreenState extends State<BookingScreen> {
 
     DateTime initial = getDefaultPickupDate();
     final today = DateTime.now();
-    final tomorrowNorm = getTomorrowStart(now: today);
+    final todayNorm = DateTime(today.year, today.month, today.day);
     if (_blockedDates.contains(
       DateTime(initial.year, initial.month, initial.day),
     )) {
-      DateTime check = tomorrowNorm;
+      DateTime check = todayNorm;
       for (int i = 0; i < 90; i++) {
         if (!_blockedDates.contains(check)) {
           initial = check;
@@ -625,11 +625,11 @@ class _BookingScreenState extends State<BookingScreen> {
     final picked = await showDatePicker(
       context: context,
       initialDate: initial,
-      firstDate: tomorrowNorm,
+      firstDate: todayNorm,
       lastDate: DateTime.now().add(const Duration(days: 90)),
       selectableDayPredicate: (DateTime day) {
         final norm = DateTime(day.year, day.month, day.day);
-        if (norm.isBefore(tomorrowNorm)) {
+        if (norm.isBefore(todayNorm)) {
           return false;
         }
         return !_blockedDates.contains(norm);
@@ -713,6 +713,18 @@ class _BookingScreenState extends State<BookingScreen> {
           }
         }
       });
+
+      final validSlots = _availablePickupTimeSlots();
+      if (validSlots.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No pickup time slots are available for today. Please choose a later date.',
+            ),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
     }
   }
 
@@ -873,10 +885,10 @@ class _BookingScreenState extends State<BookingScreen> {
         _pickupDate!.month,
         _pickupDate!.day,
       );
-      if (!selectedPickupDay.isAfter(todayStart)) {
+      if (selectedPickupDay.isBefore(todayStart)) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Pickup date must be after today.'),
+            content: Text('Pickup date cannot be in the past.'),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -906,10 +918,10 @@ class _BookingScreenState extends State<BookingScreen> {
       _pickupDate!.month,
       _pickupDate!.day,
     );
-    if (!selectedPickupDay.isAfter(todayStart)) {
+    if (selectedPickupDay.isBefore(todayStart)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Pickup date must be after today.'),
+          content: Text('Pickup date cannot be in the past.'),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -2636,7 +2648,7 @@ class _BookingScreenState extends State<BookingScreen> {
           _pickupDate!.day,
         );
         if (!isPickupDateAllowed(selectedPickupDay, now: nowToday)) {
-          throw 'Pickup date must be tomorrow or later.';
+          throw 'Pickup date cannot be in the past.';
         }
         final pickupDateTime = _composePickupDateTime();
         if (pickupDateTime == null || !pickupDateTime.isAfter(DateTime.now())) {
@@ -2945,22 +2957,20 @@ class _BookingScreenState extends State<BookingScreen> {
           backgroundColor: Colors.green,
         ),
       );
-
-      final receiptScreen = BookingConfirmationScreen(
-        booking: booking,
-        vehicle: widget.vehicle,
-        paymentMethod: _isOpenRental ? 'Open Rental' : _paymentMethod,
-        paymentStatus: 'Paid',
-      );
-
       final shell = CustomerResponsiveShell.of(context);
       if (shell != null) {
-        shell.showCustomBody(receiptScreen);
+        shell.setIndex(2);
+        shell.showCustomBody(const MyBookingsScreen(initialTabIndex: 0));
         Navigator.pop(context);
       } else {
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (context) => receiptScreen),
+          MaterialPageRoute(
+            builder: (context) => const CustomerResponsiveShell(
+              initialIndex: 2,
+              customBody: MyBookingsScreen(initialTabIndex: 0),
+            ),
+          ),
           (route) => false,
         );
       }

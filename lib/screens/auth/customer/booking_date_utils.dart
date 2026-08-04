@@ -8,24 +8,27 @@ DateTime getTomorrowStart({DateTime? now}) {
 }
 
 DateTime getDefaultPickupDate({DateTime? prefilledPickupDate, DateTime? now}) {
-  final tomorrowStart = getTomorrowStart(now: now);
+  final baseNow = now ?? DateTime.now();
+  final todayStart = DateTime(baseNow.year, baseNow.month, baseNow.day);
 
   if (prefilledPickupDate != null &&
-      prefilledPickupDate.isAfter(tomorrowStart)) {
+      (prefilledPickupDate.isAfter(todayStart) ||
+          prefilledPickupDate.isAtSameMomentAs(todayStart))) {
     return prefilledPickupDate;
   }
 
-  return tomorrowStart;
+  return todayStart;
 }
 
 bool isPickupDateAllowed(DateTime pickupDate, {DateTime? now}) {
-  final tomorrowStart = getTomorrowStart(now: now);
+  final baseNow = now ?? DateTime.now();
+  final todayStart = DateTime(baseNow.year, baseNow.month, baseNow.day);
   final normalizedPickup = DateTime(
     pickupDate.year,
     pickupDate.month,
     pickupDate.day,
   );
 
-  return normalizedPickup.isAfter(tomorrowStart) ||
-      normalizedPickup.isAtSameMomentAs(tomorrowStart);
+  return normalizedPickup.isAfter(todayStart) ||
+      normalizedPickup.isAtSameMomentAs(todayStart);
 }

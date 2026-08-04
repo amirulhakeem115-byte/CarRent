@@ -38,6 +38,80 @@ class BookingService {
     return normalized == 'active';
   }
 
+  static bool shouldBlockVehicleInventory(
+    String? status, {
+    bool isReturned = false,
+  }) {
+    if (isReturned) return false;
+
+    final normalized = (status ?? '').trim().toLowerCase();
+    if (normalized.isEmpty) return false;
+
+    if (normalized.contains('cancel') ||
+        normalized.contains('reject') ||
+        normalized.contains('complete') ||
+        normalized.contains('returned') ||
+        normalized.contains('closed') ||
+        normalized.contains('waiting for payment') ||
+        normalized.contains('pending payment')) {
+      return false;
+    }
+
+    const blockingStatuses = {
+      'pending',
+      'approved',
+      'confirmed',
+      'active',
+      'ongoing',
+      'overdue',
+      'return requested',
+      'awaiting return',
+      'awaiting return inspection',
+      'awaiting final payment',
+    };
+
+    return blockingStatuses.contains(normalized);
+  }
+
+  static String resolveBookingStatus(
+    Map<dynamic, dynamic> raw, {
+    String? fallbackStatus,
+  }) {
+    final candidates = [
+      raw['status'],
+      raw['bookingStatus'],
+      raw['customerStatus'],
+      fallbackStatus,
+    ];
+
+    bool isTerminalStatus(String text) {
+      final n = text.trim().toLowerCase();
+      return n.contains('cancel') ||
+          n.contains('reject') ||
+          n.contains('complete') ||
+          n.contains('returned') ||
+          n.contains('closed') ||
+          n.contains('waiting for payment') ||
+          n.contains('pending payment');
+    }
+
+    // If any status-like field says terminal/non-blocking, trust it first.
+    for (final candidate in candidates) {
+      final text = (candidate ?? '').toString().trim();
+      if (text.isNotEmpty && isTerminalStatus(text)) {
+        return text;
+      }
+    }
+
+    for (final candidate in candidates) {
+      final text = (candidate ?? '').toString().trim();
+      if (text.isNotEmpty) {
+        return text;
+      }
+    }
+    return '';
+  }
+
   static String getAccountRestrictionMessage(String? accountStatus) {
     final normalized = (accountStatus ?? '').trim().toLowerCase();
     if (normalized == 'suspended') {
@@ -744,11 +818,13 @@ class BookingService {
       for (final entry in data.entries) {
         final bId = entry.key.toString();
         if (bId == excludeBookingId) continue;
-        final val = entry.value as Map;
-        final status = (val['status'] ?? '').toString().toLowerCase();
-        if (status == 'cancelled' ||
-            status == 'rejected' ||
-            status == 'completed') {
+        final val = entry.value as Map<dynamic, dynamic>;
+        final status = resolveBookingStatus(val);
+        final dynamic isReturnedRaw = val['isReturned'];
+        final bool isReturned = isReturnedRaw is bool
+            ? isReturnedRaw
+            : isReturnedRaw.toString().toLowerCase() == 'true';
+        if (!shouldBlockVehicleInventory(status, isReturned: isReturned)) {
           continue;
         }
         final vId = (val['vehicleId'] ?? '').toString();
@@ -770,8 +846,8 @@ class BookingService {
   }
 
   /// Get real-time stream of blocked dates for a specific vehicle.
-  /// Blocked statuses: Pending, Confirmed, Active (or active variants).
-  /// Unblocked statuses: Cancelled, Rejected, Completed.
+  /// Blocked statuses: only active/reserved booking lifecycle statuses.
+  /// Unblocked statuses: cancelled/rejected/completed/waiting-for-payment etc.
   Stream<Set<DateTime>> getBlockedDatesStreamForVehicle(
     String vehicleId, {
     String? excludeBookingId,
@@ -798,14 +874,14 @@ class BookingService {
         }
 
         if (value is Map) {
-          final booking = BookingModel.fromMap(bookingId, value);
-          final String status = booking.status.toLowerCase();
+          final raw = Map<dynamic, dynamic>.from(value);
+          final booking = BookingModel.fromMap(bookingId, raw);
+          final String status = resolveBookingStatus(raw);
 
-          // Must NOT block dates for Cancelled, Rejected, or Completed bookings or returned vehicles
-          if (status == 'cancelled' ||
-              status == 'rejected' ||
-              status == 'completed' ||
-              booking.isReturned) {
+          if (!shouldBlockVehicleInventory(
+            status,
+            isReturned: booking.isReturned,
+          )) {
             return;
           }
 
@@ -874,14 +950,14 @@ class BookingService {
           continue;
         }
 
-        final val = entry.value as Map;
+        final val = entry.value as Map<dynamic, dynamic>;
         final booking = BookingModel.fromMap(bId, val);
-        final String status = booking.status.toLowerCase();
+        final String status = resolveBookingStatus(val);
 
-        if (status == 'cancelled' ||
-            status == 'rejected' ||
-            status == 'completed' ||
-            booking.isReturned) {
+        if (!shouldBlockVehicleInventory(
+          status,
+          isReturned: booking.isReturned,
+        )) {
           continue;
         }
 
