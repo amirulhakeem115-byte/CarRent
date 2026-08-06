@@ -27,6 +27,7 @@ import '../../../services/company_settings_provider.dart';
 import '../../../services/receipt_service.dart';
 import 'customer_responsive_shell.dart';
 import 'my_bookings_screen.dart';
+import 'booking_confirmation_screen.dart';
 import 'vehicle_details_screen.dart';
 import '../../../services/payment_restriction_service.dart';
 import 'booking_date_utils.dart';
@@ -2957,23 +2958,17 @@ class _BookingScreenState extends State<BookingScreen> {
           backgroundColor: Colors.green,
         ),
       );
-      final shell = CustomerResponsiveShell.of(context);
-      if (shell != null) {
-        shell.setIndex(2);
-        shell.showCustomBody(const MyBookingsScreen(initialTabIndex: 0));
-        Navigator.pop(context);
-      } else {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const CustomerResponsiveShell(
-              initialIndex: 2,
-              customBody: MyBookingsScreen(initialTabIndex: 0),
-            ),
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => BookingConfirmationScreen(
+            booking: booking,
+            vehicle: widget.vehicle,
+            paymentMethod: _isOpenRental ? 'Open Rental' : _paymentMethod,
+            paymentStatus: 'Paid',
           ),
-          (route) => false,
-        );
-      }
+        ),
+      );
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -4344,6 +4339,7 @@ class _BookingScreenState extends State<BookingScreen> {
             border: Border.all(color: borderColor),
           ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (_isFinalPayment) ...[
                 LayoutBuilder(
@@ -5055,29 +5051,20 @@ class _BookingScreenState extends State<BookingScreen> {
     );
     return LayoutBuilder(
       builder: (context, constraints) {
-        final hasLargeText =
-            MediaQuery.of(context).textScaler.scale(1.0) > 1.15;
-        final stacked = constraints.maxWidth < 360 || hasLargeText;
-
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: stacked
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(label, style: style, softWrap: true),
-                    const SizedBox(height: 2),
-                    Text(value, style: style),
-                  ],
-                )
-              : Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(child: Text(label, style: style, softWrap: true)),
-                    const SizedBox(width: 8),
-                    Text(value, style: style),
-                  ],
-                ),
+        return SizedBox(
+          width: double.infinity,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: Text(label, style: style, softWrap: true)),
+                const SizedBox(width: 8),
+                Text(value, style: style, textAlign: TextAlign.right),
+              ],
+            ),
+          ),
         );
       },
     );

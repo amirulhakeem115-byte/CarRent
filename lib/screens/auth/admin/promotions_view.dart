@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
@@ -34,6 +35,20 @@ class _PromotionsViewState extends State<PromotionsView> {
   String _searchQuery = '';
   String _selectedStatusFilter =
       'All'; // All, Active, Inactive, Expired, Scheduled
+
+  bool _isMobilePhoneLayout(BuildContext context) {
+    if (kIsWeb) return false;
+    final platform = defaultTargetPlatform;
+    final isMobilePlatform =
+        platform == TargetPlatform.android || platform == TargetPlatform.iOS;
+    return isMobilePlatform && MediaQuery.of(context).size.width < 600;
+  }
+
+  bool _isAndroidPhoneLayout(BuildContext context) {
+    if (kIsWeb) return false;
+    return defaultTargetPlatform == TargetPlatform.android &&
+        MediaQuery.of(context).size.width < 600;
+  }
 
   @override
   void initState() {
@@ -233,11 +248,61 @@ class _PromotionsViewState extends State<PromotionsView> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final double width = constraints.maxWidth;
+        final bool isMobilePhone = _isMobilePhoneLayout(context);
+        final bool isAndroidPhone = _isAndroidPhoneLayout(context);
         final int crossAxisCount = width > 1200
             ? 3
             : width > 700
             ? 3
             : 1;
+
+        final cards = [
+          _buildStatCard(
+            title: 'Active Promotions',
+            value: '$_activeCount',
+            subtitle: '$_totalViews Views • $_totalClicks Clicks',
+            icon: Icons.local_offer_rounded,
+            color: AppColors.primaryOrange,
+            isDark: isDark,
+            compactMode: isMobilePhone,
+            androidTightMode: isAndroidPhone,
+          ),
+          _buildStatCard(
+            title: 'Bookings Converted',
+            value: '$_totalBookings',
+            subtitle: 'Successful promo bookings',
+            icon: Icons.directions_car_filled_rounded,
+            color: const Color(0xFF10B981),
+            isDark: isDark,
+            compactMode: isMobilePhone,
+            androidTightMode: isAndroidPhone,
+          ),
+          _buildStatCard(
+            title: 'Revenue Generated',
+            value: 'RM ${_totalRevenue.toStringAsFixed(0)}',
+            subtitle: 'RM ${_totalDiscount.toStringAsFixed(0)} discounts saved',
+            icon: Icons.payments_rounded,
+            color: const Color(0xFF3B82F6),
+            isDark: isDark,
+            compactMode: isMobilePhone,
+            androidTightMode: isAndroidPhone,
+          ),
+        ];
+
+        // Android phones are prone to text-scale-induced card overflow in GridView
+        // because each row has a fixed computed height from childAspectRatio.
+        // Use a vertical list there so each card can take its natural height.
+        if (isAndroidPhone && crossAxisCount == 1) {
+          return Column(
+            children: [
+              cards[0],
+              const SizedBox(height: 16),
+              cards[1],
+              const SizedBox(height: 16),
+              cards[2],
+            ],
+          );
+        }
 
         return GridView.count(
           crossAxisCount: crossAxisCount,
@@ -245,34 +310,10 @@ class _PromotionsViewState extends State<PromotionsView> {
           physics: const NeverScrollableScrollPhysics(),
           mainAxisSpacing: 16,
           crossAxisSpacing: 16,
-          childAspectRatio: crossAxisCount == 1 ? 2.8 : 2.2,
-          children: [
-            _buildStatCard(
-              title: 'Active Promotions',
-              value: '$_activeCount',
-              subtitle: '$_totalViews Views • $_totalClicks Clicks',
-              icon: Icons.local_offer_rounded,
-              color: AppColors.primaryOrange,
-              isDark: isDark,
-            ),
-            _buildStatCard(
-              title: 'Bookings Converted',
-              value: '$_totalBookings',
-              subtitle: 'Successful promo bookings',
-              icon: Icons.directions_car_filled_rounded,
-              color: const Color(0xFF10B981),
-              isDark: isDark,
-            ),
-            _buildStatCard(
-              title: 'Revenue Generated',
-              value: 'RM ${_totalRevenue.toStringAsFixed(0)}',
-              subtitle:
-                  'RM ${_totalDiscount.toStringAsFixed(0)} discounts saved',
-              icon: Icons.payments_rounded,
-              color: const Color(0xFF3B82F6),
-              isDark: isDark,
-            ),
-          ],
+          childAspectRatio: crossAxisCount == 1
+              ? (isAndroidPhone ? 1.95 : (isMobilePhone ? 2.2 : 2.8))
+              : 2.2,
+          children: cards,
         );
       },
     );
@@ -285,9 +326,11 @@ class _PromotionsViewState extends State<PromotionsView> {
     required IconData icon,
     required Color color,
     required bool isDark,
+    required bool compactMode,
+    required bool androidTightMode,
   }) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(androidTightMode ? 12 : (compactMode ? 14 : 20)),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -305,14 +348,20 @@ class _PromotionsViewState extends State<PromotionsView> {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: EdgeInsets.all(
+              androidTightMode ? 9 : (compactMode ? 10 : 14),
+            ),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(icon, color: color, size: 28),
+            child: Icon(
+              icon,
+              color: color,
+              size: androidTightMode ? 20 : (compactMode ? 22 : 28),
+            ),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: androidTightMode ? 10 : (compactMode ? 12 : 16)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -321,34 +370,41 @@ class _PromotionsViewState extends State<PromotionsView> {
                 Text(
                   title,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: androidTightMode ? 11 : (compactMode ? 12 : 13),
                     color: isDark
                         ? const Color(0xFF94A3B8)
                         : const Color(0xFF64748B),
                     fontWeight: FontWeight.w600,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
-                    color: isDark
-                        ? const Color(0xFFF8FAFC)
-                        : AppColors.secondaryBlue,
+                SizedBox(height: compactMode ? 2 : 4),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: androidTightMode ? 18 : (compactMode ? 20 : 24),
+                      fontWeight: FontWeight.w900,
+                      color: isDark
+                          ? const Color(0xFFF8FAFC)
+                          : AppColors.secondaryBlue,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 2),
+                SizedBox(height: compactMode ? 1 : 2),
                 Text(
                   subtitle,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: androidTightMode ? 9 : (compactMode ? 10 : 11),
                     color: isDark
                         ? const Color(0xFF64748B)
                         : const Color(0xFF94A3B8),
                   ),
-                  maxLines: 1,
+                  maxLines: androidTightMode ? 1 : (compactMode ? 2 : 1),
+                  softWrap: false,
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
@@ -966,10 +1022,15 @@ class _PromotionsViewState extends State<PromotionsView> {
                 ),
               ],
               const Divider(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final bool hasLargeText =
+                      MediaQuery.of(context).textScaler.scale(1.0) > 1.1;
+                  final bool mobileStacked =
+                      _isMobilePhoneLayout(context) &&
+                      (constraints.maxWidth < 440 || hasLargeText);
+
+                  final details = Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
@@ -980,6 +1041,8 @@ class _PromotionsViewState extends State<PromotionsView> {
                           color: AppColors.primaryOrange,
                           fontSize: 14,
                         ),
+                        maxLines: mobileStacked ? 2 : 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       if (promo.promoCode != null &&
                           promo.promoCode!.isNotEmpty)
@@ -998,10 +1061,14 @@ class _PromotionsViewState extends State<PromotionsView> {
                           fontSize: 11,
                           color: isDark ? Colors.white70 : Colors.grey[700],
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
-                  ),
-                  Row(
+                  );
+
+                  final actions = Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Switch(
                         value: promo.active,
@@ -1045,8 +1112,28 @@ class _PromotionsViewState extends State<PromotionsView> {
                         onPressed: () => _confirmDeletePromotion(promo),
                       ),
                     ],
-                  ),
-                ],
+                  );
+
+                  if (mobileStacked) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        details,
+                        const SizedBox(height: 8),
+                        Align(alignment: Alignment.centerRight, child: actions),
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(child: details),
+                      const SizedBox(width: 8),
+                      actions,
+                    ],
+                  );
+                },
               ),
             ],
           ),
