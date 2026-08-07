@@ -246,8 +246,8 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
         .length;
 
     final cancelledCount = _bookings.where((b) {
-      final s = b.status.toLowerCase();
-      return s == 'cancelled' || s == 'rejected';
+      final s = BookingService.normalizeStatus(b.status);
+      return s == 'cancelled' || s == 'canceled' || s == 'rejected' || s == 'expired';
     }).length;
 
     _currentCounts = {

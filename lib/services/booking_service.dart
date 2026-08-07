@@ -17,6 +17,45 @@ class BookingService {
     'bookings',
   );
 
+  static String normalizeStatus(String? status) {
+    return (status ?? '').trim().toLowerCase();
+  }
+
+  static bool isActiveBooking(String? status) {
+    final s = normalizeStatus(status);
+    if (s.isEmpty) return false;
+    return !isClosedStatus(s);
+  }
+
+  static bool isOngoingStatus(String? status) {
+    final s = normalizeStatus(status);
+    return s == 'active' ||
+        s == 'ongoing' ||
+        s == 'overdue' ||
+        s == 'return requested' ||
+        s == 'awaiting return' ||
+        s == 'awaiting return inspection' ||
+        s == 'awaiting final payment';
+  }
+
+  static bool isUpcomingStatus(String? status) {
+    final s = normalizeStatus(status);
+    return s == 'pending' ||
+        s == 'approved' ||
+        s == 'confirmed' ||
+        s == 'pending payment' ||
+        s == 'waiting for payment';
+  }
+
+  static bool isClosedStatus(String? status) {
+    final s = normalizeStatus(status);
+    return s == 'completed' ||
+        s == 'cancelled' ||
+        s == 'canceled' ||
+        s == 'rejected' ||
+        s == 'expired' ||
+        s == 'finished';
+  }
   static bool shouldDeferAccountStatusAction(String? status) {
     final normalized = (status ?? '').trim().toLowerCase();
     return normalized == 'active' ||

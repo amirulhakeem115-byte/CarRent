@@ -570,21 +570,15 @@ class _BookingsViewState extends State<BookingsView> {
 
     // Calculations
     final totalBookings = _bookings.length;
-    final activeBookings = _bookings.where((b) {
-      final s = b.status.toLowerCase();
-      return s == 'approved' ||
-          s == 'ongoing' ||
-          s == 'active' ||
-          s == 'overdue' ||
-          s == 'confirmed' ||
-          s == 'return requested';
-    }).length;
+    final activeBookings = _bookings
+        .where((b) => BookingService.isActiveBooking(b.status))
+        .length;
     final completedBookings = _bookings
         .where((b) => b.status.toLowerCase() == 'completed')
         .length;
     final cancelledBookings = _bookings.where((b) {
       final s = b.status.toLowerCase();
-      return s == 'cancelled' || s == 'rejected';
+      return s == 'cancelled' || s == 'canceled' || s == 'rejected';
     }).length;
 
     // Filtering
@@ -596,11 +590,8 @@ class _BookingsViewState extends State<BookingsView> {
       final matchesStatus =
           _selectedFilter == 'All' ||
           b.status.toLowerCase() == _selectedFilter.toLowerCase() ||
-          (_selectedFilter == 'Ongoing' &&
-              (b.status.toLowerCase() == 'active' ||
-                  b.status.toLowerCase() == 'ongoing' ||
-                  b.status.toLowerCase() == 'return requested' ||
-                  b.status.toLowerCase() == 'overdue'));
+          (_selectedFilter == 'Ongoing' && BookingService.isOngoingStatus(b.status)) ||
+          (_selectedFilter == 'Active' && BookingService.isActiveBooking(b.status));
       return matchesSearch && matchesStatus;
     }).toList();
 

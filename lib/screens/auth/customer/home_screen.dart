@@ -230,21 +230,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     }
 
     final activeBookings = _bookings
-        .where(
-          (b) => [
-            'pending',
-            'approved',
-            'confirmed',
-            'active',
-            'ongoing',
-            'Pending',
-            'Approved',
-            'Confirmed',
-            'Active',
-            'Ongoing',
-            'Pending Payment',
-          ].contains(b.status),
-        )
+        .where((b) => BookingService.isActiveBooking(b.status))
         .toList();
     final currentBooking = activeBookings.isNotEmpty
         ? activeBookings.first
@@ -397,17 +383,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     final totalBookings = _bookings.length;
     final totalSpent = _payments.fold<double>(0.0, (sum, p) => sum + p.amount);
     final activeCount = _bookings
-        .where(
-          (b) => [
-            'pending',
-            'approved',
-            'confirmed',
-            'active',
-            'Pending',
-            'Approved',
-            'Confirmed',
-          ].contains(b.status),
-        )
+        .where((b) => BookingService.isActiveBooking(b.status))
         .length;
 
     return Row(

@@ -384,22 +384,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           _bookings = bookingsList;
           _bookings.sort((a, b) => b.createdAt.compareTo(a.createdAt));
           _activeBookingsCount = _bookings
-              .where(
-                (b) =>
-                    b.status == 'pending' ||
-                    b.status == 'approved' ||
-                    b.status == 'ongoing' ||
-                    b.status == 'Confirmed' ||
-                    b.status == 'active',
-              )
+              .where((b) => BookingService.isActiveBooking(b.status))
               .length;
 
           for (var booking in _bookings) {
-            final bStat = booking.status.toLowerCase();
-            if (bStat == 'ongoing' ||
-                bStat == 'approved' ||
-                bStat == 'confirmed' ||
-                bStat == 'active') {
+            if (BookingService.isOngoingStatus(booking.status)) {
               if (!_simulators.containsKey(booking.vehicleId)) {
                 _simulators[booking.vehicleId] = _trackingService
                     .startRouteSimulation(booking.vehicleId);
@@ -755,17 +744,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   .length;
 
               _activeBookingsCount = _bookings
-                  .where(
-                    (b) =>
-                        b.status == 'pending' ||
-                        b.status == 'approved' ||
-                        b.status == 'ongoing',
-                  )
+                  .where((b) => BookingService.isActiveBooking(b.status))
                   .length;
 
               for (var booking in _bookings) {
-                if (booking.status == 'ongoing' ||
-                    booking.status == 'approved') {
+                if (BookingService.isOngoingStatus(booking.status)) {
                   if (!_simulators.containsKey(booking.vehicleId)) {
                     _simulators[booking.vehicleId] = _trackingService
                         .startRouteSimulation(booking.vehicleId);

@@ -18,6 +18,7 @@ import '../../../services/file_download_helper.dart'
     if (dart.library.html) '../../../services/file_download_web.dart'
     as download_helper;
 import '../../../services/company_settings_provider.dart';
+import '../../../services/booking_service.dart';
 
 class ReportsView extends StatefulWidget {
   final List<BookingModel> bookings;
@@ -543,13 +544,7 @@ class _ReportsViewState extends State<ReportsView> {
         )
         .length;
     int activeBookings = filteredBookings
-        .where(
-          (b) =>
-              b.status.toLowerCase() == 'approved' ||
-              b.status.toLowerCase() == 'confirmed' ||
-              b.status.toLowerCase() == 'ongoing' ||
-              b.status.toLowerCase() == 'active',
-        )
+        .where((b) => BookingService.isActiveBooking(b.status))
         .length;
     int overdueBookings = filteredBookings
         .where((b) => b.status.toLowerCase() == 'overdue')

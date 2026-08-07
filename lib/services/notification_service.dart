@@ -4,6 +4,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/notification_model.dart';
 import 'user_role_cache.dart';
+import 'fcm_service.dart';
 
 class NotificationService {
   final DatabaseReference _baseDb = FirebaseDatabase.instance.ref().child(
@@ -69,6 +70,18 @@ class NotificationService {
         '[STEP 6] Firebase write successful (Ref: notifications/${newRef.key}) in ${stopwatch.elapsedMilliseconds}ms',
       );
 
+      // Trigger FCM push notification delivery to recipient device tokens
+      FCMService().sendPushNotification(
+        targetUserId: userId,
+        title: title,
+        message: message,
+        type: type,
+        actionRoute: actionRoute,
+        relatedId: relatedId.isNotEmpty ? relatedId : bookingId,
+      ).catchError((e) {
+        debugPrint('[NotificationService] Error sending FCM push notification: $e');
+      });
+
       // Non-blocking cleanup of old notifications to keep latest 50 per user
       _cleanupOldNotifications(userId).catchError((e) {
         debugPrint('[NotificationService] Error cleaning up notifications: $e');
@@ -124,18 +137,19 @@ class NotificationService {
   Future<List<NotificationModel>> getNotifications(
     String userId, {
     int? limit,
-    bool includeAdminNotifications = true,
+    bool includeAdminNotifications = false,
   }) async {
     List<NotificationModel> notifications = [];
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) return notifications;
 
-    final currentRole = await UserRoleCache.getRole(currentUser.uid);
-    final bool isAdmin = currentRole == 'admin';
+    final role = await UserRoleCache.getRole(currentUser.uid);
+    final currentRole = role.toLowerCase();
+    final bool isAdmin = currentRole == 'admin' || currentRole == 'super_admin';
 
     try {
       final Set<String> targetIds = {userId, currentUser.uid};
-      if (isAdmin || userId == 'admin' || includeAdminNotifications) {
+      if (isAdmin) {
         targetIds.add('admin');
       }
 
@@ -168,7 +182,7 @@ class NotificationService {
   Stream<List<NotificationModel>> getNotificationsStream(
     String userId, {
     int? limit,
-    bool includeAdminNotifications = true,
+    bool includeAdminNotifications = false,
   }) {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
@@ -197,9 +211,6 @@ class NotificationService {
       }
       final combined = map.values.toList();
       combined.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      debugPrint(
-        '[NotificationService] Stream update: ${combined.length} notifications loaded for ${currentUser.uid}',
-      );
       if (limit != null && combined.length > limit) {
         controller.add(combined.take(limit).toList());
       } else {
@@ -239,12 +250,12 @@ class NotificationService {
       },
     );
 
-    // Query 2: Admin notifications if target user or current user is Admin
+    // Query 2: Admin notifications if current user is Admin (role: admin / super_admin)
     UserRoleCache.getRole(currentUser.uid).then((role) {
-      final bool isUserAdmin = role == 'admin';
-      final bool isTargetAdmin = userId == 'admin' || isUserAdmin || includeAdminNotifications;
+      final roleLower = role.toLowerCase();
+      final bool isUserAdmin = roleLower == 'admin' || roleLower == 'super_admin';
 
-      if (isTargetAdmin && !controller.isClosed) {
+      if (isUserAdmin && !controller.isClosed) {
         final Query adminQuery = _baseDb.orderByChild('userId').equalTo('admin');
         adminSub = adminQuery.onValue.listen(
           (event) {
