@@ -25,6 +25,10 @@ class _BookingsViewState extends State<BookingsView> {
   bool _loading = true;
   String _selectedFilter =
       'All'; // 'All', 'Pending', 'Approved', 'Ongoing', 'Completed', 'Cancelled', 'Overdue'
+  String _selectedAdminTab = 'Bookings'; // 'Bookings', 'Active Rentals'
+  String _activeRentalDateFilter =
+      'Today'; // 'Today', 'Tomorrow', 'Next 7 Days', 'Custom Date'
+  DateTime? _customRentalDate;
   String? _error;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -600,6 +604,11 @@ class _BookingsViewState extends State<BookingsView> {
       return matchesSearch && matchesStatus;
     }).toList();
 
+    final activeRentals = _bookings.where((b) {
+      return _isActiveRentalStatus(b.status) &&
+          _matchesActiveRentalDateFilter(b);
+    }).toList()..sort((a, b) => a.pickUpDate.compareTo(b.pickUpDate));
+
     final double width = MediaQuery.of(context).size.width;
     final bool isDesktop = width > 1100;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -622,7 +631,9 @@ class _BookingsViewState extends State<BookingsView> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Reservation Registry',
+                _selectedAdminTab == 'Bookings'
+                    ? 'Reservation Registry'
+                    : 'Active Rentals',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w900,
@@ -630,12 +641,23 @@ class _BookingsViewState extends State<BookingsView> {
                 ),
               ),
               Text(
-                'Audit rental schedules, verify security deposits, and handover keys.',
+                _selectedAdminTab == 'Bookings'
+                    ? 'Audit rental schedules, verify security deposits, and handover keys.'
+                    : 'Track currently active rentals with pickup-return visibility.',
                 style: TextStyle(fontSize: 12, color: textSecondary),
               ),
             ],
           ),
           const SizedBox(height: 24),
+
+          _buildAdminTabSwitcher(
+            isDark: isDark,
+            cardColor: cardColor,
+            textPrimary: textPrimary,
+            textSecondary: textSecondary,
+            borderColor: borderColor,
+          ),
+          const SizedBox(height: 20),
 
           GridView.count(
             crossAxisCount: isDesktop ? 4 : 2,
@@ -693,23 +715,54 @@ class _BookingsViewState extends State<BookingsView> {
           ),
           const SizedBox(height: 24),
 
-          Container(
-            decoration: BoxDecoration(
-              color: cardColor,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: borderColor),
-            ),
-            padding: const EdgeInsets.all(16),
-            child: isDesktop
-                ? Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
+          if (_selectedAdminTab == 'Bookings') ...[
+            Container(
+              decoration: BoxDecoration(
+                color: cardColor,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: borderColor),
+              ),
+              padding: const EdgeInsets.all(16),
+              child: isDesktop
+                  ? Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            style: TextStyle(color: textPrimary),
+                            decoration: InputDecoration(
+                              hintText:
+                                  'Search by booking ID, vehicle model, or customer name...',
+                              hintStyle: TextStyle(color: textSecondary),
+                              prefixIcon: Icon(
+                                Icons.search,
+                                size: 20,
+                                color: textSecondary,
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                vertical: 8,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        _buildStatusFilterDropdown(
+                          isDark: isDark,
+                          cardColor: surfaceColor,
+                          textPrimary: textPrimary,
+                          borderColor: borderColor,
+                        ),
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        TextField(
                           controller: _searchController,
                           style: TextStyle(color: textPrimary),
                           decoration: InputDecoration(
                             hintText:
-                                'Search by booking ID, vehicle model, or customer name...',
+                                'Search by booking ID, vehicle or customer...',
                             hintStyle: TextStyle(color: textSecondary),
                             prefixIcon: Icon(
                               Icons.search,
@@ -721,97 +774,124 @@ class _BookingsViewState extends State<BookingsView> {
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      _buildStatusFilterDropdown(
-                        isDark: isDark,
-                        cardColor: surfaceColor,
-                        textPrimary: textPrimary,
-                        borderColor: borderColor,
-                      ),
-                    ],
-                  )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      TextField(
-                        controller: _searchController,
-                        style: TextStyle(color: textPrimary),
-                        decoration: InputDecoration(
-                          hintText:
-                              'Search by booking ID, vehicle or customer...',
-                          hintStyle: TextStyle(color: textSecondary),
-                          prefixIcon: Icon(
-                            Icons.search,
-                            size: 20,
-                            color: textSecondary,
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            vertical: 8,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _buildStatusFilterDropdown(
-                        isDark: isDark,
-                        cardColor: surfaceColor,
-                        textPrimary: textPrimary,
-                        borderColor: borderColor,
-                      ),
-                    ],
-                  ),
-          ),
-          const SizedBox(height: 16),
-
-          // List / Table view
-          filteredBookings.isEmpty
-              ? Container(
-                  height: 200,
-                  decoration: BoxDecoration(
-                    color: cardColor,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: borderColor),
-                  ),
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.calendar_today_outlined,
-                          size: 64,
-                          color: textSecondary,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No reservations found matching search queries.',
-                          style: TextStyle(color: textSecondary),
+                        const SizedBox(height: 12),
+                        _buildStatusFilterDropdown(
+                          isDark: isDark,
+                          cardColor: surfaceColor,
+                          textPrimary: textPrimary,
+                          borderColor: borderColor,
                         ),
                       ],
                     ),
+            ),
+            const SizedBox(height: 16),
+
+            // List / Table view
+            filteredBookings.isEmpty
+                ? Container(
+                    height: 200,
+                    decoration: BoxDecoration(
+                      color: cardColor,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: borderColor),
+                    ),
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.calendar_today_outlined,
+                            size: 64,
+                            color: textSecondary,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No reservations found matching search queries.',
+                            style: TextStyle(color: textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : Container(
+                    decoration: BoxDecoration(
+                      color: cardColor,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: borderColor),
+                    ),
+                    child: isDesktop
+                        ? _buildDesktopTable(
+                            filteredBookings,
+                            isDark: isDark,
+                            textPrimary: textPrimary,
+                            textSecondary: textSecondary,
+                          )
+                        : _buildMobileList(
+                            filteredBookings,
+                            isDark: isDark,
+                            cardColor: cardColor,
+                            textPrimary: textPrimary,
+                            textSecondary: textSecondary,
+                            borderColor: borderColor,
+                          ),
                   ),
-                )
-              : Container(
-                  decoration: BoxDecoration(
-                    color: cardColor,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: borderColor),
+          ] else ...[
+            _buildActiveRentalDateFilters(
+              isDark: isDark,
+              cardColor: cardColor,
+              textPrimary: textPrimary,
+              textSecondary: textSecondary,
+              borderColor: borderColor,
+            ),
+            const SizedBox(height: 16),
+            activeRentals.isEmpty
+                ? Container(
+                    height: 200,
+                    decoration: BoxDecoration(
+                      color: cardColor,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: borderColor),
+                    ),
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.directions_car_outlined,
+                            size: 64,
+                            color: textSecondary,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No active rentals found for this date filter.',
+                            style: TextStyle(color: textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : Container(
+                    decoration: BoxDecoration(
+                      color: cardColor,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: borderColor),
+                    ),
+                    child: isDesktop
+                        ? _buildActiveRentalsDesktopTable(
+                            activeRentals,
+                            isDark: isDark,
+                            textPrimary: textPrimary,
+                            textSecondary: textSecondary,
+                          )
+                        : _buildActiveRentalsMobileList(
+                            activeRentals,
+                            isDark: isDark,
+                            textPrimary: textPrimary,
+                            textSecondary: textSecondary,
+                            borderColor: borderColor,
+                          ),
                   ),
-                  child: isDesktop
-                      ? _buildDesktopTable(
-                          filteredBookings,
-                          isDark: isDark,
-                          textPrimary: textPrimary,
-                          textSecondary: textSecondary,
-                        )
-                      : _buildMobileList(
-                          filteredBookings,
-                          isDark: isDark,
-                          cardColor: cardColor,
-                          textPrimary: textPrimary,
-                          textSecondary: textSecondary,
-                          borderColor: borderColor,
-                        ),
-                ),
+          ],
         ],
       ),
     );
@@ -1477,5 +1557,420 @@ class _BookingsViewState extends State<BookingsView> {
     }
     final days = _getElapsedDays(booking);
     return days * booking.totalPrice;
+  }
+
+  bool _isActiveRentalStatus(String status) {
+    final normalized = status.trim().toLowerCase();
+    return normalized == 'approved' ||
+        normalized == 'confirmed' ||
+        normalized == 'on the way' ||
+        normalized == 'ontheway' ||
+        normalized == 'on_the_way' ||
+        normalized == 'active' ||
+        normalized == 'ongoing' ||
+        normalized == 'return requested' ||
+        normalized == 'awaiting return inspection' ||
+        normalized == 'awaiting final payment' ||
+        normalized == 'overdue';
+  }
+
+  DateTime _dateOnly(DateTime date) {
+    return DateTime(date.year, date.month, date.day);
+  }
+
+  bool _matchesActiveRentalDateFilter(BookingModel booking) {
+    final pickupDate = _dateOnly(booking.pickUpDate);
+    final today = _dateOnly(DateTime.now());
+
+    switch (_activeRentalDateFilter) {
+      case 'Today':
+        return pickupDate == today;
+      case 'Tomorrow':
+        return pickupDate == today.add(const Duration(days: 1));
+      case 'Next 7 Days':
+        final end = today.add(const Duration(days: 6));
+        return !pickupDate.isBefore(today) && !pickupDate.isAfter(end);
+      case 'Custom Date':
+        if (_customRentalDate == null) return true;
+        return pickupDate == _dateOnly(_customRentalDate!);
+      default:
+        return true;
+    }
+  }
+
+  String _remainingDaysText(BookingModel booking) {
+    if (booking.returnDate == null || booking.isOpenRental) {
+      return 'Open Rental';
+    }
+
+    final today = _dateOnly(DateTime.now());
+    final returnDate = _dateOnly(booking.returnDate!);
+    final diff = returnDate.difference(today).inDays;
+    if (diff < 0) {
+      return '${diff.abs()} day(s) overdue';
+    }
+    if (diff == 0) {
+      return 'Due today';
+    }
+    return '$diff day(s) left';
+  }
+
+  Widget _buildAdminTabSwitcher({
+    required bool isDark,
+    required Color cardColor,
+    required Color textPrimary,
+    required Color textSecondary,
+    required Color borderColor,
+  }) {
+    Widget tabChip(String label) {
+      final bool selected = _selectedAdminTab == label;
+      return Expanded(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: () {
+            if (_selectedAdminTab != label) {
+              setState(() => _selectedAdminTab = label);
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              color: selected
+                  ? AppColors.primaryOrange.withValues(
+                      alpha: isDark ? 0.25 : 0.12,
+                    )
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: selected ? AppColors.primaryOrange : Colors.transparent,
+              ),
+            ),
+            child: Center(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: selected ? AppColors.primaryOrange : textSecondary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        children: [
+          tabChip('Bookings'),
+          const SizedBox(width: 8),
+          tabChip('Active Rentals'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActiveRentalDateFilters({
+    required bool isDark,
+    required Color cardColor,
+    required Color textPrimary,
+    required Color textSecondary,
+    required Color borderColor,
+  }) {
+    final options = ['Today', 'Tomorrow', 'Next 7 Days', 'Custom Date'];
+    return Container(
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          for (final option in options)
+            ChoiceChip(
+              label: Text(option),
+              selected: _activeRentalDateFilter == option,
+              selectedColor: AppColors.primaryOrange.withValues(
+                alpha: isDark ? 0.25 : 0.15,
+              ),
+              labelStyle: TextStyle(
+                color: _activeRentalDateFilter == option
+                    ? AppColors.primaryOrange
+                    : textSecondary,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+              side: BorderSide(
+                color: _activeRentalDateFilter == option
+                    ? AppColors.primaryOrange
+                    : borderColor,
+              ),
+              backgroundColor: cardColor,
+              onSelected: (_) {
+                setState(() {
+                  _activeRentalDateFilter = option;
+                  if (option != 'Custom Date') {
+                    _customRentalDate = null;
+                  }
+                });
+              },
+            ),
+          if (_activeRentalDateFilter == 'Custom Date')
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: textPrimary,
+                side: BorderSide(color: borderColor),
+                backgroundColor: isDark
+                    ? const Color(0xFF0F172A)
+                    : const Color(0xFFF8FAFC),
+              ),
+              onPressed: () async {
+                final pickedDate = await showDatePicker(
+                  context: context,
+                  initialDate: _customRentalDate ?? DateTime.now(),
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime(2100),
+                );
+                if (pickedDate != null) {
+                  setState(() {
+                    _customRentalDate = pickedDate;
+                  });
+                }
+              },
+              icon: const Icon(Icons.calendar_month_outlined, size: 16),
+              label: Text(
+                _customRentalDate == null
+                    ? 'Pick date'
+                    : DateFormat('dd MMM yyyy').format(_customRentalDate!),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActiveRentalsDesktopTable(
+    List<BookingModel> rentals, {
+    required bool isDark,
+    required Color textPrimary,
+    required Color textSecondary,
+  }) {
+    final dateFormat = DateFormat('yyyy-MM-dd');
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: DataTable(
+        headingRowColor: WidgetStateProperty.all(
+          isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+        ),
+        dividerThickness: 1,
+        columns: [
+          DataColumn(
+            label: Text(
+              'Customer',
+              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
+            ),
+          ),
+          DataColumn(
+            label: Text(
+              'Vehicle',
+              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
+            ),
+          ),
+          DataColumn(
+            label: Text(
+              'Pickup Date',
+              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
+            ),
+          ),
+          DataColumn(
+            label: Text(
+              'Return Date',
+              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
+            ),
+          ),
+          DataColumn(
+            label: Text(
+              'Booking Status',
+              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
+            ),
+          ),
+          DataColumn(
+            label: Text(
+              'Remaining Days',
+              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
+            ),
+          ),
+        ],
+        rows: rentals.map((rental) {
+          final statusColor = _getBookingStatusColor(rental.status, isDark);
+          return DataRow(
+            cells: [
+              DataCell(
+                Text(rental.userName, style: TextStyle(color: textPrimary)),
+              ),
+              DataCell(
+                Text(rental.vehicleName, style: TextStyle(color: textPrimary)),
+              ),
+              DataCell(
+                Text(
+                  dateFormat.format(rental.pickUpDate),
+                  style: TextStyle(color: textSecondary),
+                ),
+              ),
+              DataCell(
+                Text(
+                  rental.returnDate == null
+                      ? 'OPEN RENTAL'
+                      : dateFormat.format(rental.returnDate!),
+                  style: TextStyle(
+                    color: rental.returnDate == null
+                        ? Colors.green
+                        : textSecondary,
+                    fontWeight: rental.returnDate == null
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                  ),
+                ),
+              ),
+              DataCell(
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    rental.status.toUpperCase(),
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+              DataCell(
+                Text(
+                  _remainingDaysText(rental),
+                  style: TextStyle(
+                    color: textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildActiveRentalsMobileList(
+    List<BookingModel> rentals, {
+    required bool isDark,
+    required Color textPrimary,
+    required Color textSecondary,
+    required Color borderColor,
+  }) {
+    final dateFormat = DateFormat('yyyy-MM-dd');
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: rentals.length,
+      itemBuilder: (context, index) {
+        final rental = rentals[index];
+        final statusColor = _getBookingStatusColor(rental.status, isDark);
+        return Card(
+          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8F9FA),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: borderColor),
+          ),
+          elevation: 0,
+          margin: const EdgeInsets.only(bottom: 12),
+          child: ListTile(
+            title: Text(
+              rental.userName,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: textPrimary,
+              ),
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 4),
+                Text(
+                  'Vehicle: ${rental.vehicleName}',
+                  style: TextStyle(fontSize: 12, color: textSecondary),
+                ),
+                Text(
+                  'Pickup: ${dateFormat.format(rental.pickUpDate)}',
+                  style: TextStyle(fontSize: 12, color: textSecondary),
+                ),
+                Text(
+                  rental.returnDate == null
+                      ? 'Return: OPEN RENTAL'
+                      : 'Return: ${dateFormat.format(rental.returnDate!)}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: rental.returnDate == null
+                        ? Colors.green
+                        : textSecondary,
+                    fontWeight: rental.returnDate == null
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Remaining: ${_remainingDaysText(rental)}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    rental.status.toUpperCase(),
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            onTap: () => _showBookingDetails(rental),
+          ),
+        );
+      },
+    );
   }
 }

@@ -1710,40 +1710,37 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             ),
                           ),
                         ),
-                      if (isDesktop)
-                        Text(
-                          _activeTab == 'Dashboard'
-                              ? 'Welcome back, ${_adminUser?.fullName ?? "Administrator"} 👋'
-                              : '${context.watch<CompanySettingsProvider>().companyName} Platform Management',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark
-                                ? const Color(0xFFCBD5E1)
-                                : Colors.grey,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        )
-                      else
-                        SizedBox(
-                          width: double.infinity,
-                          child: FittedBox(
-                            alignment: Alignment.centerLeft,
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              _activeTab == 'Dashboard'
-                                  ? 'Welcome back, ${_adminUser?.fullName ?? "Administrator"} 👋'
-                                  : '${context.watch<CompanySettingsProvider>().companyName} Platform Management',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: isDark
-                                    ? const Color(0xFFCBD5E1)
-                                    : Colors.grey,
+                      if (_activeTab == 'Dashboard')
+                        if (isDesktop)
+                          Text(
+                            'Welcome back, ${_adminUser?.fullName ?? "Administrator"} 👋',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark
+                                  ? const Color(0xFFCBD5E1)
+                                  : Colors.grey,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          )
+                        else
+                          SizedBox(
+                            width: double.infinity,
+                            child: FittedBox(
+                              alignment: Alignment.centerLeft,
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                'Welcome back, ${_adminUser?.fullName ?? "Administrator"} 👋',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark
+                                      ? const Color(0xFFCBD5E1)
+                                      : Colors.grey,
+                                ),
+                                maxLines: 1,
                               ),
-                              maxLines: 1,
                             ),
                           ),
-                        ),
                     ],
                   ),
                 ),

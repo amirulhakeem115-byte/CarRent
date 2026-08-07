@@ -44,23 +44,32 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     super.initState();
     _loadSavedEmails();
+  }
 
-    _emailFocusNode.addListener(() {
-      setState(() {
-        // Show suggestions when email field gets focus and there are recent emails
-        _showEmailSuggestions =
-            _emailFocusNode.hasFocus && _recentEmails.isNotEmpty;
-      });
-    });
+  bool _isValidStoredEmail(String value) {
+    final email = value.trim();
+    if (email.isEmpty) return false;
+    if (email.contains('*')) return false;
+    return RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email);
   }
 
   Future<void> _loadSavedEmails() async {
     final prefs = await SharedPreferences.getInstance();
     final lastEmail = prefs.getString('last_login_email') ?? '';
-    final list = prefs.getStringList('recent_login_emails') ?? [];
+    final storedList = prefs.getStringList('recent_login_emails') ?? [];
+    final normalized = storedList
+        .map((e) => e.trim().toLowerCase())
+        .where(_isValidStoredEmail)
+        .toSet()
+        .toList();
+
+    if (normalized.length != storedList.length) {
+      await prefs.setStringList('recent_login_emails', normalized);
+    }
+
     if (mounted) {
       setState(() {
-        _recentEmails = list;
+        _recentEmails = List<String>.from(normalized);
         if (lastEmail.isNotEmpty && _emailController.text.isEmpty) {
           _emailController.text = lastEmail;
         }
@@ -70,31 +79,82 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _deleteEmail(String email) async {
     final prefs = await SharedPreferences.getInstance();
+    final updatedEmails = _recentEmails.where((e) => e != email).toList();
+
     setState(() {
-      _recentEmails.remove(email);
-      _showEmailSuggestions = _recentEmails.isNotEmpty;
+      _recentEmails = updatedEmails;
+      _showEmailSuggestions = true;
     });
-    await prefs.setStringList('recent_login_emails', _recentEmails);
+    await prefs.setStringList('recent_login_emails', updatedEmails);
 
     final lastEmail = prefs.getString('last_login_email') ?? '';
     if (lastEmail == email) {
       await prefs.remove('last_login_email');
+      if (_emailController.text.trim().toLowerCase() == email.toLowerCase()) {
+        setState(() {
+          _emailController.clear();
+        });
+      }
     }
   }
 
+  String _maskEmailForDisplay(String email) {
+    final parts = email.split('@');
+    if (parts.length != 2) return email;
+
+    final local = parts[0];
+    final domain = parts[1];
+
+    if (local.isEmpty) return '***@$domain';
+    if (local.length == 1) return '${local[0]}***@$domain';
+    if (local.length == 2) return '${local[0]}*@$domain';
+
+    return '${local.substring(0, 2)}***@$domain';
+  }
+
   void _selectEmail(String email) {
+    if (!_isValidStoredEmail(email)) {
+      return;
+    }
+
+    final current = _emailController.text.trim();
+    if (current.isEmpty) {
+      _emailController.value = TextEditingValue(
+        text: email,
+        selection: TextSelection.collapsed(offset: email.length),
+      );
+    }
+
     setState(() {
-      _emailController.text = email;
       _showEmailSuggestions = false;
       _error = null;
     });
-    // Move focus to password field after selecting email
-    FocusScope.of(context).requestFocus(FocusNode());
-    // Focus to password field after a short delay
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (!mounted) return;
-      FocusScope.of(context).nextFocus();
+    FocusScope.of(context).requestFocus(_emailFocusNode);
+  }
+
+  // Closes only the suggestions dropdown.
+  void _closeSuggestions() {
+    setState(() {
+      _showEmailSuggestions = false;
+      _error = null;
     });
+  }
+
+  Future<void> _clearRememberedAccounts() async {
+    setState(() {
+      _recentEmails = [];
+      _showEmailSuggestions = true;
+      _emailController.clear();
+      _error = null;
+    });
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('recent_login_emails', <String>[]);
+    await prefs.remove('recent_login_emails');
+    await prefs.remove('last_login_email');
+
+    if (!mounted) return;
+    FocusScope.of(context).requestFocus(_emailFocusNode);
   }
 
   Future<void> _login() async {
@@ -418,8 +478,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   return null;
                 },
               ),
-              // Email suggestions dropdown
-              if (_showEmailSuggestions && _recentEmails.isNotEmpty)
+              // ✅ UPDATED: Email suggestions dropdown with improved Close button
+              if (_showEmailSuggestions)
                 Container(
                   margin: const EdgeInsets.only(top: 4),
                   decoration: BoxDecoration(
@@ -460,11 +520,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             const Spacer(),
                             TextButton(
-                              onPressed: () {
-                                setState(() {
-                                  _showEmailSuggestions = false;
-                                });
-                              },
+                              onPressed:
+                                  _closeSuggestions, // ✅ UPDATED: Uses new method
                               style: TextButton.styleFrom(
                                 padding: EdgeInsets.zero,
                                 minimumSize: const Size(40, 30),
@@ -481,51 +538,67 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       const Divider(height: 1),
-                      ..._recentEmails.map((email) {
-                        return InkWell(
-                          onTap: () => _selectEmail(email),
-                          onLongPress: () => _deleteEmail(email),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 14,
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.history,
-                                  size: 18,
-                                  color: isDark
-                                      ? Colors.white54
-                                      : Colors.grey[500],
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    email,
-                                    style: TextStyle(
-                                      color: isDark
-                                          ? Colors.white
-                                          : AppColors.secondaryBlue,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ),
-                                GestureDetector(
-                                  onTap: () => _deleteEmail(email),
-                                  child: Icon(
-                                    Icons.close,
-                                    size: 18,
-                                    color: isDark
-                                        ? Colors.white38
-                                        : Colors.grey[400],
-                                  ),
-                                ),
-                              ],
+                      if (_recentEmails.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 18,
+                          ),
+                          child: Text(
+                            'No saved accounts',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: isDark ? Colors.white54 : Colors.grey[600],
                             ),
                           ),
-                        );
-                      }),
+                        )
+                      else
+                        ..._recentEmails.map((email) {
+                          return Material(
+                            color: Colors.transparent,
+                            child: ListTile(
+                              onTap: () => _selectEmail(email),
+                              onLongPress: () => _deleteEmail(email),
+                              leading: Icon(
+                                Icons.history,
+                                size: 18,
+                                color: isDark
+                                    ? Colors.white54
+                                    : Colors.grey[500],
+                              ),
+                              title: Text(
+                                _maskEmailForDisplay(email),
+                                style: TextStyle(
+                                  color: isDark
+                                      ? Colors.white
+                                      : AppColors.secondaryBlue,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 0,
+                              ),
+                              dense: true,
+                              trailing: IconButton(
+                                onPressed: () => _deleteEmail(email),
+                                icon: Icon(
+                                  Icons.close,
+                                  size: 18,
+                                  color: isDark
+                                      ? Colors.white38
+                                      : Colors.grey[400],
+                                ),
+                                tooltip: 'Remove account',
+                                splashRadius: 18,
+                                constraints: const BoxConstraints(
+                                  minWidth: 36,
+                                  minHeight: 36,
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
                       Padding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -537,6 +610,32 @@ class _LoginScreenState extends State<LoginScreen> {
                             fontSize: 11,
                             color: isDark ? Colors.white38 : Colors.grey[400],
                           ),
+                        ),
+                      ),
+                      // Dedicated clear-all button at the bottom
+                      const Divider(height: 1),
+                      Material(
+                        color: Colors.transparent,
+                        child: ListTile(
+                          onTap: _clearRememberedAccounts,
+                          leading: Icon(
+                            Icons.cancel_outlined,
+                            size: 18,
+                            color: isDark ? Colors.white54 : Colors.grey[500],
+                          ),
+                          title: const Text(
+                            'Clear remembered accounts',
+                            style: TextStyle(
+                              color: AppColors.primaryOrange,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 0,
+                          ),
+                          dense: true,
                         ),
                       ),
                     ],
