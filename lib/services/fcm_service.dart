@@ -538,17 +538,13 @@ class FCMService {
     if (role == 'admin') {
       navigatorKey.currentState?.push(
         MaterialPageRoute(
-          builder: (context) => AdminDashboardScreen(
-            initialTabRoute: actionRoute,
-          ),
+          builder: (context) => const AdminDashboardScreen(),
         ),
       );
     } else {
       navigatorKey.currentState?.push(
         MaterialPageRoute(
-          builder: (context) => CustomerResponsiveShell(
-            initialTabRoute: actionRoute,
-          ),
+          builder: (context) => const CustomerResponsiveShell(),
         ),
       );
     }

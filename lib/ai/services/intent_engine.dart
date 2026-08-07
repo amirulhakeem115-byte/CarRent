@@ -191,7 +191,7 @@ class IntentEngine {
     double confidence = 0.0;
     final Map<String, dynamic> params = {};
 
-    final receiptKeywords = ['receipt', 'receipts', 'invoice', 'invoices', 'bill', 'bills', 'tax invoice'];
+    final receiptKeywords = ['receipt', 'receipts', 'invoice', 'invoices', 'bill', 'bills', 'tax invoice', 'invoice statement', 'invoice statements'];
     bool hasReceiptKeyword = false;
     for (final kw in receiptKeywords) {
       if (text.contains(kw)) {
@@ -202,7 +202,10 @@ class IntentEngine {
 
     if (hasReceiptKeyword) {
       confidence = 0.80;
-      if (text.contains('download') || text.contains('export') || text.contains('get')) {
+      if (text.contains('invoice statement') || text.contains('invoice statements')) {
+        confidence = 0.96;
+        params['action'] = 'open_receipt';
+      } else if (text.contains('download') || text.contains('export') || text.contains('get')) {
         confidence = 0.95;
         params['action'] = 'download_receipt';
       } else {
@@ -335,7 +338,7 @@ class IntentEngine {
     final historyKeywords = ['history', 'past rentals', 'previous rentals', 'completed bookings', 'past bookings', 'history list'];
     for (final kw in historyKeywords) {
       if (text.contains(kw)) {
-        confidence = 0.90;
+        confidence = 0.96;
         break;
       }
     }
