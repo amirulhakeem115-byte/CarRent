@@ -35,7 +35,12 @@ class UserModel {
   final String idReviewedBy;
   final String idReviewedDate;
 
-  bool get isAdmin => role == 'admin';
+  final String employeeId;
+
+  String get normalizedRole => role.trim().toLowerCase();
+  bool get isAdmin => normalizedRole == 'admin';
+  bool get isEmployee => normalizedRole == 'employee';
+  bool get isCustomer => normalizedRole == 'customer';
 
   UserModel({
     required this.id,
@@ -67,6 +72,7 @@ class UserModel {
     this.idRejectionReason = '',
     this.idReviewedBy = '',
     this.idReviewedDate = '',
+    this.employeeId = '',
   });
 
   factory UserModel.fromMap(String id, Map<dynamic, dynamic> data) {
@@ -116,6 +122,7 @@ class UserModel {
       idRejectionReason: data['idRejectionReason'] ?? '',
       idReviewedBy: data['idReviewedBy'] ?? '',
       idReviewedDate: data['idReviewedDate'] ?? '',
+      employeeId: data['employeeId'] ?? '',
     );
   }
 
@@ -149,6 +156,7 @@ class UserModel {
       'idRejectionReason': idRejectionReason,
       'idReviewedBy': idReviewedBy,
       'idReviewedDate': idReviewedDate,
+      'employeeId': employeeId,
     };
   }
 }

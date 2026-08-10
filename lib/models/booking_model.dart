@@ -44,6 +44,18 @@ class BookingModel {
   final String? promotionName;
   final double promotionDiscountAmount;
 
+  // Employee Assignment & Staff Tracking fields
+  final String? assignedEmployeeId;
+  final String? assignedEmployeeName;
+  final String? handedOverByEmployeeId;
+  final String? handedOverByEmployeeName;
+  final String? receivedByEmployeeId;
+  final String? receivedByEmployeeName;
+
+  // Return Video Evidence fields
+  final Map<String, dynamic>? returnVideos;
+  final bool returnVideoSkipped;
+
   BookingModel({
     required this.id,
     required this.vehicleId,
@@ -81,6 +93,14 @@ class BookingModel {
     this.promotionCode,
     this.promotionName,
     this.promotionDiscountAmount = 0.0,
+    this.assignedEmployeeId,
+    this.assignedEmployeeName,
+    this.handedOverByEmployeeId,
+    this.handedOverByEmployeeName,
+    this.receivedByEmployeeId,
+    this.receivedByEmployeeName,
+    this.returnVideos,
+    this.returnVideoSkipped = false,
   });
 
   factory BookingModel.fromMap(
@@ -142,6 +162,16 @@ class BookingModel {
       promotionCode: data['promotionCode'],
       promotionName: data['promotionName'],
       promotionDiscountAmount: (data['promotionDiscountAmount'] ?? 0.0).toDouble(),
+      assignedEmployeeId: data['assignedEmployeeId'] ?? data['assignedStaffId'] ?? data['employeeId'],
+      assignedEmployeeName: data['assignedEmployeeName'] ?? data['assignedStaffName'],
+      handedOverByEmployeeId: data['handedOverByEmployeeId'],
+      handedOverByEmployeeName: data['handedOverByEmployeeName'],
+      receivedByEmployeeId: data['receivedByEmployeeId'],
+      receivedByEmployeeName: data['receivedByEmployeeName'],
+      returnVideos: data['returnVideos'] != null
+          ? Map<String, dynamic>.from(data['returnVideos'] as Map)
+          : null,
+      returnVideoSkipped: data['returnVideoSkipped'] ?? false,
     );
   }
 
@@ -182,8 +212,58 @@ class BookingModel {
       'promotionCode': promotionCode,
       'promotionName': promotionName,
       'promotionDiscountAmount': promotionDiscountAmount,
+      'assignedEmployeeId': assignedEmployeeId,
+      'assignedEmployeeName': assignedEmployeeName,
+      'handedOverByEmployeeId': handedOverByEmployeeId,
+      'handedOverByEmployeeName': handedOverByEmployeeName,
+      'receivedByEmployeeId': receivedByEmployeeId,
+      'receivedByEmployeeName': receivedByEmployeeName,
+      'returnVideos': returnVideos,
+      'returnVideoSkipped': returnVideoSkipped,
     };
   }
+
+  List<Map<String, dynamic>> get returnVideosList {
+    if (returnVideos == null || returnVideos!.isEmpty) return [];
+    final list = <Map<String, dynamic>>[];
+    returnVideos!.forEach((k, v) {
+      if (v is Map) {
+        final map = Map<String, dynamic>.from(v);
+        if (!map.containsKey('videoId')) map['videoId'] = k;
+        list.add(map);
+      }
+    });
+    list.sort((a, b) {
+      final tA = a['uploadedAt']?.toString() ?? '';
+      final tB = b['uploadedAt']?.toString() ?? '';
+      return tA.compareTo(tB);
+    });
+    return list;
+  }
+
+  Map<String, dynamic>? get customerReturnVideo {
+    final list = returnVideosList;
+    for (final v in list) {
+      if ((v['uploaderRole']?.toString().toLowerCase() ?? '') == 'customer') {
+        return v;
+      }
+    }
+    return null;
+  }
+
+  Map<String, dynamic>? get employeeReturnVideo {
+    final list = returnVideosList;
+    for (final v in list) {
+      if ((v['uploaderRole']?.toString().toLowerCase() ?? '') == 'employee') {
+        return v;
+      }
+    }
+    return null;
+  }
+
+  bool get hasCustomerReturnVideo => customerReturnVideo != null;
+  bool get hasEmployeeReturnVideo => employeeReturnVideo != null;
+  bool get hasAnyReturnVideo => returnVideosList.isNotEmpty;
 
   int get rentalDays {
     if (isOpenRental) return 1;

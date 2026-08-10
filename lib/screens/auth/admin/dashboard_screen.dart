@@ -30,6 +30,7 @@ import 'vehicles_screen.dart';
 import 'bookings_screen.dart';
 import 'payments_screen.dart';
 import 'customers_screen.dart';
+import 'employees_screen.dart';
 import 'branches_screen.dart';
 import 'support_inbox_screen.dart';
 import 'vehicle_maintenance_screen.dart';
@@ -158,6 +159,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (route == 'cars' || route == 'vehicles') return 'Cars';
     if (route == 'bookings') return 'Bookings';
     if (route == 'customers') return 'Customers';
+    if (route == 'employees') return 'Employees';
     if (route == 'payments') return 'Payments';
     if (route == 'reward points' || route == 'loyalty rewards') {
       return 'Reward Points';
@@ -1332,6 +1334,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       case 'Customers':
         tabContent = const Expanded(child: CustomersView());
         break;
+      case 'Employees':
+        tabContent = const Expanded(child: EmployeesView());
+        break;
       case 'Payments':
         tabContent = const Expanded(child: PaymentsView());
         break;
@@ -1477,6 +1482,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   Icons.people_outline_rounded,
                   'Customers',
                   () => setState(() => _activeTab = 'Customers'),
+                ),
+                _buildSidebarTile(
+                  Icons.badge_outlined,
+                  'Employees',
+                  () => setState(() => _activeTab = 'Employees'),
                 ),
                 _buildSidebarTile(
                   Icons.payment_outlined,

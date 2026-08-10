@@ -13,6 +13,7 @@ import '../models/branch_model.dart';
 import 'auth/login_screen.dart';
 import 'auth/customer/customer_responsive_shell.dart';
 import 'auth/admin/dashboard_screen.dart';
+import 'auth/employee/employee_dashboard_screen.dart';
 import 'auth/customer/vehicle_details_screen.dart';
 import '../widgets/loading_widget.dart';
 import '../widgets/app_image.dart';
@@ -208,11 +209,20 @@ class _HomeScreenState extends State<HomeScreen> {
               .fetchAndCacheUserModel(currentUser.uid)
               .timeout(const Duration(seconds: 4));
           if (_user != null && mounted) {
-            if (_user!.role == 'admin') {
+            final role = _user!.normalizedRole;
+            if (role == 'admin') {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
                   builder: (context) => const AdminDashboardScreen(),
+                ),
+              );
+              return;
+            } else if (role == 'employee') {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const EmployeeDashboardScreen(),
                 ),
               );
               return;
@@ -334,10 +344,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _navigateToDashboardOrLogin() {
     if (_user != null) {
-      if (_user!.role == 'admin') {
+      final role = _user!.normalizedRole;
+      if (role == 'admin') {
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => const AdminDashboardScreen()),
+        );
+      } else if (role == 'employee') {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const EmployeeDashboardScreen(),
+          ),
         );
       } else {
         Navigator.push(

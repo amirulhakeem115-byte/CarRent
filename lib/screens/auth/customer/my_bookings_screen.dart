@@ -19,6 +19,8 @@ import 'contact_support_screen.dart';
 import '../../../services/notification_service.dart';
 import '../../../services/user_role_cache.dart';
 import '../../../services/reward_service.dart';
+import '../../../widgets/return_video_evidence_widget.dart';
+import '../../../widgets/upload_video_modal_sheet.dart';
 
 /// Simple data holder for a step in the booking progress tracker.
 class _TrackerStep {
@@ -1264,6 +1266,23 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     );
   }
 
+  void _showReturnVideoUploadModal(BookingModel booking) {
+    final uid = _authService.currentUser?.uid ?? booking.userId;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => UploadVideoModalSheet(
+        booking: booking,
+        uploaderId: uid,
+        uploaderName: booking.userName.isNotEmpty ? booking.userName : 'Customer',
+        uploaderRole: 'customer',
+        onUploaded: _loadBookings,
+        onSkipped: _loadBookings,
+      ),
+    );
+  }
+
   Future<void> _submitReview(BookingModel booking) async {
     double rating = 5;
     final commentController = TextEditingController();
@@ -1590,6 +1609,28 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
               ),
             ),
             ElevatedButton.icon(
+              onPressed: () => _showReturnVideoUploadModal(booking),
+              icon: const Icon(Icons.videocam_rounded, size: 12),
+              label: Text(
+                booking.hasCustomerReturnVideo ? 'Return Video Evidence' : 'Upload Return Video',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: booking.hasCustomerReturnVideo ? Colors.teal : AppColors.primaryOrange,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+            ElevatedButton.icon(
               onPressed: () {
                 Navigator.push(
                   context,
@@ -1598,15 +1639,14 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                   ),
                 );
               },
-              icon: const Icon(Icons.chat_bubble_outline, size: 12),
+              icon: const Icon(Icons.support_agent, size: 12),
               label: const Text(
-                'Support',
+                'Contact Support',
                 style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryOrange,
+                backgroundColor: Colors.blueGrey,
                 foregroundColor: Colors.white,
-                elevation: 0,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
                   vertical: 8,
@@ -1617,6 +1657,12 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 14),
+        ReturnVideoEvidenceWidget(
+          booking: booking,
+          isCustomerView: true,
+          onUploadClick: () => _showReturnVideoUploadModal(booking),
         ),
       ],
     );

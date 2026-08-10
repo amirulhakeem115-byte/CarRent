@@ -12,6 +12,7 @@ import 'register_screen.dart';
 import 'forgot_password_screen.dart';
 import 'customer/customer_responsive_shell.dart';
 import 'admin/dashboard_screen.dart';
+import 'employee/employee_dashboard_screen.dart';
 import '../../services/booking_lifecycle_manager.dart';
 import '../../services/user_session.dart';
 
@@ -253,10 +254,18 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       // Route based on role
-      if (userModel.role == 'admin') {
+      final normalizedRole = userModel.normalizedRole;
+      if (normalizedRole == 'admin') {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const AdminDashboardScreen()),
+        );
+      } else if (normalizedRole == 'employee') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const EmployeeDashboardScreen(),
+          ),
         );
       } else {
         Navigator.pushReplacement(
@@ -350,10 +359,18 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       // Route based on role
-      if (userModel.role == 'admin') {
+      final normalizedRole = userModel.normalizedRole;
+      if (normalizedRole == 'admin') {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const AdminDashboardScreen()),
+        );
+      } else if (normalizedRole == 'employee') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const EmployeeDashboardScreen(),
+          ),
         );
       } else {
         Navigator.pushReplacement(

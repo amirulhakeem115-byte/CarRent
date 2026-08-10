@@ -466,10 +466,12 @@ class BookingService {
     if (currentUid == null) return bookings;
 
     final currentRole = await UserRoleCache.getRole(currentUid);
+    final roleLower = currentRole.toLowerCase().trim();
+    final isStaffOrAdmin = roleLower == 'admin' || roleLower == 'employee';
 
     try {
       final DataSnapshot snapshot;
-      if (currentRole == 'admin') {
+      if (isStaffOrAdmin) {
         snapshot = await _db.get().timeout(const Duration(seconds: 10));
       } else {
         snapshot = await _db
@@ -521,7 +523,10 @@ class BookingService {
             '[BookingService] getBookingsStream — uid: $currentUid, role: $currentRole',
           );
 
-          final Query query = currentRole == 'admin'
+          final roleLower = currentRole.toLowerCase().trim();
+          final isStaffOrAdmin = roleLower == 'admin' || roleLower == 'employee';
+
+          final Query query = isStaffOrAdmin
               ? _db
               : _db.orderByChild('userId').equalTo(currentUid);
 
@@ -595,6 +600,9 @@ class BookingService {
     String vehicleId,
     String vehicleName, {
     bool isAutomatic = false,
+    String? employeeId,
+    String? employeeName,
+    Map<String, dynamic>? returnInspection,
   }) async {
     try {
       invalidateCache();
@@ -613,6 +621,11 @@ class BookingService {
           'yyyy-MM-dd',
         ).format(DateTime.now());
         updates['actualPickupTimestamp'] = DateTime.now().toIso8601String();
+        if (employeeId != null) {
+          updates['assignedEmployeeId'] = employeeId;
+          updates['handedOverByEmployeeId'] = employeeId;
+          if (employeeName != null) updates['handedOverByEmployeeName'] = employeeName;
+        }
       }
 
       if (statusLower == 'completed') {
@@ -624,6 +637,9 @@ class BookingService {
           'yyyy-MM-dd',
         ).format(DateTime.now());
         updates['actualReturnTimestamp'] = DateTime.now().toIso8601String();
+        if (employeeId != null) updates['receivedByEmployeeId'] = employeeId;
+        if (employeeName != null) updates['receivedByEmployeeName'] = employeeName;
+        if (returnInspection != null) updates['returnInspection'] = returnInspection;
       }
 
       await _db

@@ -7,6 +7,7 @@ import '../../../models/vehicle_model.dart';
 import '../../../services/booking_service.dart';
 import '../../../services/vehicle_service.dart';
 import '../../../widgets/loading_widget.dart';
+import '../../../widgets/return_video_evidence_widget.dart';
 import '../../../constants/colors.dart';
 
 class BookingsView extends StatefulWidget {
@@ -445,6 +446,11 @@ class _BookingsViewState extends State<BookingsView> {
                     ],
                   ),
                 ],
+                const SizedBox(height: 16),
+                ReturnVideoEvidenceWidget(
+                  booking: booking,
+                  isAdminView: true,
+                ),
               ],
             ),
           ),

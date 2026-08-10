@@ -29,6 +29,8 @@ class VehicleModel {
   final List<String> equipment;
   final List<Map<String, dynamic>> maintenance;
 
+  String get name => '$brand $model'.trim();
+
   VehicleModel({
     required this.id,
     required this.brand,
