@@ -29,7 +29,9 @@ class IntentEngine {
     intents.sort((a, b) => b.confidence.compareTo(a.confidence));
     final bestMatch = intents.first;
 
-    debugPrint('[AI IntentEngine] Text: "$text" -> Cleaned: "$cleaned" -> Best Match: $bestMatch with confidence ${bestMatch.confidence}');
+    debugPrint(
+      '[AI IntentEngine] Text: "$text" -> Cleaned: "$cleaned" -> Best Match: $bestMatch with confidence ${bestMatch.confidence}',
+    );
 
     if (bestMatch.confidence >= 0.5) {
       return bestMatch;
@@ -43,13 +45,19 @@ class IntentEngine {
     double confidence = 0.0;
     final Map<String, dynamic> params = {};
 
-    if (text.contains('recommend') || text.contains('suggestion') || text.contains('what should i') || text.contains('best car')) {
+    if (text.contains('recommend') ||
+        text.contains('suggestion') ||
+        text.contains('what should i') ||
+        text.contains('best car')) {
       confidence = 0.95;
       params['action'] = 'recommend_vehicles';
     }
 
     // Check Categories
-    if (text.contains('suv') || text.contains('suvs') || text.contains('sports utility') || text.contains('sport utility')) {
+    if (text.contains('suv') ||
+        text.contains('suvs') ||
+        text.contains('sports utility') ||
+        text.contains('sport utility')) {
       confidence = 0.95;
       params['category'] = 'SUV';
     } else if (text.contains('sedan') || text.contains('sedans')) {
@@ -70,7 +78,10 @@ class IntentEngine {
     }
 
     // Check Sorting & Price
-    if (text.contains('cheap') || text.contains('cheapest') || text.contains('affordable') || text.contains('budget')) {
+    if (text.contains('cheap') ||
+        text.contains('cheapest') ||
+        text.contains('affordable') ||
+        text.contains('budget')) {
       confidence = confidence > 0 ? confidence : 0.90;
       params['sort'] = 'price_asc';
     }
@@ -100,7 +111,16 @@ class IntentEngine {
 
     // General vehicle search trigger words
     if (confidence == 0.0) {
-      final searchKeywords = ['car', 'cars', 'vehicle', 'vehicles', 'fleet', 'find', 'show', 'search'];
+      final searchKeywords = [
+        'car',
+        'cars',
+        'vehicle',
+        'vehicles',
+        'fleet',
+        'find',
+        'show',
+        'search',
+      ];
       int matchCount = 0;
       for (final keyword in searchKeywords) {
         if (text.contains(keyword)) {
@@ -109,7 +129,10 @@ class IntentEngine {
       }
       if (matchCount >= 2) {
         confidence = 0.80;
-      } else if (matchCount == 1 && (text.contains('find') || text.contains('show') || text.contains('search'))) {
+      } else if (matchCount == 1 &&
+          (text.contains('find') ||
+              text.contains('show') ||
+              text.contains('search'))) {
         confidence = 0.50; // weak match
       }
     }
@@ -122,7 +145,27 @@ class IntentEngine {
     double confidence = 0.0;
     final Map<String, dynamic> params = {};
 
-    final bookingKeywords = ['booking', 'bookings', 'rentals', 'rental', 'reservation', 'reservations', 'book', 'rent', 'need a vehicle', 'rent a car', 'need a car', 'renew', 'extend', 'return', 'status', 'way', 'complete', 'finish', 'ongoing'];
+    final bookingKeywords = [
+      'booking',
+      'bookings',
+      'rentals',
+      'rental',
+      'reservation',
+      'reservations',
+      'book',
+      'rent',
+      'need a vehicle',
+      'rent a car',
+      'need a car',
+      'renew',
+      'extend',
+      'return',
+      'status',
+      'way',
+      'complete',
+      'finish',
+      'ongoing',
+    ];
     bool hasBookingKeyword = false;
     for (final kw in bookingKeywords) {
       if (text.contains(kw)) {
@@ -135,13 +178,21 @@ class IntentEngine {
       confidence = 0.70;
 
       // Classify Actions
-      if (text.contains('cancel') || text.contains('cancellation') || text.contains('terminate')) {
+      if (text.contains('cancel') ||
+          text.contains('cancellation') ||
+          text.contains('terminate')) {
         confidence = 0.95;
         params['action'] = 'cancel_booking';
-      } else if (text.contains('renew') || text.contains('extend') || text.contains('extension')) {
+      } else if (text.contains('renew') ||
+          text.contains('extend') ||
+          text.contains('extension')) {
         confidence = 0.95;
         params['action'] = 'renew_booking';
-      } else if (text.contains('return') || text.contains('give back') || text.contains('way') || text.contains('complete') || text.contains('finish')) {
+      } else if (text.contains('return') ||
+          text.contains('give back') ||
+          text.contains('way') ||
+          text.contains('complete') ||
+          text.contains('finish')) {
         confidence = 0.95;
         params['action'] = 'return_vehicle';
       } else if (text.contains('status') || text.contains('check')) {
@@ -153,10 +204,21 @@ class IntentEngine {
       } else if (text.contains('today') || text.contains('current')) {
         confidence = 0.95;
         params['action'] = 'admin_today_bookings';
-      } else if (text.contains('list') || text.contains('my') || text.contains('show') || text.contains('open') || text.endsWith('s')) {
+      } else if (text.contains('list') ||
+          text.contains('my') ||
+          text.contains('show') ||
+          text.contains('open') ||
+          text.endsWith('s')) {
         confidence = 0.90;
         params['action'] = 'view_bookings';
-      } else if (text.contains('make') || text.contains('new') || text.contains('create') || text.contains('book a') || text.contains('rent a') || text == 'book' || text == 'rent' || text.contains('need a vehicle')) {
+      } else if (text.contains('make') ||
+          text.contains('new') ||
+          text.contains('create') ||
+          text.contains('book a') ||
+          text.contains('rent a') ||
+          text == 'book' ||
+          text == 'rent' ||
+          text.contains('need a vehicle')) {
         confidence = 0.95;
         params['action'] = 'book_vehicle';
       } else {
@@ -165,16 +227,33 @@ class IntentEngine {
       }
     } else {
       // Direct action matching without standard keywords
-      if (text.contains('cancel') && (text.contains('my car') || text.contains('my ride'))) {
+      if (text.contains('cancel') &&
+          (text.contains('my car') || text.contains('my ride'))) {
         confidence = 0.80;
         params['action'] = 'cancel_booking';
       } else if (text.contains('renew') || text.contains('extend')) {
         confidence = 0.85;
         params['action'] = 'renew_booking';
-      } else if ((text.contains('return') || text.contains('way') || text.contains('complete') || text.contains('finish')) && (text.contains('car') || text.contains('vehicle') || text.contains('my') || text.contains('rental') || text.contains('vios') || text.contains('civic') || text.contains('saga') || text.contains('alza') || text.contains('myvi') || text.contains('city'))) {
+      } else if ((text.contains('return') ||
+              text.contains('way') ||
+              text.contains('complete') ||
+              text.contains('finish')) &&
+          (text.contains('car') ||
+              text.contains('vehicle') ||
+              text.contains('my') ||
+              text.contains('rental') ||
+              text.contains('vios') ||
+              text.contains('civic') ||
+              text.contains('saga') ||
+              text.contains('alza') ||
+              text.contains('myvi') ||
+              text.contains('city'))) {
         confidence = 0.85;
         params['action'] = 'return_vehicle';
-      } else if (text.contains('status') && (text.contains('booking') || text.contains('reservation') || text.contains('my'))) {
+      } else if (text.contains('status') &&
+          (text.contains('booking') ||
+              text.contains('reservation') ||
+              text.contains('my'))) {
         confidence = 0.85;
         params['action'] = 'check_booking_status';
       } else if (text.contains('overdue')) {
@@ -191,7 +270,17 @@ class IntentEngine {
     double confidence = 0.0;
     final Map<String, dynamic> params = {};
 
-    final receiptKeywords = ['receipt', 'receipts', 'invoice', 'invoices', 'bill', 'bills', 'tax invoice', 'invoice statement', 'invoice statements'];
+    final receiptKeywords = [
+      'receipt',
+      'receipts',
+      'invoice',
+      'invoices',
+      'bill',
+      'bills',
+      'tax invoice',
+      'invoice statement',
+      'invoice statements',
+    ];
     bool hasReceiptKeyword = false;
     for (final kw in receiptKeywords) {
       if (text.contains(kw)) {
@@ -202,10 +291,13 @@ class IntentEngine {
 
     if (hasReceiptKeyword) {
       confidence = 0.80;
-      if (text.contains('invoice statement') || text.contains('invoice statements')) {
+      if (text.contains('invoice statement') ||
+          text.contains('invoice statements')) {
         confidence = 0.96;
         params['action'] = 'open_receipt';
-      } else if (text.contains('download') || text.contains('export') || text.contains('get')) {
+      } else if (text.contains('download') ||
+          text.contains('export') ||
+          text.contains('get')) {
         confidence = 0.95;
         params['action'] = 'download_receipt';
       } else {
@@ -222,7 +314,17 @@ class IntentEngine {
     double confidence = 0.0;
     final Map<String, dynamic> params = {};
 
-    final rewardKeywords = ['reward', 'rewards', 'point', 'points', 'loyalty', 'loyalty points', 'member level', 'membership', 'benefits'];
+    final rewardKeywords = [
+      'reward',
+      'rewards',
+      'point',
+      'points',
+      'loyalty',
+      'loyalty points',
+      'member level',
+      'membership',
+      'benefits',
+    ];
     int matches = 0;
     for (final kw in rewardKeywords) {
       if (text.contains(kw)) {
@@ -243,11 +345,20 @@ class IntentEngine {
     final Map<String, dynamic> params = {};
 
     // Lower profile confidence if it relates to customer lists (admin CustomerIntent)
-    if (text.contains('customer') || text.contains('client') || text.contains('user list')) {
+    if (text.contains('customer') ||
+        text.contains('client') ||
+        text.contains('user list')) {
       return const ProfileIntent(confidence: 0.0);
     }
 
-    final profileKeywords = ['profile', 'account', 'user info', 'my details', 'personal details', 'settings'];
+    final profileKeywords = [
+      'profile',
+      'account',
+      'user info',
+      'my details',
+      'personal details',
+      'settings',
+    ];
     for (final kw in profileKeywords) {
       if (text.contains(kw)) {
         confidence = 0.90;
@@ -263,7 +374,20 @@ class IntentEngine {
     double confidence = 0.0;
     final Map<String, dynamic> params = {};
 
-    final supportKeywords = ['support', 'help', 'contact', 'ticket', 'inbox', 'messages', 'talk to support', 'customer care', 'complaint', 'complaints', 'faq', 'faqs'];
+    final supportKeywords = [
+      'support',
+      'help',
+      'contact',
+      'ticket',
+      'inbox',
+      'messages',
+      'talk to support',
+      'customer care',
+      'complaint',
+      'complaints',
+      'faq',
+      'faqs',
+    ];
     bool hasKeyword = false;
     for (final kw in supportKeywords) {
       if (text.contains(kw)) {
@@ -274,7 +398,9 @@ class IntentEngine {
 
     if (hasKeyword) {
       confidence = 0.80;
-      if (text.contains('inbox') || text.contains('admin') || text.contains('all tickets')) {
+      if (text.contains('inbox') ||
+          text.contains('admin') ||
+          text.contains('all tickets')) {
         confidence = 0.95;
         params['action'] = 'admin_support_inbox';
       } else {
@@ -291,11 +417,31 @@ class IntentEngine {
     double confidence = 0.0;
     final Map<String, dynamic> params = {};
 
-    final branchKeywords = ['branch', 'branches', 'location', 'locations', 'hubs', 'where are you', 'map', 'rental hubs', 'office', 'offices', 'policy', 'policies', 'rules', 'rule', 'open rental'];
+    final branchKeywords = [
+      'branch',
+      'branches',
+      'location',
+      'locations',
+      'hubs',
+      'where are you',
+      'map',
+      'rental hubs',
+      'office',
+      'offices',
+      'policy',
+      'policies',
+      'rules',
+      'rule',
+      'open rental',
+    ];
     for (final kw in branchKeywords) {
       if (text.contains(kw)) {
         confidence = 0.90;
-        if (kw.contains('policy') || kw.contains('policies') || kw.contains('rules') || kw.contains('rule') || kw.contains('open rental')) {
+        if (kw.contains('policy') ||
+            kw.contains('policies') ||
+            kw.contains('rules') ||
+            kw.contains('rule') ||
+            kw.contains('open rental')) {
           params['action'] = 'explain_policy';
         }
         break;
@@ -310,7 +456,13 @@ class IntentEngine {
     double confidence = 0.0;
     final Map<String, dynamic> params = {};
 
-    final notificationKeywords = ['notification', 'notifications', 'alerts', 'alert', 'announcements'];
+    final notificationKeywords = [
+      'notification',
+      'notifications',
+      'alerts',
+      'alert',
+      'announcements',
+    ];
     for (final kw in notificationKeywords) {
       if (text.contains(kw)) {
         confidence = 0.90;
@@ -331,11 +483,20 @@ class IntentEngine {
     final Map<String, dynamic> params = {};
 
     // Lower general history confidence if it belongs to transaction/payment ledger history
-    if (text.contains('payment') || text.contains('ledger') || text.contains('transaction')) {
+    if (text.contains('payment') ||
+        text.contains('ledger') ||
+        text.contains('transaction')) {
       return const HistoryIntent(confidence: 0.0);
     }
 
-    final historyKeywords = ['history', 'past rentals', 'previous rentals', 'completed bookings', 'past bookings', 'history list'];
+    final historyKeywords = [
+      'history',
+      'past rentals',
+      'previous rentals',
+      'completed bookings',
+      'past bookings',
+      'history list',
+    ];
     for (final kw in historyKeywords) {
       if (text.contains(kw)) {
         confidence = 0.96;
@@ -351,7 +512,16 @@ class IntentEngine {
     double confidence = 0.0;
     final Map<String, dynamic> params = {};
 
-    final dashboardKeywords = ['dashboard', 'home', 'main screen', 'overview', 'panel', 'summary', 'system stats', 'statistics'];
+    final dashboardKeywords = [
+      'dashboard',
+      'home',
+      'main screen',
+      'overview',
+      'panel',
+      'summary',
+      'system stats',
+      'statistics',
+    ];
     for (final kw in dashboardKeywords) {
       if (text.contains(kw)) {
         confidence = 0.85;
@@ -373,7 +543,26 @@ class IntentEngine {
     double confidence = 0.0;
     final Map<String, dynamic> params = {};
 
-    final paymentKeywords = ['payment', 'payments', 'revenue', 'sales', 'ledger', 'pay', 'transaction', 'transactions', 'earnings', 'statement', 'owe', 'due', 'outstanding', 'how much do i', 'invoice', 'invoices', 'bill', 'bills'];
+    final paymentKeywords = [
+      'payment',
+      'payments',
+      'revenue',
+      'sales',
+      'ledger',
+      'pay',
+      'transaction',
+      'transactions',
+      'earnings',
+      'statement',
+      'owe',
+      'due',
+      'outstanding',
+      'how much do i',
+      'invoice',
+      'invoices',
+      'bill',
+      'bills',
+    ];
     bool hasKeyword = false;
     for (final kw in paymentKeywords) {
       if (text.contains(kw)) {
@@ -384,20 +573,36 @@ class IntentEngine {
 
     if (hasKeyword) {
       confidence = 0.70;
-      if (text.contains('owe') || text.contains('due') || text.contains('outstanding') || text.contains('how much') || text.contains('invoice') || text.contains('invoices') || text.contains('bill') || text.contains('bills')) {
+      if (text.contains('owe') ||
+          text.contains('due') ||
+          text.contains('outstanding') ||
+          text.contains('how much') ||
+          text.contains('invoice') ||
+          text.contains('invoices') ||
+          text.contains('bill') ||
+          text.contains('bills')) {
         confidence = 0.95;
-        if (text.contains('pay') || text.contains('clear') || text.contains('settle')) {
+        if (text.contains('pay') ||
+            text.contains('clear') ||
+            text.contains('settle')) {
           params['action'] = 'pay_outstanding_invoice';
         } else {
           params['action'] = 'check_debts';
         }
-      } else if (text.contains('pay') && (text.contains('booking') || text.contains('invoice') || text.contains('bill'))) {
+      } else if (text.contains('pay') &&
+          (text.contains('booking') ||
+              text.contains('invoice') ||
+              text.contains('bill'))) {
         confidence = 0.95;
         params['action'] = 'pay_outstanding_invoice';
-      } else if (text.contains('revenue') || text.contains('sales') || text.contains('earnings')) {
+      } else if (text.contains('revenue') ||
+          text.contains('sales') ||
+          text.contains('earnings')) {
         confidence = 0.95;
         params['action'] = 'admin_revenue_today';
-      } else if (text.contains('statistics') || text.contains('stats') || text.contains('summary')) {
+      } else if (text.contains('statistics') ||
+          text.contains('stats') ||
+          text.contains('summary')) {
         confidence = 0.95;
         params['action'] = 'admin_payment_stats';
       } else {
@@ -414,7 +619,17 @@ class IntentEngine {
     double confidence = 0.0;
     final Map<String, dynamic> params = {};
 
-    final maintenanceKeywords = ['maintenance', 'repair', 'repairs', 'service', 'servicing', 'mechanic', 'fix car', 'inspection', 'inspect'];
+    final maintenanceKeywords = [
+      'maintenance',
+      'repair',
+      'repairs',
+      'service',
+      'servicing',
+      'mechanic',
+      'fix car',
+      'inspection',
+      'inspect',
+    ];
     for (final kw in maintenanceKeywords) {
       if (text.contains(kw)) {
         confidence = 0.90;
@@ -423,7 +638,10 @@ class IntentEngine {
     }
 
     if (confidence > 0) {
-      if (text.contains('schedule') || text.contains('list') || text.contains('show') || text.contains('all')) {
+      if (text.contains('schedule') ||
+          text.contains('list') ||
+          text.contains('show') ||
+          text.contains('all')) {
         params['action'] = 'admin_maintenance_schedule';
       }
     }
@@ -437,7 +655,16 @@ class IntentEngine {
     final Map<String, dynamic> params = {};
 
     // Match reports, stats, analytics. Prevent 'stat' matching 'statement' or 'status'
-    final reportKeywords = ['report', 'reports', 'generate report', 'analytics', 'statistics', 'stats', 'charts', 'chart'];
+    final reportKeywords = [
+      'report',
+      'reports',
+      'generate report',
+      'analytics',
+      'statistics',
+      'stats',
+      'charts',
+      'chart',
+    ];
     for (final kw in reportKeywords) {
       if (text.contains(kw)) {
         confidence = 0.90;
@@ -484,9 +711,15 @@ class IntentEngine {
     String? type;
     if (text.contains('payment') || text.contains('payments')) {
       type = 'Payments';
-    } else if (text.contains('revenue') || text.contains('earnings') || text.contains('sales') || text.contains('income')) {
+    } else if (text.contains('revenue') ||
+        text.contains('earnings') ||
+        text.contains('sales') ||
+        text.contains('income')) {
       type = 'Revenue';
-    } else if (text.contains('booking') || text.contains('bookings') || text.contains('rentals') || text.contains('rental')) {
+    } else if (text.contains('booking') ||
+        text.contains('bookings') ||
+        text.contains('rentals') ||
+        text.contains('rental')) {
       if (text.contains('overdue')) {
         type = 'Overdue Rentals';
       } else if (text.contains('open')) {
@@ -494,15 +727,34 @@ class IntentEngine {
       } else {
         type = 'Bookings';
       }
-    } else if (text.contains('vehicle') || text.contains('vehicles') || text.contains('car') || text.contains('cars') || text.contains('fleet')) {
+    } else if (text.contains('vehicle') ||
+        text.contains('vehicles') ||
+        text.contains('car') ||
+        text.contains('cars') ||
+        text.contains('fleet')) {
       type = 'Vehicles';
-    } else if (text.contains('maintenance') || text.contains('repair') || text.contains('repairs') || text.contains('service')) {
+    } else if (text.contains('maintenance') ||
+        text.contains('repair') ||
+        text.contains('repairs') ||
+        text.contains('service')) {
       type = 'Maintenance';
-    } else if (text.contains('customer') || text.contains('customers') || text.contains('user') || text.contains('users') || text.contains('client') || text.contains('clients')) {
+    } else if (text.contains('customer') ||
+        text.contains('customers') ||
+        text.contains('user') ||
+        text.contains('users') ||
+        text.contains('client') ||
+        text.contains('clients')) {
       type = 'Customers';
-    } else if (text.contains('reward') || text.contains('rewards') || text.contains('point') || text.contains('points')) {
+    } else if (text.contains('reward') ||
+        text.contains('rewards') ||
+        text.contains('point') ||
+        text.contains('points')) {
       type = 'Reward Points';
-    } else if (text.contains('review') || text.contains('reviews') || text.contains('rating') || text.contains('ratings') || text.contains('feedback')) {
+    } else if (text.contains('review') ||
+        text.contains('reviews') ||
+        text.contains('rating') ||
+        text.contains('ratings') ||
+        text.contains('feedback')) {
       type = 'Reviews';
     } else if (text.contains('overdue')) {
       type = 'Overdue Rentals';
@@ -521,7 +773,17 @@ class IntentEngine {
     double confidence = 0.0;
     final Map<String, dynamic> params = {};
 
-    final customerKeywords = ['customer', 'customers', 'users', 'clients', 'customer list', 'client list', 'members', 'info', 'lookup'];
+    final customerKeywords = [
+      'customer',
+      'customers',
+      'users',
+      'clients',
+      'customer list',
+      'client list',
+      'members',
+      'info',
+      'lookup',
+    ];
     for (final kw in customerKeywords) {
       if (text.contains(kw)) {
         confidence = 0.90;
@@ -541,7 +803,16 @@ class IntentEngine {
     double confidence = 0.0;
     final Map<String, dynamic> params = {};
 
-    final navKeywords = ['tracking', 'track', 'gps', 'vehicle tracking', 'live location', 'where is the car', 'live tracking', 'car tracking'];
+    final navKeywords = [
+      'tracking',
+      'track',
+      'gps',
+      'vehicle tracking',
+      'live location',
+      'where is the car',
+      'live tracking',
+      'car tracking',
+    ];
     for (final kw in navKeywords) {
       if (text.contains(kw)) {
         confidence = 0.95;
