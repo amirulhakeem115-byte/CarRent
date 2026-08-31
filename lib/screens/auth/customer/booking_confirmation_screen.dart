@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'dart:ui' as ui;
 import '../../../constants/colors.dart';
 import '../../../models/booking_model.dart';
 import '../../../models/vehicle_model.dart';
@@ -9,6 +10,7 @@ import '../../../widgets/app_image.dart';
 import '../../../services/receipt_service.dart';
 import '../../../services/company_settings_provider.dart';
 import '../../../widgets/app_logo.dart';
+import '../../../l10n/app_translations.dart';
 
 class BookingConfirmationScreen extends StatelessWidget {
   final BookingModel booking;
@@ -97,7 +99,7 @@ class BookingConfirmationScreen extends StatelessWidget {
           onPressed: () => _goHome(context),
         ),
         title: Text(
-          'Booking Confirmation',
+          'Booking Confirmation'.tr(context),
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w900,
@@ -124,7 +126,7 @@ class BookingConfirmationScreen extends StatelessWidget {
                     const AnimatedCheckIcon(),
                     const SizedBox(height: 16),
                     Text(
-                      'Booking Successful!',
+                      'Booking Successful!'.tr(context),
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w900,
@@ -134,7 +136,7 @@ class BookingConfirmationScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Your vehicle reservation is confirmed and ready. Check My Bookings > Upcoming to monitor your rental status.',
+                      'Your vehicle reservation is confirmed and ready. Check My Bookings > Upcoming to monitor your rental status.'.tr(context),
                       style: TextStyle(
                         color: textSecondary,
                         fontSize: 14,
@@ -238,7 +240,7 @@ class BookingConfirmationScreen extends StatelessWidget {
                                         ),
                                         const SizedBox(width: 4),
                                         Text(
-                                          vehicle.color,
+                                          vehicle.color.tr(context),
                                           style: TextStyle(
                                             color: textSecondary,
                                             fontSize: 13,
@@ -251,10 +253,10 @@ class BookingConfirmationScreen extends StatelessWidget {
                                     const SizedBox(height: 16),
                                     _infoBlock(
                                       Icons.my_location,
-                                      'Pick Up & Return Hub',
+                                      'Pick Up & Return Hub'.tr(context),
                                       vehicle.branchName.isNotEmpty
-                                          ? vehicle.branchName
-                                          : 'HQ Central Branch',
+                                          ? vehicle.branchName.tr(context)
+                                          : 'HQ Central Branch'.tr(context),
                                       isDark,
                                     ),
                                   ],
@@ -264,7 +266,7 @@ class BookingConfirmationScreen extends StatelessWidget {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'RESERVATION DETAILS',
+                                      'RESERVATION DETAILS'.tr(context),
                                       style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.bold,
@@ -274,43 +276,47 @@ class BookingConfirmationScreen extends StatelessWidget {
                                     ),
                                     const SizedBox(height: 16),
                                     _detailRow(
-                                      'Booking Reference',
+                                      'Booking Reference'.tr(context),
                                       booking.id.toUpperCase(),
                                       isDark,
                                       isCode: true,
+                                      isLtr: true,
                                     ),
                                     _detailRow(
-                                      'Status',
-                                      booking.status,
+                                      'Status'.tr(context),
+                                      booking.status.tr(context),
                                       isDark,
                                       highlightValue: true,
                                     ),
                                     _detailRow(
-                                      'Check-in Date',
+                                      'Check-in Date'.tr(context),
                                       dateTimeFormat.format(booking.pickUpDate),
                                       isDark,
+                                      isLtr: true,
                                     ),
                                     _detailRow(
-                                      'Check-out Date',
+                                      'Check-out Date'.tr(context),
                                       booking.isOpenRental
-                                          ? 'Open Rental'
+                                          ? 'Open Rental'.tr(context)
                                           : (booking.returnDate != null
                                                 ? dateTimeFormat.format(
                                                     booking.returnDate!,
                                                   )
-                                                : ""),
+                                                : "Open Rental".tr(context)),
                                       isDark,
+                                      isLtr: !booking.isOpenRental,
                                     ),
                                     _detailRow(
-                                      'Rental Duration',
-                                      '$days Day${days == 1 ? '' : 's'}',
+                                      'Rental Duration'.tr(context),
+                                      '$days ${'Day'.tr(context)}',
                                       isDark,
+                                      isLtr: true,
                                     ),
                                     const SizedBox(height: 16),
                                     const Divider(color: Colors.white10),
                                     const SizedBox(height: 16),
                                     Text(
-                                      'PAYMENT SUMMARY',
+                                      'PAYMENT SUMMARY'.tr(context),
                                       style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.bold,
@@ -320,35 +326,39 @@ class BookingConfirmationScreen extends StatelessWidget {
                                     ),
                                     const SizedBox(height: 16),
                                     _detailRow(
-                                      'Payment Method',
-                                      paymentMethod,
+                                      'Payment Method'.tr(context),
+                                      paymentMethod.tr(context),
                                       isDark,
                                     ),
                                     if (booking.promotionDiscountAmount > 0)
                                       _detailRow(
-                                        'Promotion (${booking.promotionCode ?? booking.promotionName ?? "Applied"})',
+                                        '${'Promotion'.tr(context)} (${booking.promotionCode ?? booking.promotionName ?? "Applied"})',
                                         '- RM ${booking.promotionDiscountAmount.toStringAsFixed(2)}',
                                         isDark,
                                         highlightValue: true,
+                                        isLtr: true,
                                       ),
                                     _detailRow(
-                                      'Points Redeemed',
-                                      '${booking.pointsRedeemed} Points',
+                                      'Points Redeemed'.tr(context),
+                                      '${booking.pointsRedeemed} ${'Points'.tr(context)}',
                                       isDark,
                                       isPoints: booking.pointsRedeemed > 0,
+                                      isLtr: true,
                                     ),
                                     _detailRow(
-                                      'Total Rent Price',
+                                      'Total Rent Price'.tr(context),
                                       'RM ${booking.totalPrice.toStringAsFixed(2)}',
                                       isDark,
                                       isPrice: true,
+                                      isLtr: true,
                                     ),
                                     if (booking.depositAmount > 0)
                                       _detailRow(
-                                        'Deposit Paid',
+                                        'Deposit Paid'.tr(context),
                                         'RM ${booking.depositAmount.toStringAsFixed(2)}',
                                         isDark,
                                         highlightValue: true,
+                                        isLtr: true,
                                       ),
                                   ],
                                 );
@@ -407,19 +417,19 @@ class BookingConfirmationScreen extends StatelessWidget {
                                       height: 1.4,
                                     ),
                                     children: [
-                                      const TextSpan(
-                                        text: 'Congratulations! You earned ',
+                                      TextSpan(
+                                        text: 'Congratulations! You earned '.tr(context),
                                       ),
                                       TextSpan(
-                                        text: '$pointsEarned loyalty points',
+                                        text: '$pointsEarned${' loyalty points'.tr(context)}',
                                         style: const TextStyle(
                                           fontWeight: FontWeight.bold,
                                           color: Colors.green,
                                         ),
                                       ),
-                                      const TextSpan(
+                                      TextSpan(
                                         text:
-                                            ' from this reservation transaction.',
+                                            ' from this reservation transaction.'.tr(context),
                                       ),
                                     ],
                                   ),
@@ -467,9 +477,9 @@ class BookingConfirmationScreen extends StatelessWidget {
                                         Icons.receipt_long_outlined,
                                         size: 18,
                                       ),
-                                      label: const Text(
-                                        'Digital Invoice',
-                                        style: TextStyle(
+                                      label: Text(
+                                        'Digital Invoice'.tr(context),
+                                        style: const TextStyle(
                                           fontWeight: FontWeight.bold,
                                           fontSize: 13,
                                         ),
@@ -505,9 +515,9 @@ class BookingConfirmationScreen extends StatelessWidget {
                           ),
                           onPressed: () => _goToMyBookings(context),
                           icon: const Icon(Icons.calendar_month_outlined),
-                          label: const Text(
-                            'View your bookings here',
-                            style: TextStyle(
+                          label: Text(
+                            'View your bookings here'.tr(context),
+                            style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 13,
                             ),
@@ -577,6 +587,7 @@ class BookingConfirmationScreen extends StatelessWidget {
     bool isPrice = false,
     bool isPoints = false,
     bool highlightValue = false,
+    bool isLtr = false,
   }) {
     TextStyle valueStyle = TextStyle(
       fontWeight: FontWeight.w700,
@@ -613,6 +624,13 @@ class BookingConfirmationScreen extends StatelessWidget {
       );
     }
 
+    final Widget textWidget = Text(
+      value,
+      style: valueStyle,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: Row(
@@ -630,12 +648,12 @@ class BookingConfirmationScreen extends StatelessWidget {
           Expanded(
             child: Align(
               alignment: Alignment.centerRight,
-              child: Text(
-                value,
-                style: valueStyle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+              child: isLtr
+                  ? Directionality(
+                      textDirection: ui.TextDirection.ltr,
+                      child: textWidget,
+                    )
+                  : textWidget,
             ),
           ),
         ],

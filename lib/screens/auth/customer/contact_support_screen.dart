@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
@@ -6,6 +7,8 @@ import '../../../constants/colors.dart';
 import '../../../services/database_service.dart';
 import '../../../services/company_settings_provider.dart';
 import '../../../services/payment_restriction_service.dart';
+import '../../../l10n/app_translations.dart';
+import '../../../utils/url_launcher_helper.dart';
 
 class ContactSupportScreen extends StatefulWidget {
   const ContactSupportScreen({super.key});
@@ -53,9 +56,9 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'Support ticket created successfully! Our support team will get in touch with you shortly.',
+              'Support ticket created successfully! Our support team will get in touch with you shortly.'.tr(context),
             ),
             backgroundColor: Colors.green,
           ),
@@ -69,7 +72,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to create ticket: ${e.toString()}'),
+            content: Text('${'Failed to create ticket:'.tr(context)} ${e.toString()}'),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -91,6 +94,14 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
     final String email = companySettings.companyEmail;
     final String address = companySettings.companyAddress;
     final String hours = companySettings.businessHours;
+    final socialLinks = companySettings.socialMediaLinks;
+
+    // Retrieve WhatsApp contact number from social links or support info
+    final String rawWa = (socialLinks['whatsapp'] ??
+            companySettings.supportContactInfo['whatsapp'] ??
+            phone)
+        .toString();
+    final String whatsappNumber = rawWa.isEmpty ? phone : rawWa;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -102,11 +113,11 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
           children: [
             // Hero Header
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
               child: Column(
                 children: [
                   Text(
-                    'Contact Support',
+                    'Contact Support'.tr(context),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 32,
@@ -117,7 +128,8 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Our team is here to help you get back on the road. Reach out via any of the channels below and we\'ll assist you immediately.',
+                    'Our team is here to help you get back on the road. Reach out via any of the channels below and we\'ll assist you immediately.'
+                        .tr(context),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 15,
@@ -130,7 +142,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
             ),
             const SizedBox(height: 28),
 
-            // Two contact cards (Phone + Email) — centered
+            // Three Interactive Contact Cards (WhatsApp + Phone + Email)
             Padding(
               padding: EdgeInsets.symmetric(
                 horizontal: isDesktop ? 60.0 : 20.0,
@@ -142,23 +154,36 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                   runSpacing: 24,
                   children: [
                     _buildContactCard(
-                      icon: Icons.phone_in_talk_outlined,
-                      title: 'Phone',
+                      icon: Icons.chat_bubble_rounded,
+                      title: 'WhatsApp'.tr(context),
                       description:
-                          'Available 24/7 for urgent rental assistance.',
+                          'Chat live with our support team instantly on WhatsApp.'.tr(context),
+                      actionText: whatsappNumber,
+                      brandColor: const Color(0xFF25D366),
+                      onTap: () => UrlLauncherHelper.openWhatsApp(whatsappNumber),
+                    ),
+                    _buildContactCard(
+                      icon: Icons.phone_in_talk_outlined,
+                      title: 'Phone'.tr(context),
+                      description:
+                          'Available 24/7 for urgent rental assistance.'.tr(context),
                       actionText: phone,
+                      brandColor: AppColors.primaryOrange,
+                      onTap: () => UrlLauncherHelper.openPhoneCall(phone),
                     ),
                     _buildContactCard(
                       icon: Icons.email_outlined,
-                      title: 'Email',
-                      description: 'Get a response within 2 business hours.',
+                      title: 'Email'.tr(context),
+                      description: 'Get a response within 2 business hours.'.tr(context),
                       actionText: email,
+                      brandColor: Colors.blue,
+                      onTap: () => UrlLauncherHelper.openEmail(email),
                     ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 60),
+            const SizedBox(height: 50),
 
             // Send Us a Message form
             Padding(
@@ -185,7 +210,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        'Send Us a Message',
+                        'Send Us a Message'.tr(context),
                         style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
@@ -194,7 +219,8 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Have a question or feedback? Drop us a line and we\'ll get back to you as soon as possible.',
+                        'Have a question or feedback? Drop us a line and we\'ll get back to you as soon as possible.'
+                            .tr(context),
                         style: TextStyle(color: _subColor, fontSize: 14),
                       ),
                       const SizedBox(height: 24),
@@ -202,9 +228,9 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                         controller: _nameController,
                         style: TextStyle(color: _textColor),
                         decoration: InputDecoration(
-                          labelText: 'Full Name',
+                          labelText: 'Full Name'.tr(context),
                           labelStyle: TextStyle(color: _subColor),
-                          hintText: 'Enter your name',
+                          hintText: 'Enter your name'.tr(context),
                           hintStyle: TextStyle(
                             color: _isDark ? Colors.white30 : Colors.grey,
                           ),
@@ -217,7 +243,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                           ),
                         ),
                         validator: (val) => val == null || val.trim().isEmpty
-                            ? 'Name is required'
+                            ? 'Name is required'.tr(context)
                             : null,
                       ),
                       const SizedBox(height: 16),
@@ -225,9 +251,9 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                         controller: _emailController,
                         style: TextStyle(color: _textColor),
                         decoration: InputDecoration(
-                          labelText: 'Email Address',
+                          labelText: 'Email Address'.tr(context),
                           labelStyle: TextStyle(color: _subColor),
-                          hintText: 'Enter your email',
+                          hintText: 'Enter your email'.tr(context),
                           hintStyle: TextStyle(
                             color: _isDark ? Colors.white30 : Colors.grey,
                           ),
@@ -241,10 +267,10 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                         ),
                         validator: (val) {
                           if (val == null || val.trim().isEmpty) {
-                            return 'Email is required';
+                            return 'Email is required'.tr(context);
                           }
                           if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val)) {
-                            return 'Enter a valid email';
+                            return 'Enter a valid email'.tr(context);
                           }
                           return null;
                         },
@@ -254,9 +280,9 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                         controller: _subjectController,
                         style: TextStyle(color: _textColor),
                         decoration: InputDecoration(
-                          labelText: 'Subject',
+                          labelText: 'Subject'.tr(context),
                           labelStyle: TextStyle(color: _subColor),
-                          hintText: 'What is this regarding?',
+                          hintText: 'What is this regarding?'.tr(context),
                           hintStyle: TextStyle(
                             color: _isDark ? Colors.white30 : Colors.grey,
                           ),
@@ -269,7 +295,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                           ),
                         ),
                         validator: (val) => val == null || val.trim().isEmpty
-                            ? 'Subject is required'
+                            ? 'Subject is required'.tr(context)
                             : null,
                       ),
                       const SizedBox(height: 16),
@@ -278,9 +304,9 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                         maxLines: 4,
                         style: TextStyle(color: _textColor),
                         decoration: InputDecoration(
-                          labelText: 'Message',
+                          labelText: 'Message'.tr(context),
                           labelStyle: TextStyle(color: _subColor),
-                          hintText: 'How can we help you?',
+                          hintText: 'How can we help you?'.tr(context),
                           hintStyle: TextStyle(
                             color: _isDark ? Colors.white30 : Colors.grey,
                           ),
@@ -293,7 +319,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                           ),
                         ),
                         validator: (val) => val == null || val.trim().isEmpty
-                            ? 'Message cannot be empty'
+                            ? 'Message cannot be empty'.tr(context)
                             : null,
                       ),
                       const SizedBox(height: 24),
@@ -317,9 +343,9 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                                     strokeWidth: 2,
                                   ),
                                 )
-                              : const Text(
-                                  'SEND MESSAGE',
-                                  style: TextStyle(
+                              : Text(
+                                  'SEND MESSAGE'.tr(context),
+                                  style: const TextStyle(
                                     fontWeight: FontWeight.w900,
                                     letterSpacing: 1,
                                   ),
@@ -331,7 +357,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 60),
+            const SizedBox(height: 50),
 
             // My Support Tickets
             Padding(
@@ -340,7 +366,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
               ),
               child: _buildMyTicketsSection(),
             ),
-            const SizedBox(height: 60),
+            const SizedBox(height: 50),
 
             // Headquarters block — live from Firebase
             Padding(
@@ -374,7 +400,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Headquarters',
+                                'Headquarters'.tr(context),
                                 style: TextStyle(
                                   fontSize: 22,
                                   fontWeight: FontWeight.bold,
@@ -392,12 +418,15 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                                   ),
                                   const SizedBox(width: 16),
                                   Expanded(
-                                    child: Text(
-                                      address,
-                                      style: TextStyle(
-                                        color: _subColor,
-                                        height: 1.5,
-                                        fontSize: 14,
+                                    child: Directionality(
+                                      textDirection: ui.TextDirection.ltr,
+                                      child: Text(
+                                        address,
+                                        style: TextStyle(
+                                          color: _subColor,
+                                          height: 1.5,
+                                          fontSize: 14,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -413,11 +442,14 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                                   ),
                                   const SizedBox(width: 16),
                                   Expanded(
-                                    child: Text(
-                                      hours,
-                                      style: TextStyle(
-                                        color: _subColor,
-                                        fontSize: 14,
+                                    child: Directionality(
+                                      textDirection: ui.TextDirection.ltr,
+                                      child: Text(
+                                        hours,
+                                        style: TextStyle(
+                                          color: _subColor,
+                                          fontSize: 14,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -478,7 +510,120 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 80),
+            const SizedBox(height: 50),
+
+            // Bottom WhatsApp Action Card
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: isDesktop ? 60.0 : 20.0,
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF25D366), Color(0xFF128C7E)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black12,
+                      blurRadius: 12,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Flex(
+                  direction: isDesktop ? Axis.horizontal : Axis.vertical,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircleAvatar(
+                          radius: 28,
+                          backgroundColor: Colors.white.withValues(alpha: 0.2),
+                          child: const Icon(
+                            Icons.chat_rounded,
+                            color: Colors.white,
+                            size: 30,
+                          ),
+                        ),
+                        const SizedBox(width: 20),
+                      ],
+                    ),
+                    Expanded(
+                      flex: isDesktop ? 1 : 0,
+                      child: Column(
+                        crossAxisAlignment: isDesktop
+                            ? CrossAxisAlignment.start
+                            : CrossAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Direct WhatsApp Support'.tr(context),
+                            textAlign:
+                                isDesktop ? TextAlign.start : TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 18,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Chat with our team directly on WhatsApp for instant assistance.'
+                                .tr(context),
+                            textAlign:
+                                isDesktop ? TextAlign.start : TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (!isDesktop) const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: const Color(0xFF128C7E),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 14,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 2,
+                      ),
+                      icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                      label: Text(
+                        'CHAT NOW'.tr(context),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 13,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      onPressed: () {
+                        UrlLauncherHelper.openWhatsApp(whatsappNumber);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 50),
+
+            // Social Media Channels Section — placed down at the bottom of the page
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: isDesktop ? 60.0 : 20.0,
+              ),
+              child: _buildSocialMediaSection(socialLinks),
+            ),
+            const SizedBox(height: 50),
 
             // Footer
             _buildFooter(isDesktop),
@@ -493,46 +638,192 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
     required String title,
     required String description,
     required String actionText,
+    Color brandColor = AppColors.primaryOrange,
+    VoidCallback? onTap,
   }) {
     return Container(
       width: 280,
-      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: brandColor.withValues(alpha: 0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              CircleAvatar(
+                radius: 28,
+                backgroundColor: brandColor.withValues(alpha: 0.12),
+                child: Icon(icon, color: brandColor, size: 28),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                title,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: _textColor,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                description,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: _subColor, fontSize: 13, height: 1.4),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: brandColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.open_in_new_rounded, size: 14, color: brandColor),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Directionality(
+                        textDirection: ui.TextDirection.ltr,
+                        child: Text(
+                          actionText,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: brandColor,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 13,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSocialMediaSection(Map<String, dynamic> socialLinks) {
+    final channels = [
+      {
+        'key': 'whatsapp',
+        'label': 'WhatsApp'.tr(context),
+        'icon': Icons.chat_rounded,
+        'color': const Color(0xFF25D366),
+        'url': (socialLinks['whatsapp'] ?? '').toString(),
+        'isWhatsApp': true,
+      },
+      {
+        'key': 'facebook',
+        'label': 'Facebook'.tr(context),
+        'icon': Icons.facebook_rounded,
+        'color': const Color(0xFF1877F2),
+        'url': (socialLinks['facebook'] ?? '').toString(),
+        'isWhatsApp': false,
+      },
+      {
+        'key': 'instagram',
+        'label': 'Instagram'.tr(context),
+        'icon': Icons.camera_alt_outlined,
+        'color': const Color(0xFFE4405F),
+        'url': (socialLinks['instagram'] ?? '').toString(),
+        'isWhatsApp': false,
+      },
+      {
+        'key': 'twitter',
+        'label': 'Twitter'.tr(context),
+        'icon': Icons.alternate_email_rounded,
+        'color': const Color(0xFF1DA1F2),
+        'url': (socialLinks['twitter'] ?? '').toString(),
+        'isWhatsApp': false,
+      },
+      {
+        'key': 'linkedin',
+        'label': 'LinkedIn'.tr(context),
+        'icon': Icons.work_outline_rounded,
+        'color': const Color(0xFF0A66C2),
+        'url': (socialLinks['linkedin'] ?? '').toString(),
+        'isWhatsApp': false,
+      },
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _borderColor),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: AppColors.primaryOrange.withValues(alpha: 0.1),
-            child: Icon(icon, color: AppColors.primaryOrange, size: 28),
+          Row(
+            children: [
+              const Icon(Icons.share_rounded, color: AppColors.primaryOrange, size: 24),
+              const SizedBox(width: 12),
+              Text(
+                'Social Media Channels'.tr(context),
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: _textColor,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 6),
           Text(
-            title,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-              color: _textColor,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            description,
-            textAlign: TextAlign.center,
-            style: TextStyle(color: _subColor, fontSize: 13, height: 1.4),
+            'Connect with us on our official social media accounts.'.tr(context),
+            style: TextStyle(color: _subColor, fontSize: 13),
           ),
           const SizedBox(height: 20),
-          Text(
-            actionText,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: AppColors.primaryOrange,
-              fontWeight: FontWeight.w900,
-              fontSize: 15,
-            ),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: channels.map((c) {
+              final String url = (c['url'] as String).trim();
+              if (url.isEmpty) return const SizedBox.shrink();
+              final Color brandColor = c['color'] as Color;
+              final bool isWa = c['isWhatsApp'] as bool;
+
+              return ActionChip(
+                elevation: 1,
+                backgroundColor: brandColor.withValues(alpha: 0.1),
+                side: BorderSide(color: brandColor.withValues(alpha: 0.3)),
+                avatar: Icon(c['icon'] as IconData, size: 18, color: brandColor),
+                label: Text(
+                  c['label'] as String,
+                  style: TextStyle(
+                    color: brandColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+                onPressed: () {
+                  if (isWa) {
+                    UrlLauncherHelper.openWhatsApp(url);
+                  } else {
+                    UrlLauncherHelper.launchURL(url);
+                  }
+                },
+              );
+            }).toList(),
           ),
         ],
       ),
@@ -560,7 +851,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
               padding: const EdgeInsets.all(12.0),
               child: Text(
                 isPermission
-                    ? 'Support tickets access is currently denied by backend rules. Please retry after session refresh.'
+                    ? 'Support tickets access is currently denied by backend rules. Please retry after session refresh.'.tr(context)
                     : 'Error loading tickets: $raw',
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.red),
@@ -573,7 +864,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'My Support Tickets',
+              'My Support Tickets'.tr(context),
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
@@ -582,7 +873,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Track and reply to your conversation with our customer care agents.',
+              'Track and reply to your conversation with our customer care agents.'.tr(context),
               style: TextStyle(fontSize: 13, color: _subColor),
             ),
             const SizedBox(height: 16),
@@ -596,7 +887,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                     ),
                     child: Center(
                       child: Text(
-                        'You have not submitted any support tickets yet.',
+                        'You have not submitted any support tickets yet.'.tr(context),
                         style: TextStyle(color: _subColor, fontSize: 13),
                       ),
                     ),
@@ -672,11 +963,14 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                                         ),
                                       ),
                                       const SizedBox(height: 4),
-                                      Text(
-                                        'Last Active: $fTime',
-                                        style: TextStyle(
-                                          color: _subColor,
-                                          fontSize: 11,
+                                      Directionality(
+                                        textDirection: ui.TextDirection.ltr,
+                                        child: Text(
+                                          '${'Last Active:'.tr(context)} $fTime',
+                                          style: TextStyle(
+                                            color: _subColor,
+                                            fontSize: 11,
+                                          ),
                                         ),
                                       ),
                                     ],
@@ -693,7 +987,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
-                                    status.toUpperCase(),
+                                    status.toUpperCase().tr(context),
                                     style: TextStyle(
                                       color: statusColor,
                                       fontSize: 9,
@@ -796,7 +1090,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      status.toUpperCase(),
+                      status.toUpperCase().tr(context),
                       style: TextStyle(
                         color: statusColor,
                         fontSize: 9,
@@ -815,9 +1109,12 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Ticket ID: #${id.toUpperCase()}',
-                  style: TextStyle(fontSize: 10, color: _subColor),
+                Directionality(
+                  textDirection: ui.TextDirection.ltr,
+                  child: Text(
+                    'Ticket ID: #${id.toUpperCase()}',
+                    style: TextStyle(fontSize: 10, color: _subColor),
+                  ),
                 ),
                 if (isLegacyTicket) ...[
                   const SizedBox(height: 8),
@@ -838,7 +1135,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'This support ticket was created using an older version of the system.',
+                            'This support ticket was created using an older version of the system.'.tr(context),
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
@@ -855,7 +1152,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Conversation History',
+                      'Conversation History'.tr(context),
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
@@ -874,7 +1171,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          'Live Real-time Sync',
+                          'Live Real-time Sync'.tr(context),
                           style: TextStyle(
                             fontSize: 10,
                             color: Colors.green.shade700,
@@ -915,7 +1212,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                       if (messages.isEmpty) {
                         return Center(
                           child: Text(
-                            'No messages in this ticket yet.',
+                            'No messages in this ticket yet.'.tr(context),
                             style: TextStyle(color: _subColor, fontSize: 11),
                           ),
                         );
@@ -929,9 +1226,9 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                           final bool isAdmin = r['senderRole'] == 'admin';
                           final String senderName =
                               r['senderName'] ??
-                              (isAdmin ? 'Support Admin' : 'You');
+                              (isAdmin ? 'Support Admin'.tr(context) : 'You'.tr(context));
                           final String senderRole =
-                              (r['senderRole'] ?? 'customer').toUpperCase();
+                              (r['senderRole'] ?? 'customer').toUpperCase().tr(context);
                           final String rTime = r['timestamp'] ?? '';
                           String fRTime = '';
                           if (rTime.isNotEmpty) {
@@ -1042,13 +1339,16 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                                   ),
                                   if (fRTime.isNotEmpty) ...[
                                     const SizedBox(height: 4),
-                                    Text(
-                                      fRTime,
-                                      style: TextStyle(
-                                        color: isAdmin
-                                            ? _subColor
-                                            : Colors.white70,
-                                        fontSize: 9,
+                                    Directionality(
+                                      textDirection: ui.TextDirection.ltr,
+                                      child: Text(
+                                        fRTime,
+                                        style: TextStyle(
+                                          color: isAdmin
+                                              ? _subColor
+                                              : Colors.white70,
+                                          fontSize: 9,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -1069,7 +1369,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                         controller: replyController,
                         style: TextStyle(color: _textColor, fontSize: 13),
                         decoration: InputDecoration(
-                          hintText: 'Type your reply message...',
+                          hintText: 'Type your reply message...'.tr(context),
                           hintStyle: TextStyle(
                             color: _isDark ? Colors.white30 : Colors.grey,
                             fontSize: 13,
@@ -1085,8 +1385,9 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                         onSubmitted: (val) async {
                           if (PaymentRestrictionService().checkRestriction(
                             context,
-                          ))
+                          )) {
                             return;
+                          }
                           final text = val.trim();
                           if (text.isEmpty) return;
                           replyController.clear();
@@ -1112,8 +1413,9 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                       onPressed: () async {
                         if (PaymentRestrictionService().checkRestriction(
                           context,
-                        ))
+                        )) {
                           return;
+                        }
                         final text = replyController.text.trim();
                         if (text.isEmpty) return;
                         replyController.clear();
@@ -1142,7 +1444,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                 Navigator.pop(context);
               },
               child: Text(
-                'Close',
+                'Close'.tr(context),
                 style: TextStyle(
                   color: _isDark ? const Color(0xFF94A3B8) : Colors.grey,
                   fontWeight: FontWeight.bold,
@@ -1184,9 +1486,12 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    '© 2026 ${CompanySettingsProvider().companyName.toUpperCase()}. ALL RIGHTS RESERVED.',
-                    style: TextStyle(color: _subColor, fontSize: 11),
+                  Directionality(
+                    textDirection: ui.TextDirection.ltr,
+                    child: Text(
+                      '© 2026 ${CompanySettingsProvider().companyName.toUpperCase()}. ALL RIGHTS RESERVED.',
+                      style: TextStyle(color: _subColor, fontSize: 11),
+                    ),
                   ),
                 ],
               ),
@@ -1195,13 +1500,13 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                   ? Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _buildFooterLink('Privacy Policy'),
+                        _buildFooterLink('Privacy Policy'.tr(context)),
                         const SizedBox(width: 16),
-                        _buildFooterLink('Terms of Service'),
+                        _buildFooterLink('Terms of Service'.tr(context)),
                         const SizedBox(width: 16),
-                        _buildFooterLink('Fleet Management'),
+                        _buildFooterLink('Fleet Management'.tr(context)),
                         const SizedBox(width: 16),
-                        _buildFooterLink('Contact Us'),
+                        _buildFooterLink('Contact Us'.tr(context)),
                       ],
                     )
                   : Wrap(
@@ -1209,10 +1514,10 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                       spacing: 16,
                       runSpacing: 8,
                       children: [
-                        _buildFooterLink('Privacy Policy'),
-                        _buildFooterLink('Terms of Service'),
-                        _buildFooterLink('Fleet Management'),
-                        _buildFooterLink('Contact Us'),
+                        _buildFooterLink('Privacy Policy'.tr(context)),
+                        _buildFooterLink('Terms of Service'.tr(context)),
+                        _buildFooterLink('Fleet Management'.tr(context)),
+                        _buildFooterLink('Contact Us'.tr(context)),
                       ],
                     ),
             ],

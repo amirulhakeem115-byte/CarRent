@@ -2,6 +2,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../constants/colors.dart';
+import '../../l10n/app_translations.dart';
 import '../../services/auth_service.dart';
 import '../../services/database_service.dart';
 import '../../services/company_settings_provider.dart';
@@ -182,7 +183,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (userModel == null) {
         setState(() {
-          _error = 'User profile not found. Please contact support.';
+          _error = 'User profile not found. Please contact support.'.tr(context);
           _loading = false;
         });
         return;
@@ -192,7 +193,7 @@ class _LoginScreenState extends State<LoginScreen> {
           (userModel.toMap()['accountStatus'] ?? 'Active').toString().trim();
       if (accountStatus.toLowerCase() == 'suspended') {
         setState(() {
-          _error = 'Your account has been suspended. Please contact support.';
+          _error = 'Your account has been suspended. Please contact support.'.tr(context);
           _loading = false;
         });
         await _authService.logout();
@@ -202,7 +203,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!userModel.isActive && accountStatus.toLowerCase() != 'disabled') {
         setState(() {
           _error =
-              'Your account has been disabled or suspended. Please contact support.';
+              'Your account has been disabled or suspended. Please contact support.'.tr(context);
           _loading = false;
         });
         await _authService.logout();
@@ -211,9 +212,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (accountStatus.toLowerCase() == 'disabled') {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'Your account is disabled. Some features are currently unavailable.',
+              'Your account is disabled. Some features are currently unavailable.'.tr(context),
             ),
             backgroundColor: Colors.orange,
           ),
@@ -248,7 +249,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Welcome back, ${userModel.fullName}!'),
+          content: Text('${"Welcome back, ".tr(context)}${userModel.fullName}!'),
           backgroundColor: AppColors.primaryOrange,
         ),
       );
@@ -308,7 +309,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (userModel == null) {
         setState(() {
-          _error = 'Failed to load user profile. Please contact support.';
+          _error = 'Failed to load user profile. Please contact support.'.tr(context);
           _googleLoading = false;
         });
         return;
@@ -318,7 +319,7 @@ class _LoginScreenState extends State<LoginScreen> {
           (userModel.toMap()['accountStatus'] ?? 'Active').toString().trim();
       if (accountStatus.toLowerCase() == 'suspended') {
         setState(() {
-          _error = 'Your account has been suspended. Please contact support.';
+          _error = 'Your account has been suspended. Please contact support.'.tr(context);
           _googleLoading = false;
         });
         await _authService.logout();
@@ -328,7 +329,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!userModel.isActive && accountStatus.toLowerCase() != 'disabled') {
         setState(() {
           _error =
-              'Your account has been disabled or suspended. Please contact support.';
+              'Your account has been disabled or suspended. Please contact support.'.tr(context);
           _googleLoading = false;
         });
         await _authService.logout();
@@ -337,9 +338,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (accountStatus.toLowerCase() == 'disabled') {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'Your account is disabled. Some features are currently unavailable.',
+              'Your account is disabled. Some features are currently unavailable.'.tr(context),
             ),
             backgroundColor: Colors.orange,
           ),
@@ -353,7 +354,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Welcome back, ${userModel.fullName}!'),
+          content: Text('${"Welcome back, ".tr(context)}${userModel.fullName}!'),
           backgroundColor: AppColors.primaryOrange,
         ),
       );
@@ -435,7 +436,7 @@ class _LoginScreenState extends State<LoginScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Welcome Back!',
+            'Welcome Back!'.tr(context),
             textAlign: isDesktop ? TextAlign.left : TextAlign.center,
             style: TextStyle(
               fontSize: 28,
@@ -445,7 +446,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Sign in to continue to your account',
+            'Sign in to continue to your account'.tr(context),
             textAlign: isDesktop ? TextAlign.left : TextAlign.center,
             style: TextStyle(
               fontSize: 14,
@@ -457,7 +458,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
           // Email label and field
           Text(
-            '   Email Address',
+            '   ${"Email Address".tr(context)}',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
@@ -470,7 +471,7 @@ class _LoginScreenState extends State<LoginScreen> {
               CustomTextField(
                 controller: _emailController,
                 labelText: '',
-                hintText: 'Enter your email',
+                hintText: 'Enter your email'.tr(context),
                 prefixIcon: Icons.email_outlined,
                 focusNode: _emailFocusNode,
                 keyboardType: TextInputType.emailAddress,
@@ -487,10 +488,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 },
                 validator: (val) {
                   if (val == null || val.trim().isEmpty) {
-                    return 'Email is required';
+                    return 'Email is required'.tr(context);
                   }
                   if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val)) {
-                    return 'Enter a valid email';
+                    return 'Enter a valid email'.tr(context);
                   }
                   return null;
                 },
@@ -526,7 +527,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Row(
                           children: [
                             Text(
-                              'Recent accounts',
+                              'Recent accounts'.tr(context),
                               style: TextStyle(
                                 color: isDark
                                     ? Colors.white54
@@ -543,9 +544,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                 padding: EdgeInsets.zero,
                                 minimumSize: const Size(40, 30),
                               ),
-                              child: const Text(
-                                'Close',
-                                style: TextStyle(
+                              child: Text(
+                                'Close'.tr(context),
+                                style: const TextStyle(
                                   color: AppColors.primaryOrange,
                                   fontSize: 12,
                                 ),
@@ -562,7 +563,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             vertical: 18,
                           ),
                           child: Text(
-                            'No saved accounts',
+                            'No saved accounts'.tr(context),
                             style: TextStyle(
                               fontSize: 13,
                               color: isDark ? Colors.white54 : Colors.grey[600],
@@ -606,7 +607,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       ? Colors.white38
                                       : Colors.grey[400],
                                 ),
-                                tooltip: 'Remove account',
+                                tooltip: 'Remove account'.tr(context),
                                 splashRadius: 18,
                                 constraints: const BoxConstraints(
                                   minWidth: 36,
@@ -622,7 +623,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           vertical: 8,
                         ),
                         child: Text(
-                          'Long press email to remove',
+                          'Long press email to remove'.tr(context),
                           style: TextStyle(
                             fontSize: 11,
                             color: isDark ? Colors.white38 : Colors.grey[400],
@@ -640,9 +641,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             size: 18,
                             color: isDark ? Colors.white54 : Colors.grey[500],
                           ),
-                          title: const Text(
-                            'Clear remembered accounts',
-                            style: TextStyle(
+                          title: Text(
+                            'Clear remembered accounts'.tr(context),
+                            style: const TextStyle(
                               color: AppColors.primaryOrange,
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
@@ -664,7 +665,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
           // Password label and field
           Text(
-            '   Password',
+            '   ${"Password".tr(context)}',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
@@ -675,7 +676,7 @@ class _LoginScreenState extends State<LoginScreen> {
           CustomTextField(
             controller: _passwordController,
             labelText: '',
-            hintText: 'Enter your password',
+            hintText: 'Enter your password'.tr(context),
             obscureText: _obscurePassword,
             prefixIcon: Icons.lock_outline,
             suffixIcon: IconButton(
@@ -695,7 +696,7 @@ class _LoginScreenState extends State<LoginScreen> {
               });
             },
             validator: (val) {
-              if (val == null || val.isEmpty) return 'Password is required';
+              if (val == null || val.isEmpty) return 'Password is required'.tr(context);
               return null;
             },
           ),
@@ -726,7 +727,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   Flexible(
                     child: Text(
-                      'Remember Me',
+                      'Remember Me'.tr(context),
                       style: TextStyle(
                         color: isDark
                             ? Colors.white70
@@ -748,9 +749,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   );
                 },
-                child: const Text(
-                  'Forgot Password?',
-                  style: TextStyle(
+                child: Text(
+                  'Forgot Password?'.tr(context),
+                  style: const TextStyle(
                     color: AppColors.primaryOrange,
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
@@ -788,7 +789,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               child: Text(
-                _error!,
+                _error!.tr(context),
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: Colors.redAccent,
@@ -823,9 +824,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         strokeWidth: 2,
                       ),
                     )
-                  : const Text(
-                      'Login',
-                      style: TextStyle(
+                  : Text(
+                      'Login'.tr(context),
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 0.5,
@@ -848,7 +849,7 @@ class _LoginScreenState extends State<LoginScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Text(
-                  'OR CONTINUE WITH',
+                  'OR CONTINUE WITH'.tr(context),
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
@@ -905,20 +906,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   : Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Image.network(
-                          'https://www.gstatic.com/mobilesdk/160503_mobilesdk/logo/2x/google_g_normal_id_48dp.png',
-                          height: 24,
-                          width: 24,
-                          errorBuilder: (context, error, stackTrace) =>
-                              const Icon(
-                                Icons.g_mobiledata_rounded,
-                                color: AppColors.primaryOrange,
-                                size: 28,
-                              ),
+                        const Icon(
+                          Icons.g_mobiledata_rounded,
+                          color: AppColors.primaryOrange,
+                          size: 32,
                         ),
                         const SizedBox(width: 12),
                         Text(
-                          'Continue with Google',
+                          'Continue with Google'.tr(context),
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
@@ -939,7 +934,7 @@ class _LoginScreenState extends State<LoginScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                "Don't have an account? ",
+                "Don't have an account? ".tr(context),
                 style: TextStyle(
                   color: isDark ? const Color(0xFF94A3B8) : Colors.grey[600],
                   fontWeight: FontWeight.w500,
@@ -954,9 +949,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   );
                 },
-                child: const Text(
-                  'Register',
-                  style: TextStyle(
+                child: Text(
+                  'Register'.tr(context),
+                  style: const TextStyle(
                     color: AppColors.primaryOrange,
                     fontWeight: FontWeight.bold,
                     decoration: TextDecoration.underline,
@@ -969,7 +964,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
           // Copyright
           Text(
-            '© 2026 ${context.watch<CompanySettingsProvider>().companyName}. All rights reserved.',
+            '${"© 2026 ".tr(context)}${context.watch<CompanySettingsProvider>().companyName}${" . All rights reserved.".tr(context)}',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 11,

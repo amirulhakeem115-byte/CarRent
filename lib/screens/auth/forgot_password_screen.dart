@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../constants/colors.dart';
+import '../../l10n/app_translations.dart';
 import '../../services/auth_service.dart';
 import '../../services/company_settings_provider.dart';
 import '../../widgets/custom_textfield.dart';
@@ -128,7 +129,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           _buildPremiumIllustration(),
           const SizedBox(height: 24),
           Text(
-            'Forgot Password?',
+            'Forgot Password?'.tr(context),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 26,
@@ -138,7 +139,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            "No worries! Enter your email address and we'll send you a link to reset your password.",
+            "No worries! Enter your email address and we'll send you a link to reset your password.".tr(context),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
@@ -151,7 +152,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           
           // Email label and field
           Text(
-            '   Email Address',
+            '   ${"Email Address".tr(context)}',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
@@ -162,12 +163,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           CustomTextField(
             controller: _emailController,
             labelText: '',
-            hintText: 'Enter your email address',
+            hintText: 'Enter your email address'.tr(context),
             prefixIcon: Icons.email_outlined,
             keyboardType: TextInputType.emailAddress,
             validator: (val) {
-              if (val == null || val.trim().isEmpty) return 'Email is required';
-              if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val)) return 'Enter a valid email';
+              if (val == null || val.trim().isEmpty) return 'Email is required'.tr(context);
+              if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val)) return 'Enter a valid email'.tr(context);
               return null;
             },
           ),
@@ -183,7 +184,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
               ),
               child: Text(
-                _error!,
+                _error!.tr(context),
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.bold),
               ),
@@ -201,7 +202,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
               ),
               child: Text(
-                _successMessage!,
+                _successMessage!.tr(context),
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.green, fontSize: 13, fontWeight: FontWeight.bold),
               ),
@@ -229,9 +230,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       height: 20,
                       child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                     )
-                  : const Text(
-                      'Send Reset Link',
-                      style: TextStyle(
+                  : Text(
+                      'Send Reset Link'.tr(context),
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 0.5,
@@ -245,9 +246,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           TextButton.icon(
             onPressed: () => Navigator.pop(context),
             icon: const Icon(Icons.arrow_back_rounded, size: 18, color: AppColors.primaryOrange),
-            label: const Text(
-              'Back to Login',
-              style: TextStyle(
+            label: Text(
+              'Back to Login'.tr(context),
+              style: const TextStyle(
                 color: AppColors.primaryOrange,
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
@@ -259,7 +260,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           _buildBottomGraphic(context, isDark),
           const SizedBox(height: 16),
           Text(
-            '© 2026 ${context.watch<CompanySettingsProvider>().companyName}. All rights reserved.',
+            '${"© 2026 ".tr(context)}${context.watch<CompanySettingsProvider>().companyName}${" . All rights reserved.".tr(context)}',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 11,

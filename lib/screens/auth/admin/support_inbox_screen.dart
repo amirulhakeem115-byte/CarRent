@@ -5,6 +5,7 @@ import '../../../services/database_service.dart';
 import '../../../widgets/loading_widget.dart';
 import '../../../models/user_model.dart';
 import '../../../widgets/animated_widgets.dart';
+import '../../../l10n/app_translations.dart';
 
 class SupportInboxView extends StatefulWidget {
   const SupportInboxView({super.key});
@@ -63,19 +64,20 @@ class _SupportInboxViewState extends State<SupportInboxView> {
   }
 
   Future<void> _updateStatus(String ticketId, String newStatus) async {
-    final messenger = ScaffoldMessenger.of(context);
     try {
       await _databaseService.updateTicketStatus(ticketId, newStatus);
-      messenger.showSnackBar(
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Ticket status updated to $newStatus'),
+          content: Text('${'Ticket status updated to '.tr(context)}${newStatus.tr(context)}'),
           backgroundColor: Colors.green,
         ),
       );
     } catch (e) {
-      messenger.showSnackBar(
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to update status: $e'),
+          content: Text('${'Failed to update status: '.tr(context)}$e'),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -97,7 +99,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
 
   void _showTicketDetails(Map<String, dynamic> ticket) {
     final String id = ticket['id'] ?? '';
-    final String subject = ticket['subject'] ?? 'No Subject';
+    final String subject = ticket['subject'] ?? 'No Subject'.tr(context);
     final String customerId = (ticket['customerId'] ?? ticket['userId'] ?? ticket['customerUid'] ?? '').toString();
     final bool isLegacyTicket = customerId.trim().isEmpty;
     final replyController = TextEditingController();
@@ -107,8 +109,8 @@ class _SupportInboxViewState extends State<SupportInboxView> {
     try {
       customer = _users.firstWhere((u) => u.id == ticket['customerId']);
     } catch (_) {}
-    final String name = customer?.fullName ?? ticket['customerName'] ?? 'Customer';
-    final String email = customer?.email ?? 'No Email';
+    final String name = customer?.fullName ?? ticket['customerName'] ?? 'Customer'.tr(context);
+    final String email = customer?.email ?? 'No Email'.tr(context);
 
     void scrollToBottom() {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -155,12 +157,12 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                   title: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: Text(
-                          'Support Ticket Specs',
+                          'Support Ticket Specs'.tr(context),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             color: AppColors.secondaryBlue,
                           ),
@@ -177,7 +179,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          status.toUpperCase(),
+                          status.tr(context).toUpperCase(),
                           style: TextStyle(
                             color: statusColor,
                             fontSize: 9,
@@ -199,7 +201,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Ticket ID: $id',
+                          '${'Ticket ID: '.tr(context)}$id',
                           style: const TextStyle(
                             fontSize: 11,
                             color: Colors.grey,
@@ -207,7 +209,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'From: $name ($email)',
+                          '${'From: '.tr(context)}$name ($email)',
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
@@ -217,7 +219,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
-                          'Subject: $subject',
+                          '${'Subject: '.tr(context)}$subject',
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
@@ -241,7 +243,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    'This support ticket was created using an older version of the system.',
+                                    'This support ticket was created using an older version of the system.'.tr(context),
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
@@ -259,9 +261,9 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
-                              'Conversation History',
-                              style: TextStyle(
+                            Text(
+                              'Conversation History'.tr(context),
+                              style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 12,
                                 color: AppColors.secondaryBlue,
@@ -279,7 +281,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  'Live Real-time Sync',
+                                  'Live Real-time Sync'.tr(context),
                                   style: TextStyle(
                                     fontSize: 10,
                                     color: Colors.green.shade700,
@@ -310,7 +312,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                                   child: Padding(
                                     padding: const EdgeInsets.all(12.0),
                                     child: Text(
-                                      'Error loading messages: ${snapshot.error}',
+                                      '${'Error loading messages: '.tr(context)}${snapshot.error}',
                                       style: const TextStyle(color: Colors.redAccent, fontSize: 11),
                                     ),
                                   ),
@@ -320,7 +322,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                               if (messages.isEmpty) {
                                 return Center(
                                   child: Text(
-                                    'No replies yet.',
+                                    'No replies yet.'.tr(context),
                                     style: TextStyle(
                                       color: Colors.grey[400],
                                       fontSize: 11,
@@ -337,8 +339,8 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                                   final bool isAdmin =
                                       r['senderRole'] == 'admin';
                                   final String senderName = r['senderName'] ??
-                                      (isAdmin ? 'Support Admin' : name);
-                                  final String senderRole = (r['senderRole'] ?? 'customer').toUpperCase();
+                                      (isAdmin ? 'Support Admin'.tr(context) : name);
+                                  final String senderRole = (r['senderRole'] ?? 'customer').toString().tr(context).toUpperCase();
                                   final String rTime = r['timestamp'] ?? '';
                                   String fRTime = '';
                                   if (rTime.isNotEmpty) {
@@ -475,9 +477,9 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                             Expanded(
                               child: TextField(
                                 controller: replyController,
-                                decoration: const InputDecoration(
-                                  hintText: 'Type reply message...',
-                                  contentPadding: EdgeInsets.symmetric(
+                                decoration: InputDecoration(
+                                  hintText: 'Type reply message...'.tr(context),
+                                  contentPadding: const EdgeInsets.symmetric(
                                     horizontal: 12,
                                     vertical: 10,
                                   ),
@@ -515,9 +517,9 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                           spacing: 12,
                           runSpacing: 8,
                           children: [
-                            const Text(
-                              'Modify Ticket Status:',
-                              style: TextStyle(
+                            Text(
+                              'Modify Ticket Status:'.tr(context),
+                              style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
                                 color: AppColors.secondaryBlue,
@@ -537,7 +539,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                                 return DropdownMenuItem(
                                   value: s,
                                   child: Text(
-                                    s,
+                                    s.tr(context),
                                     style: const TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.bold,
@@ -563,7 +565,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                         replyController.dispose();
                         Navigator.pop(context);
                       },
-                      child: const Text('Close'),
+                      child: Text('Close'.tr(context)),
                     ),
                   ],
                 );
@@ -578,8 +580,8 @@ class _SupportInboxViewState extends State<SupportInboxView> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(
-        child: LoadingWidget(message: 'Loading support ticket systems...'),
+      return Center(
+        child: LoadingWidget(message: 'Loading support ticket systems...'.tr(context)),
       );
     }
 
@@ -595,7 +597,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
             ),
             const SizedBox(height: 16),
             Text(
-              _error!,
+              _error!.tr(context),
               style: const TextStyle(
                 fontSize: 16,
                 color: AppColors.secondaryBlue,
@@ -605,7 +607,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: _loadUsers,
-              child: const Text('Retry Loading'),
+              child: Text('Retry Loading'.tr(context)),
             ),
           ],
         ),
@@ -616,8 +618,8 @@ class _SupportInboxViewState extends State<SupportInboxView> {
       stream: _databaseService.getTicketsStream(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-          return const Center(
-            child: LoadingWidget(message: 'Connecting to live ticket stream...'),
+          return Center(
+            child: LoadingWidget(message: 'Connecting to live ticket stream...'.tr(context)),
           );
         }
 
@@ -631,7 +633,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                   const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 64),
                   const SizedBox(height: 16),
                   Text(
-                    'Error loading tickets: ${snapshot.error}',
+                    '${'Error loading tickets: '.tr(context)}${snapshot.error}',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 14,
@@ -724,7 +726,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Support Desk Inbox',
+                              'Support Desk Inbox'.tr(context),
                               style: TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.w900,
@@ -732,7 +734,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                               ),
                             ),
                             Text(
-                              'Respond to customer tickets, coordinate inquiries, and close resolved issues.',
+                              'Respond to customer tickets, coordinate inquiries, and close resolved issues.'.tr(context),
                               style: TextStyle(
                                 fontSize: 12,
                                 color: textSecondary,
@@ -754,7 +756,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                           children: [
                             Expanded(
                               child: Text(
-                                'Support Desk Inbox',
+                                'Support Desk Inbox'.tr(context),
                                 style: TextStyle(
                                   fontSize: 22,
                                   fontWeight: FontWeight.w900,
@@ -769,7 +771,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                           ],
                         ),
                         Text(
-                          'Respond to customer tickets, coordinate inquiries, and close resolved issues.',
+                          'Respond to customer tickets, coordinate inquiries, and close resolved issues.'.tr(context),
                           style: TextStyle(fontSize: 12, color: textSecondary),
                         ),
                       ],
@@ -786,7 +788,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
                   _buildStatCard(
-                    'Total Tickets Received',
+                    'Total Tickets Received'.tr(context),
                     totalTickets.toString(),
                     Icons.mark_as_unread,
                     Colors.indigo,
@@ -797,7 +799,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                     borderColor: borderColor,
                   ),
                   _buildStatCard(
-                    'Open Tickets',
+                    'Open Tickets'.tr(context),
                     openTickets.toString(),
                     Icons.hourglass_top,
                     Colors.orange,
@@ -808,7 +810,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                     borderColor: borderColor,
                   ),
                   _buildStatCard(
-                    'In Progress Tickets',
+                    'In Progress Tickets'.tr(context),
                     inProgressTickets.toString(),
                     Icons.chat_bubble_outline,
                     Colors.blue,
@@ -819,7 +821,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                     borderColor: borderColor,
                   ),
                   _buildStatCard(
-                    'Closed Tickets',
+                    'Closed Tickets'.tr(context),
                     closedTickets.toString(),
                     Icons.check_circle_outline,
                     Colors.green,
@@ -850,7 +852,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                               style: TextStyle(color: textPrimary),
                               decoration: InputDecoration(
                                 hintText:
-                                    'Search tickets by customer name, email, subject, or ticket ID...',
+                                    'Search tickets by customer name, email, subject, or ticket ID...'.tr(context),
                                 hintStyle: TextStyle(color: textSecondary),
                                 prefixIcon: Icon(
                                   Icons.search,
@@ -886,7 +888,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                                   .map((s) {
                                     return DropdownMenuItem(
                                       value: s,
-                                      child: Text(s),
+                                      child: Text(s.tr(context)),
                                     );
                                   })
                                   .toList(),
@@ -907,7 +909,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                             style: TextStyle(color: textPrimary),
                             decoration: InputDecoration(
                               hintText:
-                                  'Search tickets by name, email, subject or ID...',
+                                  'Search tickets by name, email, subject or ID...'.tr(context),
                               hintStyle: TextStyle(color: textSecondary),
                               prefixIcon: Icon(
                                 Icons.search,
@@ -943,7 +945,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                                   .map((s) {
                                     return DropdownMenuItem(
                                       value: s,
-                                      child: Text(s),
+                                      child: Text(s.tr(context)),
                                     );
                                   })
                                   .toList(),
@@ -968,11 +970,11 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: borderColor),
                       ),
-                      child: const AnimatedEmptyState(
+                      child: AnimatedEmptyState(
                         icon: Icons.mail_outline_rounded,
-                        title: 'No Support Tickets Found',
+                        title: 'No Support Tickets Found'.tr(context),
                         subtitle:
-                            'No tickets match your search query or status filter.',
+                            'No tickets match your search query or status filter.'.tr(context),
                       ),
                     )
                   : Container(
@@ -1093,50 +1095,50 @@ class _SupportInboxViewState extends State<SupportInboxView> {
         columns: [
           DataColumn(
             label: Text(
-              'Ticket ID',
+              'Ticket ID'.tr(context),
               style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
             ),
           ),
           DataColumn(
             label: Text(
-              'Customer',
+              'Customer'.tr(context),
               style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
             ),
           ),
           DataColumn(
             label: Text(
-              'Subject',
+              'Subject'.tr(context),
               style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
             ),
           ),
           DataColumn(
             label: Text(
-              'Created Date',
+              'Created Date'.tr(context),
               style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
             ),
           ),
           DataColumn(
             label: Text(
-              'Last Reply Date',
+              'Last Reply Date'.tr(context),
               style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
             ),
           ),
           DataColumn(
             label: Text(
-              'Status',
+              'Status'.tr(context),
               style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
             ),
           ),
           DataColumn(
             label: Text(
-              'Action',
+              'Action'.tr(context),
               style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
             ),
           ),
         ],
         rows: ticketsList.map((ticket) {
           final String id = ticket['id'] ?? '';
-          final String subject = ticket['subject'] ?? 'No Subject';
+          final String subject = ticket['subject'] ?? 'No Subject'.tr(context);
           final String status = ticket['status'] ?? 'Open';
           final String createdRaw = ticket['createdAt'] ?? '';
           final String replyRaw = ticket['lastReplyAt'] ?? '';
@@ -1147,10 +1149,10 @@ class _SupportInboxViewState extends State<SupportInboxView> {
           } catch (_) {}
           final String name = (cust?.fullName != null && cust!.fullName.isNotEmpty)
               ? cust.fullName
-              : (ticket['customerName'] ?? 'Customer').toString();
+              : (ticket['customerName'] ?? 'Customer'.tr(context)).toString();
           final String email = (cust?.email != null && cust!.email.isNotEmpty)
               ? cust.email
-              : (ticket['customerEmail'] ?? 'No Email').toString();
+              : (ticket['customerEmail'] ?? 'No Email'.tr(context)).toString();
 
           String createdStr = '';
           if (createdRaw.isNotEmpty) {
@@ -1258,7 +1260,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    status.toUpperCase(),
+                    status.tr(context).toUpperCase(),
                     style: TextStyle(
                       color: statusColor,
                       fontSize: 9,
@@ -1299,7 +1301,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
       itemBuilder: (context, index) {
         final ticket = ticketsList[index];
         final String id = ticket['id'] ?? '';
-        final String subject = ticket['subject'] ?? 'No Subject';
+        final String subject = ticket['subject'] ?? 'No Subject'.tr(context);
         final String status = ticket['status'] ?? 'Open';
         final String createdRaw = ticket['createdAt'] ?? '';
         final String replyRaw = ticket['lastReplyAt'] ?? '';
@@ -1310,10 +1312,10 @@ class _SupportInboxViewState extends State<SupportInboxView> {
         } catch (_) {}
         final String name = (cust?.fullName != null && cust!.fullName.isNotEmpty)
             ? cust.fullName
-            : (ticket['customerName'] ?? 'Customer').toString();
+            : (ticket['customerName'] ?? 'Customer'.tr(context)).toString();
         final String email = (cust?.email != null && cust!.email.isNotEmpty)
             ? cust.email
-            : (ticket['customerEmail'] ?? 'No Email').toString();
+            : (ticket['customerEmail'] ?? 'No Email'.tr(context)).toString();
 
         String createdStr = '';
         if (createdRaw.isNotEmpty) {
@@ -1362,15 +1364,15 @@ class _SupportInboxViewState extends State<SupportInboxView> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'From: $name ($email)',
+                '${'From: '.tr(context)}$name ($email)',
                 style: TextStyle(fontSize: 11, color: textSecondary),
               ),
               Text(
-                'ID: #${id.substring(0, id.length > 8 ? 8 : id.length).toUpperCase()} | Created: $createdStr',
+                '${'ID: #'.tr(context)}${id.substring(0, id.length > 8 ? 8 : id.length).toUpperCase()} | ${'Created: '.tr(context)}$createdStr',
                 style: TextStyle(fontSize: 10, color: textSecondary),
               ),
               Text(
-                'Last Active: ${replyStr.isNotEmpty ? replyStr : "N/A"}',
+                '${'Last Active: '.tr(context)}${replyStr.isNotEmpty ? replyStr : "N/A"}',
                 style: TextStyle(fontSize: 10, color: textSecondary),
               ),
             ],
@@ -1382,7 +1384,7 @@ class _SupportInboxViewState extends State<SupportInboxView> {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              status.toUpperCase(),
+              status.tr(context).toUpperCase(),
               style: TextStyle(
                 color: statusColor,
                 fontSize: 9,

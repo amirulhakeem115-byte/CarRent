@@ -7,6 +7,9 @@ import 'dart:typed_data';
 import 'dart:math';
 import 'dart:convert';
 
+import 'package:provider/provider.dart';
+import 'package:printing/printing.dart';
+import '../../../providers/language_provider.dart';
 import '../../../constants/colors.dart';
 import '../../../models/user_model.dart';
 import '../../../models/vehicle_model.dart';
@@ -19,6 +22,9 @@ import '../../../services/file_download_helper.dart'
     as download_helper;
 import '../../../services/company_settings_provider.dart';
 import '../../../services/booking_service.dart';
+import '../../../services/review_service.dart';
+import '../../../services/user_session.dart';
+import '../../../l10n/app_translations.dart';
 
 class ReportsView extends StatefulWidget {
   final List<BookingModel> bookings;
@@ -112,6 +118,56 @@ class _ReportsViewState extends State<ReportsView> {
   void _clearAIFilters() {
     if (widget.onClearAIFilters != null) {
       widget.onClearAIFilters!();
+    }
+  }
+
+  Future<void> _confirmAndDeleteReview(ReviewModel review) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Comment?'),
+        content: const Text('This comment will no longer be visible to the customer.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await ReviewService().deleteReview(review.id);
+        if (mounted) {
+          setState(() {
+            widget.reviews.removeWhere((r) => r.id == review.id);
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Comment deleted successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to delete comment: $e'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+      }
     }
   }
 
@@ -648,13 +704,100 @@ class _ReportsViewState extends State<ReportsView> {
     return '${reportType}_Report_$periodStr.$extension';
   }
 
+  String _cleanTextForPdf(String text, bool isArabic) {
+    if (isArabic) return text;
+    // Strip non-ASCII characters (e.g. Arabic sub-names) in English mode to prevent Helvetica black box cross glyphs
+    return text
+        .replaceAll(RegExp(r'[^\x00-\x7F]'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
+  String _getReportTypeNameAr(String type) {
+    switch (type) {
+      case 'Bookings':
+        return 'الحجوزات';
+      case 'Payments':
+        return 'المدفوعات';
+      case 'Revenue':
+        return 'الإيرادات';
+      case 'Promotions & Discounts':
+      case 'Promotions':
+        return 'العروض والخصومات';
+      case 'Vehicles':
+        return 'السيارات';
+      case 'Maintenance':
+        return 'الصيانة';
+      case 'Customers':
+        return 'العملاء';
+      case 'Reward Points':
+        return 'نقاط المكافآت';
+      case 'Reviews':
+        return 'التقييمات';
+      case 'Open Rentals':
+        return 'التأجيرات المفتوحة';
+      case 'Overdue Rentals':
+        return 'التأجيرات المتأخرة';
+      default:
+        return type;
+    }
+  }
+
+  String _getPeriodNameAr(String period) {
+    switch (period) {
+      case 'Today':
+        return 'اليوم';
+      case 'Yesterday':
+        return 'الأمس';
+      case 'Last 7 Days':
+        return 'آخر 7 أيام';
+      case 'This Week':
+        return 'هذا الأسبوع';
+      case 'Last Week':
+        return 'الأسبوع الماضي';
+      case 'This Month':
+        return 'هذا الشهر';
+      case 'Last Month':
+        return 'الشهر الماضي';
+      case 'Last 3 Months':
+        return 'آخر 3 أشهر';
+      case 'Last 6 Months':
+        return 'آخر 6 أشهر';
+      case 'This Year':
+        return 'هذا العام';
+      case 'Last Year':
+        return 'العام الماضي';
+      case 'Custom Date Range':
+        return 'نطاق تاريخ مخصص';
+      default:
+        return period;
+    }
+  }
+
   // ── CSV Exporter ───────────────────────────────────────────────────────────
   void _exportCSV() {
+    final isArabic =
+        Provider.of<LanguageProvider>(context, listen: false).isArabic;
     final type = _selectedReportType;
-    final List<String> headers = _getReportHeaders(type);
-    final List<List<String>> tableData = _getReportTableData(type);
+    final List<String> rawHeaders = _getReportHeaders(type, isArabic);
+    final List<List<String>> rawTableData = _getReportTableData(type, isArabic);
+    final List<String> headers = rawHeaders
+        .where((h) => h != 'Action' && h != 'Actions' && h != 'الإجراءات')
+        .toList();
+    final List<List<String>> tableData = rawTableData.map((row) {
+      if ((rawHeaders.contains('Action') ||
+              rawHeaders.contains('Actions') ||
+              rawHeaders.contains('الإجراءات')) &&
+          row.length > headers.length) {
+        return row.sublist(0, headers.length);
+      }
+      return row;
+    }).toList();
 
     final buffer = StringBuffer();
+    if (isArabic) {
+      buffer.write('\uFEFF'); // UTF-8 BOM for Arabic Excel
+    }
     // Write Headers
     buffer.writeln(
       headers.map((h) => '"${h.replaceAll('"', '""')}"').join(','),
@@ -670,9 +813,13 @@ class _ReportsViewState extends State<ReportsView> {
     final fileName = _getExportFileName(type, 'csv');
     download_helper.downloadFile(Uint8List.fromList(bytes), fileName);
 
+    final msg = isArabic
+        ? 'تم تنزيل تقرير ${_getReportTypeNameAr(type)} بصيغة CSV!'
+        : '$type report downloaded in CSV format!';
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$type report downloaded in CSV format!'),
+        content: Text(msg),
         backgroundColor: Colors.green,
       ),
     );
@@ -680,12 +827,26 @@ class _ReportsViewState extends State<ReportsView> {
 
   // ── Excel Exporter ─────────────────────────────────────────────────────────
   void _exportExcel() {
+    final isArabic =
+        Provider.of<LanguageProvider>(context, listen: false).isArabic;
     final type = _selectedReportType;
     var excelObj = Excel.createExcel();
     var sheet = excelObj[excelObj.getDefaultSheet() ?? 'Sheet1'];
 
-    final List<String> headers = _getReportHeaders(type);
-    final List<List<String>> tableData = _getReportTableData(type);
+    final List<String> rawHeaders = _getReportHeaders(type, isArabic);
+    final List<List<String>> rawTableData = _getReportTableData(type, isArabic);
+    final List<String> headers = rawHeaders
+        .where((h) => h != 'Action' && h != 'Actions' && h != 'الإجراءات')
+        .toList();
+    final List<List<String>> tableData = rawTableData.map((row) {
+      if ((rawHeaders.contains('Action') ||
+              rawHeaders.contains('Actions') ||
+              rawHeaders.contains('الإجراءات')) &&
+          row.length > headers.length) {
+        return row.sublist(0, headers.length);
+      }
+      return row;
+    }).toList();
 
     // Header Row
     sheet.appendRow(headers.map((h) => TextCellValue(h)).toList());
@@ -693,7 +854,6 @@ class _ReportsViewState extends State<ReportsView> {
     for (final row in tableData) {
       sheet.appendRow(
         row.map((cell) {
-          // Try parsing number
           final numVal = double.tryParse(
             cell.replaceAll('RM', '').replaceAll(' ', '').trim(),
           );
@@ -709,9 +869,12 @@ class _ReportsViewState extends State<ReportsView> {
     if (fileBytes != null) {
       final fileName = _getExportFileName(type, 'xlsx');
       download_helper.downloadFile(Uint8List.fromList(fileBytes), fileName);
+      final msg = isArabic
+          ? 'تم تنزيل تقرير ${_getReportTypeNameAr(type)} بصيغة Excel!'
+          : '$type report downloaded in Excel format!';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('$type report downloaded in Excel format!'),
+          content: Text(msg),
           backgroundColor: Colors.green,
         ),
       );
@@ -720,24 +883,79 @@ class _ReportsViewState extends State<ReportsView> {
 
   // ── PDF Exporter ───────────────────────────────────────────────────────────
   Future<void> _exportPdf() async {
+    final isArabic =
+        Provider.of<LanguageProvider>(context, listen: false).isArabic;
     final type = _selectedReportType;
     final pdf = pw.Document();
 
-    final List<String> headers = _getReportHeaders(type);
-    final List<List<String>> tableData = _getReportTableData(type);
+    pw.Font? customFont;
+    pw.Font? customBoldFont;
+    if (isArabic) {
+      try {
+        customFont = await PdfGoogleFonts.cairoRegular();
+        customBoldFont = await PdfGoogleFonts.cairoBold();
+      } catch (_) {}
+    }
+
+    final themeData = (customFont != null && customBoldFont != null)
+        ? pw.ThemeData.withFont(base: customFont, bold: customBoldFont)
+        : null;
+
+    final List<String> rawHeaders = _getReportHeaders(type, isArabic);
+    final List<List<String>> rawTableData = _getReportTableData(type, isArabic);
+    final List<String> headers = rawHeaders
+        .where((h) => h != 'Action' && h != 'Actions' && h != 'الإجراءات')
+        .toList();
+    final List<List<String>> tableData = rawTableData.map((row) {
+      List<String> cleanRow = row;
+      if ((rawHeaders.contains('Action') ||
+              rawHeaders.contains('Actions') ||
+              rawHeaders.contains('الإجراءات')) &&
+          row.length > headers.length) {
+        cleanRow = row.sublist(0, headers.length);
+      }
+      return cleanRow.map((c) => _cleanTextForPdf(c, isArabic)).toList();
+    }).toList();
     final kpis = _calculateKPIs();
+
+    final titleStr = isArabic ? 'تقرير منصة سيارنتي' : 'CARENT PLATFORM REPORT';
+    final dateStr = isArabic
+        ? 'التاريخ: ${DateFormat('dd MMM yyyy').format(DateTime.now())}'
+        : 'Date: ${DateFormat('dd MMM yyyy').format(DateTime.now())}';
+    final periodTitleStr = isArabic
+        ? 'تحليل ${_getReportTypeNameAr(type)} - الفترة: ${_getPeriodNameAr(_selectedPeriod)}'
+        : '$type Analysis - Period: $_selectedPeriod';
+    final filterStr = isArabic
+        ? 'الفلاتر النشطة: الفرع (${_selectedBranch == "All" ? "الكل" : _selectedBranch})، السيارة (${_selectedVehicle == "All" ? "الكل" : _selectedVehicle})، العميل (${_selectedCustomer == "All" ? "الكل" : _selectedCustomer})'
+        : 'Filters Active: Branch ($_selectedBranch), Vehicle ($_selectedVehicle), Customer ($_selectedCustomer)';
+    final summaryTitleStr = isArabic ? 'الملخص الإجمالي' : 'Summary Aggregates';
+
+    final totalBookingsLbl = isArabic ? 'إجمالي الحجوزات: ' : 'Total Bookings: ';
+    final revenueLbl = isArabic ? 'الإيرادات: رينغيت ' : 'Revenue: RM ';
+    final activeRentalsLbl = isArabic ? 'التأجيرات النشطة: ' : 'Active Rentals: ';
+    final overdueLbl = isArabic ? 'الحجوزات المتأخرة: ' : 'Overdue Bookings: ';
+    final avgDurationLbl = isArabic ? 'متوسط المدة: ' : 'Avg Duration: ';
+    final daysLbl = isArabic ? ' أيام' : ' Days';
+    final mostActiveLbl = isArabic ? 'الأكثر نشاطاً: ' : 'Most Active: ';
+    final maintenanceJobsLbl = isArabic ? 'أعمال الصيانة: ' : 'Maintenance Jobs: ';
+    final rewardsIssuedLbl = isArabic ? 'المكافآت الصادرة: ' : 'Rewards Issued: ';
+    final pointsLbl = isArabic ? ' نقاط' : ' pts';
+    final footerStr = isArabic
+        ? 'سجل تجاري سري | صفحة 1 من 1'
+        : 'Confidential Business Record | Page 1 of 1';
 
     pdf.addPage(
       pw.MultiPage(
+        theme: themeData,
         pageFormat: pdf_lib.PdfPageFormat.a4,
-        build: (pw.Context context) {
+        build: (pw.Context pdfCtx) {
           return [
             // Header
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
                 pw.Text(
-                  'CARENT PLATFORM REPORT',
+                  titleStr,
                   style: pw.TextStyle(
                     fontWeight: pw.FontWeight.bold,
                     fontSize: 20,
@@ -745,7 +963,7 @@ class _ReportsViewState extends State<ReportsView> {
                   ),
                 ),
                 pw.Text(
-                  'Date: ${DateFormat('dd MMM yyyy').format(DateTime.now())}',
+                  dateStr,
                   style: pw.TextStyle(
                     fontSize: 10,
                     color: pdf_lib.PdfColor.fromInt(0xFF6B7280),
@@ -759,7 +977,7 @@ class _ReportsViewState extends State<ReportsView> {
 
             // Subtitle & Filter Configuration
             pw.Text(
-              '$type Analysis - Period: $_selectedPeriod',
+              periodTitleStr,
               style: pw.TextStyle(
                 fontSize: 14,
                 fontWeight: pw.FontWeight.bold,
@@ -768,7 +986,7 @@ class _ReportsViewState extends State<ReportsView> {
             ),
             pw.SizedBox(height: 5),
             pw.Text(
-              'Filters Active: Branch ($_selectedBranch), Vehicle ($_selectedVehicle), Customer ($_selectedCustomer)',
+              filterStr,
               style: pw.TextStyle(
                 fontSize: 8,
                 color: pdf_lib.PdfColor.fromInt(0xFF6B7280),
@@ -787,7 +1005,7 @@ class _ReportsViewState extends State<ReportsView> {
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
                   pw.Text(
-                    'Summary Aggregates',
+                    summaryTitleStr,
                     style: pw.TextStyle(
                       fontSize: 11,
                       fontWeight: pw.FontWeight.bold,
@@ -799,19 +1017,19 @@ class _ReportsViewState extends State<ReportsView> {
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
                       pw.Text(
-                        'Total Bookings: ${kpis['totalBookings']}',
+                        '$totalBookingsLbl${kpis['totalBookings']}',
                         style: const pw.TextStyle(fontSize: 8),
                       ),
                       pw.Text(
-                        'Revenue: RM ${kpis['revenue'].toStringAsFixed(2)}',
+                        '$revenueLbl${kpis['revenue'].toStringAsFixed(2)}',
                         style: const pw.TextStyle(fontSize: 8),
                       ),
                       pw.Text(
-                        'Active Rentals: ${kpis['activeBookings']}',
+                        '$activeRentalsLbl${kpis['activeBookings']}',
                         style: const pw.TextStyle(fontSize: 8),
                       ),
                       pw.Text(
-                        'Overdue Bookings: ${kpis['overdueBookings']}',
+                        '$overdueLbl${kpis['overdueBookings']}',
                         style: const pw.TextStyle(fontSize: 8),
                       ),
                     ],
@@ -821,19 +1039,19 @@ class _ReportsViewState extends State<ReportsView> {
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
                       pw.Text(
-                        'Avg Duration: ${kpis['avgDuration'].toStringAsFixed(1)} Days',
+                        '$avgDurationLbl${kpis['avgDuration'].toStringAsFixed(1)}$daysLbl',
                         style: const pw.TextStyle(fontSize: 8),
                       ),
                       pw.Text(
-                        'Most Active: ${kpis['mostActiveCustomer']}',
+                        '$mostActiveLbl${_cleanTextForPdf(kpis['mostActiveCustomer'] ?? '', isArabic)}',
                         style: const pw.TextStyle(fontSize: 8),
                       ),
                       pw.Text(
-                        'Maintenance Jobs: ${kpis['maintenanceJobs']}',
+                        '$maintenanceJobsLbl${kpis['maintenanceJobs']}',
                         style: const pw.TextStyle(fontSize: 8),
                       ),
                       pw.Text(
-                        'Rewards Issued: ${kpis['rewardPointsIssued']} Points',
+                        '$rewardsIssuedLbl${kpis['rewardPointsIssued']}$pointsLbl',
                         style: const pw.TextStyle(fontSize: 8),
                       ),
                     ],
@@ -874,7 +1092,7 @@ class _ReportsViewState extends State<ReportsView> {
             pw.Align(
               alignment: pw.Alignment.centerRight,
               child: pw.Text(
-                'Confidential Business Record | Page 1 of 1',
+                footerStr,
                 style: pw.TextStyle(
                   fontSize: 7,
                   color: pdf_lib.PdfColor.fromInt(0xFF9CA3AF),
@@ -890,9 +1108,12 @@ class _ReportsViewState extends State<ReportsView> {
     final fileName = _getExportFileName(type, 'pdf');
     download_helper.downloadFile(fileBytes, fileName);
     if (mounted) {
+      final msg = isArabic
+          ? 'تم تنزيل تقرير ${_getReportTypeNameAr(type)} بصيغة PDF!'
+          : '$type report downloaded in PDF format!';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('$type report downloaded in PDF format!'),
+          content: Text(msg),
           backgroundColor: Colors.green,
         ),
       );
@@ -900,99 +1121,105 @@ class _ReportsViewState extends State<ReportsView> {
   }
 
   // ── Table Schema Configurations ────────────────────────────────────────────
-  List<String> _getReportHeaders(String type) {
-    switch (type) {
-      case 'Bookings':
-        return [
-          'Booking ID',
-          'Vehicle',
-          'Customer',
-          'Pickup Date',
-          'Return Date',
-          'Total Price',
-          'Status',
-        ];
-      case 'Payments':
-        return [
-          'Payment ID',
-          'Booking ID',
-          'Amount',
-          'Method',
-          'Status',
-          'Transaction ID',
-          'Date',
-        ];
-      case 'Revenue':
-        return [
-          'Payment ID',
-          'Booking ID',
-          'Amount',
-          'Method',
-          'Status',
-          'Date',
-        ];
-      case 'Vehicles':
-        return [
-          'Brand & Model',
-          'Plate Number',
-          'Category',
-          'Daily Rate',
-          'Mileage',
-          'Branch',
-          'Status',
-        ];
-      case 'Maintenance':
-        return [
-          'Job Title',
-          'Vehicle',
-          'Cost',
-          'Start Date',
-          'End Date',
-          'Status',
-        ];
-      case 'Customers':
-        return [
-          'Name',
-          'Email',
-          'Phone',
-          'Membership Level',
-          'Points',
-          'Verified',
-          'Active',
-        ];
-      case 'Reward Points':
-        return [
-          'User ID',
-          'Booking ID',
-          'Type',
-          'Points Change',
-          'Balance After',
-          'Reason',
-          'Date',
-        ];
-      case 'Reviews':
-        return ['Customer', 'Vehicle ID', 'Rating', 'Comment', 'Date'];
-      case 'Open Rentals':
-        return ['Booking ID', 'Vehicle', 'Customer', 'Pickup Date', 'Status'];
-      case 'Overdue Rentals':
-        return ['Booking ID', 'Vehicle', 'Customer', 'Due Date', 'Status'];
-      case 'Promotions & Discounts':
-      case 'Promotions':
-        return [
-          'Booking ID',
-          'Customer',
-          'Promo Code / Name',
-          'Original Price',
-          'Discount Amount',
-          'Final Price',
-          'Date',
-        ];
-      default:
-        return [];
+  List<String> _getReportHeaders(String type, [bool? isArabicParam]) {
+    final isArabic = isArabicParam ??
+        Provider.of<LanguageProvider>(context, listen: false).isArabic;
+    if (isArabic) {
+      switch (type) {
+        case 'Bookings':
+          return ['معرف الحجز', 'السيارة', 'العميل', 'تاريخ الاستلام', 'تاريخ الإرجاع', 'السعر الإجمالي', 'الحالة'];
+        case 'Payments':
+          return ['معرف الدفع', 'معرف الحجز', 'المبلغ', 'الفئة', 'الحالة', 'معرف المعاملة', 'التاريخ'];
+        case 'Revenue':
+          return ['معرف الدفع', 'معرف الحجز', 'المبلغ', 'الفئة', 'الحالة', 'التاريخ'];
+        case 'Vehicles':
+          return ['الماركة والموديل', 'رقم اللوحة', 'الفئة', 'السعر اليومي', 'المسافة المقطوعة', 'الفرع', 'الحالة'];
+        case 'Maintenance':
+          return ['عنوان الصيانة', 'السيارة', 'التكلفة', 'تاريخ البداية', 'تاريخ النهاية', 'الحالة'];
+        case 'Customers':
+          return ['المستخدم', 'البريد الإلكتروني', 'الهاتف', 'مستوى العضوية', 'النقاط', 'موثق', 'نشط'];
+        case 'Reward Points':
+          return ['معرف المستخدم', 'معرف الحجز', 'الفئة', 'تغيير النقاط', 'الرصيد بعد', 'السبب', 'التاريخ'];
+        case 'Reviews':
+          return ['العميل', 'معرف السيارة', 'التقييم', 'التعليق', 'التاريخ', 'الإجراءات'];
+        case 'Open Rentals':
+          return ['معرف الحجز', 'السيارة', 'العميل', 'تاريخ الاستلام', 'الحالة'];
+        case 'Overdue Rentals':
+          return ['معرف الحجز', 'السيارة', 'العميل', 'تاريخ الاستحقاق', 'الحالة'];
+        case 'Promotions & Discounts':
+        case 'Promotions':
+          return ['معرف الحجز', 'العميل', 'رمز / اسم العرض', 'السعر الأصلي', 'مبلغ الخصم', 'السعر النهائي', 'التاريخ'];
+        default:
+          return [];
+      }
+    } else {
+      switch (type) {
+        case 'Bookings':
+          return ['Booking ID', 'Vehicle', 'Customer', 'Pickup Date', 'Return Date', 'Total Price', 'Status'];
+        case 'Payments':
+          return ['Payment ID', 'Booking ID', 'Amount', 'Method', 'Status', 'Transaction ID', 'Date'];
+        case 'Revenue':
+          return ['Payment ID', 'Booking ID', 'Amount', 'Method', 'Status', 'Date'];
+        case 'Vehicles':
+          return ['Brand & Model', 'Plate Number', 'Category', 'Daily Rate', 'Mileage', 'Branch', 'Status'];
+        case 'Maintenance':
+          return ['Job Title', 'Vehicle', 'Cost', 'Start Date', 'End Date', 'Status'];
+        case 'Customers':
+          return ['Name', 'Email', 'Phone', 'Membership Level', 'Points', 'Verified', 'Active'];
+        case 'Reward Points':
+          return ['User ID', 'Booking ID', 'Type', 'Points Change', 'Balance After', 'Reason', 'Date'];
+        case 'Reviews':
+          return ['Customer', 'Vehicle ID', 'Rating', 'Comment', 'Date', 'Actions'];
+        case 'Open Rentals':
+          return ['Booking ID', 'Vehicle', 'Customer', 'Pickup Date', 'Status'];
+        case 'Overdue Rentals':
+          return ['Booking ID', 'Vehicle', 'Customer', 'Due Date', 'Status'];
+        case 'Promotions & Discounts':
+        case 'Promotions':
+          return ['Booking ID', 'Customer', 'Promo Code / Name', 'Original Price', 'Discount Amount', 'Final Price', 'Date'];
+        default:
+          return [];
+      }
     }
   }
 
-  List<List<String>> _getReportTableData(String type) {
+  List<List<String>> _getReportTableData(String type, [bool? isArabicParam]) {
+    final isArabic = isArabicParam ??
+        Provider.of<LanguageProvider>(context, listen: false).isArabic;
+
+    String formatStatus(String status) {
+      if (!isArabic) return status.toUpperCase();
+      switch (status.toLowerCase()) {
+        case 'completed':
+          return 'مكتمل';
+        case 'active':
+        case 'ongoing':
+          return 'نشط';
+        case 'pending':
+          return 'معلق';
+        case 'cancelled':
+          return 'ملغى';
+        case 'overdue':
+          return 'متأخر';
+        case 'approved':
+          return 'معتمد';
+        case 'paid':
+          return 'مدفوع';
+        case 'rejected':
+          return 'مرفوض';
+        case 'available':
+          return 'متاح';
+        case 'booked':
+          return 'محجوز';
+        case 'maintenance':
+          return 'صيانة';
+        case 'inactive':
+          return 'غير نشط';
+        default:
+          return status.toUpperCase();
+      }
+    }
+
     switch (type) {
       case 'Bookings':
         return _getFilteredBookings()
@@ -1003,12 +1230,12 @@ class _ReportsViewState extends State<ReportsView> {
                 b.userName,
                 DateFormat('dd/MM/yyyy').format(b.pickUpDate),
                 b.isOpenRental
-                    ? 'Open Rental'
+                    ? (isArabic ? 'إيجار مفتوح' : 'Open Rental')
                     : (b.returnDate != null
-                          ? DateFormat('dd/MM/yyyy').format(b.returnDate!)
-                          : 'N/A'),
+                        ? DateFormat('dd/MM/yyyy').format(b.returnDate!)
+                        : 'N/A'),
                 'RM ${b.totalPrice.toStringAsFixed(2)}',
-                b.status.toUpperCase(),
+                formatStatus(b.status),
               ],
             )
             .toList();
@@ -1020,7 +1247,7 @@ class _ReportsViewState extends State<ReportsView> {
                 p.bookingId.substring(0, min(8, p.bookingId.length)),
                 'RM ${p.amount.toStringAsFixed(2)}',
                 p.paymentMethod,
-                (p.paymentStatus ?? p.status).toUpperCase(),
+                formatStatus(p.paymentStatus ?? p.status),
                 p.transactionId ?? 'N/A',
                 DateFormat('dd/MM/yyyy').format(p.paymentDate),
               ],
@@ -1038,7 +1265,7 @@ class _ReportsViewState extends State<ReportsView> {
                 p.bookingId.substring(0, min(8, p.bookingId.length)),
                 'RM ${p.amount.toStringAsFixed(2)}',
                 p.paymentMethod,
-                (p.paymentStatus ?? p.status).toUpperCase(),
+                formatStatus(p.paymentStatus ?? p.status),
                 DateFormat('dd/MM/yyyy').format(p.paymentDate),
               ],
             )
@@ -1049,11 +1276,13 @@ class _ReportsViewState extends State<ReportsView> {
               (v) => [
                 '${v.brand} ${v.model}',
                 v.plateNumber,
-                v.category,
+                isArabic ? v.category.tr(context) : v.category,
                 'RM ${v.pricePerDay.toStringAsFixed(2)}',
                 '${v.mileage} KM',
-                v.branchName.isEmpty ? 'Main Hub' : v.branchName,
-                v.status.toUpperCase(),
+                v.branchName.isEmpty
+                    ? (isArabic ? 'المركز الرئيسي' : 'Main Hub')
+                    : v.branchName,
+                formatStatus(v.status),
               ],
             )
             .toList();
@@ -1066,7 +1295,7 @@ class _ReportsViewState extends State<ReportsView> {
                 'RM ${j.cost.toStringAsFixed(2)}',
                 j.startDate,
                 j.endDate,
-                j.status.toUpperCase(),
+                formatStatus(j.status),
               ],
             )
             .toList();
@@ -1077,10 +1306,18 @@ class _ReportsViewState extends State<ReportsView> {
                 c.fullName,
                 c.email,
                 c.phone.isEmpty ? 'N/A' : c.phone,
-                CompanySettingsProvider().determineLevel(c.rewardPoints),
-                '${c.rewardPoints} pts',
-                c.isVerified ? 'YES' : 'NO',
-                c.isActive ? 'YES' : 'NO',
+                isArabic
+                    ? CompanySettingsProvider()
+                        .determineLevel(c.rewardPoints)
+                        .tr(context)
+                    : CompanySettingsProvider().determineLevel(c.rewardPoints),
+                '${c.rewardPoints} ${isArabic ? "نقاط" : "pts"}',
+                c.isVerified
+                    ? (isArabic ? 'نعم' : 'YES')
+                    : (isArabic ? 'لا' : 'NO'),
+                c.isActive
+                    ? (isArabic ? 'نعم' : 'YES')
+                    : (isArabic ? 'لا' : 'NO'),
               ],
             )
             .toList();
@@ -1097,11 +1334,9 @@ class _ReportsViewState extends State<ReportsView> {
             (tx['type'] ?? '').toString().toUpperCase(),
             '${tx['points'] ?? 0}',
             '${tx['balanceAfter'] ?? 0}',
-            (tx['reason'] ?? tx['comment'] ?? 'Loyalty Action').toString(),
+            (tx['reason'] ?? tx['comment'] ?? (isArabic ? 'إجراء ولاء' : 'Loyalty Action')).toString(),
             tx['createdAt'] != null
-                ? DateFormat(
-                    'dd/MM/yyyy',
-                  ).format(DateTime.parse(tx['createdAt']))
+                ? DateFormat('dd/MM/yyyy').format(DateTime.parse(tx['createdAt']))
                 : 'N/A',
           ];
         }).toList();
@@ -1114,6 +1349,7 @@ class _ReportsViewState extends State<ReportsView> {
                 '${r.rating} ⭐',
                 r.comment,
                 DateFormat('dd/MM/yyyy').format(r.createdAt),
+                r.id,
               ],
             )
             .toList();
@@ -1126,7 +1362,7 @@ class _ReportsViewState extends State<ReportsView> {
                 b.vehicleName,
                 b.userName,
                 DateFormat('dd/MM/yyyy').format(b.pickUpDate),
-                b.status.toUpperCase(),
+                formatStatus(b.status),
               ],
             )
             .toList();
@@ -1141,7 +1377,7 @@ class _ReportsViewState extends State<ReportsView> {
                 b.returnDate != null
                     ? DateFormat('dd/MM/yyyy').format(b.returnDate!)
                     : 'N/A',
-                b.status.toUpperCase(),
+                formatStatus(b.status),
               ],
             )
             .toList();
@@ -1153,7 +1389,9 @@ class _ReportsViewState extends State<ReportsView> {
               (b) => [
                 b.id.substring(0, min(8, b.id.length)),
                 b.userName,
-                b.promotionCode ?? b.promotionName ?? 'Points Discount',
+                b.promotionCode ??
+                    b.promotionName ??
+                    (isArabic ? 'خصم نقاط' : 'Points Discount'),
                 'RM ${(b.totalPrice + b.discountAmount).toStringAsFixed(2)}',
                 'RM ${b.discountAmount.toStringAsFixed(2)}',
                 'RM ${b.totalPrice.toStringAsFixed(2)}',
@@ -1262,7 +1500,7 @@ class _ReportsViewState extends State<ReportsView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Operations Reports Center',
+              'Operations Reports Center'.tr(context),
               style: TextStyle(
                 fontSize: isNarrow ? 18 : 24,
                 fontWeight: FontWeight.w900,
@@ -1273,9 +1511,9 @@ class _ReportsViewState extends State<ReportsView> {
             if (hasActiveAIFilters) ...[
               const SizedBox(height: 8),
               Chip(
-                label: const Text(
-                  'AI Synced',
-                  style: TextStyle(
+                label: Text(
+                  'AI Synced'.tr(context),
+                  style: const TextStyle(
                     fontSize: 10,
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -1292,7 +1530,7 @@ class _ReportsViewState extends State<ReportsView> {
             ],
             const SizedBox(height: 6),
             Text(
-              'Generate operational analytics ledgers based on filters and custom date periods.',
+              'Generate operational analytics ledgers based on filters and custom date periods.'.tr(context),
               style: TextStyle(fontSize: 13, color: textSecondary),
               softWrap: true,
             ),
@@ -1393,7 +1631,7 @@ class _ReportsViewState extends State<ReportsView> {
               ),
               const SizedBox(width: 8),
               Text(
-                'Report Period',
+                'Report Period'.tr(context),
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -1424,7 +1662,7 @@ class _ReportsViewState extends State<ReportsView> {
                   final isSel = _selectedPeriod == p;
                   return ChoiceChip(
                     label: Text(
-                      p,
+                      p.tr(context),
                       style: TextStyle(
                         color: isSel ? Colors.white : textPrimary,
                         fontSize: 11,
@@ -1490,7 +1728,7 @@ class _ReportsViewState extends State<ReportsView> {
                         icon: const Icon(Icons.date_range, size: 16),
                         label: Text(
                           _startDate == null
-                              ? 'Select Start Date'
+                              ? 'Select Start Date'.tr(context)
                               : DateFormat('dd MMM yyyy').format(_startDate!),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -1516,7 +1754,7 @@ class _ReportsViewState extends State<ReportsView> {
                         icon: const Icon(Icons.date_range, size: 16),
                         label: Text(
                           _endDate == null
-                              ? 'Select End Date'
+                              ? 'Select End Date'.tr(context)
                               : DateFormat('dd MMM yyyy').format(_endDate!),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -1555,7 +1793,7 @@ class _ReportsViewState extends State<ReportsView> {
           ListTile(
             leading: Icon(Icons.tune, color: AppColors.primaryOrange, size: 20),
             title: Text(
-              'Advanced filters & segments',
+              'Advanced filters & segments'.tr(context),
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
@@ -1563,7 +1801,7 @@ class _ReportsViewState extends State<ReportsView> {
               ),
             ),
             subtitle: Text(
-              'Filter by Branch, Customer, Statuses, Vehicle properties',
+              'Filter by Branch, Customer, Statuses, Vehicle properties'.tr(context),
               style: TextStyle(fontSize: 11, color: textSecondary),
             ),
             trailing: IconButton(
@@ -1600,7 +1838,7 @@ class _ReportsViewState extends State<ReportsView> {
                         children: [
                           filterCell(
                             _buildFilterDropdown(
-                              'Branch Location',
+                              'Branch Location'.tr(context),
                               _selectedBranch,
                               [
                                 'All',
@@ -1618,7 +1856,7 @@ class _ReportsViewState extends State<ReportsView> {
                           ),
                           filterCell(
                             _buildFilterDropdown(
-                              'Vehicle',
+                              'Vehicle'.tr(context),
                               _selectedVehicle,
                               ['All', ...widget.vehicles.map((v) => v.id)],
                               (val) {
@@ -1627,7 +1865,7 @@ class _ReportsViewState extends State<ReportsView> {
                               textPrimary,
                               textSecondary,
                               itemLabelBuilder: (val) {
-                                if (val == 'All') return 'All Vehicles';
+                                if (val == 'All') return 'All Vehicles'.tr(context);
                                 final v = _getVehicleById(val);
                                 return v != null
                                     ? '${v.brand} ${v.model} (${v.plateNumber})'
@@ -1637,7 +1875,7 @@ class _ReportsViewState extends State<ReportsView> {
                           ),
                           filterCell(
                             _buildFilterDropdown(
-                              'Customer',
+                              'Customer'.tr(context),
                               _selectedCustomer,
                               [
                                 'All',
@@ -1651,7 +1889,7 @@ class _ReportsViewState extends State<ReportsView> {
                               textPrimary,
                               textSecondary,
                               itemLabelBuilder: (val) {
-                                if (val == 'All') return 'All Customers';
+                                if (val == 'All') return 'All Customers'.tr(context);
                                 final u = _getUserById(val);
                                 return u != null ? u.fullName : val;
                               },
@@ -1659,7 +1897,7 @@ class _ReportsViewState extends State<ReportsView> {
                           ),
                           filterCell(
                             _buildFilterDropdown(
-                              'Booking Status',
+                              'Booking Status'.tr(context),
                               _selectedBookingStatus,
                               [
                                 'All',
@@ -1680,7 +1918,7 @@ class _ReportsViewState extends State<ReportsView> {
                           ),
                           filterCell(
                             _buildFilterDropdown(
-                              'Payment Status',
+                              'Payment Status'.tr(context),
                               _selectedPaymentStatus,
                               [
                                 'All',
@@ -1698,7 +1936,7 @@ class _ReportsViewState extends State<ReportsView> {
                           ),
                           filterCell(
                             _buildFilterDropdown(
-                              'Vehicle Status',
+                              'Vehicle Status'.tr(context),
                               _selectedVehicleStatus,
                               [
                                 'All',
@@ -1716,7 +1954,7 @@ class _ReportsViewState extends State<ReportsView> {
                           ),
                           filterCell(
                             _buildFilterDropdown(
-                              'Membership Level',
+                              'Membership Level'.tr(context),
                               _selectedMembershipLevel,
                               ['All', 'Bronze', 'Silver', 'Gold', 'Premium'],
                               (val) {
@@ -1748,8 +1986,8 @@ class _ReportsViewState extends State<ReportsView> {
                             _currentPage = 1;
                           });
                         },
-                        child: const Text(
-                          'Reset All Filters',
+                        child: Text(
+                          'Reset All Filters'.tr(context),
                           style: TextStyle(
                             color: Colors.redAccent,
                             fontWeight: FontWeight.bold,
@@ -1801,7 +2039,9 @@ class _ReportsViewState extends State<ReportsView> {
             return DropdownMenuItem<String>(
               value: item,
               child: Text(
-                itemLabelBuilder != null ? itemLabelBuilder(item) : item,
+                itemLabelBuilder != null
+                    ? itemLabelBuilder(item)
+                    : item.tr(context),
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
               ),
@@ -1907,7 +2147,7 @@ class _ReportsViewState extends State<ReportsView> {
         ),
         _buildMetricCard(
           'Avg Duration',
-          '${kpis['avgDuration'].toStringAsFixed(1)} Days',
+          '${kpis['avgDuration'].toStringAsFixed(1)} ${"Days".tr(context)}',
           Icons.timelapse_rounded,
           Colors.indigo,
           cardColor,
@@ -1957,7 +2197,7 @@ class _ReportsViewState extends State<ReportsView> {
         ),
         _buildMetricCard(
           'Reward Points Issued',
-          '${kpis['rewardPointsIssued']} pts',
+          '${kpis['rewardPointsIssued']} ${"pts".tr(context)}',
           Icons.military_tech_rounded,
           Colors.deepOrange,
           cardColor,
@@ -2002,7 +2242,7 @@ class _ReportsViewState extends State<ReportsView> {
             children: [
               Flexible(
                 child: Text(
-                  title,
+                  title.tr(context),
                   style: TextStyle(
                     color: textSecondary,
                     fontSize: 10,
@@ -2163,7 +2403,7 @@ class _ReportsViewState extends State<ReportsView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Revenue and Bookings Trends',
+            'Revenue and Bookings Trends'.tr(context),
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
@@ -2172,7 +2412,7 @@ class _ReportsViewState extends State<ReportsView> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Approved Revenue Trend (Last 7 Active Days)',
+            'Approved Revenue Trend (Last 7 Active Days)'.tr(context),
             style: TextStyle(fontSize: 11, color: textSecondary),
           ),
           const SizedBox(height: 10),
@@ -2180,7 +2420,7 @@ class _ReportsViewState extends State<ReportsView> {
             height: 140,
             padding: const EdgeInsets.only(top: 10),
             child: revEntries.isEmpty
-                ? const Center(child: Text('No revenue records in this period'))
+                ? Center(child: Text('No revenue records in this period'.tr(context)))
                 : LayoutBuilder(
                     builder: (context, constraints) {
                       final minChartWidth = revEntries.length * 54.0;
@@ -2251,7 +2491,7 @@ class _ReportsViewState extends State<ReportsView> {
           const Divider(),
           const SizedBox(height: 16),
           Text(
-            'Booking Volume Trend (Last 7 Active Days)',
+            'Booking Volume Trend (Last 7 Active Days)'.tr(context),
             style: TextStyle(fontSize: 11, color: textSecondary),
           ),
           const SizedBox(height: 10),
@@ -2259,8 +2499,8 @@ class _ReportsViewState extends State<ReportsView> {
             height: 140,
             padding: const EdgeInsets.only(top: 10),
             child: bookingEntries.isEmpty
-                ? const Center(
-                    child: Text('No bookings records in this period'),
+                ? Center(
+                    child: Text('No bookings records in this period'.tr(context)),
                   )
                 : LayoutBuilder(
                     builder: (context, constraints) {
@@ -2367,7 +2607,7 @@ class _ReportsViewState extends State<ReportsView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Payments & Vehicle Usage Metrics',
+            'Payments & Vehicle Usage Metrics'.tr(context),
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
@@ -2376,14 +2616,14 @@ class _ReportsViewState extends State<ReportsView> {
           ),
           const SizedBox(height: 20),
           Text(
-            'Payment Volume Distribution by Method',
+            'Payment Volume Distribution by Method'.tr(context),
             style: TextStyle(fontSize: 11, color: textSecondary),
           ),
           const SizedBox(height: 12),
           SizedBox(
             height: 120,
             child: methodEntries.isEmpty
-                ? const Center(child: Text('No payment methods recorded'))
+                ? Center(child: Text('No payment methods recorded'.tr(context)))
                 : Row(
                     children: [
                       SizedBox(
@@ -2449,15 +2689,15 @@ class _ReportsViewState extends State<ReportsView> {
           const Divider(),
           const SizedBox(height: 16),
           Text(
-            'Top Active Rented Fleet Units',
+            'Top Active Rented Fleet Units'.tr(context),
             style: TextStyle(fontSize: 11, color: textSecondary),
           ),
           const SizedBox(height: 10),
           Container(
             padding: const EdgeInsets.symmetric(vertical: 10),
             child: topUsage.isEmpty
-                ? const Center(
-                    child: Text('No active rental logs in this period'),
+                ? Center(
+                    child: Text('No active rental logs in this period'.tr(context)),
                   )
                 : Column(
                     children: topUsage.map((e) {
@@ -2495,7 +2735,7 @@ class _ReportsViewState extends State<ReportsView> {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              '${e.value} times',
+                              '${e.value} ${"times".tr(context)}',
                               style: TextStyle(
                                 fontSize: 10,
                                 color: textSecondary,
@@ -2553,7 +2793,7 @@ class _ReportsViewState extends State<ReportsView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Overdue Reservations & Maintenance Cost Analytics',
+            'Overdue Reservations & Maintenance Cost Analytics'.tr(context),
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
@@ -2576,7 +2816,7 @@ class _ReportsViewState extends State<ReportsView> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Overdue vs Completed Rentals Ratio',
+                    'Overdue vs Completed Rentals Ratio'.tr(context),
                     style: TextStyle(fontSize: 11, color: textSecondary),
                   ),
                   const SizedBox(height: 12),
@@ -2587,7 +2827,7 @@ class _ReportsViewState extends State<ReportsView> {
                       vertical: 8,
                     ),
                     child: (overdueCount == 0 && onTimeCount == 0)
-                        ? const Center(child: Text('No relevant booking logs'))
+                        ? Center(child: Text('No relevant booking logs'.tr(context)))
                         : Column(
                             children: [
                               Expanded(
@@ -2638,21 +2878,21 @@ class _ReportsViewState extends State<ReportsView> {
                                 ),
                               ),
                               const SizedBox(height: 6),
-                              const Wrap(
+                              Wrap(
                                 spacing: 24,
                                 runSpacing: 2,
                                 alignment: WrapAlignment.center,
                                 children: [
                                   Text(
-                                    'Overdue',
-                                    style: TextStyle(
+                                    'Overdue'.tr(context),
+                                    style: const TextStyle(
                                       fontSize: 8,
                                       color: Colors.redAccent,
                                     ),
                                   ),
                                   Text(
-                                    'Returned',
-                                    style: TextStyle(
+                                    'Returned'.tr(context),
+                                    style: const TextStyle(
                                       fontSize: 8,
                                       color: Colors.green,
                                     ),
@@ -2669,7 +2909,7 @@ class _ReportsViewState extends State<ReportsView> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Fleet Maintenance Costs by Vehicle Unit (Total: RM ${totalMaintCost.toStringAsFixed(0)})',
+                    '${"Fleet Maintenance Costs by Vehicle Unit (Total: RM ".tr(context)}${totalMaintCost.toStringAsFixed(0)})',
                     style: TextStyle(fontSize: 11, color: textSecondary),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -2820,7 +3060,7 @@ class _ReportsViewState extends State<ReportsView> {
                           .map(
                             (t) => DropdownMenuItem(
                               value: t,
-                              child: Text('$t Ledger'),
+                              child: Text('${t.tr(context)} ${"Ledger".tr(context)}'),
                             ),
                           )
                           .toList(),
@@ -2847,7 +3087,7 @@ class _ReportsViewState extends State<ReportsView> {
                         style: TextStyle(color: textPrimary, fontSize: 13),
                         decoration: InputDecoration(
                           prefixIcon: const Icon(Icons.search, size: 16),
-                          hintText: 'Search records...',
+                          hintText: 'Search records...'.tr(context),
                           hintStyle: TextStyle(
                             color: textSecondary.withValues(alpha: 0.6),
                             fontSize: 13,
@@ -2889,7 +3129,7 @@ class _ReportsViewState extends State<ReportsView> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'No operational records found matching the active filters',
+                      'No operational records found matching the active filters'.tr(context),
                       style: TextStyle(
                         color: textSecondary,
                         fontWeight: FontWeight.bold,
@@ -2922,6 +3162,43 @@ class _ReportsViewState extends State<ReportsView> {
                     .cast<DataColumn>(),
                 rows: paginatedData
                     .map<DataRow>((row) {
+                      if (type == 'Reviews' && row.length >= 6) {
+                        final reviewId = row[5];
+                        final reviewObj = widget.reviews.firstWhere(
+                          (r) => r.id == reviewId,
+                          orElse: () => ReviewModel(
+                            id: reviewId,
+                            bookingId: '',
+                            vehicleId: row[1],
+                            userId: '',
+                            userName: row[0],
+                            rating: 5,
+                            comment: row[3],
+                            createdAt: DateTime.now(),
+                          ),
+                        );
+                        final bool canDelete = ReviewService.canManageComments(UserSession().currentRole);
+
+                        return DataRow(
+                          cells: [
+                            DataCell(Text(row[0], style: TextStyle(color: textPrimary, fontSize: 12))),
+                            DataCell(Text(row[1], style: TextStyle(color: textPrimary, fontSize: 12))),
+                            DataCell(Text(row[2], style: TextStyle(color: textPrimary, fontSize: 12))),
+                            DataCell(Text(row[3], style: TextStyle(color: textPrimary, fontSize: 12))),
+                            DataCell(Text(row[4], style: TextStyle(color: textPrimary, fontSize: 12))),
+                            DataCell(
+                              canDelete
+                                  ? IconButton(
+                                      icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18),
+                                      tooltip: 'Delete Comment',
+                                      onPressed: () => _confirmAndDeleteReview(reviewObj),
+                                    )
+                                  : const SizedBox(),
+                            ),
+                          ],
+                        );
+                      }
+
                       return DataRow(
                         cells: row
                             .map<DataCell>(
@@ -2951,7 +3228,7 @@ class _ReportsViewState extends State<ReportsView> {
                 builder: (context, constraints) {
                   final isNarrow = constraints.maxWidth < 560;
                   final recordsText = Text(
-                    'Showing ${startIdx + 1} to $endIdx of $totalRecords records',
+                    '${"Showing ".tr(context)}${startIdx + 1}${" to ".tr(context)}$endIdx${" of ".tr(context)}$totalRecords${" records".tr(context)}',
                     style: TextStyle(fontSize: 12, color: textSecondary),
                   );
 
@@ -2965,7 +3242,7 @@ class _ReportsViewState extends State<ReportsView> {
                             : null,
                       ),
                       Text(
-                        'Page $_currentPage of ${max(1, totalPages)}',
+                        '${"Page ".tr(context)}$_currentPage${" of ".tr(context)}${max(1, totalPages)}',
                         style: TextStyle(
                           fontSize: 12,
                           color: textPrimary,

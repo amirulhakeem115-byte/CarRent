@@ -22,6 +22,7 @@ class PaymentModel {
   final String? rejectionReason;
   final String? paymentTime;
   final bool? rewardPointsAwarded;
+  final String paymentPurpose; // "rental" or "delivery"
 
   PaymentModel({
     required this.id,
@@ -45,6 +46,7 @@ class PaymentModel {
     this.rejectionReason,
     this.paymentTime,
     this.rewardPointsAwarded,
+    this.paymentPurpose = 'rental',
   });
 
   factory PaymentModel.fromMap(
@@ -79,6 +81,7 @@ class PaymentModel {
       rejectionReason: data['rejectionReason'],
       paymentTime: data['paymentTime'],
       rewardPointsAwarded: data['rewardPointsAwarded'] as bool?,
+      paymentPurpose: (data['paymentPurpose'] ?? 'rental').toString().toLowerCase(),
     );
   }
 
@@ -104,6 +107,7 @@ class PaymentModel {
       'rejectionReason': rejectionReason,
       'paymentTime': paymentTime,
       'rewardPointsAwarded': rewardPointsAwarded,
+      'paymentPurpose': paymentPurpose,
     };
   }
 }

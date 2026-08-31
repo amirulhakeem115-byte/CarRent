@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_model.dart';
+import '../providers/language_provider.dart';
 import 'notification_service.dart';
 import 'user_role_cache.dart';
 import 'user_session.dart';
@@ -465,6 +466,7 @@ class DatabaseService {
             'licenseNumber': licenseNumber,
             'licenseStatus': 'unprovided',
             'licenseRejectionReason': '',
+            'preferredLanguage': LanguageProvider().locale.languageCode,
           })
           .timeout(const Duration(seconds: 5));
 
@@ -519,6 +521,7 @@ class DatabaseService {
             'address': '4521 Oakwood Avenue, Suite 300, Los Angeles, CA 90024',
             'licenseClass': 'Class DA',
             'licenseExpiry': '12 / 2028',
+            'preferredLanguage': LanguageProvider().locale.languageCode,
           })
           .timeout(const Duration(seconds: 5));
 
@@ -676,19 +679,15 @@ class DatabaseService {
   }
 
   List<UserModel>? _cachedUsers;
-  DateTime? _usersCacheTime;
-  static const Duration _cacheTtl = Duration(seconds: 30);
 
   void invalidateUsersCache() {
     _cachedUsers = null;
-    _usersCacheTime = null;
   }
 
   Future<List<UserModel>> getUsers({bool forceRefresh = false}) async {
     if (!forceRefresh &&
         _cachedUsers != null &&
-        _usersCacheTime != null &&
-        DateTime.now().difference(_usersCacheTime!) < _cacheTtl) {
+        _cachedUsers!.isNotEmpty) {
       debugPrint(
         '[DatabaseService] Returning warm cached users (${_cachedUsers!.length} items)',
       );
@@ -696,28 +695,36 @@ class DatabaseService {
     }
 
     List<UserModel> users = [];
+    final perfSw = Stopwatch()..start();
+    debugPrint('[PERF] Starting customers/users query');
 
     try {
       final snapshot = await _db
           .child('users')
           .get()
           .timeout(const Duration(seconds: 15));
-      if (snapshot.exists) {
+      if (snapshot.exists && snapshot.value != null) {
         final Map<dynamic, dynamic> data =
             snapshot.value as Map<dynamic, dynamic>;
         data.forEach((key, value) {
-          users.add(
-            UserModel.fromMap(key.toString(), value as Map<dynamic, dynamic>),
-          );
+          if (value is Map) {
+            users.add(
+              UserModel.fromMap(key.toString(), value),
+            );
+          }
         });
       }
       _cachedUsers = users;
-      _usersCacheTime = DateTime.now();
+      perfSw.stop();
       debugPrint(
-        '[DatabaseService] [getUsers] Users count loaded: ${users.length}',
+        '[PERF] Customers/users query completed: ${perfSw.elapsedMilliseconds}ms (${users.length} items)',
       );
     } catch (e) {
-      debugPrint('[DatabaseService] [getUsers] Error listing users: $e');
+      perfSw.stop();
+      debugPrint('[PERF] Customers/users query FAILED in ${perfSw.elapsedMilliseconds}ms: $e');
+      if (_cachedUsers != null && _cachedUsers!.isNotEmpty) {
+        return _cachedUsers!;
+      }
       rethrow;
     }
     return users;
@@ -842,13 +849,34 @@ class DatabaseService {
           .child('qr_payment_settings')
           .get()
           .timeout(const Duration(seconds: 5));
-      if (snapshot.exists) {
-        return Map<String, dynamic>.from(snapshot.value as Map);
+      if (snapshot.exists && snapshot.value != null) {
+        final Map<String, dynamic> result = {};
+        if (snapshot.value is Map) {
+          (snapshot.value as Map).forEach((key, value) {
+            result[key.toString()] = value;
+          });
+        }
+        return result;
       }
     } catch (e) {
       debugPrint('Error getting QR settings: $e');
     }
     return null;
+  }
+
+  Stream<Map<String, dynamic>> getQrPaymentSettingsStream() {
+    return _db.child('qr_payment_settings').onValue.map((event) {
+      if (event.snapshot.exists && event.snapshot.value != null) {
+        final Map<String, dynamic> result = {};
+        if (event.snapshot.value is Map) {
+          (event.snapshot.value as Map).forEach((key, value) {
+            result[key.toString()] = value;
+          });
+        }
+        return result;
+      }
+      return {};
+    });
   }
 
   Future<void> updateQrPaymentSettings(Map<String, dynamic> settings) async {
@@ -931,15 +959,18 @@ class DatabaseService {
   Stream<List<UserModel>> getUsersStream() {
     return _db.child('users').onValue.map((event) {
       List<UserModel> users = [];
-      if (event.snapshot.exists) {
+      if (event.snapshot.exists && event.snapshot.value != null) {
         final Map<dynamic, dynamic> data =
             event.snapshot.value as Map<dynamic, dynamic>;
         data.forEach((key, value) {
-          users.add(
-            UserModel.fromMap(key.toString(), value as Map<dynamic, dynamic>),
-          );
+          if (value is Map) {
+            users.add(
+              UserModel.fromMap(key.toString(), value),
+            );
+          }
         });
       }
+      _cachedUsers = users;
       return users;
     });
   }

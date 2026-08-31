@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -12,6 +13,9 @@ import 'booking_screen.dart';
 import 'customer_responsive_shell.dart';
 import '../../../widgets/app_image.dart';
 import '../../../services/payment_restriction_service.dart';
+import '../../../services/user_session.dart';
+import '../../../services/review_service.dart';
+import '../../../l10n/app_translations.dart';
 
 class VehicleDetailsScreen extends StatefulWidget {
   final VehicleModel vehicle;
@@ -298,9 +302,9 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     alignment: Alignment.center,
-                    child: const Text(
-                      'BOOKED',
-                      style: TextStyle(
+                    child: Text(
+                      'BOOKED'.tr(context),
+                      style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w900,
                         fontSize: 24,
@@ -318,9 +322,9 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                     color: AppColors.primaryOrange,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Text(
-                    'PREMIUM CHOICE',
-                    style: TextStyle(
+                  child: Text(
+                    'PREMIUM CHOICE'.tr(context),
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 9,
                       fontWeight: FontWeight.bold,
@@ -413,7 +417,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  _vehicle.status.toUpperCase(),
+                  _vehicle.status.toUpperCase().tr(context),
                   style: TextStyle(
                     color: _getStatusColor(_vehicle.status),
                     fontSize: 10,
@@ -432,14 +436,20 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                 children: [
                   const Icon(Icons.star_rounded, color: Colors.amber, size: 20),
                   const SizedBox(width: 4),
-                  Text(
-                    _avgRating > 0 ? _avgRating.toStringAsFixed(1) : "4.8",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _textColor),
+                  Directionality(
+                    textDirection: ui.TextDirection.ltr,
+                    child: Text(
+                      _avgRating > 0 ? _avgRating.toStringAsFixed(1) : "4.8",
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _textColor),
+                    ),
                   ),
                   const SizedBox(width: 6),
-                  Text(
-                    '(${_reviews.length} reviews)',
-                    style: TextStyle(fontSize: 12, color: _subColor),
+                  Directionality(
+                    textDirection: ui.TextDirection.ltr,
+                    child: Text(
+                      '(${_reviews.length} ${'reviews'.tr(context)})',
+                      style: TextStyle(fontSize: 12, color: _subColor),
+                    ),
                   ),
                 ],
               ),
@@ -447,15 +457,18 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    'DAILY RATE',
+                    'DAILY RATE'.tr(context),
                     style: TextStyle(fontSize: 9, color: _subColor, fontWeight: FontWeight.bold, letterSpacing: 0.5),
                   ),
-                  Text(
-                    'RM ${_vehicle.pricePerDay.toStringAsFixed(0)}/Day',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 18,
-                      color: AppColors.primaryOrange,
+                  Directionality(
+                    textDirection: ui.TextDirection.ltr,
+                    child: Text(
+                      'RM ${_vehicle.pricePerDay.toStringAsFixed(0)}/${'Day'.tr(context)}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 18,
+                        color: AppColors.primaryOrange,
+                      ),
                     ),
                   ),
                 ],
@@ -484,10 +497,10 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
               onPressed: isAvailable ? _handleBookNow : null,
               child: Text(
                 isAvailable
-                    ? 'Book Your Ride'
+                    ? 'Book Your Ride'.tr(context)
                     : _vehicle.status.toLowerCase() == 'booked'
-                        ? 'Currently Booked'
-                        : 'Under Maintenance',
+                        ? 'Currently Booked'.tr(context)
+                        : 'Under Maintenance'.tr(context),
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               ),
             ),
@@ -518,7 +531,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Specifications',
+            'Specifications'.tr(context),
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w900,
@@ -541,19 +554,26 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
       crossAxisSpacing: 12,
       mainAxisSpacing: 12,
       children: [
-        _buildSpecCard('TRANSMISSION', _vehicle.transmission, Icons.settings_input_component_outlined),
-        _buildSpecCard('ENGINE', _vehicle.engine, Icons.offline_bolt_outlined),
-        _buildSpecCard('FUEL TYPE', _vehicle.fuelType, Icons.local_gas_station_outlined),
-        _buildSpecCard('SEATING', '${_vehicle.seats} Seats', Icons.airline_seat_recline_normal_rounded),
-        _buildSpecCard('MILEAGE', '${_vehicle.mileage} km', Icons.speed_rounded),
-        _buildSpecCard('MODEL YEAR', '${_vehicle.year}', Icons.calendar_today_rounded),
-        _buildSpecCard('AIR COND', _vehicle.ac ? 'Equipped' : 'N/A', Icons.ac_unit_rounded),
-        _buildSpecCard('COLOR', _vehicle.color, Icons.palette_outlined),
+        _buildSpecCard('TRANSMISSION'.tr(context), _vehicle.transmission.tr(context), Icons.settings_input_component_outlined),
+        _buildSpecCard('ENGINE'.tr(context), _vehicle.engine, Icons.offline_bolt_outlined, isLtr: true),
+        _buildSpecCard('FUEL TYPE'.tr(context), _vehicle.fuelType.tr(context), Icons.local_gas_station_outlined),
+        _buildSpecCard('SEATING'.tr(context), '${_vehicle.seats} ${'Seats'.tr(context)}', Icons.airline_seat_recline_normal_rounded, isLtr: true),
+        _buildSpecCard('MILEAGE'.tr(context), '${_vehicle.mileage} ${'km'.tr(context)}', Icons.speed_rounded, isLtr: true),
+        _buildSpecCard('MODEL YEAR'.tr(context), '${_vehicle.year}', Icons.calendar_today_rounded, isLtr: true),
+        _buildSpecCard('AIR COND'.tr(context), _vehicle.ac ? 'Equipped'.tr(context) : 'N/A'.tr(context), Icons.ac_unit_rounded),
+        _buildSpecCard('COLOR'.tr(context), _vehicle.color.tr(context), Icons.palette_outlined),
       ],
     );
   }
 
-  Widget _buildSpecCard(String label, String value, IconData icon) {
+  Widget _buildSpecCard(String label, String value, IconData icon, {bool isLtr = false}) {
+    final Widget valueWidget = Text(
+      value,
+      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: _textColor),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -586,12 +606,12 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  value,
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: _textColor),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                isLtr
+                    ? Directionality(
+                        textDirection: ui.TextDirection.ltr,
+                        child: valueWidget,
+                      )
+                    : valueWidget,
               ],
             ),
           ),
@@ -621,14 +641,14 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Description',
+            'Description'.tr(context),
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: _textColor),
           ),
           const SizedBox(height: 12),
           Text(
             _vehicle.description.isNotEmpty
                 ? _vehicle.description
-                : 'No description provided for this vehicle.',
+                : 'No description provided for this vehicle.'.tr(context),
             style: TextStyle(color: _subColor, height: 1.6, fontSize: 13),
           ),
         ],
@@ -657,7 +677,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Car Equipment & Features',
+            'Car Equipment & Features'.tr(context),
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w900,
@@ -667,7 +687,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
           const SizedBox(height: 16),
           _vehicle.equipment.isEmpty
               ? Text(
-                  'Standard package inclusions.',
+                  'Standard package inclusions.'.tr(context),
                   style: TextStyle(color: _subColor, fontSize: 12),
                 )
               : Wrap(
@@ -682,7 +702,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              item,
+                              item.tr(context),
                               style: TextStyle(
                                 color: _textColor,
                                 fontWeight: FontWeight.bold,
@@ -723,7 +743,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Maintenance Records',
+            'Maintenance Records'.tr(context),
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: _textColor),
           ),
           const SizedBox(height: 16),
@@ -732,7 +752,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     child: Text(
-                      'No public maintenance logs recorded.',
+                      'No public maintenance logs recorded.'.tr(context),
                       style: TextStyle(color: _subColor, fontSize: 12),
                     ),
                   ),
@@ -755,10 +775,10 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                         TableRow(
                           decoration: BoxDecoration(color: _isDark ? const Color(0xFF1B2436) : AppColors.secondaryBlue),
                           children: [
-                            _buildTableHeaderCell('SERVICE TYPE'),
-                            _buildTableHeaderCell('DESCRIPTION'),
-                            _buildTableHeaderCell('START DATE'),
-                            _buildTableHeaderCell('END DATE'),
+                            _buildTableHeaderCell('SERVICE TYPE'.tr(context)),
+                            _buildTableHeaderCell('DESCRIPTION'.tr(context)),
+                            _buildTableHeaderCell('START DATE'.tr(context)),
+                            _buildTableHeaderCell('END DATE'.tr(context)),
                           ],
                         ),
                         ..._maintenanceJobs.map((record) {
@@ -767,10 +787,10 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                               border: Border(bottom: BorderSide(color: _isDark ? const Color(0xFF334155) : AppColors.borderGray)),
                             ),
                             children: [
-                              _buildTableCell(record.title, isBold: true),
-                              _buildTableCell(record.description.isNotEmpty ? record.description : 'Routine servicing'),
-                              _buildTableCell(record.startDate),
-                              _buildTableCell(record.endDate),
+                              _buildTableCell(record.title.tr(context), isBold: true),
+                              _buildTableCell(record.description.isNotEmpty ? record.description.tr(context) : 'Routine servicing'.tr(context)),
+                              _buildTableCell(record.startDate, isLtr: true),
+                              _buildTableCell(record.endDate, isLtr: true),
                             ],
                           );
                         }),
@@ -799,19 +819,26 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
     );
   }
 
-  Widget _buildTableCell(String text, {bool isBold = false}) {
+  Widget _buildTableCell(String text, {bool isBold = false, bool isLtr = false}) {
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final Widget labelWidget = Text(
+      text,
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        color: isDark ? const Color(0xFFCBD5E1) : AppColors.secondaryBlue,
+        fontSize: 11,
+        fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+      ),
+    );
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
-      child: Text(
-        text,
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          color: isDark ? const Color(0xFFCBD5E1) : AppColors.secondaryBlue,
-          fontSize: 11,
-          fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-        ),
-      ),
+      child: isLtr
+          ? Directionality(
+              textDirection: ui.TextDirection.ltr,
+              child: labelWidget,
+            )
+          : labelWidget,
     );
   }
 
@@ -848,7 +875,59 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
     });
   }
 
+  Future<void> _confirmAndDeleteComment(ReviewModel review) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Delete Comment?'.tr(context)),
+        content: Text('This comment will no longer be visible to the customer.'.tr(context)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text('Cancel'.tr(context)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text('Delete'.tr(context)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await ReviewService().deleteReview(review.id);
+        if (mounted) {
+          setState(() {
+            _reviews.removeWhere((r) => r.id == review.id);
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Comment deleted successfully'.tr(context)),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${'Failed to delete comment:'.tr(context)} $e'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   Widget _buildReviewsSection() {
+    final bool canDeleteComments = ReviewService.canManageComments(UserSession().currentRole);
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -872,21 +951,27 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Customer Reviews',
+                'Customer Reviews'.tr(context),
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: _textColor),
               ),
               Row(
                 children: [
                   const Icon(Icons.star_rounded, color: Colors.amber, size: 20),
                   const SizedBox(width: 4),
-                  Text(
-                    _avgRating > 0 ? _avgRating.toStringAsFixed(1) : "0.0",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _textColor),
+                  Directionality(
+                    textDirection: ui.TextDirection.ltr,
+                    child: Text(
+                      _avgRating > 0 ? _avgRating.toStringAsFixed(1) : "0.0",
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _textColor),
+                    ),
                   ),
                   const SizedBox(width: 4),
-                  Text(
-                    '(${_reviews.length})',
-                    style: TextStyle(fontSize: 12, color: _subColor),
+                  Directionality(
+                    textDirection: ui.TextDirection.ltr,
+                    child: Text(
+                      '(${_reviews.length})',
+                      style: TextStyle(fontSize: 12, color: _subColor),
+                    ),
                   ),
                 ],
               ),
@@ -898,7 +983,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     child: Text(
-                      'No reviews yet for this vehicle.',
+                      'No reviews yet for this vehicle.'.tr(context),
                       style: TextStyle(color: _subColor, fontSize: 12),
                     ),
                   ),
@@ -916,13 +1001,35 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              review.userName,
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: _textColor),
+                            Row(
+                              children: [
+                                Text(
+                                  review.userName,
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: _textColor),
+                                ),
+                                if (canDeleteComments) ...[
+                                  const SizedBox(width: 6),
+                                  InkWell(
+                                    onTap: () => _confirmAndDeleteComment(review),
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: const Padding(
+                                      padding: EdgeInsets.all(4.0),
+                                      child: Icon(
+                                        Icons.delete_outline,
+                                        size: 18,
+                                        color: Colors.redAccent,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
-                            Text(
-                              DateFormat('dd MMM yyyy').format(review.createdAt),
-                              style: TextStyle(fontSize: 11, color: _subColor),
+                            Directionality(
+                              textDirection: ui.TextDirection.ltr,
+                              child: Text(
+                                DateFormat('dd MMM yyyy').format(review.createdAt),
+                                style: TextStyle(fontSize: 11, color: _subColor),
+                              ),
                             ),
                           ],
                         ),

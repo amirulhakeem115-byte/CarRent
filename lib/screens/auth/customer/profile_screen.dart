@@ -30,8 +30,10 @@ import '../../../services/file_download_helper.dart'
 
 import '../login_screen.dart';
 import 'reward_history_screen.dart';
+import '../../../widgets/language_selector_widget.dart';
 import '../../../services/company_settings_provider.dart';
 import '../../../services/payment_restriction_service.dart';
+import '../../../l10n/app_translations.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -453,38 +455,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              ListTile(
-                leading: const Icon(Icons.visibility_outlined),
-                title: const Text('View Profile Image'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _viewProfileImage();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library_outlined),
-                title: const Text('Edit Profile Image'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _pickProfileImage();
-                },
-              ),
-              ListTile(
-                enabled: hasImage,
-                leading: const Icon(
-                  Icons.delete_outline,
-                  color: Colors.redAccent,
+              Material(
+                color: Colors.transparent,
+                child: ListTile(
+                  leading: const Icon(Icons.visibility_outlined),
+                  title: const Text('View Profile Image'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _viewProfileImage();
+                  },
                 ),
-                title: const Text(
-                  'Remove Profile Image',
-                  style: TextStyle(color: Colors.redAccent),
+              ),
+              Material(
+                color: Colors.transparent,
+                child: ListTile(
+                  leading: const Icon(Icons.photo_library_outlined),
+                  title: const Text('Edit Profile Image'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickProfileImage();
+                  },
                 ),
-                onTap: hasImage
-                    ? () {
-                        Navigator.pop(context);
-                        _removeProfileImage();
-                      }
-                    : null,
+              ),
+              Material(
+                color: Colors.transparent,
+                child: ListTile(
+                  enabled: hasImage,
+                  leading: const Icon(
+                    Icons.delete_outline,
+                    color: Colors.redAccent,
+                  ),
+                  title: const Text(
+                    'Remove Profile Image',
+                    style: TextStyle(color: Colors.redAccent),
+                  ),
+                  onTap: hasImage
+                      ? () {
+                          Navigator.pop(context);
+                          _removeProfileImage();
+                        }
+                      : null,
+                ),
               ),
               const SizedBox(height: 8),
             ],
@@ -509,7 +520,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             borderRadius: BorderRadius.circular(20),
           ),
           title: Text(
-            'Edit Profile Details',
+            'Edit Profile Details'.tr(context),
             style: TextStyle(
               fontWeight: FontWeight.bold,
               color: Theme.of(context).brightness == Brightness.dark
@@ -523,25 +534,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 TextField(
                   controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Full Name',
-                    prefixIcon: Icon(Icons.person_outline),
+                  decoration: InputDecoration(
+                    labelText: 'Full Name'.tr(context),
+                    prefixIcon: const Icon(Icons.person_outline),
                   ),
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: phoneController,
-                  decoration: const InputDecoration(
-                    labelText: 'Phone Number',
-                    prefixIcon: Icon(Icons.phone_outlined),
+                  decoration: InputDecoration(
+                    labelText: 'Phone Number'.tr(context),
+                    prefixIcon: const Icon(Icons.phone_outlined),
                   ),
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: addressController,
-                  decoration: const InputDecoration(
-                    labelText: 'Residential Address',
-                    prefixIcon: Icon(Icons.home_outlined),
+                  decoration: InputDecoration(
+                    labelText: 'Residential Address'.tr(context),
+                    prefixIcon: const Icon(Icons.home_outlined),
                   ),
                 ),
               ],
@@ -550,7 +561,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              child: Text('Cancel'.tr(context)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -566,14 +577,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 if (!context.mounted) return;
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Profile updated successfully'),
+                  SnackBar(
+                    content: Text('Profile updated successfully'.tr(context)),
                     backgroundColor: Colors.green,
                   ),
                 );
                 _loadProfileData();
               },
-              child: const Text('Save'),
+              child: Text('Save'.tr(context)),
             ),
           ],
         );
@@ -779,7 +790,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
 
-    return SingleChildScrollView(
+    final bodyContent = SingleChildScrollView(
       padding: EdgeInsets.symmetric(
         horizontal: isDesktop ? 60.0 : 20.0,
         vertical: 24.0,
@@ -956,6 +967,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
+                    const LanguageSelectorWidget(),
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.secondaryBlue,
@@ -969,9 +981,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                       icon: const Icon(Icons.edit, size: 16),
-                      label: const Text(
-                        'Edit Profile',
-                        style: TextStyle(
+                      label: Text(
+                        'Edit Profile'.tr(context),
+                        style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
@@ -991,9 +1003,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                       icon: const Icon(Icons.logout, size: 16),
-                      label: const Text(
-                        'Logout',
-                        style: TextStyle(
+                      label: Text(
+                        'Logout'.tr(context),
+                        style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
@@ -1008,479 +1020,460 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 24),
 
           // Dual Column layout (Grid layout in mockup)
-          Flex(
-            direction: isDesktop ? Axis.horizontal : Axis.vertical,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Left Column: Personal info & credentials
-              Expanded(
-                flex: isDesktop ? 4 : 0,
-                child: Column(
-                  children: [
-                    // 1. Personal Information Card
-                    _buildInfoCard(
-                      title: 'Personal Information',
-                      icon: Icons.person_outline,
-                      children: [
-                        _buildDetailRow('EMAIL ADDRESS', _user?.email ?? 'N/A'),
-                        _buildDetailRow('PHONE NUMBER', _user?.phone ?? 'N/A'),
-                        _buildDetailRow(
-                          'RESIDENTIAL ADDRESS',
-                          _user?.address ?? 'N/A',
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    // 2. Loyalty Rewards
-                    _buildMembershipCard(isDark),
-                    const SizedBox(height: 16),
-
-                    // 3. Theme Settings
-                    _buildInfoCard(
-                      title: 'Theme Settings',
-                      icon: Icons.brightness_6_outlined,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'THEME MODE',
-                                    style: TextStyle(
-                                      color: Colors.grey,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    themeProvider.themeMode == ThemeMode.system
-                                        ? 'System'
-                                        : themeProvider.themeMode ==
-                                              ThemeMode.light
-                                        ? 'Light Mode'
-                                        : 'Dark Mode',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: isDark
-                                          ? Colors.white
-                                          : AppColors.secondaryBlue,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            DropdownButton<ThemeMode>(
-                              value: themeProvider.themeMode == ThemeMode.dark
-                                  ? ThemeMode.dark
-                                  : ThemeMode.light,
-                              onChanged: (mode) {
-                                if (mode != null) {
-                                  themeProvider.setThemeMode(mode);
-                                }
-                              },
-                              dropdownColor: isDark
-                                  ? const Color(0xFF1E293B)
-                                  : Colors.white,
-                              style: TextStyle(
-                                color: isDark
-                                    ? Colors.white
-                                    : AppColors.secondaryBlue,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              items: const [
-                                DropdownMenuItem(
-                                  value: ThemeMode.light,
-                                  child: Text('Light'),
-                                ),
-                                DropdownMenuItem(
-                                  value: ThemeMode.dark,
-                                  child: Text('Dark'),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    // 4. Identity Verification
-                    _buildIdentityVerificationCard(isDark),
-                  ],
-                ),
-              ),
-              if (isDesktop) const SizedBox(width: 24),
-              if (!isDesktop) const SizedBox(height: 24),
-
-              // Right Column: Recent Bookings (Grid Right in mockup)
-              Expanded(
-                flex: isDesktop ? 5 : 0,
-                child: Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).cardColor,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: isDark
-                          ? const Color(0xFF334155)
-                          : Colors.grey[200]!,
-                    ),
+          Builder(
+            builder: (context) {
+              final Widget leftCol = Column(
+                children: [
+                  // 1. Personal Information Card
+                  _buildInfoCard(
+                    title: 'Personal Information'.tr(context),
+                    icon: Icons.person_outline,
+                    children: [
+                      _buildDetailRow('EMAIL ADDRESS'.tr(context), _user?.email ?? 'N/A'),
+                      _buildDetailRow('PHONE NUMBER'.tr(context), _user?.phone ?? 'N/A'),
+                      _buildDetailRow(
+                        'RESIDENTIAL ADDRESS'.tr(context),
+                        _user?.address ?? 'N/A',
+                      ),
+                    ],
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  const SizedBox(height: 16),
+
+                  // 2. Loyalty Rewards
+                  _buildMembershipCard(isDark),
+                  const SizedBox(height: 16),
+
+                  // 3. Theme Settings
+                  _buildInfoCard(
+                    title: 'Theme Settings'.tr(context),
+                    icon: Icons.brightness_6_outlined,
                     children: [
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'Recent Bookings',
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'THEME MODE'.tr(context),
+                                  style: const TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  (themeProvider.themeMode == ThemeMode.system
+                                      ? 'System'
+                                      : themeProvider.themeMode ==
+                                            ThemeMode.light
+                                      ? 'Light Mode'
+                                      : 'Dark Mode').tr(context),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark
+                                        ? Colors.white
+                                        : AppColors.secondaryBlue,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          DropdownButton<ThemeMode>(
+                            value: themeProvider.themeMode == ThemeMode.dark
+                                ? ThemeMode.dark
+                                : ThemeMode.light,
+                            onChanged: (mode) {
+                              if (mode != null) {
+                                themeProvider.setThemeMode(mode);
+                              }
+                            },
+                            dropdownColor: isDark
+                                ? const Color(0xFF1E293B)
+                                : Colors.white,
                             style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
                               color: isDark
                                   ? Colors.white
                                   : AppColors.secondaryBlue,
+                              fontWeight: FontWeight.bold,
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      // Statistics Row
-                      SizedBox(
-                        height: isDesktop ? 240 : null,
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 20),
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? const Color(0xFF0F172A)
-                                : const Color(0xFFF8F9FA),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isDark
-                                  ? const Color(0xFF334155)
-                                  : Colors.grey[200]!,
-                            ),
-                          ),
-                          child: GridView.count(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            crossAxisCount: isDesktop ? 2 : 2,
-                            childAspectRatio: isDesktop ? 2.2 : 2.0,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                            children: [
-                              _buildStatMiniTile(
-                                'Total Bookings',
-                                '${_bookings.length}',
-                                Icons.book_online,
-                                Colors.blue,
+                            items: [
+                              DropdownMenuItem(
+                                value: ThemeMode.light,
+                                child: Text('Light'.tr(context)),
                               ),
-                              _buildStatMiniTile(
-                                'Active Bookings',
-                                '${_bookings.where((b) => b.status == 'approved' || b.status == 'active' || b.status == 'ongoing').length}',
-                                Icons.directions_car,
-                                Colors.orange,
-                              ),
-                              _buildStatMiniTile(
-                                'Completed',
-                                '${_bookings.where((b) => b.status == 'completed').length}',
-                                Icons.check_circle_outline,
-                                Colors.green,
-                              ),
-                              _buildStatMiniTile(
-                                'Total Spent',
-                                'RM ${_bookings.where((b) => b.status == 'completed' || b.status == 'active' || b.status == 'approved' || b.status == 'ongoing').fold(0.0, (sum, b) => sum + b.totalPrice).toStringAsFixed(0)}',
-                                Icons.monetization_on,
-                                Colors.indigo,
+                              DropdownMenuItem(
+                                value: ThemeMode.dark,
+                                child: Text('Dark'.tr(context)),
                               ),
                             ],
                           ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 4. Identity Verification
+                  _buildIdentityVerificationCard(isDark),
+                ],
+              );
+
+              final Widget rightCol = Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).cardColor,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isDark
+                        ? const Color(0xFF334155)
+                        : Colors.grey[200]!,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Recent Bookings'.tr(context),
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: isDark
+                                ? Colors.white
+                                : AppColors.secondaryBlue,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Statistics Row
+                    SizedBox(
+                      height: isDesktop ? 240 : null,
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 20),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? const Color(0xFF0F172A)
+                              : const Color(0xFFF8F9FA),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isDark
+                                ? const Color(0xFF334155)
+                                : Colors.grey[200]!,
+                          ),
+                        ),
+                        child: GridView.count(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          crossAxisCount: isDesktop ? 2 : 2,
+                          childAspectRatio: isDesktop ? 2.2 : 2.0,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          children: [
+                            _buildStatMiniTile(
+                              'Total Bookings'.tr(context),
+                              '${_bookings.length}',
+                              Icons.book_online,
+                              Colors.blue,
+                            ),
+                            _buildStatMiniTile(
+                              'Active Bookings'.tr(context),
+                              '${_bookings.where((b) => b.status == 'approved' || b.status == 'active' || b.status == 'ongoing').length}',
+                              Icons.directions_car,
+                              Colors.orange,
+                            ),
+                            _buildStatMiniTile(
+                              'Completed'.tr(context),
+                              '${_bookings.where((b) => b.status == 'completed').length}',
+                              Icons.check_circle_outline,
+                              Colors.green,
+                            ),
+                            _buildStatMiniTile(
+                              'Total Spent'.tr(context),
+                              'RM ${_bookings.where((b) => b.status == 'completed' || b.status == 'active' || b.status == 'approved' || b.status == 'ongoing').fold(0.0, (sum, b) => sum + b.totalPrice).toStringAsFixed(0)}',
+                              Icons.monetization_on,
+                              Colors.indigo,
+                            ),
+                          ],
                         ),
                       ),
-                      _bookings.isEmpty
-                          ? Center(
-                              child: Padding(
-                                padding: const EdgeInsets.all(32.0),
-                                child: Column(
-                                  children: [
-                                    Icon(
-                                      Icons.history_toggle_off,
-                                      size: 48,
-                                      color: Colors.grey[300],
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Text(
-                                      'No rental history found.',
-                                      style: TextStyle(color: Colors.grey[500]),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            )
-                          : ListView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: _bookings.length > 5
-                                  ? 5
-                                  : _bookings.length,
-                              itemBuilder: (context, index) {
-                                final booking = _bookings[index];
-                                final dateFormat = DateFormat('dd MMM yyyy');
-
-                                Color statusColor = Colors.orange;
-                                if (booking.status == 'approved' ||
-                                    booking.status == 'ongoing') {
-                                  statusColor = Colors.blue;
-                                } else if (booking.status == 'completed') {
-                                  statusColor = Colors.green;
-                                } else if (booking.status == 'cancelled' ||
-                                    booking.status == 'rejected') {
-                                  statusColor = Colors.red;
-                                }
-                                final paymentList = _payments
-                                    .where((p) => p.bookingId == booking.id)
-                                    .toList();
-                                final payment = paymentList.isNotEmpty
-                                    ? paymentList.first
-                                    : null;
-
-                                return Card(
-                                  color: isDark
-                                      ? const Color(0xFF1E293B)
-                                      : const Color(0xFFF8F9FA),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    side: BorderSide(
-                                      color: isDark
-                                          ? const Color(0xFF334155)
-                                          : Colors.grey[200]!,
-                                    ),
+                    ),
+                    _bookings.isEmpty
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(32.0),
+                              child: Column(
+                                children: [
+                                  Icon(
+                                    Icons.history_toggle_off,
+                                    size: 48,
+                                    color: Colors.grey[300],
                                   ),
-                                  elevation: 0,
-                                  margin: const EdgeInsets.only(bottom: 12),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(12.0),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            // Left rounded vehicle image
-                                            Container(
-                                              width: 80,
-                                              height: 60,
-                                              decoration: BoxDecoration(
-                                                color: Colors.grey[200],
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                              ),
-                                              child: const Icon(
-                                                Icons.directions_car,
-                                                color: Colors.grey,
-                                              ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    'No rental history found.'.tr(context),
+                                    style: TextStyle(color: Colors.grey[500]),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        : ListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: _bookings.length > 5
+                                ? 5
+                                : _bookings.length,
+                            itemBuilder: (context, index) {
+                              final booking = _bookings[index];
+                              final dateFormat = DateFormat('dd MMM yyyy');
+
+                              Color statusColor = Colors.orange;
+                              if (booking.status == 'approved' ||
+                                  booking.status == 'ongoing') {
+                                statusColor = Colors.blue;
+                              } else if (booking.status == 'completed') {
+                                statusColor = Colors.green;
+                              } else if (booking.status == 'cancelled' ||
+                                  booking.status == 'rejected') {
+                                statusColor = Colors.red;
+                              }
+                              final paymentList = _payments
+                                  .where((p) => p.bookingId == booking.id)
+                                  .toList();
+                              final payment = paymentList.isNotEmpty
+                                  ? paymentList.first
+                                  : null;
+
+                              return Card(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                elevation: 0,
+                                color: isDark
+                                    ? const Color(0xFF0F172A)
+                                    : Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  side: BorderSide(
+                                    color: isDark
+                                        ? const Color(0xFF334155)
+                                        : Colors.grey[200]!,
+                                  ),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Column(
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Container(
+                                            width: 40,
+                                            height: 40,
+                                            decoration: BoxDecoration(
+                                              color: AppColors.primaryOrange
+                                                  .withValues(alpha: 0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
                                             ),
-                                            const SizedBox(width: 12),
-                                            // Center detail text block
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    booking.vehicleName,
-                                                    style: const TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 14,
-                                                      color: AppColors
-                                                          .secondaryBlue,
+                                            child: const Icon(
+                                              Icons.directions_car,
+                                              color: AppColors.primaryOrange,
+                                              size: 20,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  booking.vehicleName,
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: isDark
+                                                        ? Colors.white
+                                                        : AppColors
+                                                              .secondaryBlue,
+                                                    fontSize: 13,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Row(
+                                                  children: [
+                                                    const Icon(
+                                                      Icons.calendar_today,
+                                                      size: 10,
+                                                      color: Colors.grey,
                                                     ),
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                  ),
-                                                  const SizedBox(height: 2),
-                                                  Text(
-                                                    'Booking ID: #${booking.id.substring(0, booking.id.length > 8 ? 8 : booking.id.length).toUpperCase()}',
-                                                    style: TextStyle(
-                                                      color: Colors.grey[500],
-                                                      fontSize: 10,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                    ),
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                  ),
-                                                  const SizedBox(height: 4),
-                                                  Row(
-                                                    children: [
-                                                      const Icon(
-                                                        Icons.calendar_today,
-                                                        size: 10,
-                                                        color: Colors.grey,
-                                                      ),
-                                                      const SizedBox(width: 4),
-                                                      Expanded(
-                                                        child: Text(
-                                                          booking.isOpenRental
-                                                              ? '${dateFormat.format(booking.pickUpDate)} - Open Rental'
-                                                              : '${dateFormat.format(booking.pickUpDate)} - ${booking.returnDate != null ? dateFormat.format(booking.returnDate!) : ""}',
-                                                          style: TextStyle(
-                                                            color: Colors
-                                                                .grey[600],
-                                                            fontSize: 10,
-                                                          ),
-                                                          maxLines: 1,
-                                                          overflow: TextOverflow
-                                                              .ellipsis,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  const SizedBox(height: 2),
-                                                  Row(
-                                                    children: [
-                                                      const Icon(
-                                                        Icons.payments_outlined,
-                                                        size: 10,
-                                                        color: Colors.grey,
-                                                      ),
-                                                      const SizedBox(width: 4),
-                                                      Text(
-                                                        'RM ${booking.totalPrice.toStringAsFixed(2)}',
+                                                    const SizedBox(width: 4),
+                                                    Expanded(
+                                                      child: Text(
+                                                        booking.isOpenRental
+                                                            ? '${dateFormat.format(booking.pickUpDate)} - Open Rental'
+                                                            : '${dateFormat.format(booking.pickUpDate)} - ${booking.returnDate != null ? dateFormat.format(booking.returnDate!) : ""}',
                                                         style: TextStyle(
-                                                          color:
-                                                              Colors.grey[600],
+                                                          color: Colors
+                                                              .grey[600],
                                                           fontSize: 10,
-                                                          fontWeight:
-                                                              FontWeight.bold,
                                                         ),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
                                                       ),
-                                                    ],
-                                                  ),
-                                                ],
-                                              ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Row(
+                                                  children: [
+                                                    const Icon(
+                                                      Icons.payments_outlined,
+                                                      size: 10,
+                                                      color: Colors.grey,
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      'RM ${booking.totalPrice.toStringAsFixed(2)}',
+                                                      style: const TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 11,
+                                                        color: AppColors
+                                                            .primaryOrange,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
                                             ),
-                                            // Right status badge
-                                            const SizedBox(width: 8),
-                                            ConstrainedBox(
-                                              constraints: const BoxConstraints(
-                                                maxWidth: 92,
-                                              ),
-                                              child: FittedBox(
-                                                fit: BoxFit.scaleDown,
-                                                alignment:
-                                                    Alignment.centerRight,
-                                                child: Container(
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                        horizontal: 8,
-                                                        vertical: 4,
-                                                      ),
-                                                  decoration: BoxDecoration(
-                                                    color: statusColor
-                                                        .withValues(alpha: 0.1),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          6,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.end,
+                                            children: [
+                                              MouseRegion(
+                                                cursor:
+                                                    SystemMouseCursors.click,
+                                                child: GestureDetector(
+                                                  onTap: payment != null
+                                                      ? () {
+                                                          _openReceiptLightbox(
+                                                            payment,
+                                                          );
+                                                        }
+                                                      : null,
+                                                  child: Container(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 8,
+                                                          vertical: 4,
                                                         ),
-                                                  ),
-                                                  child: Text(
-                                                    booking.status
-                                                        .toUpperCase(),
-                                                    style: TextStyle(
-                                                      color: statusColor,
-                                                      fontSize: 9,
-                                                      fontWeight:
-                                                          FontWeight.bold,
+                                                    decoration: BoxDecoration(
+                                                      color: statusColor
+                                                          .withValues(alpha: 0.1),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            6,
+                                                          ),
+                                                    ),
+                                                    child: Text(
+                                                      booking.status
+                                                          .toUpperCase(),
+                                                      style: TextStyle(
+                                                        color: statusColor,
+                                                        fontSize: 9,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
                                                     ),
                                                   ),
                                                 ),
                                               ),
-                                            ),
-                                          ],
-                                        ),
-                                        if (payment != null) ...[
-                                          const Divider(height: 16),
-                                          LayoutBuilder(
-                                            builder: (context, constraints) {
-                                              final bool isNarrow =
-                                                  constraints.maxWidth < 360;
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                      if (payment != null) ...[
+                                        const Divider(height: 16),
+                                        LayoutBuilder(
+                                          builder: (context, constraints) {
+                                            final bool isNarrow =
+                                                constraints.maxWidth < 360;
 
-                                              final statusRow = Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  const Text(
-                                                    'Payment Status: ',
-                                                    style: TextStyle(
-                                                      fontSize: 11,
-                                                      color: Colors.grey,
-                                                      fontWeight:
-                                                          FontWeight.w600,
+                                            final Widget statusRow = Row(
+                                              children: [
+                                                _buildPaymentBadge(payment),
+                                              ],
+                                            );
+
+                                            final Widget actionsWrap = Wrap(
+                                              spacing: 8,
+                                              runSpacing: 4,
+                                              alignment: WrapAlignment.end,
+                                              children: [
+                                                if (payment.receiptImage !=
+                                                        null &&
+                                                    payment.receiptImage!
+                                                        .isNotEmpty)
+                                                  TextButton.icon(
+                                                    onPressed: () {
+                                                      _openReceiptLightbox(
+                                                        payment,
+                                                      );
+                                                    },
+                                                    icon: const Icon(
+                                                      Icons.receipt_long,
+                                                      size: 14,
+                                                    ),
+                                                    label: const Text(
+                                                      'Receipt',
+                                                      style: TextStyle(
+                                                        fontSize: 10,
+                                                      ),
+                                                    ),
+                                                    style: TextButton.styleFrom(
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 8,
+                                                          ),
+                                                      minimumSize: Size.zero,
+                                                      tapTargetSize:
+                                                          MaterialTapTargetSize
+                                                              .shrinkWrap,
                                                     ),
                                                   ),
-                                                  _buildPaymentBadge(payment),
-                                                ],
-                                              );
-
-                                              final actionsWrap = Wrap(
-                                                spacing: 8,
-                                                runSpacing: 4,
-                                                alignment: WrapAlignment.end,
-                                                children: [
-                                                  if (payment.receiptImage !=
-                                                          null &&
-                                                      payment
-                                                          .receiptImage!
-                                                          .isNotEmpty)
-                                                    TextButton.icon(
-                                                      onPressed: () =>
-                                                          _openReceiptLightbox(
-                                                            payment,
-                                                          ),
-                                                      icon: const Icon(
-                                                        Icons
-                                                            .visibility_outlined,
-                                                        size: 14,
-                                                        color: AppColors
-                                                            .secondaryBlue,
-                                                      ),
-                                                      label: const Text(
-                                                        'View Receipt',
-                                                        style: TextStyle(
-                                                          color: AppColors
-                                                              .secondaryBlue,
-                                                          fontSize: 11,
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                        ),
-                                                      ),
-                                                      style: TextButton.styleFrom(
-                                                        padding:
-                                                            const EdgeInsets.symmetric(
-                                                              horizontal: 8,
-                                                              vertical: 4,
-                                                            ),
-                                                        tapTargetSize:
-                                                            MaterialTapTargetSize
-                                                                .shrinkWrap,
-                                                      ),
-                                                    ),
-                                                  if (payment.paymentStatus ==
-                                                      'Rejected')
-                                                    TextButton.icon(
-                                                      onPressed:
+                                                if (payment.paymentStatus ==
+                                                    'Rejected')
+                                                  TextButton.icon(
+                                                    onPressed:
+                                                        _vehicles.any(
+                                                          (v) =>
+                                                              v.id ==
+                                                                  booking
+                                                                      .vehicleId &&
+                                                              v.status.toLowerCase() ==
+                                                                  'maintenance',
+                                                        )
+                                                        ? null
+                                                        : () =>
+                                                              _showReUploadReceiptDialog(
+                                                                payment,
+                                                              ),
+                                                    icon: Icon(
+                                                      Icons.replay_outlined,
+                                                      size: 14,
+                                                      color:
                                                           _vehicles.any(
                                                             (v) =>
                                                                 v.id ==
@@ -1489,14 +1482,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                                 v.status.toLowerCase() ==
                                                                     'maintenance',
                                                           )
-                                                          ? null
-                                                          : () =>
-                                                                _showReUploadReceiptDialog(
-                                                                  payment,
-                                                                ),
-                                                      icon: Icon(
-                                                        Icons.replay_outlined,
-                                                        size: 14,
+                                                          ? Colors.grey
+                                                          : Colors.orange,
+                                                    ),
+                                                    label: Text(
+                                                      _vehicles.any(
+                                                            (v) =>
+                                                                v.id ==
+                                                                    booking
+                                                                        .vehicleId &&
+                                                                v.status.toLowerCase() ==
+                                                                    'maintenance',
+                                                          )
+                                                          ? 'Under Maintenance'
+                                                          : 'Re-upload Receipt',
+                                                      style: TextStyle(
+                                                        fontSize: 10,
                                                         color:
                                                             _vehicles.any(
                                                               (v) =>
@@ -1507,141 +1508,159 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                                       'maintenance',
                                                             )
                                                             ? Colors.grey
-                                                            : AppColors
-                                                                  .primaryOrange,
-                                                      ),
-                                                      label: Text(
-                                                        _vehicles.any(
-                                                              (v) =>
-                                                                  v.id ==
-                                                                      booking
-                                                                          .vehicleId &&
-                                                                  v.status.toLowerCase() ==
-                                                                      'maintenance',
-                                                            )
-                                                            ? 'Under Maintenance'
-                                                            : 'Re-upload Receipt',
-                                                        style: TextStyle(
-                                                          color:
-                                                              _vehicles.any(
-                                                                (v) =>
-                                                                    v.id ==
-                                                                        booking
-                                                                            .vehicleId &&
-                                                                    v.status.toLowerCase() ==
-                                                                        'maintenance',
-                                                              )
-                                                              ? Colors.grey
-                                                              : AppColors
-                                                                    .primaryOrange,
-                                                          fontSize: 11,
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                        ),
-                                                      ),
-                                                      style: TextButton.styleFrom(
-                                                        padding:
-                                                            const EdgeInsets.symmetric(
-                                                              horizontal: 8,
-                                                              vertical: 4,
-                                                            ),
-                                                        tapTargetSize:
-                                                            MaterialTapTargetSize
-                                                                .shrinkWrap,
+                                                            : Colors.orange,
                                                       ),
                                                     ),
-                                                ],
-                                              );
-
-                                              if (isNarrow) {
-                                                return Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    statusRow,
-                                                    const SizedBox(height: 6),
-                                                    Align(
-                                                      alignment:
-                                                          Alignment.centerRight,
-                                                      child: actionsWrap,
+                                                    style: TextButton.styleFrom(
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 8,
+                                                          ),
+                                                      minimumSize: Size.zero,
+                                                      tapTargetSize:
+                                                          MaterialTapTargetSize
+                                                              .shrinkWrap,
                                                     ),
-                                                  ],
-                                                );
-                                              }
+                                                  ),
+                                              ],
+                                            );
 
-                                              return Row(
+                                            if (isNarrow) {
+                                              return Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
                                                 children: [
-                                                  Expanded(child: statusRow),
-                                                  actionsWrap,
+                                                  statusRow,
+                                                  const SizedBox(height: 6),
+                                                  Align(
+                                                    alignment:
+                                                        Alignment.centerRight,
+                                                    child: actionsWrap,
+                                                  ),
                                                 ],
                                               );
-                                            },
-                                          ),
-                                          if (payment.paymentStatus ==
-                                                  'Rejected' &&
-                                              payment.rejectionReason != null &&
-                                              payment
-                                                  .rejectionReason!
-                                                  .isNotEmpty) ...[
-                                            const SizedBox(height: 6),
-                                            Align(
-                                              alignment: Alignment.centerLeft,
-                                              child: Text(
-                                                'Rejection Reason: ${payment.rejectionReason}',
-                                                style: const TextStyle(
-                                                  color: Colors.redAccent,
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
+                                            }
+
+                                            return Row(
+                                              children: [
+                                                Expanded(child: statusRow),
+                                                actionsWrap,
+                                              ],
+                                            );
+                                          },
+                                        ),
+                                        if (payment.paymentStatus ==
+                                                'Rejected' &&
+                                            payment.rejectionReason != null &&
+                                            payment.rejectionReason!
+                                                .isNotEmpty)
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                              top: 4,
+                                            ),
+                                            child: Text(
+                                              'Reason: ${payment.rejectionReason}',
+                                              style: const TextStyle(
+                                                color: Colors.red,
+                                                fontSize: 10,
+                                                fontStyle: FontStyle.italic,
                                               ),
                                             ),
-                                          ],
-                                        ],
-                                        if (booking.status == 'completed') ...[
-                                          const Divider(height: 16),
-                                          SizedBox(
-                                            width: double.infinity,
-                                            height: 32,
-                                            child: ElevatedButton.icon(
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor:
-                                                    AppColors.secondaryBlue,
-                                                foregroundColor: Colors.white,
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(6),
-                                                ),
-                                              ),
-                                              icon: const Icon(
-                                                Icons.rate_review,
-                                                size: 14,
-                                              ),
-                                              label: const Text(
-                                                'SUBMIT REVIEW',
-                                                style: TextStyle(
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                              onPressed: () =>
-                                                  _submitReview(booking),
-                                            ),
                                           ),
-                                        ],
                                       ],
-                                    ),
+                                      if (booking.status == 'completed') ...[
+                                        const Divider(height: 16),
+                                        SizedBox(
+                                          width: double.infinity,
+                                          height: 32,
+                                          child: ElevatedButton.icon(
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor:
+                                                  AppColors.secondaryBlue,
+                                              foregroundColor: Colors.white,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                              ),
+                                            ),
+                                            icon: const Icon(
+                                              Icons.rate_review,
+                                              size: 14,
+                                            ),
+                                            label: const Text(
+                                              'SUBMIT REVIEW',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            onPressed: () =>
+                                                _submitReview(booking),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
-                                );
-                              },
-                            ),
-                    ],
-                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ],
                 ),
-              ),
-            ],
+              );
+
+              return Flex(
+                direction: isDesktop ? Axis.horizontal : Axis.vertical,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (isDesktop)
+                    Expanded(flex: 4, child: leftCol)
+                  else
+                    leftCol,
+                  if (isDesktop) const SizedBox(width: 24),
+                  if (!isDesktop) const SizedBox(height: 24),
+                  if (isDesktop)
+                    Expanded(flex: 5, child: rightCol)
+                  else
+                    rightCol,
+                ],
+              );
+            },
           ),
         ],
       ),
+    );
+
+    final bool canPop = Navigator.canPop(context);
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: canPop
+          ? AppBar(
+              backgroundColor: isDark ? const Color(0xFF1B2436) : Colors.white,
+              elevation: 0,
+              leading: IconButton(
+                icon: Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: isDark
+                      ? const Color(0xFFF8FAFC)
+                      : AppColors.secondaryBlue,
+                  size: 18,
+                ),
+                onPressed: () => Navigator.pop(context),
+              ),
+              title: Text(
+                'My Profile',
+                style: TextStyle(
+                  color: isDark
+                      ? const Color(0xFFF8FAFC)
+                      : AppColors.secondaryBlue,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            )
+          : null,
+      body: bodyContent,
     );
   }
 
@@ -2760,21 +2779,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final licenseStatus = _user!.licenseStatus;
 
     return _buildInfoCard(
-      title: 'Identity Verification',
+      title: 'Identity Verification'.tr(context),
       icon: Icons.verified_user_outlined,
       children: [
         // Document 1: ID / Passport
         _buildDocumentVerificationRow(
-          title: 'National ID or Passport',
+          title: 'National ID or Passport'.tr(context),
           status: idStatus,
           rejectionReason: _user!.idRejectionReason,
           isDark: isDark,
           uploadWidget: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
-                'ID Type',
-                style: TextStyle(
+              Text(
+                'ID Type'.tr(context),
+                style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
                   color: Colors.grey,
@@ -2793,14 +2812,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                items: const [
+                items: [
                   DropdownMenuItem(
                     value: 'National ID',
-                    child: Text('National ID / IC'),
+                    child: Text('National ID / IC'.tr(context)),
                   ),
                   DropdownMenuItem(
                     value: 'Passport',
-                    child: Text('International Passport'),
+                    child: Text('International Passport'.tr(context)),
                   ),
                 ],
                 onChanged: (val) {
@@ -2810,9 +2829,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 },
               ),
               const SizedBox(height: 12),
-              const Text(
-                'Document Number',
-                style: TextStyle(
+              Text(
+                'Document Number'.tr(context),
+                style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
                   color: Colors.grey,
@@ -2822,12 +2841,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               CustomTextField(
                 controller: _idNumberController,
                 labelText: '',
-                hintText: 'Enter ID or Passport Number',
+                hintText: 'Enter ID or Passport Number'.tr(context),
                 prefixIcon: Icons.badge_outlined,
               ),
               const SizedBox(height: 12),
-              const Text(
-                'Document Photo Card',
+              Text(
+                'Document Photo Card'.tr(context),
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
@@ -2924,16 +2943,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         // Document 2: Driving License
         _buildDocumentVerificationRow(
-          title: 'Driving License',
+          title: 'Driving License'.tr(context),
           status: licenseStatus,
           rejectionReason: _user!.licenseRejectionReason,
           isDark: isDark,
           uploadWidget: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
-                'License Number',
-                style: TextStyle(
+              Text(
+                'License Number'.tr(context),
+                style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
                   color: Colors.grey,
@@ -2943,13 +2962,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               CustomTextField(
                 controller: _licenseNumberController,
                 labelText: '',
-                hintText: 'Enter License Number',
+                hintText: 'Enter License Number'.tr(context),
                 prefixIcon: Icons.card_membership_outlined,
               ),
               const SizedBox(height: 12),
-              const Text(
-                'License Classification Class',
-                style: TextStyle(
+              Text(
+                'License Classification Class'.tr(context),
+                style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
                   color: Colors.grey,
@@ -2970,18 +2989,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                items: const [
+                items: [
                   DropdownMenuItem(
                     value: 'Class D (Car)',
-                    child: Text('Class D (Car)'),
+                    child: Text('Class D (Car)'.tr(context)),
                   ),
                   DropdownMenuItem(
                     value: 'Class DA (Automatic Car)',
-                    child: Text('Class DA (Automatic Car)'),
+                    child: Text('Class DA (Automatic Car)'.tr(context)),
                   ),
                   DropdownMenuItem(
                     value: 'Class B2 (Motorcycle)',
-                    child: Text('Class B2 (Motorcycle)'),
+                    child: Text('Class B2 (Motorcycle)'.tr(context)),
                   ),
                 ],
                 onChanged: (val) {
@@ -2994,9 +3013,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 },
               ),
               const SizedBox(height: 12),
-              const Text(
-                'Expiry Date',
-                style: TextStyle(
+              Text(
+                'Expiry Date'.tr(context),
+                style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
                   color: Colors.grey,
@@ -3021,7 +3040,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     children: [
                       Text(
                         _licenseExpiryDate == null
-                            ? 'Select Expiry Date'
+                            ? 'Select Expiry Date'.tr(context)
                             : DateFormat(
                                 'dd / MM / yyyy',
                               ).format(_licenseExpiryDate!),
@@ -3042,9 +3061,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              const Text(
-                'License Card Photo',
-                style: TextStyle(
+              Text(
+                'License Card Photo'.tr(context),
+                style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
                   color: Colors.grey,
@@ -3064,36 +3083,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   alignment: Alignment.center,
                   child: _licenseImageFile == null
-                      ? const Column(
+                      ? Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.add_photo_alternate_outlined,
                               size: 24,
                               color: AppColors.primaryOrange,
                             ),
-                            SizedBox(height: 4),
+                            const SizedBox(height: 4),
                             Text(
-                              'Upload license photo',
-                              style: TextStyle(
+                              'Upload license photo'.tr(context),
+                              style: const TextStyle(
                                 fontSize: 11,
                                 color: Colors.grey,
                               ),
                             ),
                           ],
                         )
-                      : const Column(
+                      : Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.check_circle_outline,
                               size: 28,
                               color: Colors.green,
                             ),
-                            SizedBox(height: 4),
+                            const SizedBox(height: 4),
                             Text(
-                              'Card Photo Selected',
-                              style: TextStyle(
+                              'Card Photo Selected'.tr(context),
+                              style: const TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.green,
@@ -3124,9 +3143,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           strokeWidth: 2,
                         ),
                       )
-                    : const Text(
-                        'Submit Driving License',
-                        style: TextStyle(
+                    : Text(
+                        'Submit Driving License'.tr(context),
+                        style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
@@ -3147,17 +3166,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required Widget uploadWidget,
   }) {
     Color statusColor = Colors.grey;
-    String statusText = 'Not Uploaded';
+    String statusText = 'Not Uploaded'.tr(context);
 
     if (status == 'pending') {
       statusColor = Colors.orange;
-      statusText = 'Pending Review';
+      statusText = 'Pending Review'.tr(context);
     } else if (status == 'approved') {
       statusColor = Colors.green;
-      statusText = 'Approved';
+      statusText = 'Approved'.tr(context);
     } else if (status == 'rejected') {
       statusColor = Colors.red;
-      statusText = 'Rejected';
+      statusText = 'Rejected'.tr(context);
     }
 
     return Column(
@@ -3201,16 +3220,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              'Reason: $rejectionReason',
+              '${"Reason:".tr(context)} $rejectionReason',
               style: const TextStyle(color: Colors.redAccent, fontSize: 11),
             ),
           ),
         ],
         if (status == 'pending') ...[
           const SizedBox(height: 12),
-          const Text(
-            'Documents submitted and awaiting verification review.',
-            style: TextStyle(color: Colors.grey, fontSize: 12),
+          Text(
+            'Documents submitted and awaiting verification review.'.tr(context),
+            style: const TextStyle(color: Colors.grey, fontSize: 12),
           ),
         ],
         if (status == 'unprovided' || status == 'rejected') ...[
@@ -3236,9 +3255,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         gradientColors = [const Color(0xFF6D28D9), const Color(0xFF4C1D95)];
         levelIcon = Icons.military_tech_rounded;
         benefits = [
-          'Open Rental access (no upfront payment!)',
-          '1.5x Reward Points earning multiplier',
-          'Priority booking approval & support',
+          'Open Rental access (no upfront payment!)'.tr(context),
+          '1.5x Reward Points earning multiplier'.tr(context),
+          'Priority booking approval & support'.tr(context),
         ];
         break;
       case 'Gold':
@@ -3246,9 +3265,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         gradientColors = [const Color(0xFFD97706), const Color(0xFFB45309)];
         levelIcon = Icons.stars_rounded;
         benefits = [
-          'Priority booking approval',
-          'Exclusive promotions',
-          'Dynamic discount points redemptions',
+          'Priority booking approval'.tr(context),
+          'Exclusive promotions'.tr(context),
+          'Dynamic discount points redemptions'.tr(context),
         ];
         break;
       case 'Silver':
@@ -3256,15 +3275,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         gradientColors = [const Color(0xFF475569), const Color(0xFF334155)];
         levelIcon = Icons.verified_user_rounded;
         benefits = [
-          'Dynamic discount points redemptions',
-          'Priority customer support channels',
+          'Dynamic discount points redemptions'.tr(context),
+          'Priority customer support channels'.tr(context),
         ];
         break;
       default: // Standard
         levelColor = const Color(0xFF94A3B8);
         gradientColors = [const Color(0xFF374151), const Color(0xFF1F2937)];
         levelIcon = Icons.emoji_events_outlined;
-        benefits = ['Standard points earning', 'Standard booking approval'];
+        benefits = ['Standard points earning'.tr(context), 'Standard booking approval'.tr(context)];
     }
 
     final int pct = (status.progress * 100).toInt();
@@ -3313,7 +3332,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         Icon(levelIcon, color: levelColor, size: 24),
                         const SizedBox(width: 8),
                         Text(
-                          '${status.currentLevel} Member',
+                          '${status.currentLevel.tr(context)} ${"Member".tr(context)}',
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w900,
@@ -3332,9 +3351,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         color: Colors.white.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: const Text(
-                        'Loyalty Status',
-                        style: TextStyle(
+                      child: Text(
+                        'Loyalty Status'.tr(context),
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 9,
                           fontWeight: FontWeight.bold,
@@ -3344,9 +3363,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
                 const SizedBox(height: 20),
-                const Text(
-                  'REWARD POINTS',
-                  style: TextStyle(
+                Text(
+                  'REWARD POINTS'.tr(context),
+                  style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
@@ -3355,7 +3374,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '$points pts',
+                  '$points ${"pts".tr(context)}',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 26,
@@ -3368,8 +3387,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     Text(
                       status.currentLevel == 'Premium'
-                          ? 'Maximum Membership Level Reached.'
-                          : '${status.pointsNeededForNext} more points to unlock ${status.nextLevel}.',
+                          ? 'Maximum Membership Level Reached.'.tr(context)
+                          : '${status.pointsNeededForNext} ${"more points to unlock".tr(context)} ${status.nextLevel.tr(context)}.',
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 11,
@@ -3400,9 +3419,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                const Text(
-                  'CURRENT MEMBERSHIP BENEFITS',
-                  style: TextStyle(
+                Text(
+                  'CURRENT MEMBERSHIP BENEFITS'.tr(context),
+                  style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
@@ -3451,9 +3470,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                       icon: const Icon(Icons.history, size: 14),
-                      label: const Text(
-                        'View History Ledger',
-                        style: TextStyle(
+                      label: Text(
+                        'View History Ledger'.tr(context),
+                        style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
                         ),

@@ -7,6 +7,7 @@ import '../../../models/notification_model.dart';
 import '../../../widgets/loading_widget.dart';
 import '../../../services/booking_service.dart';
 import 'package:firebase_database/firebase_database.dart';
+import '../../../l10n/app_translations.dart';
 
 class AdminNotificationsView extends StatefulWidget {
   final Function(String, String?) onNavigateTab;
@@ -54,7 +55,7 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
   Widget build(BuildContext context) {
     final currentUser = _auth.currentUser;
     if (currentUser == null || _notificationsStream == null) {
-      return const Center(child: Text('User not authenticated'));
+      return Center(child: Text('User not authenticated'.tr(context)));
     }
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -74,14 +75,14 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
       stream: _notificationsStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: LoadingWidget(message: 'Loading notification logs...'),
+          return Center(
+            child: LoadingWidget(message: 'Loading notification logs...'.tr(context)),
           );
         }
         if (snapshot.hasError) {
           return Center(
             child: Text(
-              'Error loading logs: ${snapshot.error}',
+              '${"Error loading logs:".tr(context)} ${snapshot.error}',
               style: const TextStyle(color: Colors.red),
             ),
           );
@@ -158,7 +159,7 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Notification Audit Center',
+                              'Notification Audit Center'.tr(context),
                               style: TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.w900,
@@ -166,7 +167,7 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
                               ),
                             ),
                             Text(
-                              'View real-time event logs, system logins, and audit verification actions.',
+                              'View real-time event logs, system logins, and audit verification actions.'.tr(context),
                               style: TextStyle(
                                 fontSize: 12,
                                 color: textSecondary,
@@ -185,7 +186,7 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Notification Audit Center',
+                          'Notification Audit Center'.tr(context),
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w900,
@@ -193,7 +194,7 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
                           ),
                         ),
                         Text(
-                          'View real-time event logs and audit actions.',
+                          'View real-time event logs and audit actions.'.tr(context),
                           style: TextStyle(fontSize: 12, color: textSecondary),
                         ),
                         const SizedBox(height: 12),
@@ -296,7 +297,7 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Showing ${filteredNotifs.length} notifications ($unreadCount unread)',
+                    '${"Showing".tr(context)} ${filteredNotifs.length} ${"notifications".tr(context)} ($unreadCount ${"unread".tr(context)})',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
@@ -314,9 +315,9 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
                         _selectedStatus = 'All';
                         _selectedDateRange = 'All Time';
                       }),
-                      child: const Text(
-                        'Reset Filters',
-                        style: TextStyle(
+                      child: Text(
+                        'Reset Filters'.tr(context),
+                        style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           color: AppColors.primaryOrange,
                         ),
@@ -346,7 +347,7 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              'No matching notifications found',
+                              'No matching notifications found'.tr(context),
                               style: TextStyle(
                                 color: textSecondary,
                                 fontWeight: FontWeight.bold,
@@ -447,7 +448,7 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
                                                     CrossAxisAlignment.start,
                                                 children: [
                                                   Text(
-                                                    notif.title,
+                                                    notif.title.tr(context),
                                                     maxLines: 2,
                                                     overflow:
                                                         TextOverflow.ellipsis,
@@ -463,7 +464,7 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
                                                   Text(
                                                     DateFormat(
                                                       'dd MMM, hh:mm a',
-                                                    ).format(notif.createdAt),
+                                                    ).format(notif.createdAt).tr(context),
                                                     style: TextStyle(
                                                       fontSize: 11,
                                                       color: textSecondary,
@@ -476,7 +477,7 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
                                         ),
                                         const SizedBox(height: 12),
                                         Text(
-                                          notif.message,
+                                          notif.message.tr(context),
                                           style: TextStyle(
                                             fontSize: 13,
                                             height: 1.45,
@@ -518,9 +519,9 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
                                                     );
                                                   }
                                                 },
-                                                child: const Text(
-                                                  'View Booking',
-                                                  style: TextStyle(
+                                                child: Text(
+                                                  'View Booking'.tr(context),
+                                                  style: const TextStyle(
                                                     fontSize: 10,
                                                     fontWeight: FontWeight.bold,
                                                   ),
@@ -549,9 +550,9 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
                                                     _confirmCustomerPickup(
                                                       notif.relatedId,
                                                     ),
-                                                child: const Text(
-                                                  "Customer Picked Up",
-                                                  style: TextStyle(
+                                                child: Text(
+                                                  "Customer Picked Up".tr(context),
+                                                  style: const TextStyle(
                                                     fontSize: 10,
                                                     fontWeight: FontWeight.bold,
                                                   ),
@@ -594,9 +595,9 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
                                                     );
                                                   }
                                                 },
-                                                child: const Text(
-                                                  'View Booking',
-                                                  style: TextStyle(
+                                                child: Text(
+                                                  'View Booking'.tr(context),
+                                                  style: const TextStyle(
                                                     fontSize: 10,
                                                     fontWeight: FontWeight.bold,
                                                   ),
@@ -625,9 +626,9 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
                                                     _confirmVehicleReturn(
                                                       notif.relatedId,
                                                     ),
-                                                child: const Text(
-                                                  "Vehicle Returned",
-                                                  style: TextStyle(
+                                                child: Text(
+                                                  "Vehicle Returned".tr(context),
+                                                  style: const TextStyle(
                                                     fontSize: 10,
                                                     fontWeight: FontWeight.bold,
                                                   ),
@@ -652,8 +653,8 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
                                                 size: 20,
                                               ),
                                               tooltip: notif.isRead
-                                                  ? 'Mark as Unread'
-                                                  : 'Mark as Read',
+                                                  ? 'Mark as Unread'.tr(context)
+                                                  : 'Mark as Read'.tr(context),
                                               onPressed: () async {
                                                 await _notificationService
                                                     .toggleReadStatus(
@@ -669,7 +670,7 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
                                                 color: textSecondary,
                                                 size: 20,
                                               ),
-                                              tooltip: 'Delete Log',
+                                              tooltip: 'Delete Log'.tr(context),
                                               onPressed: () async {
                                                 await _notificationService
                                                     .deleteNotification(
@@ -702,7 +703,7 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
                                         children: [
                                           Expanded(
                                             child: Text(
-                                              notif.title,
+                                              notif.title.tr(context),
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                               style: TextStyle(
@@ -732,7 +733,7 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
                                               CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              notif.message,
+                                              notif.message.tr(context),
                                               style: TextStyle(
                                                 fontSize: 12,
                                                 height: 1.4,
@@ -774,9 +775,9 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
                                                         );
                                                       }
                                                     },
-                                                    child: const Text(
-                                                      'View Booking',
-                                                      style: TextStyle(
+                                                    child: Text(
+                                                      'View Booking'.tr(context),
+                                                      style: const TextStyle(
                                                         fontSize: 10,
                                                         fontWeight:
                                                             FontWeight.bold,
@@ -807,9 +808,9 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
                                                         _confirmCustomerPickup(
                                                           notif.relatedId,
                                                         ),
-                                                    child: const Text(
-                                                      "Customer Picked Up",
-                                                      style: TextStyle(
+                                                    child: Text(
+                                                      "Customer Picked Up".tr(context),
+                                                      style: const TextStyle(
                                                         fontSize: 10,
                                                         fontWeight:
                                                             FontWeight.bold,
@@ -983,9 +984,9 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
               includeAdminShared: true,
             ),
             icon: const Icon(Icons.done_all, size: 16),
-            label: const Text(
-              'Mark All Read',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            label: Text(
+              'Mark All Read'.tr(context),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
             ),
           ),
         if (allNotifs.any((n) => n.isRead))
@@ -1007,9 +1008,9 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
                   includeAdminShared: true,
                 ),
             icon: const Icon(Icons.delete_sweep_outlined, size: 16),
-            label: const Text(
-              'Clear Read',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            label: Text(
+              'Clear Read'.tr(context),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
             ),
           ),
       ],
@@ -1025,7 +1026,7 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
       onChanged: (val) => setState(() => _searchQuery = val),
       style: TextStyle(color: textPrimary),
       decoration: InputDecoration(
-        hintText: 'Search alert title or messages...',
+        hintText: 'Search alert title or messages...'.tr(context),
         hintStyle: TextStyle(color: textSecondary),
         prefixIcon: Icon(Icons.search, color: textSecondary),
         contentPadding: const EdgeInsets.symmetric(
@@ -1074,15 +1075,15 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
   }) {
     return _buildDropdown<String>(
       value: _selectedStatus,
-      label: 'Read Status',
+      label: 'Read Status'.tr(context),
       isDark: isDark,
       cardColor: cardColor,
       textPrimary: textPrimary,
       borderColor: borderColor,
-      items: const [
-        DropdownMenuItem(value: 'All', child: Text('All Logs')),
-        DropdownMenuItem(value: 'Unread', child: Text('Unread Alerts')),
-        DropdownMenuItem(value: 'Read', child: Text('Read Logs')),
+      items: [
+        DropdownMenuItem(value: 'All', child: Text('All Logs'.tr(context))),
+        DropdownMenuItem(value: 'Unread', child: Text('Unread Alerts'.tr(context))),
+        DropdownMenuItem(value: 'Read', child: Text('Read Logs'.tr(context))),
       ],
       onChanged: (val) {
         if (val != null) setState(() => _selectedStatus = val);
@@ -1098,7 +1099,7 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
   }) {
     return _buildDropdown<String>(
       value: _selectedType,
-      label: 'Category',
+      label: 'Category'.tr(context),
       isDark: isDark,
       cardColor: cardColor,
       textPrimary: textPrimary,
@@ -1107,7 +1108,7 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
           .map(
             (t) => DropdownMenuItem(
               value: t,
-              child: Text(t[0].toUpperCase() + t.substring(1)),
+              child: Text((t[0].toUpperCase() + t.substring(1)).tr(context)),
             ),
           )
           .toList(),
@@ -1125,16 +1126,16 @@ class _AdminNotificationsViewState extends State<AdminNotificationsView> {
   }) {
     return _buildDropdown<String>(
       value: _selectedDateRange,
-      label: 'Date Range',
+      label: 'Date Range'.tr(context),
       isDark: isDark,
       cardColor: cardColor,
       textPrimary: textPrimary,
       borderColor: borderColor,
-      items: const [
-        DropdownMenuItem(value: 'All Time', child: Text('All Time')),
-        DropdownMenuItem(value: 'Today', child: Text('Today')),
-        DropdownMenuItem(value: 'Last 7 Days', child: Text('Last 7 Days')),
-        DropdownMenuItem(value: 'Last 30 Days', child: Text('Last 30 Days')),
+      items: [
+        DropdownMenuItem(value: 'All Time', child: Text('All Time'.tr(context))),
+        DropdownMenuItem(value: 'Today', child: Text('Today'.tr(context))),
+        DropdownMenuItem(value: 'Last 7 Days', child: Text('Last 7 Days'.tr(context))),
+        DropdownMenuItem(value: 'Last 30 Days', child: Text('Last 30 Days'.tr(context))),
       ],
       onChanged: (val) {
         if (val != null) setState(() => _selectedDateRange = val);

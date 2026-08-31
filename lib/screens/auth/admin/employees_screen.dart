@@ -8,6 +8,7 @@ import '../../../services/database_service.dart';
 import '../../../constants/colors.dart';
 import '../../../widgets/loading_widget.dart';
 import '../../../widgets/custom_textfield.dart';
+import '../../../l10n/app_translations.dart';
 
 class EmployeesView extends StatefulWidget {
   const EmployeesView({super.key});
@@ -35,8 +36,21 @@ class _EmployeesViewState extends State<EmployeesView> {
   @override
   void initState() {
     super.initState();
+    _subscribeToLiveData();
     _loadData();
     _searchController.addListener(_onSearchChanged);
+  }
+
+  void _subscribeToLiveData() {
+    _usersSubscription?.cancel();
+    _usersSubscription = _databaseService.getUsersStream().listen((uList) {
+      if (mounted) {
+        setState(() {
+          _allUsers = uList;
+          _loading = false;
+        });
+      }
+    });
   }
 
   void _onSearchChanged() {
@@ -52,15 +66,17 @@ class _EmployeesViewState extends State<EmployeesView> {
     super.dispose();
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadData({bool forceRefresh = false}) async {
     if (!mounted) return;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (_allUsers.isEmpty) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
 
     try {
-      final users = await _databaseService.getUsers(forceRefresh: true);
+      final users = await _databaseService.getUsers(forceRefresh: forceRefresh);
       if (mounted) {
         setState(() {
           _allUsers = users;
@@ -69,7 +85,7 @@ class _EmployeesViewState extends State<EmployeesView> {
       }
     } catch (e) {
       debugPrint('[EmployeesView] Error loading users: $e');
-      if (mounted) {
+      if (mounted && _allUsers.isEmpty) {
         setState(() {
           _error = 'Failed to load employee records. Please check connection.';
           _loading = false;
@@ -287,8 +303,8 @@ class _EmployeesViewState extends State<EmployeesView> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(
-        child: LoadingWidget(message: 'Loading employee records...'),
+      return Center(
+        child: LoadingWidget(message: 'Loading employee records...'.tr(context)),
       );
     }
 
@@ -304,7 +320,7 @@ class _EmployeesViewState extends State<EmployeesView> {
             ),
             const SizedBox(height: 16),
             Text(
-              _error!,
+              _error!.tr(context),
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -313,7 +329,7 @@ class _EmployeesViewState extends State<EmployeesView> {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _loadData,
-              child: const Text('Retry Loading'),
+              child: Text('Retry Loading'.tr(context)),
             ),
           ],
         ),
@@ -348,7 +364,7 @@ class _EmployeesViewState extends State<EmployeesView> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Employee Management',
+                      'Employee Management'.tr(context),
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w900,
@@ -356,7 +372,7 @@ class _EmployeesViewState extends State<EmployeesView> {
                       ),
                     ),
                     Text(
-                      'Manage staff accounts, credentials, role assignments, and active statuses.',
+                      'Manage staff accounts, credentials, role assignments, and active statuses.'.tr(context),
                       style: TextStyle(
                         fontSize: 13,
                         color: textSecondary,
@@ -368,7 +384,7 @@ class _EmployeesViewState extends State<EmployeesView> {
               ElevatedButton.icon(
                 onPressed: _showAddEmployeeDialog,
                 icon: const Icon(Icons.person_add_rounded, size: 20),
-                label: const Text('Add Employee'),
+                label: Text('Add Employee'.tr(context)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryOrange,
                   foregroundColor: Colors.white,
@@ -442,7 +458,7 @@ class _EmployeesViewState extends State<EmployeesView> {
                           controller: _searchController,
                           style: TextStyle(color: textPrimary),
                           decoration: InputDecoration(
-                            hintText: 'Search employees by name, email, phone, or ID...',
+                            hintText: 'Search employees by name, email, phone, or ID...'.tr(context),
                             hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.7)),
                             prefixIcon: Icon(Icons.search, color: textSecondary),
                             contentPadding: const EdgeInsets.symmetric(vertical: 8),
@@ -460,7 +476,7 @@ class _EmployeesViewState extends State<EmployeesView> {
                         controller: _searchController,
                         style: TextStyle(color: textPrimary),
                         decoration: InputDecoration(
-                          hintText: 'Search employees by name, email, phone, or ID...',
+                          hintText: 'Search employees by name, email, phone, or ID...'.tr(context),
                           hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.7)),
                           prefixIcon: Icon(Icons.search, color: textSecondary),
                           contentPadding: const EdgeInsets.symmetric(vertical: 8),
@@ -493,7 +509,7 @@ class _EmployeesViewState extends State<EmployeesView> {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          'No employee records match the search query or filter criteria.',
+                          'No employee records match the search query or filter criteria.'.tr(context),
                           style: TextStyle(
                             color: textSecondary,
                             fontWeight: FontWeight.bold,
@@ -560,7 +576,7 @@ class _EmployeesViewState extends State<EmployeesView> {
                 ),
               ),
               Text(
-                label,
+                label.tr(context),
                 style: TextStyle(
                   fontSize: 12,
                   color: textSecondary,
@@ -590,10 +606,10 @@ class _EmployeesViewState extends State<EmployeesView> {
               value: _filterStatus,
               dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
               style: TextStyle(color: textPrimary, fontSize: 13, fontWeight: FontWeight.bold),
-              items: const [
-                DropdownMenuItem(value: 'All', child: Text('Status: All')),
-                DropdownMenuItem(value: 'Active', child: Text('Status: Active')),
-                DropdownMenuItem(value: 'Inactive', child: Text('Status: Inactive')),
+              items: [
+                DropdownMenuItem(value: 'All', child: Text('Status: All'.tr(context))),
+                DropdownMenuItem(value: 'Active', child: Text('Status: Active'.tr(context))),
+                DropdownMenuItem(value: 'Inactive', child: Text('Status: Inactive'.tr(context))),
               ],
               onChanged: (val) {
                 if (val != null) setState(() => _filterStatus = val);
@@ -615,10 +631,10 @@ class _EmployeesViewState extends State<EmployeesView> {
               value: _filterRole,
               dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
               style: TextStyle(color: textPrimary, fontSize: 13, fontWeight: FontWeight.bold),
-              items: const [
-                DropdownMenuItem(value: 'All', child: Text('Role: All')),
-                DropdownMenuItem(value: 'Employee', child: Text('Role: Employee')),
-                DropdownMenuItem(value: 'Admin', child: Text('Role: Admin')),
+              items: [
+                DropdownMenuItem(value: 'All', child: Text('Role: All'.tr(context))),
+                DropdownMenuItem(value: 'Employee', child: Text('Role: Employee'.tr(context))),
+                DropdownMenuItem(value: 'Admin', child: Text('Role: Admin'.tr(context))),
               ],
               onChanged: (val) {
                 if (val != null) setState(() => _filterRole = val);
@@ -642,13 +658,13 @@ class _EmployeesViewState extends State<EmployeesView> {
       headingRowHeight: 52,
       dataRowMaxHeight: 64,
       columns: [
-        DataColumn(label: Text('Employee', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
-        DataColumn(label: Text('ID', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
-        DataColumn(label: Text('Contact', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
-        DataColumn(label: Text('Role', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
-        DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
-        DataColumn(label: Text('Created Date', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
-        DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
+        DataColumn(label: Text('Employee'.tr(context), style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
+        DataColumn(label: Text('ID'.tr(context), style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
+        DataColumn(label: Text('Contact'.tr(context), style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
+        DataColumn(label: Text('Role'.tr(context), style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
+        DataColumn(label: Text('Status'.tr(context), style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
+        DataColumn(label: Text('Created Date'.tr(context), style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
+        DataColumn(label: Text('Actions'.tr(context), style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary))),
       ],
       rows: employees.map((emp) {
         final isActive = emp.isActive && emp.accountStatus.toLowerCase() != 'disabled';
@@ -797,58 +813,61 @@ class _EmployeesViewState extends State<EmployeesView> {
         final isActive = emp.isActive && emp.accountStatus.toLowerCase() != 'disabled';
         final empIdDisplay = emp.employeeId.isNotEmpty ? emp.employeeId : 'EMP-${emp.id.substring(0, 5).toUpperCase()}';
 
-        return ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          leading: CircleAvatar(
-            backgroundColor: AppColors.primaryOrange.withValues(alpha: 0.15),
-            child: Text(
-              emp.fullName.isNotEmpty ? emp.fullName[0].toUpperCase() : 'E',
-              style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryOrange),
+        return Material(
+          color: Colors.transparent,
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            leading: CircleAvatar(
+              backgroundColor: AppColors.primaryOrange.withValues(alpha: 0.15),
+              child: Text(
+                emp.fullName.isNotEmpty ? emp.fullName[0].toUpperCase() : 'E',
+                style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryOrange),
+              ),
             ),
-          ),
-          title: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  emp.fullName,
-                  style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
+            title: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    emp.fullName,
+                    style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
+                  ),
                 ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: isActive ? Colors.teal.withValues(alpha: 0.15) : Colors.redAccent.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: isActive ? Colors.teal.withValues(alpha: 0.15) : Colors.redAccent.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    isActive ? 'ACTIVE' : 'INACTIVE',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isActive ? Colors.teal : Colors.redAccent),
+                  ),
                 ),
-                child: Text(
-                  isActive ? 'ACTIVE' : 'INACTIVE',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isActive ? Colors.teal : Colors.redAccent),
-                ),
-              ),
-            ],
-          ),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 4),
-              Text('${emp.email} • ID: $empIdDisplay', style: TextStyle(fontSize: 12, color: textSecondary)),
-              Text('Role: ${emp.normalizedRole.toUpperCase()} • Phone: ${emp.phone.isNotEmpty ? emp.phone : "N/A"}', style: TextStyle(fontSize: 12, color: textSecondary)),
-            ],
-          ),
-          trailing: PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            onSelected: (val) {
-              if (val == 'view') _showEmployeeDetailsDialog(emp);
-              if (val == 'edit') _showEditEmployeeDialog(emp);
-              if (val == 'toggle') _toggleEmployeeStatus(emp);
-              if (val == 'delete') _deleteEmployee(emp);
-            },
-            itemBuilder: (ctx) => [
-              const PopupMenuItem(value: 'view', child: Text('View Details')),
-              const PopupMenuItem(value: 'edit', child: Text('Edit Employee')),
-              PopupMenuItem(value: 'toggle', child: Text(isActive ? 'Deactivate' : 'Activate')),
-              const PopupMenuItem(value: 'delete', child: Text('Delete Record', style: TextStyle(color: Colors.redAccent))),
-            ],
+              ],
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 4),
+                Text('${emp.email} • ID: $empIdDisplay', style: TextStyle(fontSize: 12, color: textSecondary)),
+                Text('Role: ${emp.normalizedRole.toUpperCase()} • Phone: ${emp.phone.isNotEmpty ? emp.phone : "N/A"}', style: TextStyle(fontSize: 12, color: textSecondary)),
+              ],
+            ),
+            trailing: PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              onSelected: (val) {
+                if (val == 'view') _showEmployeeDetailsDialog(emp);
+                if (val == 'edit') _showEditEmployeeDialog(emp);
+                if (val == 'toggle') _toggleEmployeeStatus(emp);
+                if (val == 'delete') _deleteEmployee(emp);
+              },
+              itemBuilder: (ctx) => [
+                PopupMenuItem(value: 'view', child: Text('View Details'.tr(context))),
+                PopupMenuItem(value: 'edit', child: Text('Edit Employee'.tr(context))),
+                PopupMenuItem(value: 'toggle', child: Text(isActive ? 'Deactivate'.tr(context) : 'Activate'.tr(context))),
+                PopupMenuItem(value: 'delete', child: Text('Delete Record'.tr(context), style: const TextStyle(color: Colors.redAccent))),
+              ],
+            ),
           ),
         );
       },
@@ -933,11 +952,11 @@ class _AddEmployeeDialogState extends State<_AddEmployeeDialog> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return AlertDialog(
-      title: const Row(
+      title: Row(
         children: [
-          Icon(Icons.person_add_rounded, color: AppColors.primaryOrange),
-          SizedBox(width: 10),
-          Text('Add New Employee', style: TextStyle(fontWeight: FontWeight.bold)),
+          const Icon(Icons.person_add_rounded, color: AppColors.primaryOrange),
+          const SizedBox(width: 10),
+          Text('Add New Employee'.tr(context), style: const TextStyle(fontWeight: FontWeight.bold)),
         ],
       ),
       content: SingleChildScrollView(
@@ -957,7 +976,7 @@ class _AddEmployeeDialogState extends State<_AddEmployeeDialog> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      _error!,
+                      _error!.tr(context),
                       style: const TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -966,22 +985,22 @@ class _AddEmployeeDialogState extends State<_AddEmployeeDialog> {
 
                 CustomTextField(
                   controller: _nameController,
-                  labelText: 'Full Name',
+                  labelText: 'Full Name'.tr(context),
                   hintText: 'e.g. Ahmad Razak',
                   prefixIcon: Icons.person_outline,
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Full Name is required' : null,
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Full Name is required'.tr(context) : null,
                 ),
                 const SizedBox(height: 14),
 
                 CustomTextField(
                   controller: _emailController,
-                  labelText: 'Email Address',
+                  labelText: 'Email Address'.tr(context),
                   hintText: 'e.g. ahmad.employee@carrent.com',
                   prefixIcon: Icons.email_outlined,
                   keyboardType: TextInputType.emailAddress,
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'Email is required';
-                    if (!v.contains('@')) return 'Enter valid email';
+                    if (v == null || v.trim().isEmpty) return 'Email is required'.tr(context);
+                    if (!v.contains('@')) return 'Enter valid email'.tr(context);
                     return null;
                   },
                 ),
@@ -989,7 +1008,7 @@ class _AddEmployeeDialogState extends State<_AddEmployeeDialog> {
 
                 CustomTextField(
                   controller: _phoneController,
-                  labelText: 'Phone Number',
+                  labelText: 'Phone Number'.tr(context),
                   hintText: 'e.g. +60123456789',
                   prefixIcon: Icons.phone_outlined,
                   keyboardType: TextInputType.phone,
@@ -998,7 +1017,7 @@ class _AddEmployeeDialogState extends State<_AddEmployeeDialog> {
 
                 CustomTextField(
                   controller: _empIdController,
-                  labelText: 'Employee ID (Optional)',
+                  labelText: 'Employee ID (Optional)'.tr(context),
                   hintText: 'e.g. EMP-108',
                   prefixIcon: Icons.badge_outlined,
                 ),
@@ -1006,20 +1025,20 @@ class _AddEmployeeDialogState extends State<_AddEmployeeDialog> {
 
                 CustomTextField(
                   controller: _passwordController,
-                  labelText: 'Initial Password',
-                  hintText: 'At least 6 characters',
+                  labelText: 'Initial Password'.tr(context),
+                  hintText: 'At least 6 characters'.tr(context),
                   prefixIcon: Icons.lock_outline,
                   obscureText: _obscurePassword,
                   suffixIcon: IconButton(
                     icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
                     onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                   ),
-                  validator: (v) => (v == null || v.length < 6) ? 'Password must be at least 6 characters' : null,
+                  validator: (v) => (v == null || v.length < 6) ? 'Password must be at least 6 characters'.tr(context) : null,
                 ),
                 const SizedBox(height: 14),
 
                 // Role Dropdown
-                const Text('  Role Assignment', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                Text('  ${"Role Assignment".tr(context)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<String>(
                   initialValue: _role,
@@ -1027,9 +1046,9 @@ class _AddEmployeeDialogState extends State<_AddEmployeeDialog> {
                     prefixIcon: const Icon(Icons.security_outlined),
                     fillColor: isDark ? const Color(0xFF1E293B) : AppColors.lightGray,
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'employee', child: Text('Employee')),
-                    DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                  items: [
+                    DropdownMenuItem(value: 'employee', child: Text('Employee'.tr(context))),
+                    DropdownMenuItem(value: 'admin', child: Text('Admin'.tr(context))),
                   ],
                   onChanged: (val) {
                     if (val != null) setState(() => _role = val);
@@ -1043,7 +1062,7 @@ class _AddEmployeeDialogState extends State<_AddEmployeeDialog> {
       actions: [
         TextButton(
           onPressed: _loading ? null : () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text('Cancel'.tr(context)),
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
@@ -1054,7 +1073,7 @@ class _AddEmployeeDialogState extends State<_AddEmployeeDialog> {
           onPressed: _loading ? null : _submit,
           child: _loading
               ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : const Text('Create Account'),
+              : Text('Create Account'.tr(context)),
         ),
       ],
     );
@@ -1143,11 +1162,11 @@ class _EditEmployeeDialogState extends State<_EditEmployeeDialog> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return AlertDialog(
-      title: const Row(
+      title: Row(
         children: [
-          Icon(Icons.edit_outlined, color: AppColors.primaryOrange),
-          SizedBox(width: 10),
-          Text('Edit Employee', style: TextStyle(fontWeight: FontWeight.bold)),
+          const Icon(Icons.edit_outlined, color: AppColors.primaryOrange),
+          const SizedBox(width: 10),
+          Text('Edit Employee'.tr(context), style: const TextStyle(fontWeight: FontWeight.bold)),
         ],
       ),
       content: SingleChildScrollView(
@@ -1159,32 +1178,32 @@ class _EditEmployeeDialogState extends State<_EditEmployeeDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('Email: ${widget.employee.email}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                Text('${"Email:".tr(context)} ${widget.employee.email}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                 const SizedBox(height: 14),
 
                 CustomTextField(
                   controller: _nameController,
-                  labelText: 'Full Name',
+                  labelText: 'Full Name'.tr(context),
                   prefixIcon: Icons.person_outline,
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Full Name required' : null,
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Full Name is required'.tr(context) : null,
                 ),
                 const SizedBox(height: 14),
 
                 CustomTextField(
                   controller: _phoneController,
-                  labelText: 'Phone Number',
+                  labelText: 'Phone Number'.tr(context),
                   prefixIcon: Icons.phone_outlined,
                 ),
                 const SizedBox(height: 14),
 
                 CustomTextField(
                   controller: _empIdController,
-                  labelText: 'Employee ID',
+                  labelText: 'Employee ID'.tr(context),
                   prefixIcon: Icons.badge_outlined,
                 ),
                 const SizedBox(height: 14),
 
-                const Text('  Role Assignment', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                Text('  ${"Role Assignment".tr(context)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<String>(
                   initialValue: _role,
@@ -1192,9 +1211,9 @@ class _EditEmployeeDialogState extends State<_EditEmployeeDialog> {
                     prefixIcon: const Icon(Icons.security_outlined),
                     fillColor: isDark ? const Color(0xFF1E293B) : AppColors.lightGray,
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'employee', child: Text('Employee')),
-                    DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                  items: [
+                    DropdownMenuItem(value: 'employee', child: Text('Employee'.tr(context))),
+                    DropdownMenuItem(value: 'admin', child: Text('Admin'.tr(context))),
                   ],
                   onChanged: (val) {
                     if (val != null) setState(() => _role = val);
@@ -1203,8 +1222,8 @@ class _EditEmployeeDialogState extends State<_EditEmployeeDialog> {
                 const SizedBox(height: 14),
 
                 SwitchListTile(
-                  title: const Text('Active Account', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  subtitle: Text(_isActive ? 'Allowed to access system' : 'Blocked from accessing system', style: const TextStyle(fontSize: 12)),
+                  title: Text('Active Account'.tr(context), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  subtitle: Text(_isActive ? 'Allowed to access system'.tr(context) : 'Blocked from accessing system'.tr(context), style: const TextStyle(fontSize: 12)),
                   value: _isActive,
                   activeThumbColor: Colors.teal,
                   onChanged: (val) => setState(() => _isActive = val),
@@ -1217,7 +1236,7 @@ class _EditEmployeeDialogState extends State<_EditEmployeeDialog> {
       actions: [
         TextButton(
           onPressed: _loading ? null : () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text('Cancel'.tr(context)),
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
@@ -1227,7 +1246,7 @@ class _EditEmployeeDialogState extends State<_EditEmployeeDialog> {
           onPressed: _loading ? null : _submit,
           child: _loading
               ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : const Text('Save Changes'),
+              : Text('Save Changes'.tr(context)),
         ),
       ],
     );
@@ -1289,12 +1308,12 @@ class _EmployeeDetailsDialog extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Divider(),
-            _buildDetailRow('Employee ID', empIdDisplay, textPrimary, textSecondary),
-            _buildDetailRow('Role', employee.normalizedRole.toUpperCase(), textPrimary, textSecondary),
-            _buildDetailRow('Status', isActive ? 'ACTIVE' : 'INACTIVE', isActive ? Colors.teal : Colors.redAccent, textSecondary),
-            _buildDetailRow('Phone Number', employee.phone.isNotEmpty ? employee.phone : 'N/A', textPrimary, textSecondary),
-            _buildDetailRow('Registration Date', _formatDate(employee.createdAt), textPrimary, textSecondary),
-            _buildDetailRow('Account Status', employee.accountStatus.isNotEmpty ? employee.accountStatus : (isActive ? 'Active' : 'Disabled'), textPrimary, textSecondary),
+            _buildDetailRow('Employee ID'.tr(context), empIdDisplay, textPrimary, textSecondary),
+            _buildDetailRow('Role'.tr(context), employee.normalizedRole.toUpperCase().tr(context), textPrimary, textSecondary),
+            _buildDetailRow('Status'.tr(context), isActive ? 'ACTIVE'.tr(context) : 'INACTIVE'.tr(context), isActive ? Colors.teal : Colors.redAccent, textSecondary),
+            _buildDetailRow('Phone Number'.tr(context), employee.phone.isNotEmpty ? employee.phone : 'N/A', textPrimary, textSecondary),
+            _buildDetailRow('Registration Date'.tr(context), _formatDate(employee.createdAt), textPrimary, textSecondary),
+            _buildDetailRow('Account Status'.tr(context), employee.accountStatus.isNotEmpty ? employee.accountStatus.tr(context) : (isActive ? 'Active'.tr(context) : 'Disabled'.tr(context)), textPrimary, textSecondary),
           ],
         ),
       ),
@@ -1302,7 +1321,7 @@ class _EmployeeDetailsDialog extends StatelessWidget {
         ElevatedButton(
           style: ElevatedButton.styleFrom(backgroundColor: AppColors.secondaryBlue, foregroundColor: Colors.white),
           onPressed: () => Navigator.pop(context),
-          child: const Text('Close'),
+          child: Text('Close'.tr(context)),
         ),
       ],
     );

@@ -12,6 +12,7 @@ import '../../../services/receipt_service.dart';
 import '../../../services/user_role_cache.dart';
 import '../../../widgets/animated_widgets.dart';
 import '../../../widgets/skeleton_loaders.dart';
+import '../../../l10n/app_translations.dart';
 
 class CustomerNotificationsScreen extends StatefulWidget {
   const CustomerNotificationsScreen({super.key});
@@ -91,8 +92,8 @@ class _CustomerNotificationsScreenState
     final currentUser = _auth.currentUser;
     if (currentUser == null || _notificationsStream == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Notifications')),
-        body: const Center(child: Text('Please log in first.')),
+        appBar: AppBar(title: Text('Notifications'.tr(context))),
+        body: Center(child: Text('Please log in first.'.tr(context))),
       );
     }
 
@@ -106,7 +107,7 @@ class _CustomerNotificationsScreenState
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'Notifications Centre',
+          'Notifications Centre'.tr(context),
           style: TextStyle(color: _textColor, fontWeight: FontWeight.bold),
         ),
         actions: [
@@ -146,8 +147,8 @@ class _CustomerNotificationsScreenState
                     const SizedBox(height: 12),
                     Text(
                       isPermission
-                          ? 'Notifications access is currently denied by backend rules.'
-                          : 'Failed to load notifications.',
+                          ? 'Notifications access is currently denied by backend rules.'.tr(context)
+                          : 'Failed to load notifications.'.tr(context),
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         color: Colors.redAccent,
@@ -158,7 +159,7 @@ class _CustomerNotificationsScreenState
                     const SizedBox(height: 8),
                     Text(
                       isPermission
-                          ? 'Tap retry after refreshing session. If it persists, Firebase rules must allow your user to read notifications.'
+                          ? 'Tap retry after refreshing session. If it persists, Firebase rules must allow your user to read notifications.'.tr(context)
                           : raw,
                       textAlign: TextAlign.center,
                       style: TextStyle(color: _subColor, fontSize: 12),
@@ -168,7 +169,7 @@ class _CustomerNotificationsScreenState
                       onPressed: () =>
                           _reloadNotifications(forceTokenRefresh: true),
                       icon: const Icon(Icons.refresh_rounded),
-                      label: const Text('Retry'),
+                      label: Text('Retry'.tr(context)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryOrange,
                         foregroundColor: Colors.white,
@@ -223,7 +224,7 @@ class _CustomerNotificationsScreenState
                   runSpacing: 4,
                   children: [
                     Text(
-                      'Showing ${filteredNotifs.length} alerts ($unreadCount unread)',
+                      '${"Showing".tr(context)} ${filteredNotifs.length} ${"alerts".tr(context)} ($unreadCount ${"unread".tr(context)})',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: _rf(12, min: 10),
@@ -242,7 +243,7 @@ class _CustomerNotificationsScreenState
                           });
                         },
                         child: Text(
-                          'Reset Filters',
+                          'Reset Filters'.tr(context),
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             color: AppColors.primaryOrange,
@@ -313,7 +314,7 @@ class _CustomerNotificationsScreenState
             onChanged: (val) => setState(() => _searchQuery = val),
             style: TextStyle(color: _textColor, fontSize: _rf(13, min: 11)),
             decoration: InputDecoration(
-              hintText: 'Search notifications...',
+              hintText: 'Search notifications...'.tr(context),
               hintStyle: TextStyle(
                 color: _isDark ? Colors.white30 : Colors.grey,
                 fontSize: _rf(13, min: 11),
@@ -344,7 +345,7 @@ class _CustomerNotificationsScreenState
                       dropdownColor: Theme.of(context).cardColor,
                       style: TextStyle(color: _textColor, fontSize: _rf(12)),
                       decoration: InputDecoration(
-                        labelText: 'Category',
+                        labelText: 'Category'.tr(context),
                         labelStyle: TextStyle(
                           color: _subColor,
                           fontSize: _rf(12),
@@ -359,7 +360,7 @@ class _CustomerNotificationsScreenState
                         return DropdownMenuItem(
                           value: t,
                           child: Text(
-                            t.substring(0, 1).toUpperCase() + t.substring(1),
+                            t.tr(context),
                             style: TextStyle(fontSize: _rf(12)),
                           ),
                         );
@@ -374,7 +375,7 @@ class _CustomerNotificationsScreenState
                       dropdownColor: Theme.of(context).cardColor,
                       style: TextStyle(color: _textColor, fontSize: _rf(12)),
                       decoration: InputDecoration(
-                        labelText: 'Status',
+                        labelText: 'Status'.tr(context),
                         labelStyle: TextStyle(
                           color: _subColor,
                           fontSize: _rf(12),
@@ -389,21 +390,21 @@ class _CustomerNotificationsScreenState
                         DropdownMenuItem(
                           value: 'All',
                           child: Text(
-                            'All Status',
+                            'All Status'.tr(context),
                             style: TextStyle(fontSize: _rf(12)),
                           ),
                         ),
                         DropdownMenuItem(
                           value: 'Unread',
                           child: Text(
-                            'Unread',
+                            'Unread'.tr(context),
                             style: TextStyle(fontSize: _rf(12)),
                           ),
                         ),
                         DropdownMenuItem(
                           value: 'Read',
                           child: Text(
-                            'Read',
+                            'Read'.tr(context),
                             style: TextStyle(fontSize: _rf(12)),
                           ),
                         ),
@@ -422,7 +423,7 @@ class _CustomerNotificationsScreenState
                         dropdownColor: Theme.of(context).cardColor,
                         style: TextStyle(color: _textColor, fontSize: _rf(12)),
                         decoration: InputDecoration(
-                          labelText: 'Category',
+                          labelText: 'Category'.tr(context),
                           labelStyle: TextStyle(
                             color: _subColor,
                             fontSize: _rf(12),
@@ -437,7 +438,7 @@ class _CustomerNotificationsScreenState
                           return DropdownMenuItem(
                             value: t,
                             child: Text(
-                              t.substring(0, 1).toUpperCase() + t.substring(1),
+                              t.tr(context),
                               style: TextStyle(fontSize: _rf(12)),
                             ),
                           );
@@ -454,7 +455,7 @@ class _CustomerNotificationsScreenState
                         dropdownColor: Theme.of(context).cardColor,
                         style: TextStyle(color: _textColor, fontSize: _rf(12)),
                         decoration: InputDecoration(
-                          labelText: 'Status',
+                          labelText: 'Status'.tr(context),
                           labelStyle: TextStyle(
                             color: _subColor,
                             fontSize: _rf(12),
@@ -469,21 +470,21 @@ class _CustomerNotificationsScreenState
                           DropdownMenuItem(
                             value: 'All',
                             child: Text(
-                              'All Status',
+                              'All Status'.tr(context),
                               style: TextStyle(fontSize: _rf(12)),
                             ),
                           ),
                           DropdownMenuItem(
                             value: 'Unread',
                             child: Text(
-                              'Unread',
+                              'Unread'.tr(context),
                               style: TextStyle(fontSize: _rf(12)),
                             ),
                           ),
                           DropdownMenuItem(
                             value: 'Read',
                             child: Text(
-                              'Read',
+                              'Read'.tr(context),
                               style: TextStyle(fontSize: _rf(12)),
                             ),
                           ),
@@ -516,7 +517,7 @@ class _CustomerNotificationsScreenState
                     color: AppColors.primaryOrange,
                   ),
                   label: Text(
-                    'Mark All Read',
+                    'Mark All Read'.tr(context),
                     style: TextStyle(
                       color: AppColors.primaryOrange,
                       fontWeight: FontWeight.bold,
@@ -535,7 +536,7 @@ class _CustomerNotificationsScreenState
                     color: Colors.redAccent,
                   ),
                   label: Text(
-                    'Clear Read',
+                    'Clear Read'.tr(context),
                     style: TextStyle(
                       color: Colors.redAccent,
                       fontWeight: FontWeight.bold,
@@ -551,10 +552,10 @@ class _CustomerNotificationsScreenState
   }
 
   Widget _buildEmptyState() {
-    return const AnimatedEmptyState(
+    return AnimatedEmptyState(
       icon: Icons.notifications_off_outlined,
-      title: 'No Matching Notifications',
-      subtitle: 'Try adjusting your search query or category filters.',
+      title: 'No Matching Notifications'.tr(context),
+      subtitle: 'Try adjusting your search query or category filters.'.tr(context),
     );
   }
 
@@ -602,7 +603,7 @@ class _CustomerNotificationsScreenState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                notif.title,
+                notif.title.tr(context),
                 style: TextStyle(
                   fontWeight: notif.isRead ? FontWeight.bold : FontWeight.w900,
                   fontSize: _rf(13, min: 11),
@@ -626,7 +627,7 @@ class _CustomerNotificationsScreenState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  notif.message,
+                  notif.message.tr(context),
                   style: TextStyle(
                     fontSize: _rf(11, min: 10),
                     height: 1.3,
@@ -659,7 +660,7 @@ class _CustomerNotificationsScreenState
                         onPressed: () =>
                             _showBookingDetails(context, notif.relatedId),
                         child: Text(
-                          'View Booking',
+                          'View Booking'.tr(context),
                           style: TextStyle(
                             fontSize: _rf(10, min: 9),
                             fontWeight: FontWeight.bold,
@@ -682,7 +683,7 @@ class _CustomerNotificationsScreenState
                         ),
                         onPressed: () => _sendOnMyWayStatus(notif.relatedId),
                         child: Text(
-                          "I'm On My Way",
+                          "I'm On My Way".tr(context),
                           style: TextStyle(
                             fontSize: _rf(10, min: 9),
                             fontWeight: FontWeight.bold,
@@ -715,7 +716,7 @@ class _CustomerNotificationsScreenState
                         ),
                         onPressed: () => _sendOnMyWayStatus(notif.relatedId),
                         child: Text(
-                          "I'm On My Way",
+                          "I'm On My Way".tr(context),
                           style: TextStyle(
                             fontSize: _rf(10, min: 9),
                             fontWeight: FontWeight.bold,
@@ -740,7 +741,7 @@ class _CustomerNotificationsScreenState
                         ),
                         onPressed: () => _showExtendRentalGuidance(),
                         child: Text(
-                          "Extend Rental",
+                          "Extend Rental".tr(context),
                           style: TextStyle(
                             fontSize: _rf(10, min: 9),
                             fontWeight: FontWeight.bold,
@@ -1017,7 +1018,7 @@ class _CustomerNotificationsScreenState
                     children: [
                       Expanded(
                         child: Text(
-                          'Booking Specification',
+                          'Booking Specification'.tr(context),
                           style: TextStyle(
                             fontSize: _rf(16, min: 14),
                             fontWeight: FontWeight.bold,
@@ -1047,36 +1048,36 @@ class _CustomerNotificationsScreenState
                     ],
                   ),
                   SizedBox(height: isPhone ? 14 : 20),
-                  _buildDetailRow('Reservation Ref ID', booking.id),
-                  _buildDetailRow('Vehicle Name', booking.vehicleName),
+                  _buildDetailRow('Reservation Ref ID'.tr(context), booking.id),
+                  _buildDetailRow('Vehicle Name'.tr(context), booking.vehicleName),
                   _buildDetailRow(
-                    'Rental Days',
+                    'Rental Days'.tr(context),
                     booking.isOpenRental
-                        ? 'Open Ended'
-                        : '${booking.rentalDays} days',
+                        ? 'Open Ended'.tr(context)
+                        : '${booking.rentalDays} ${"days".tr(context)}',
                   ),
                   _buildDetailRow(
-                    'Rental Duration',
+                    'Rental Duration'.tr(context),
                     booking.isOpenRental
                         ? '${dateFormat.format(booking.pickUpDate)} to OPEN RENTAL'
                         : '${dateFormat.format(booking.pickUpDate)} to ${booking.returnDate != null ? dateFormat.format(booking.returnDate!) : ""}',
                   ),
                   _buildDetailRow(
-                    'Security Deposit',
+                    'Security Deposit'.tr(context),
                     'RM ${booking.depositAmount.toStringAsFixed(2)}',
                   ),
                   _buildDetailRow(
-                    'Total Price Paid',
+                    'Total Price Paid'.tr(context),
                     'RM ${booking.totalPrice.toStringAsFixed(2)}',
                   ),
                   if (booking.notes != null && booking.notes!.isNotEmpty)
-                    _buildDetailRow('Remarks', booking.notes!),
+                    _buildDetailRow('Remarks'.tr(context), booking.notes!),
                   if (isPaid) ...[
                     const SizedBox(height: 16),
                     Divider(color: _borderColor),
                     const SizedBox(height: 12),
                     Text(
-                      'Receipt Documents',
+                      'Receipt Documents'.tr(context),
                       style: TextStyle(
                         fontSize: _rf(12, min: 10),
                         fontWeight: FontWeight.bold,
@@ -1114,7 +1115,7 @@ class _CustomerNotificationsScreenState
                               size: _rf(14, min: 12),
                             ),
                             label: Text(
-                              'View',
+                              'View'.tr(context),
                               style: TextStyle(
                                 fontSize: _rf(11, min: 10),
                                 fontWeight: FontWeight.bold,
@@ -1147,7 +1148,7 @@ class _CustomerNotificationsScreenState
                             },
                             icon: Icon(Icons.download, size: _rf(14, min: 12)),
                             label: Text(
-                              'Download',
+                              'Download'.tr(context),
                               style: TextStyle(
                                 fontSize: _rf(11, min: 10),
                                 fontWeight: FontWeight.bold,
@@ -1174,7 +1175,7 @@ class _CustomerNotificationsScreenState
                       ),
                       onPressed: () => Navigator.pop(context),
                       child: Text(
-                        'Close Details',
+                        'Close Details'.tr(context),
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: _rf(13, min: 11),
@@ -1223,7 +1224,7 @@ class _CustomerNotificationsScreenState
                     children: [
                       Expanded(
                         child: Text(
-                          'Payment Transaction',
+                          'Payment Transaction'.tr(context),
                           style: TextStyle(
                             fontSize: _rf(16, min: 14),
                             fontWeight: FontWeight.bold,
@@ -1254,26 +1255,26 @@ class _CustomerNotificationsScreenState
                     ],
                   ),
                   SizedBox(height: isPhone ? 14 : 20),
-                  _buildDetailRow('Transaction ID', payment.id),
-                  _buildDetailRow('Booking Ref ID', payment.bookingId),
+                  _buildDetailRow('Transaction ID'.tr(context), payment.id),
+                  _buildDetailRow('Booking Ref ID'.tr(context), payment.bookingId),
                   _buildDetailRow(
-                    'Paid Amount',
+                    'Paid Amount'.tr(context),
                     'RM ${payment.amount.toStringAsFixed(2)}',
                   ),
                   _buildDetailRow(
-                    'Method Type',
+                    'Method Type'.tr(context),
                     payment.paymentMethod.toUpperCase(),
                   ),
                   _buildDetailRow(
-                    'Lodged At',
+                    'Lodged At'.tr(context),
                     dateFormat.format(payment.paymentDate),
                   ),
                   if (payment.transactionId != null)
-                    _buildDetailRow('Reference Ref', payment.transactionId!),
+                    _buildDetailRow('Reference Ref'.tr(context), payment.transactionId!),
                   if (payment.rejectionReason != null &&
                       payment.rejectionReason!.isNotEmpty)
                     _buildDetailRow(
-                      'Rejection Reason',
+                      'Rejection Reason'.tr(context),
                       payment.rejectionReason!,
                       isItalic: true,
                     ),
@@ -1293,7 +1294,7 @@ class _CustomerNotificationsScreenState
                       ),
                       onPressed: () => Navigator.pop(context),
                       child: Text(
-                        'Close details',
+                        'Close details'.tr(context),
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: _rf(13, min: 11),
@@ -1467,8 +1468,8 @@ class _CustomerNotificationsScreenState
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Status sent to admin: You are on your way!"),
+          SnackBar(
+            content: Text("Status sent to admin: You are on your way!".tr(context)),
             backgroundColor: Colors.green,
           ),
         );
@@ -1477,7 +1478,7 @@ class _CustomerNotificationsScreenState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Failed to send status: $e"),
+            content: Text("${"Failed to send status: ".tr(context)}$e"),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -1496,14 +1497,14 @@ class _CustomerNotificationsScreenState
             borderRadius: BorderRadius.circular(16),
           ),
           title: Text(
-            "Extend Active Rental",
+            "Extend Active Rental".tr(context),
             style: TextStyle(
               fontWeight: FontWeight.bold,
               color: isDark ? Colors.white : AppColors.secondaryBlue,
             ),
           ),
           content: Text(
-            "To request a rental contract extension, please contact CARENT Corporate Support directly at +60 3-2274 1234 or visit the nearest branch center.",
+            "To request a rental contract extension, please contact CARENT Corporate Support directly at +60 3-2274 1234 or visit the nearest branch center.".tr(context),
             style: TextStyle(
               color: isDark ? const Color(0xFFCBD5E1) : Colors.black87,
             ),
@@ -1514,9 +1515,9 @@ class _CustomerNotificationsScreenState
                 backgroundColor: AppColors.primaryOrange,
               ),
               onPressed: () => Navigator.pop(context),
-              child: const Text(
-                "OK",
-                style: TextStyle(
+              child: Text(
+                "OK".tr(context),
+                style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                 ),

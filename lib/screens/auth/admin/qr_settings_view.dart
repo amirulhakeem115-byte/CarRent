@@ -4,6 +4,7 @@ import '../../../constants/colors.dart';
 import '../../../services/database_service.dart';
 import '../../../widgets/loading_widget.dart';
 import '../../../widgets/app_image.dart';
+import '../../../l10n/app_translations.dart';
 
 class QrSettingsView extends StatefulWidget {
   const QrSettingsView({super.key});
@@ -113,14 +114,17 @@ class _QrSettingsViewState extends State<QrSettingsView> {
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${isQrCode ? "QR Code" : "Bank Logo"} saved to database successfully!'), backgroundColor: Colors.green),
+          SnackBar(
+            content: Text('${(isQrCode ? "QR Code" : "Bank Logo").tr(context)}${' saved to database successfully!'.tr(context)}'),
+            backgroundColor: Colors.green,
+          ),
         );
       }
     } catch (e) {
       debugPrint('[QR_SETTINGS] Error picking or saving settings image: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Save failed: $e'), backgroundColor: Colors.redAccent),
+          SnackBar(content: Text('${'Save failed: '.tr(context)}$e'), backgroundColor: Colors.redAccent),
         );
       }
     } finally {
@@ -147,13 +151,13 @@ class _QrSettingsViewState extends State<QrSettingsView> {
       debugPrint('[QR_SETTINGS] Firebase save success');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('QR payment settings updated successfully!'), backgroundColor: Colors.green),
+        SnackBar(content: Text('QR payment settings updated successfully!'.tr(context)), backgroundColor: Colors.green),
       );
     } catch (e) {
       debugPrint('[QR_SETTINGS] Error saving settings: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save settings: $e'), backgroundColor: Colors.redAccent),
+          SnackBar(content: Text('${'Failed to save settings: '.tr(context)}$e'), backgroundColor: Colors.redAccent),
         );
       }
     } finally {
@@ -166,7 +170,7 @@ class _QrSettingsViewState extends State<QrSettingsView> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: LoadingWidget(message: 'Syncing QR Settings...'));
+      return Center(child: LoadingWidget(message: 'Syncing QR Settings...'.tr(context)));
     }
 
     if (_error != null) {
@@ -176,9 +180,9 @@ class _QrSettingsViewState extends State<QrSettingsView> {
           children: [
             const Icon(Icons.error_outline, size: 64, color: Colors.redAccent),
             const SizedBox(height: 16),
-            Text(_error!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Text(_error!.tr(context), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 16),
-            ElevatedButton(onPressed: _loadSettings, child: const Text('Retry')),
+            ElevatedButton(onPressed: _loadSettings, child: Text('Retry'.tr(context))),
           ],
         ),
       );
@@ -206,8 +210,8 @@ class _QrSettingsViewState extends State<QrSettingsView> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('QR Payment Settings', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textPrimary)),
-                        Text('Configure DuitNow bank details and QR codes shown during checkout.', style: TextStyle(fontSize: 12, color: textSecondary)),
+                        Text('QR Payment Settings'.tr(context), style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textPrimary)),
+                        Text('Configure DuitNow bank details and QR codes shown during checkout.'.tr(context), style: TextStyle(fontSize: 12, color: textSecondary)),
                       ],
                     ),
                     ElevatedButton.icon(
@@ -221,15 +225,15 @@ class _QrSettingsViewState extends State<QrSettingsView> {
                       icon: _saving
                           ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                           : const Icon(Icons.save_outlined, size: 18),
-                      label: const Text('Save Settings', style: TextStyle(fontWeight: FontWeight.bold)),
+                      label: Text('Save Settings'.tr(context), style: const TextStyle(fontWeight: FontWeight.bold)),
                     ),
                   ],
                 )
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('QR Payment Settings', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: textPrimary)),
-                    Text('Configure DuitNow bank details and QR codes shown during checkout.', style: TextStyle(fontSize: 12, color: textSecondary)),
+                    Text('QR Payment Settings'.tr(context), style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: textPrimary)),
+                    Text('Configure DuitNow bank details and QR codes shown during checkout.'.tr(context), style: TextStyle(fontSize: 12, color: textSecondary)),
                     const SizedBox(height: 12),
                     SizedBox(
                       width: double.infinity,
@@ -244,7 +248,7 @@ class _QrSettingsViewState extends State<QrSettingsView> {
                         icon: _saving
                             ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                             : const Icon(Icons.save_outlined, size: 18),
-                        label: const Text('Save Settings', style: TextStyle(fontWeight: FontWeight.bold)),
+                        label: Text('Save Settings'.tr(context), style: const TextStyle(fontWeight: FontWeight.bold)),
                       ),
                     ),
                   ],
@@ -267,7 +271,7 @@ class _QrSettingsViewState extends State<QrSettingsView> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('QR Payments Enabled', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textPrimary)),
+                        Text('QR Payments Enabled'.tr(context), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textPrimary)),
                         Switch(
                           value: _isEnabled,
                           activeThumbColor: AppColors.primaryOrange,
@@ -279,30 +283,30 @@ class _QrSettingsViewState extends State<QrSettingsView> {
                     TextField(
                       controller: _bankNameController,
                       style: TextStyle(color: textPrimary),
-                      decoration: const InputDecoration(
-                        labelText: 'Bank Name',
-                        hintText: 'e.g., Maybank, CIMB Bank',
-                        prefixIcon: Icon(Icons.account_balance_outlined),
+                      decoration: InputDecoration(
+                        labelText: 'Bank Name'.tr(context),
+                        hintText: 'e.g., Maybank, CIMB Bank'.tr(context),
+                        prefixIcon: const Icon(Icons.account_balance_outlined),
                       ),
                     ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: _accountNameController,
                       style: TextStyle(color: textPrimary),
-                      decoration: const InputDecoration(
-                        labelText: 'Account Holder Name',
-                        hintText: 'e.g., CARRENT SDN BHD',
-                        prefixIcon: Icon(Icons.person_outline),
+                      decoration: InputDecoration(
+                        labelText: 'Account Holder Name'.tr(context),
+                        hintText: 'e.g., CARRENT SDN BHD'.tr(context),
+                        prefixIcon: const Icon(Icons.person_outline),
                       ),
                     ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: _accountNumberController,
                       style: TextStyle(color: textPrimary),
-                      decoration: const InputDecoration(
-                        labelText: 'Bank Account Number',
-                        hintText: 'e.g., 514012345678',
-                        prefixIcon: Icon(Icons.credit_card_outlined),
+                      decoration: InputDecoration(
+                        labelText: 'Bank Account Number'.tr(context),
+                        hintText: 'e.g., 514012345678'.tr(context),
+                        prefixIcon: const Icon(Icons.credit_card_outlined),
                       ),
                     ),
                   ],
@@ -354,7 +358,7 @@ class _QrSettingsViewState extends State<QrSettingsView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textPrimary)),
+          Text(label.tr(context), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textPrimary)),
           const SizedBox(height: 12),
           Container(
             height: 150,
@@ -375,7 +379,7 @@ class _QrSettingsViewState extends State<QrSettingsView> {
                       children: [
                         Icon(isQr ? Icons.qr_code_2 : Icons.image_search, size: 48, color: textSecondary),
                         const SizedBox(height: 8),
-                        Text('No asset selected', style: TextStyle(color: textSecondary, fontSize: 12)),
+                        Text('No asset selected'.tr(context), style: TextStyle(color: textSecondary, fontSize: 12)),
                       ],
                     ),
                   ),
@@ -390,7 +394,7 @@ class _QrSettingsViewState extends State<QrSettingsView> {
             ),
             onPressed: _saving ? null : () => _pickImage(isQr),
             icon: const Icon(Icons.upload_file, size: 18),
-            label: Text(url != null && url.isNotEmpty ? 'Replace Image' : 'Upload Image'),
+            label: Text((url != null && url.isNotEmpty ? 'Replace Image' : 'Upload Image').tr(context)),
           ),
         ],
       ),

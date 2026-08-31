@@ -6,7 +6,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/vehicle_model.dart';
 import '../models/booking_model.dart';
 import 'notification_service.dart';
-import 'booking_lifecycle_manager.dart';
 import 'user_role_cache.dart';
 
 class VehicleService {
@@ -18,12 +17,9 @@ class VehicleService {
   final Set<String> _manuallyUpdatedVehicleIds = {};
 
   List<VehicleModel>? _cachedVehicles;
-  DateTime? _vehiclesCacheTime;
-  static const Duration _cacheTtl = Duration(seconds: 30);
 
   void invalidateCache() {
     _cachedVehicles = null;
-    _vehiclesCacheTime = null;
   }
 
   Future<List<VehicleModel>> getVehicles({
@@ -33,24 +29,16 @@ class VehicleService {
     if (!forceRefresh &&
         !applyStatusSync &&
         _cachedVehicles != null &&
-        _vehiclesCacheTime != null &&
-        DateTime.now().difference(_vehiclesCacheTime!) < _cacheTtl) {
+        _cachedVehicles!.isNotEmpty) {
       debugPrint(
         '[VehicleService] Returning warm cached vehicles (${_cachedVehicles!.length} items)',
       );
       return _cachedVehicles!;
     }
 
-    // Run lifecycle manager check asynchronously in the background
-    BookingLifecycleManager().checkAndProcessLifecycle().catchError((
-      lifecycleErr,
-    ) {
-      debugPrint(
-        '[VehicleService] Warning: background lifecycle check failed: $lifecycleErr',
-      );
-    });
-
     List<VehicleModel> vehicles = [];
+    final perfSw = Stopwatch()..start();
+    debugPrint('[PERF] Starting vehicles query');
     final currentUid = FirebaseAuth.instance.currentUser?.uid;
     String currentRole = 'unknown';
     if (currentUid != null) {
@@ -58,7 +46,7 @@ class VehicleService {
     }
 
     try {
-      final snapshot = await _db.get().timeout(const Duration(seconds: 8));
+      final snapshot = await _db.get().timeout(const Duration(seconds: 10));
       if (snapshot.exists && snapshot.value != null) {
         final Map<dynamic, dynamic> data =
             snapshot.value as Map<dynamic, dynamic>;
@@ -70,7 +58,10 @@ class VehicleService {
       }
 
       _cachedVehicles = vehicles;
-      _vehiclesCacheTime = DateTime.now();
+      perfSw.stop();
+      debugPrint(
+        '[PERF] Vehicles query completed: ${perfSw.elapsedMilliseconds}ms (${vehicles.length} items)',
+      );
 
       if (applyStatusSync) {
         // Fetch bookings to determine dynamic availability
@@ -78,7 +69,7 @@ class VehicleService {
             .ref()
             .child('bookings')
             .get()
-            .timeout(const Duration(seconds: 8));
+            .timeout(const Duration(seconds: 10));
         List<BookingModel> allBookings = [];
         if (bookingsSnap.exists && bookingsSnap.value != null) {
           final Map<dynamic, dynamic> data =
@@ -130,7 +121,8 @@ class VehicleService {
             return booking.pickUpDate.isBefore(
                   now.add(const Duration(hours: 12)),
                 ) &&
-                (booking.returnDate == null ||
+                (booking.isOpenRental ||
+                    booking.returnDate == null ||
                     now.isBefore(booking.returnDate!));
           });
 
@@ -168,6 +160,9 @@ class VehicleService {
       );
     } catch (e) {
       debugPrint('[VehicleService] [getVehicles] Error getting vehicles: $e');
+      if (_cachedVehicles != null && _cachedVehicles!.isNotEmpty) {
+        return _cachedVehicles!;
+      }
     }
     return vehicles;
   }
@@ -182,9 +177,18 @@ class VehicleService {
     void updateAndEmit() {
       if (controller.isClosed) return;
 
-      // Emit vehicle statuses exactly as stored/normalized from database so
-      // list, details, and booking flows remain consistent.
-      controller.add(latestVehicles.values.toList());
+      final list = latestVehicles.values.toList();
+      _cachedVehicles = list;
+      controller.add(list);
+    }
+
+    // Immediately emit warm cached vehicles if available
+    if (_cachedVehicles != null && _cachedVehicles!.isNotEmpty) {
+      scheduleMicrotask(() {
+        if (!controller.isClosed && _cachedVehicles != null) {
+          controller.add(_cachedVehicles!);
+        }
+      });
     }
 
     vehiclesSub = _db.onValue.listen((event) {

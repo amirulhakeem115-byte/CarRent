@@ -5,6 +5,7 @@ import '../../constants/colors.dart';
 import '../../services/booking_service.dart';
 import '../../services/vehicle_service.dart';
 import '../../services/payment_service.dart';
+import '../../l10n/app_translations.dart';
 import '../services/ai_service.dart';
 import '../widgets/ai_message_bubble.dart';
 import '../widgets/typing_indicator.dart';
@@ -231,7 +232,7 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Admin AI Assistant',
+                  'Admin AI Assistant'.tr(context),
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
@@ -253,7 +254,7 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        'Live System Access · Local AI Engine',
+                        'Live System Access · Local AI Engine'.tr(context),
                         style: TextStyle(
                           fontSize: isNarrow ? 10 : 11,
                           color: textSecondary,
@@ -270,7 +271,7 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
           // Clear history button
           Consumer<AIService>(
             builder: (context, ai, _) => Tooltip(
-              message: 'Clear conversation',
+              message: 'Clear conversation'.tr(context),
               child: IconButton(
                 onPressed: ai.clearHistory,
                 icon: Icon(
@@ -304,7 +305,7 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
       _buildStatChip(
         Icons.calendar_today_rounded,
         _statsLoaded ? '$_totalBookings' : '...',
-        'Bookings',
+        'Bookings'.tr(context),
         const Color(0xFF3B82F6),
         isDark,
       ),
@@ -312,7 +313,7 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
       _buildStatChip(
         Icons.directions_car_filled_rounded,
         _statsLoaded ? '$_totalVehicles' : '...',
-        'Vehicles',
+        'Vehicles'.tr(context),
         const Color(0xFF22C55E),
         isDark,
       ),
@@ -322,7 +323,7 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
         _statsLoaded
             ? 'RM ${(_totalRevenue / 1000).toStringAsFixed(1)}k'
             : '...',
-        'Revenue',
+        'Revenue'.tr(context),
         AppColors.primaryOrange,
         isDark,
       ),
@@ -346,7 +347,7 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
             ),
             const SizedBox(width: 4),
             Text(
-              'Admin Mode',
+              'Admin Mode'.tr(context),
               style: TextStyle(
                 fontSize: isNarrow ? 9 : 10,
                 fontWeight: FontWeight.bold,
@@ -482,10 +483,10 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
                             ),
                           ),
                           const SizedBox(width: 12),
-                          const Expanded(
+                          Expanded(
                             child: Text(
-                              'Welcome, Administrator',
-                              style: TextStyle(
+                              'Welcome, Administrator'.tr(context),
+                              style: const TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w900,
                                 color: AppColors.primaryOrange,
@@ -496,7 +497,7 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'I\'m your Admin AI Assistant with live access to your CARENT system. Ask me about bookings, revenue, fleet status, customers, maintenance, reports, and more.',
+                        'I\'m your Admin AI Assistant with live access to your CARENT system. Ask me about bookings, revenue, fleet status, customers, maintenance, reports, and more.'.tr(context),
                         style: TextStyle(
                           fontSize: 12,
                           height: 1.5,
@@ -513,7 +514,7 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
 
                 // Suggested actions
                 Text(
-                  'Suggested Actions',
+                  'Suggested Actions'.tr(context),
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
@@ -529,7 +530,7 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
                   runSpacing: 8,
                   children: _quickCommands.map((cmd) {
                     return InkWell(
-                      onTap: () => _sendMessage(cmd.query),
+                      onTap: () => _sendMessage(cmd.label.tr(context)),
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
@@ -557,7 +558,7 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
                           ],
                         ),
                         child: Text(
-                          cmd.label,
+                          cmd.label.tr(context),
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -653,7 +654,7 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
                     ),
                   ),
                   child: Text(
-                    cmd.label,
+                    cmd.label.tr(context),
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -729,7 +730,7 @@ class _AdminAIAssistantViewState extends State<AdminAIAssistantView>
                     ),
                     decoration: InputDecoration(
                       hintText:
-                          'Ask about bookings, revenue, fleet, reports...',
+                          'Ask about bookings, revenue, fleet, reports...'.tr(context),
                       hintStyle: TextStyle(
                         fontSize: 12.5,
                         color: isDark

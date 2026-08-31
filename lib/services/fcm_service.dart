@@ -451,50 +451,56 @@ class FCMService {
         }
       }
 
-      // Dispatch HTTP POST requests to FCM API endpoint for each target token & topic
-      final List<String> recipients = List.from(targetTokens);
-      if (targetUserId == 'admin') {
-        recipients.add('/topics/admin');
-      }
+      // Dispatch HTTP POST requests to FCM API endpoint for each target token & topic (Mobile platforms only; Web uses Realtime Database listener)
+      if (kIsWeb) {
+        debugPrint(
+          '[FCMService Web] Direct HTTP FCM POST skipped on web (CORS protection). Realtime database listener delivers notifications.',
+        );
+      } else {
+        final List<String> recipients = List.from(targetTokens);
+        if (targetUserId == 'admin') {
+          recipients.add('/topics/admin');
+        }
 
-      for (final recipient in recipients) {
-        try {
-          final bodyMap = {
-            'to': recipient,
-            'priority': 'high',
-            'notification': {
-              'title': title,
-              'body': message,
-              'sound': 'default',
-              'android_channel_id': 'high_importance_channel',
-            },
-            'data': {
-              'title': title,
-              'body': message,
-              'type': type,
-              'actionRoute': actionRoute,
-              'relatedId': relatedId,
-              'click_action': 'FLUTTER_NOTIFICATION_CLICK',
-            },
-          };
+        for (final recipient in recipients) {
+          try {
+            final bodyMap = {
+              'to': recipient,
+              'priority': 'high',
+              'notification': {
+                'title': title,
+                'body': message,
+                'sound': 'default',
+                'android_channel_id': 'high_importance_channel',
+              },
+              'data': {
+                'title': title,
+                'body': message,
+                'type': type,
+                'actionRoute': actionRoute,
+                'relatedId': relatedId,
+                'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+              },
+            };
 
-          final response = await http
-              .post(
-                Uri.parse('https://fcm.googleapis.com/fcm/send'),
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization':
-                      'key=AIzaSyBWCi7fvcfuZIEWeZfqOSVFvQncgXzf0kc',
-                },
-                body: jsonEncode(bodyMap),
-              )
-              .timeout(const Duration(seconds: 5));
+            final response = await http
+                .post(
+                  Uri.parse('https://fcm.googleapis.com/fcm/send'),
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization':
+                        'key=AIzaSyBWCi7fvcfuZIEWeZfqOSVFvQncgXzf0kc',
+                  },
+                  body: jsonEncode(bodyMap),
+                )
+                .timeout(const Duration(seconds: 5));
 
-          debugPrint(
-            '[FCM Push Request] Sent to "$recipient", HTTP Status: ${response.statusCode}',
-          );
-        } catch (e) {
-          debugPrint('[FCM Push Request Error] Failed for $recipient: $e');
+            debugPrint(
+              '[FCM Push Request] Sent to "$recipient", HTTP Status: ${response.statusCode}',
+            );
+          } catch (e) {
+            debugPrint('[FCM Push Request Error] Failed for $recipient: $e');
+          }
         }
       }
 

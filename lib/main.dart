@@ -15,6 +15,9 @@ import 'services/user_session.dart';
 import 'services/overdue_reminder_service.dart';
 import 'services/admin_booking_observer_service.dart';
 
+import 'l10n/app_localizations.dart';
+import 'providers/language_provider.dart';
+
 import 'services/payment_restriction_service.dart';
 
 Future<void> main() async {
@@ -64,6 +67,7 @@ Future<void> main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => CompanySettingsProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => LanguageProvider()),
         ChangeNotifierProvider(create: (_) => AIService()),
         ChangeNotifierProvider(
           create: (_) => PaymentRestrictionService()..initialize(),
@@ -81,24 +85,34 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final companyName = context.watch<CompanySettingsProvider>().companyName;
     final themeProvider = context.watch<ThemeProvider>();
+    final languageProvider = context.watch<LanguageProvider>();
 
     return MaterialApp(
       scrollBehavior: const AppScrollBehavior(),
       debugShowCheckedModeBanner: false,
       title: '$companyName System',
+      locale: languageProvider.locale,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       builder: (context, child) {
         final media = MediaQuery.of(context);
         final isMobile = media.size.shortestSide < 600;
-        if (!isMobile) {
-          return child ?? const SizedBox.shrink();
+        Widget widgetTree = child ?? const SizedBox.shrink();
+
+        if (isMobile) {
+          final currentScale = media.textScaler.scale(1.0);
+          final clampedScale = currentScale.clamp(0.9, 1.0);
+          widgetTree = MediaQuery(
+            data: media.copyWith(textScaler: TextScaler.linear(clampedScale)),
+            child: widgetTree,
+          );
         }
 
-        final currentScale = media.textScaler.scale(1.0);
-        final clampedScale = currentScale.clamp(0.9, 1.0);
-
-        return MediaQuery(
-          data: media.copyWith(textScaler: TextScaler.linear(clampedScale)),
-          child: child ?? const SizedBox.shrink(),
+        return Directionality(
+          textDirection: languageProvider.isArabic
+              ? TextDirection.rtl
+              : TextDirection.ltr,
+          child: widgetTree,
         );
       },
       themeMode: themeProvider.themeMode,

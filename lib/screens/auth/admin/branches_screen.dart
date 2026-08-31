@@ -7,6 +7,7 @@ import '../../../services/branch_service.dart';
 import '../../../widgets/loading_widget.dart';
 import '../../../constants/colors.dart';
 import '../../../services/file_download_helper.dart' if (dart.library.html) '../../../services/file_download_web.dart' as download_helper;
+import '../../../l10n/app_translations.dart';
 
 class BranchesView extends StatefulWidget {
   const BranchesView({super.key});
@@ -119,7 +120,7 @@ class _BranchesViewState extends State<BranchesView> {
 
     if (name.isEmpty || address.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Branch Name and Address are required!'), backgroundColor: Colors.redAccent),
+        SnackBar(content: Text('Branch Name and Address are required!'.tr(context)), backgroundColor: Colors.redAccent),
       );
       return;
     }
@@ -152,7 +153,7 @@ class _BranchesViewState extends State<BranchesView> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_editingBranch != null ? 'Branch updated successfully' : 'Branch added successfully'), backgroundColor: Colors.green),
+        SnackBar(content: Text(_editingBranch != null ? 'Branch updated successfully'.tr(context) : 'Branch added successfully'.tr(context)), backgroundColor: Colors.green),
       );
       _cancelForm();
     } catch (e) {
@@ -173,14 +174,14 @@ class _BranchesViewState extends State<BranchesView> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: dialogBg,
-        title: Text('Remove Branch', style: TextStyle(color: textPrimary, fontWeight: FontWeight.bold)),
-        content: Text('Are you sure you want to remove this branch from locations listing?', style: TextStyle(color: textSecondary)),
+        title: Text('Remove Branch'.tr(context), style: TextStyle(color: textPrimary, fontWeight: FontWeight.bold)),
+        content: Text('Are you sure you want to remove this branch from locations listing?'.tr(context), style: TextStyle(color: textSecondary)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel', style: TextStyle(color: textSecondary))),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel'.tr(context), style: TextStyle(color: textSecondary))),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Remove'),
+            child: Text('Remove'.tr(context)),
           ),
         ],
       ),
@@ -235,7 +236,7 @@ class _BranchesViewState extends State<BranchesView> {
                     children: [
                       const Icon(Icons.info_outline, size: 14, color: Colors.blue),
                       const SizedBox(width: 6),
-                      Flexible(child: Text('Status: ${branch.status}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textPrimary))),
+                      Flexible(child: Text('${"Status: ".tr(context)}${branch.status.tr(context)}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textPrimary))),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -247,7 +248,7 @@ class _BranchesViewState extends State<BranchesView> {
                         child: Text(
                           isValid
                               ? 'GPS: ${branch.latitude.toStringAsFixed(4)}, ${branch.longitude.toStringAsFixed(4)}'
-                              : 'GPS: Missing/Invalid coordinates',
+                              : '${"GPS: ".tr(context)}${"Missing/Invalid coordinates".tr(context)}',
                           style: TextStyle(fontSize: 12, color: isValid ? textSecondary : Colors.red, fontWeight: isValid ? FontWeight.normal : FontWeight.bold),
                         ),
                       ),
@@ -264,11 +265,11 @@ class _BranchesViewState extends State<BranchesView> {
                   Navigator.pop(context);
                   download_helper.openUrl('https://www.google.com/maps/search/?api=1&query=${branch.latitude},${branch.longitude}');
                 },
-                child: const Text('Open in Google Maps'),
+                child: Text('Open in Google Maps'.tr(context)),
               ),
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text('Close', style: TextStyle(color: textSecondary)),
+              child: Text('Close'.tr(context), style: TextStyle(color: textSecondary)),
             ),
           ],
         );
@@ -321,8 +322,8 @@ class _BranchesViewState extends State<BranchesView> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Locations & Branches', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textPrimary)),
-                          Text('Configure corporate branch details, latitude coordinates, and live pins.', style: TextStyle(fontSize: 12, color: textSecondary)),
+                          Text('Locations & Branches'.tr(context), style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textPrimary)),
+                          Text('Configure corporate branch details, latitude coordinates, and live pins.'.tr(context), style: TextStyle(fontSize: 12, color: textSecondary)),
                         ],
                       ),
                     ),
@@ -336,8 +337,8 @@ class _BranchesViewState extends State<BranchesView> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Locations & Branches', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textPrimary)),
-                        Text('Configure corporate branch details, latitude coordinates, and live pins.', style: TextStyle(fontSize: 12, color: textSecondary)),
+                        Text('Locations & Branches'.tr(context), style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textPrimary)),
+                        Text('Configure corporate branch details, latitude coordinates, and live pins.'.tr(context), style: TextStyle(fontSize: 12, color: textSecondary)),
                       ],
                     ),
                     if (!_isFormActive) ...[
@@ -488,16 +489,16 @@ class _BranchesViewState extends State<BranchesView> {
             child: Card(
               color: Colors.redAccent,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Row(
                   children: [
-                    Icon(Icons.touch_app, color: Colors.white),
-                    SizedBox(width: 12),
+                    const Icon(Icons.touch_app, color: Colors.white),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Click anywhere on the map to set coordinates!',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                        'Click anywhere on the map to set coordinates!'.tr(context),
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                       ),
                     ),
                   ],
@@ -519,7 +520,7 @@ class _BranchesViewState extends State<BranchesView> {
       ),
       onPressed: () => _activateForm(),
       icon: const Icon(Icons.add, size: 18),
-      label: const Text('Add Branch', style: TextStyle(fontWeight: FontWeight.bold)),
+      label: Text('Add Branch'.tr(context), style: const TextStyle(fontWeight: FontWeight.bold)),
     );
   }
 
@@ -538,7 +539,7 @@ class _BranchesViewState extends State<BranchesView> {
       ),
       padding: const EdgeInsets.all(12),
       child: _branches.isEmpty
-          ? Center(child: Text('No branches registered.', style: TextStyle(color: textSecondary)))
+          ? Center(child: Text('No branches registered.'.tr(context), style: TextStyle(color: textSecondary)))
           : ListView.separated(
               shrinkWrap: true,
               itemCount: _branches.length,
@@ -571,7 +572,7 @@ class _BranchesViewState extends State<BranchesView> {
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          branch.status.toUpperCase(),
+                          branch.status.tr(context).toUpperCase(),
                           style: TextStyle(color: isActive ? Colors.green : textSecondary, fontSize: 8, fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -582,17 +583,17 @@ class _BranchesViewState extends State<BranchesView> {
                     children: [
                       Text(branch.address, style: TextStyle(fontSize: 12, color: textSecondary)),
                       if (!isValid)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 4.0),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4.0),
                           child: Row(
                             children: [
-                              Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 14),
-                              SizedBox(width: 4),
-                              Text('Missing/Invalid GPS Coordinates!', style: TextStyle(color: Colors.orange, fontSize: 11, fontWeight: FontWeight.bold)),
+                              const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 14),
+                              const SizedBox(width: 4),
+                              Text('Missing/Invalid GPS Coordinates!'.tr(context), style: const TextStyle(color: Colors.orange, fontSize: 11, fontWeight: FontWeight.bold)),
                             ],
                           ),
                         ),
-                      Text('Phone: ${branch.phone} | GPS: ${branch.latitude.toStringAsFixed(3)}, ${branch.longitude.toStringAsFixed(3)}', style: TextStyle(fontSize: 11, color: textSecondary)),
+                      Text('${"Phone: ".tr(context)}${branch.phone} | GPS: ${branch.latitude.toStringAsFixed(3)}, ${branch.longitude.toStringAsFixed(3)}', style: TextStyle(fontSize: 11, color: textSecondary)),
                     ],
                   ),
                   trailing: Row(
@@ -644,7 +645,7 @@ class _BranchesViewState extends State<BranchesView> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                isEdit ? 'Edit Branch' : 'Add Branch Location',
+                isEdit ? 'Edit Branch'.tr(context) : 'Add Branch Location'.tr(context),
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimary),
               ),
               IconButton(
@@ -657,25 +658,25 @@ class _BranchesViewState extends State<BranchesView> {
           TextField(
             controller: _nameController,
             style: TextStyle(color: textPrimary),
-            decoration: const InputDecoration(labelText: 'Branch Name', hintText: 'e.g. Kajang Hub'),
+            decoration: InputDecoration(labelText: 'Branch Name'.tr(context), hintText: 'e.g. Kajang Hub'.tr(context)),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _addressController,
             style: TextStyle(color: textPrimary),
-            decoration: const InputDecoration(labelText: 'Address', hintText: 'Full physical address'),
+            decoration: InputDecoration(labelText: 'Address'.tr(context), hintText: 'Full physical address'.tr(context)),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _phoneController,
             style: TextStyle(color: textPrimary),
-            decoration: const InputDecoration(labelText: 'Phone Number', hintText: 'e.g. +603-87391234'),
+            decoration: InputDecoration(labelText: 'Phone Number'.tr(context), hintText: 'e.g. +603-87391234'.tr(context)),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _hoursController,
             style: TextStyle(color: textPrimary),
-            decoration: const InputDecoration(labelText: 'Operating Hours', hintText: 'e.g. 09:00 AM - 09:00 PM'),
+            decoration: InputDecoration(labelText: 'Operating Hours'.tr(context), hintText: 'e.g. 09:00 AM - 09:00 PM'.tr(context)),
           ),
           const SizedBox(height: 12),
           
@@ -686,7 +687,7 @@ class _BranchesViewState extends State<BranchesView> {
                   controller: _latController,
                   style: TextStyle(color: textPrimary),
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Latitude'),
+                  decoration: InputDecoration(labelText: 'Latitude'.tr(context)),
                 ),
               ),
               const SizedBox(width: 12),
@@ -695,7 +696,7 @@ class _BranchesViewState extends State<BranchesView> {
                   controller: _lngController,
                   style: TextStyle(color: textPrimary),
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Longitude'),
+                  decoration: InputDecoration(labelText: 'Longitude'.tr(context)),
                 ),
               ),
             ],
@@ -717,7 +718,7 @@ class _BranchesViewState extends State<BranchesView> {
               },
               icon: Icon(_isSelectingLocationFromMap ? Icons.touch_app : Icons.map, size: 16),
               label: Text(
-                _isSelectingLocationFromMap ? 'TAPPING ACTIVE...' : 'Select Location Directly From Map',
+                _isSelectingLocationFromMap ? 'TAPPING ACTIVE...'.tr(context) : 'Select Location Directly From Map'.tr(context),
                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
               ),
             ),
@@ -728,9 +729,9 @@ class _BranchesViewState extends State<BranchesView> {
             initialValue: _status,
             dropdownColor: cardColor,
             style: TextStyle(color: textPrimary, fontWeight: FontWeight.bold),
-            decoration: const InputDecoration(labelText: 'Branch Status'),
+            decoration: InputDecoration(labelText: 'Branch Status'.tr(context)),
             items: ['Active', 'Inactive'].map((s) {
-              return DropdownMenuItem(value: s, child: Text(s));
+              return DropdownMenuItem(value: s, child: Text(s.tr(context)));
             }).toList(),
             onChanged: (val) {
               if (val != null) {
@@ -749,7 +750,7 @@ class _BranchesViewState extends State<BranchesView> {
                     foregroundColor: textSecondary,
                   ),
                   onPressed: _cancelForm,
-                  child: const Text('Cancel'),
+                  child: Text('Cancel'.tr(context)),
                 ),
               ),
               const SizedBox(width: 12),
@@ -760,7 +761,7 @@ class _BranchesViewState extends State<BranchesView> {
                     foregroundColor: Colors.white,
                   ),
                   onPressed: _saveForm,
-                  child: const Text('Save Branch'),
+                  child: Text('Save Branch'.tr(context)),
                 ),
               ),
             ],
@@ -803,7 +804,7 @@ class _BranchesViewState extends State<BranchesView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(label, style: TextStyle(color: textSecondary, fontSize: 11, fontWeight: FontWeight.bold)),
+                Text(label.tr(context), style: TextStyle(color: textSecondary, fontSize: 11, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
                 Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textPrimary)),
               ],

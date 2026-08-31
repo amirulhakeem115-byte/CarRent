@@ -11,22 +11,24 @@ import '../../../services/notification_service.dart';
 import '../../../services/company_settings_provider.dart';
 import '../../../services/web_audio_player.dart';
 import '../../../services/user_session.dart';
+import '../../../l10n/app_translations.dart';
 
 import '../../../models/user_model.dart';
 import '../../../models/notification_model.dart';
 import '../../../widgets/app_image.dart';
 import '../../../widgets/app_logo.dart';
+import '../../../widgets/language_selector_widget.dart';
 import '../../../ai/services/ai_service.dart';
 import '../../../ai/models/ai_intent.dart';
 import '../../../ai/widgets/ai_chat_panel.dart';
 import '../../../ai/widgets/movable_ai_floating_button_overlay.dart';
 import '../../../models/booking_model.dart';
-import 'booking_screen.dart';
 import '../../../services/payment_restriction_service.dart';
 import '../login_screen.dart';
 
 // Import all screens to load them inside the shell
 import 'home_screen.dart';
+import 'booking_screen.dart';
 import 'vehicle_list_screen.dart';
 import 'my_bookings_screen.dart';
 import 'history_screen.dart';
@@ -507,15 +509,15 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
     final difference = now.difference(dateTime);
 
     if (difference.inSeconds < 60) {
-      return 'Just now';
+      return 'Just now'.tr(context);
     } else if (difference.inMinutes < 60) {
       final mins = difference.inMinutes;
-      return '$mins min${mins == 1 ? "" : "s"} ago';
+      return '$mins ${mins == 1 ? "minute ago".tr(context) : "minutes ago".tr(context)}';
     } else if (difference.inHours < 24) {
       final hours = difference.inHours;
-      return '$hours hr${hours == 1 ? "" : "s"} ago';
+      return '$hours ${hours == 1 ? "hour ago".tr(context) : "hours ago".tr(context)}';
     } else {
-      return DateFormat('dd MMM').format(dateTime);
+      return DateFormat('dd MMM').format(dateTime).tr(context);
     }
   }
 
@@ -547,25 +549,25 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
 
   String _getScreenTitle() {
     if (_customBody != null) {
-      return 'Details';
+      return 'Details'.tr(context);
     }
     switch (_currentIndex) {
       case 0:
-        return 'Dashboard';
+        return 'Dashboard'.tr(context);
       case 1:
-        return 'Search Cars';
+        return 'Search Cars'.tr(context);
       case 2:
-        return 'My Bookings';
+        return 'My Bookings'.tr(context);
       case 3:
-        return 'Rental Hubs';
+        return 'Rental Hubs'.tr(context);
       case 4:
-        return 'Loyalty Rewards';
+        return 'Loyalty Rewards'.tr(context);
       case 5:
-        return 'Payments Ledger';
+        return 'Payments Ledger'.tr(context);
       case 6:
-        return 'My Profile';
+        return 'My Profile'.tr(context);
       case 7:
-        return 'Support Desk';
+        return 'Support Desk'.tr(context);
       default:
         return context.watch<CompanySettingsProvider>().companyName;
     }
@@ -638,10 +640,12 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                   ],
                 ),
                 actions: [
+                  const LanguageSelectorWidget(isCompact: true),
+                  const SizedBox(width: 8),
                   _buildNotificationBell(unreadCount),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
                   _buildProfileAvatar(),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 12),
                 ],
               )
             : null,
@@ -785,25 +789,25 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                       if (index == 3) _currentIndex = 6;
                     });
                   },
-                  items: const [
+                  items: [
                     BottomNavigationBarItem(
-                      icon: Icon(Icons.dashboard_outlined),
-                      activeIcon: Icon(Icons.dashboard_rounded),
-                      label: 'Dashboard',
+                      icon: const Icon(Icons.dashboard_outlined),
+                      activeIcon: const Icon(Icons.dashboard_rounded),
+                      label: 'Dashboard'.tr(context),
                     ),
                     BottomNavigationBarItem(
-                      icon: Icon(Icons.search_rounded),
-                      label: 'Search',
+                      icon: const Icon(Icons.search_rounded),
+                      label: 'Search Cars'.tr(context),
                     ),
                     BottomNavigationBarItem(
-                      icon: Icon(Icons.calendar_today_outlined),
-                      activeIcon: Icon(Icons.calendar_today_rounded),
-                      label: 'Bookings',
+                      icon: const Icon(Icons.calendar_today_outlined),
+                      activeIcon: const Icon(Icons.calendar_today_rounded),
+                      label: 'Bookings'.tr(context),
                     ),
                     BottomNavigationBarItem(
-                      icon: Icon(Icons.person_outline),
-                      activeIcon: Icon(Icons.person_rounded),
-                      label: 'Profile',
+                      icon: const Icon(Icons.person_outline),
+                      activeIcon: const Icon(Icons.person_rounded),
+                      label: 'Profile'.tr(context),
                     ),
                   ],
                 ),
@@ -817,7 +821,7 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
     return PopupMenuButton<void>(
       offset: const Offset(0, 48),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      tooltip: 'Notifications',
+      tooltip: 'Notifications'.tr(context),
       padding: EdgeInsets.zero,
       itemBuilder: (context) {
         final recentNotifs = _notifications.take(10).toList();
@@ -842,8 +846,8 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                       children: [
                         Text(
                           unreadCount > 0
-                              ? 'Notifications ($unreadCount)'
-                              : 'Notifications',
+                              ? '${'Notifications'.tr(context)} ($unreadCount)'
+                              : 'Notifications'.tr(context),
                           style: const TextStyle(
                             fontWeight: FontWeight.w900,
                             fontSize: 14,
@@ -860,9 +864,9 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                                 _user!.id,
                               );
                             },
-                            child: const Text(
-                              'Mark All Read',
-                              style: TextStyle(
+                            child: Text(
+                              'Mark All Read'.tr(context),
+                              style: const TextStyle(
                                 color: AppColors.primaryOrange,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 11,
@@ -884,9 +888,9 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                             color: Colors.grey[300],
                           ),
                           const SizedBox(height: 12),
-                          const Text(
-                            'No notifications yet',
-                            style: TextStyle(
+                          Text(
+                            'No notifications yet'.tr(context),
+                            style: const TextStyle(
                               color: Colors.grey,
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
@@ -951,7 +955,7 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          notif.title,
+                                          notif.title.tr(context),
                                           style: TextStyle(
                                             fontWeight: notif.isRead
                                                 ? FontWeight.bold
@@ -962,7 +966,7 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
-                                          notif.message,
+                                          notif.message.tr(context),
                                           maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
@@ -1011,9 +1015,9 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       alignment: Alignment.center,
-                      child: const Text(
-                        'View All Notifications',
-                        style: TextStyle(
+                      child: Text(
+                        'View All Notifications'.tr(context),
+                        style: const TextStyle(
                           color: AppColors.primaryOrange,
                           fontWeight: FontWeight.bold,
                           fontSize: 12,
@@ -1124,6 +1128,8 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
           ),
           Row(
             children: [
+              const LanguageSelectorWidget(isCompact: true),
+              const SizedBox(width: 12),
               _buildNotificationBell(unreadCount),
               const SizedBox(width: 16),
               const VerticalDivider(width: 20, indent: 20, endIndent: 20),
@@ -1135,7 +1141,7 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _user?.fullName ?? 'Customer',
+                    _user?.fullName ?? 'Customer'.tr(context),
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
@@ -1189,25 +1195,29 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
             child: ListView(
               padding: const EdgeInsets.symmetric(vertical: 16),
               children: [
-                _buildSidebarTile(Icons.dashboard_rounded, 'Dashboard', 0),
-                _buildSidebarTile(Icons.search_rounded, 'Search Cars', 1),
+                _buildSidebarTile(Icons.dashboard_rounded, 'Dashboard'.tr(context), 0),
+                _buildSidebarTile(Icons.search_rounded, 'Search Cars'.tr(context), 1),
                 _buildSidebarTile(
                   Icons.calendar_today_rounded,
-                  'My Bookings',
+                  'My Bookings'.tr(context),
                   2,
                 ),
-                _buildSidebarTile(Icons.map_rounded, 'Branches', 3),
-                _buildSidebarTile(Icons.stars_rounded, 'Loyalty Rewards', 4),
-                _buildSidebarTile(Icons.history_rounded, 'History', 5),
+                _buildSidebarTile(Icons.map_rounded, 'Branches'.tr(context), 3),
+                _buildSidebarTile(Icons.stars_rounded, 'Loyalty Rewards'.tr(context), 4),
+                _buildSidebarTile(Icons.history_rounded, 'History'.tr(context), 5),
                 _buildSidebarTile(
                   Icons.support_agent_rounded,
-                  'Support Desk',
+                  'Support Desk'.tr(context),
                   7,
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          const Divider(color: Colors.white10, height: 1),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            child: LanguageSelectorWidget(isCompact: false),
+          ),
         ],
       ),
     );
@@ -1265,7 +1275,7 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
                 const AppLogo(size: 32, fallbackColor: Colors.white),
                 const SizedBox(height: 12),
                 Text(
-                  '${context.watch<CompanySettingsProvider>().companyName} SYSTEM',
+                  '${context.watch<CompanySettingsProvider>().companyName} ${'SYSTEM'.tr(context)}',
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w900,
@@ -1280,25 +1290,29 @@ class CustomerResponsiveShellState extends State<CustomerResponsiveShell> {
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
-                _buildDrawerTile(Icons.dashboard_rounded, 'Dashboard', 0),
-                _buildDrawerTile(Icons.search_rounded, 'Search Cars', 1),
+                _buildDrawerTile(Icons.dashboard_rounded, 'Dashboard'.tr(context), 0),
+                _buildDrawerTile(Icons.search_rounded, 'Search Cars'.tr(context), 1),
                 _buildDrawerTile(
                   Icons.calendar_today_rounded,
-                  'My Bookings',
+                  'My Bookings'.tr(context),
                   2,
                 ),
-                _buildDrawerTile(Icons.map_rounded, 'Branches', 3),
-                _buildDrawerTile(Icons.history_rounded, 'History', 5),
+                _buildDrawerTile(Icons.map_rounded, 'Branches'.tr(context), 3),
+                _buildDrawerTile(Icons.history_rounded, 'History'.tr(context), 5),
                 _buildDrawerTile(
                   Icons.support_agent_rounded,
-                  'Support Desk',
+                  'Support Desk'.tr(context),
                   7,
                 ),
               ],
             ),
           ),
           const Divider(color: Colors.white10),
-          const SizedBox(height: 16),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            child: LanguageSelectorWidget(isCompact: false),
+          ),
+          const SizedBox(height: 12),
         ],
       ),
     );

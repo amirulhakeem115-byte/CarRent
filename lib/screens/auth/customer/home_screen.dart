@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -18,6 +19,7 @@ import '../../../widgets/app_image.dart';
 import '../../../widgets/hero_promotion_carousel.dart';
 import '../../../services/company_settings_provider.dart';
 import '../../../services/user_session.dart';
+import '../../../l10n/app_translations.dart';
 
 import 'vehicle_list_screen.dart';
 import 'vehicle_details_screen.dart';
@@ -162,9 +164,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           throw Exception("User data not found in database");
         }
       }
-      // Seed preset promotions if empty
-      await _promotionService.seedDefaultPromotions();
-      _promotions = await _promotionService.getPromotions(forceRefresh: true);
+      _promotions = await _promotionService.getPromotions();
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -203,7 +203,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
               ),
               const SizedBox(height: 16),
               Text(
-                _error!,
+                _error!.tr(context),
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
@@ -221,7 +221,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text('Retry'),
+                child: Text('Retry'.tr(context)),
               ),
             ],
           ),
@@ -289,11 +289,11 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
 
   Widget _buildHeroBanner() {
     final hour = DateTime.now().hour;
-    final greeting = hour < 12
+    final greeting = (hour < 12
         ? 'Good Morning'
         : hour < 17
         ? 'Good Afternoon'
-        : 'Good Evening';
+        : 'Good Evening').tr(context);
 
     return Container(
       width: double.infinity,
@@ -316,7 +316,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '$greeting! 👋',
+                      '$greeting 👋',
                       style: const TextStyle(
                         color: Colors.white60,
                         fontSize: 12,
@@ -324,7 +324,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                       ),
                     ),
                     Text(
-                      _user?.fullName ?? 'Valued Customer',
+                      _user?.fullName ?? 'Valued Customer'.tr(context),
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 18,
@@ -358,12 +358,15 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                         size: 14,
                       ),
                       const SizedBox(width: 4),
-                      Text(
-                        '${_user?.rewardPoints ?? 0}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
+                      Directionality(
+                        textDirection: ui.TextDirection.ltr,
+                        child: Text(
+                          '${_user?.rewardPoints ?? 0}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ],
@@ -392,7 +395,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           child: _buildStatCard(
             icon: Icons.directions_car_filled_rounded,
             value: '$totalBookings',
-            label: 'Bookings',
+            label: 'Bookings'.tr(context),
             color: const Color(0xFF3B82F6),
           ),
         ),
@@ -401,7 +404,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           child: _buildStatCard(
             icon: Icons.receipt_long_rounded,
             value: 'RM ${totalSpent.toStringAsFixed(0)}',
-            label: 'Total Spent',
+            label: 'Total Spent'.tr(context),
             color: AppColors.primaryOrange,
           ),
         ),
@@ -410,7 +413,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           child: _buildStatCard(
             icon: Icons.event_available_rounded,
             value: '$activeCount',
-            label: 'Active',
+            label: 'Active'.tr(context),
             color: const Color(0xFF10B981),
           ),
         ),
@@ -507,7 +510,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'LAST PAYMENT SUMMARY',
+                        'LAST PAYMENT SUMMARY'.tr(context),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -533,7 +536,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   border: Border.all(color: statusColor.withValues(alpha: 0.2)),
                 ),
                 child: Text(
-                  statusStr.toUpperCase(),
+                  statusStr.toUpperCase().tr(context),
                   style: TextStyle(
                     color: statusColor,
                     fontSize: 9,
@@ -564,15 +567,18 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 6),
-                Text(
-                  '${DateFormat('dd MMM yyyy').format(lastPayment.paymentDate)} at ${lastPayment.paymentTime ?? DateFormat('HH:mm:ss').format(lastPayment.paymentDate)}',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 10.5, color: _subColor),
+                Directionality(
+                  textDirection: ui.TextDirection.ltr,
+                  child: Text(
+                    '${DateFormat('dd MMM yyyy').format(lastPayment.paymentDate)} at ${lastPayment.paymentTime ?? DateFormat('HH:mm:ss').format(lastPayment.paymentDate)}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 10.5, color: _subColor),
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  lastPayment.paymentMethod,
+                  lastPayment.paymentMethod.tr(context),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 10.5, color: _subColor),
@@ -580,12 +586,15 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 const SizedBox(height: 10),
                 Align(
                   alignment: Alignment.centerRight,
-                  child: Text(
-                    'RM ${lastPayment.amount.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 18,
-                      color: AppColors.primaryOrange,
+                  child: Directionality(
+                    textDirection: ui.TextDirection.ltr,
+                    child: Text(
+                      'RM ${lastPayment.amount.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 18,
+                        color: AppColors.primaryOrange,
+                      ),
                     ),
                   ),
                 ),
@@ -617,9 +626,12 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                       runSpacing: 4,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Text(
-                          '${DateFormat('dd MMM yyyy').format(lastPayment.paymentDate)} at ${lastPayment.paymentTime ?? DateFormat('HH:mm:ss').format(lastPayment.paymentDate)}',
-                          style: TextStyle(fontSize: 11, color: _subColor),
+                        Directionality(
+                          textDirection: ui.TextDirection.ltr,
+                          child: Text(
+                            '${DateFormat('dd MMM yyyy').format(lastPayment.paymentDate)} at ${lastPayment.paymentTime ?? DateFormat('HH:mm:ss').format(lastPayment.paymentDate)}',
+                            style: TextStyle(fontSize: 11, color: _subColor),
+                          ),
                         ),
                         Container(
                           width: 4,
@@ -630,7 +642,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                           ),
                         ),
                         Text(
-                          lastPayment.paymentMethod,
+                          lastPayment.paymentMethod.tr(context),
                           style: TextStyle(fontSize: 11, color: _subColor),
                         ),
                       ],
@@ -638,12 +650,15 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   ],
                 );
 
-                final amount = Text(
-                  'RM ${lastPayment.amount.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 18,
-                    color: AppColors.primaryOrange,
+                final amount = Directionality(
+                  textDirection: ui.TextDirection.ltr,
+                  child: Text(
+                    'RM ${lastPayment.amount.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 18,
+                      color: AppColors.primaryOrange,
+                    ),
                   ),
                 );
 
@@ -705,12 +720,15 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             child: Icon(icon, color: color, size: 16),
           ),
           const SizedBox(height: 10),
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: FontWeight.w900,
-              fontSize: 16,
-              color: _textColor,
+          Directionality(
+            textDirection: ui.TextDirection.ltr,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 16,
+                color: _textColor,
+              ),
             ),
           ),
           Text(label, style: TextStyle(fontSize: 10, color: _subColor)),
@@ -723,25 +741,25 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     final actions = [
       _QuickAction(
         icon: Icons.directions_car_filled_rounded,
-        label: 'Browse Cars',
+        label: 'Browse Cars'.tr(context),
         color: const Color(0xFF3B82F6),
         onTap: () => CustomerResponsiveShell.of(context)?.setIndex(1),
       ),
       _QuickAction(
         icon: Icons.map_outlined,
-        label: 'Branches',
+        label: 'Branches'.tr(context),
         color: const Color(0xFFEC4899),
         onTap: () => CustomerResponsiveShell.of(context)?.setIndex(3),
       ),
       _QuickAction(
         icon: Icons.support_agent_rounded,
-        label: 'Support',
+        label: 'Support'.tr(context),
         color: const Color(0xFF6366F1),
         onTap: () => CustomerResponsiveShell.of(context)?.setIndex(7),
       ),
       _QuickAction(
         icon: Icons.history_rounded,
-        label: 'History',
+        label: 'History'.tr(context),
         color: const Color(0xFF10B981),
         onTap: () => CustomerResponsiveShell.of(context)?.setIndex(5),
       ),
@@ -751,7 +769,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Quick Actions',
+          'Quick Actions'.tr(context),
           style: TextStyle(
             fontWeight: FontWeight.w800,
             fontSize: 16,
@@ -830,7 +848,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Active Journey',
+          'Active Journey'.tr(context),
           style: TextStyle(
             fontWeight: FontWeight.w800,
             fontSize: 16,
@@ -878,7 +896,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  'No Active Booking',
+                  'No Active Booking'.tr(context),
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 15,
@@ -887,7 +905,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Browse our premium fleet and book your next ride.',
+                  'Browse our premium fleet and book your next ride.'.tr(context),
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: _subColor),
                 ),
@@ -914,9 +932,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                       vertical: 12,
                     ),
                   ),
-                  child: const Text(
-                    'Book a Ride',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  child: Text(
+                    'Book a Ride'.tr(context),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                   ),
                 ),
               ],
@@ -972,9 +990,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Active Journey',
-                  style: TextStyle(
+                Text(
+                  'Active Journey'.tr(context),
+                  style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
@@ -994,7 +1012,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     ),
                   ),
                   child: Text(
-                    booking.status.toUpperCase(),
+                    booking.status.toUpperCase().tr(context),
                     style: TextStyle(
                       color: statusColor,
                       fontSize: 9,
@@ -1031,21 +1049,24 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'PICK UP',
-                          style: TextStyle(
+                        Text(
+                          'PICK UP'.tr(context),
+                          style: const TextStyle(
                             color: Colors.white38,
                             fontSize: 9,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          dateFormat.format(booking.pickUpDate),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
+                        Directionality(
+                          textDirection: ui.TextDirection.ltr,
+                          child: Text(
+                            dateFormat.format(booking.pickUpDate),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
                           ),
                         ),
                       ],
@@ -1063,25 +1084,28 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'RETURN',
-                          style: TextStyle(
+                        Text(
+                          'RETURN'.tr(context),
+                          style: const TextStyle(
                             color: Colors.white38,
                             fontSize: 9,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          booking.isOpenRental
-                              ? 'Open Rental'
-                              : (booking.returnDate != null
-                                    ? dateFormat.format(booking.returnDate!)
-                                    : ""),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
+                        Directionality(
+                          textDirection: ui.TextDirection.ltr,
+                          child: Text(
+                            booking.isOpenRental
+                                ? 'Open Rental'.tr(context)
+                                : (booking.returnDate != null
+                                      ? dateFormat.format(booking.returnDate!)
+                                      : ""),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
                           ),
                         ),
                       ],
@@ -1097,20 +1121,23 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'TOTAL COST',
-                      style: TextStyle(
+                    Text(
+                      'TOTAL COST'.tr(context),
+                      style: const TextStyle(
                         color: Colors.white38,
                         fontSize: 9,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    Text(
-                      'RM ${booking.totalPrice.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        color: AppColors.primaryOrange,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
+                    Directionality(
+                      textDirection: ui.TextDirection.ltr,
+                      child: Text(
+                        'RM ${booking.totalPrice.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          color: AppColors.primaryOrange,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                     ),
                   ],
@@ -1129,9 +1156,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                       vertical: 10,
                     ),
                   ),
-                  child: const Text(
-                    'View Details',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  child: Text(
+                    'View Details'.tr(context),
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
@@ -1150,7 +1177,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Available Cars',
+              'Available Cars'.tr(context),
               style: TextStyle(
                 fontWeight: FontWeight.w800,
                 fontSize: 16,
@@ -1162,9 +1189,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 context,
                 MaterialPageRoute(builder: (_) => const VehicleListScreen()),
               ).then((_) => _loadData()),
-              child: const Text(
-                'See All',
-                style: TextStyle(
+              child: Text(
+                'See All'.tr(context),
+                style: const TextStyle(
                   color: AppColors.primaryOrange,
                   fontWeight: FontWeight.bold,
                   fontSize: 12,
@@ -1179,7 +1206,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             child: Padding(
               padding: const EdgeInsets.all(24),
               child: Text(
-                'No available vehicles at the moment.',
+                'No available vehicles at the moment.'.tr(context),
                 style: TextStyle(color: Colors.grey[500], fontSize: 13),
               ),
             ),
@@ -1285,19 +1312,22 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    vehicle.category,
+                    vehicle.category.tr(context),
                     style: TextStyle(fontSize: 10, color: _subColor),
                   ),
                   const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'RM ${vehicle.pricePerDay.toStringAsFixed(0)}/day',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 12,
-                          color: AppColors.primaryOrange,
+                      Directionality(
+                        textDirection: ui.TextDirection.ltr,
+                        child: Text(
+                          'RM ${vehicle.pricePerDay.toStringAsFixed(0)}/day',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 12,
+                            color: AppColors.primaryOrange,
+                          ),
                         ),
                       ),
                       Container(
@@ -1309,9 +1339,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                           color: const Color(0xFF10B981).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: const Text(
-                          'Available',
-                          style: TextStyle(
+                        child: Text(
+                          'Available'.tr(context),
+                          style: const TextStyle(
                             color: Color(0xFF10B981),
                             fontSize: 9,
                             fontWeight: FontWeight.bold,
@@ -1338,7 +1368,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Recent Payments',
+              'Recent Payments'.tr(context),
               style: TextStyle(
                 fontWeight: FontWeight.w800,
                 fontSize: 16,
@@ -1347,9 +1377,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             ),
             TextButton(
               onPressed: () => CustomerResponsiveShell.of(context)?.setIndex(5),
-              child: const Text(
-                'See All',
-                style: TextStyle(
+              child: Text(
+                'See All'.tr(context),
+                style: const TextStyle(
                   color: AppColors.primaryOrange,
                   fontWeight: FontWeight.bold,
                   fontSize: 12,
@@ -1372,7 +1402,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'No payments yet.',
+                    'No payments yet.'.tr(context),
                     style: TextStyle(color: Colors.grey[500], fontSize: 13),
                   ),
                 ],
@@ -1441,16 +1471,19 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  payment.paymentMethod.toUpperCase(),
+                  payment.paymentMethod.toUpperCase().tr(context),
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
                     color: _textColor,
                   ),
                 ),
-                Text(
-                  DateFormat('dd MMM yyyy').format(payment.paymentDate),
-                  style: TextStyle(fontSize: 10, color: _subColor),
+                Directionality(
+                  textDirection: ui.TextDirection.ltr,
+                  child: Text(
+                    DateFormat('dd MMM yyyy').format(payment.paymentDate),
+                    style: TextStyle(fontSize: 10, color: _subColor),
+                  ),
                 ),
               ],
             ),
@@ -1458,12 +1491,15 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
-                'RM ${payment.amount.toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 14,
-                  color: _textColor,
+              Directionality(
+                textDirection: ui.TextDirection.ltr,
+                child: Text(
+                  'RM ${payment.amount.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 14,
+                    color: _textColor,
+                  ),
                 ),
               ),
               Container(
@@ -1473,7 +1509,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  statusStr,
+                  statusStr.tr(context),
                   style: TextStyle(
                     color: statusColor,
                     fontSize: 9,
@@ -1503,9 +1539,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         gradientColors = [const Color(0xFF6D28D9), const Color(0xFF4C1D95)];
         levelIcon = Icons.military_tech_rounded;
         benefits = [
-          'Open Rental access (no upfront payment!)',
-          '1.5x Reward Points earning multiplier',
-          'Priority booking approval & support',
+          'Open Rental access (no upfront payment!)'.tr(context),
+          '1.5x Reward Points earning multiplier'.tr(context),
+          'Priority booking approval & support'.tr(context),
         ];
         break;
       case 'Gold':
@@ -1513,9 +1549,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         gradientColors = [const Color(0xFFD97706), const Color(0xFFB45309)];
         levelIcon = Icons.stars_rounded;
         benefits = [
-          'Priority booking approval',
-          'Exclusive promotions',
-          'Dynamic discount points redemptions',
+          'Priority booking approval'.tr(context),
+          'Exclusive promotions'.tr(context),
+          'Dynamic discount points redemptions'.tr(context),
         ];
         break;
       case 'Silver':
@@ -1523,15 +1559,18 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         gradientColors = [const Color(0xFF475569), const Color(0xFF334155)];
         levelIcon = Icons.verified_user_rounded;
         benefits = [
-          'Dynamic discount points redemptions',
-          'Priority customer support channels',
+          'Dynamic discount points redemptions'.tr(context),
+          'Priority customer support channels'.tr(context),
         ];
         break;
       default: // Standard
         levelColor = const Color(0xFF94A3B8);
         gradientColors = [const Color(0xFF374151), const Color(0xFF1F2937)];
         levelIcon = Icons.emoji_events_outlined;
-        benefits = ['Standard points earning', 'Standard booking approval'];
+        benefits = [
+          'Standard points earning'.tr(context),
+          'Standard booking approval'.tr(context),
+        ];
     }
 
     final int pct = (status.progress * 100).toInt();
@@ -1580,7 +1619,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                         Icon(levelIcon, color: levelColor, size: 24),
                         const SizedBox(width: 8),
                         Text(
-                          '${status.currentLevel} Member',
+                          '${status.currentLevel.tr(context)} ${'Member'.tr(context)}',
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w900,
@@ -1599,9 +1638,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                         color: Colors.white.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: const Text(
-                        'Loyalty Status',
-                        style: TextStyle(
+                      child: Text(
+                        'Loyalty Status'.tr(context),
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 9,
                           fontWeight: FontWeight.bold,
@@ -1611,9 +1650,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   ],
                 ),
                 const SizedBox(height: 20),
-                const Text(
-                  'REWARD POINTS',
-                  style: TextStyle(
+                Text(
+                  'REWARD POINTS'.tr(context),
+                  style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
@@ -1622,7 +1661,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '$points pts',
+                  '$points ${'pts'.tr(context)}',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 26,
@@ -1635,8 +1674,8 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   children: [
                     Text(
                       status.currentLevel == 'Premium'
-                          ? 'Maximum Membership Level Reached.'
-                          : '${status.pointsNeededForNext} more points to unlock ${status.nextLevel}.',
+                          ? 'Maximum Membership Level Reached.'.tr(context)
+                          : '${status.pointsNeededForNext} ${'more points to unlock'.tr(context)} ${status.nextLevel.tr(context)}.',
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 11,
@@ -1644,12 +1683,15 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                       ),
                     ),
                     if (status.currentLevel != 'Premium')
-                      Text(
-                        '$pct%',
-                        style: TextStyle(
-                          color: levelColor,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
+                      Directionality(
+                        textDirection: ui.TextDirection.ltr,
+                        child: Text(
+                          '$pct%',
+                          style: TextStyle(
+                            color: levelColor,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                   ],
@@ -1667,9 +1709,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                const Text(
-                  'CURRENT MEMBERSHIP BENEFITS',
-                  style: TextStyle(
+                Text(
+                  'CURRENT MEMBERSHIP BENEFITS'.tr(context),
+                  style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 10,
                     fontWeight: FontWeight.bold,

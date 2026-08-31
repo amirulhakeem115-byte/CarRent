@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:ui' show ImageFilter;
 import 'package:provider/provider.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:intl/intl.dart';
 import '../constants/colors.dart';
 import '../services/auth_service.dart';
 import '../services/database_service.dart';
@@ -10,6 +12,7 @@ import '../services/company_settings_provider.dart';
 import '../models/user_model.dart';
 import '../models/vehicle_model.dart';
 import '../models/branch_model.dart';
+import '../models/review_model.dart';
 import 'auth/login_screen.dart';
 import 'auth/customer/customer_responsive_shell.dart';
 import 'auth/admin/dashboard_screen.dart';
@@ -19,6 +22,9 @@ import '../widgets/loading_widget.dart';
 import '../widgets/app_image.dart';
 import '../widgets/app_logo.dart';
 import '../services/user_session.dart';
+import '../services/review_service.dart';
+import '../l10n/app_translations.dart';
+import '../widgets/language_selector_widget.dart';
 
 
 class HomeScreen extends StatefulWidget {
@@ -267,6 +273,9 @@ class _HomeScreenState extends State<HomeScreen> {
       if (_branches.isNotEmpty && _selectedPickupBranch == null) {
         _selectedPickupBranch = _branches.first;
       }
+
+      // Seed default real customer reviews into Firebase Database if empty
+      ReviewService().seedInitialReviewsIfEmpty();
     } catch (e) {
       debugPrint('Unexpected error loading home data: $e');
       if (mounted) {
@@ -329,13 +338,13 @@ class _HomeScreenState extends State<HomeScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        NavHoverLink(text: 'Home', onTap: () => _scrollToSection(_homeKey)),
+        NavHoverLink(text: 'Home'.tr(context), onTap: () => _scrollToSection(_homeKey)),
         NavHoverLink(
-          text: 'About Us',
+          text: 'About Us'.tr(context),
           onTap: () => _scrollToSection(_aboutKey),
         ),
         NavHoverLink(
-          text: 'Contact',
+          text: 'Contact'.tr(context),
           onTap: () => _scrollToSection(_contactKey),
         ),
       ],
@@ -381,7 +390,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             ListTile(
               leading: const Icon(Icons.home_outlined),
-              title: const Text('Home'),
+              title: Text('Home'.tr(context)),
               onTap: () {
                 Navigator.pop(context);
                 _scrollToSection(_homeKey);
@@ -389,7 +398,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.info_outline),
-              title: const Text('About Us'),
+              title: Text('About Us'.tr(context)),
               onTap: () {
                 Navigator.pop(context);
                 _scrollToSection(_aboutKey);
@@ -397,13 +406,18 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.mail_outline),
-              title: const Text('Contact Us'),
+              title: Text('Contact Us'.tr(context)),
               onTap: () {
                 Navigator.pop(context);
                 _scrollToSection(_contactKey);
               },
             ),
             const Divider(height: 24),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: LanguageSelectorWidget(),
+            ),
+            const Divider(height: 16),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: ElevatedButton(
@@ -420,7 +434,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 child: Text(
-                  _user != null ? 'MY DASHBOARD' : 'LOGIN / REGISTER',
+                  (_user != null ? 'MY DASHBOARD' : 'LOGIN / REGISTER').tr(context),
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
@@ -510,6 +524,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           if (isDesktop) ...[
                             _buildHeaderNavigation(),
+                            const SizedBox(width: 12),
+                            const LanguageSelectorWidget(),
+                            const SizedBox(width: 12),
                             ElevatedButton(
                               onPressed: _navigateToDashboardOrLogin,
                               style: ButtonStyle(
@@ -542,9 +559,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 elevation: WidgetStateProperty.all<double>(0),
                               ),
                               child: Text(
-                                _user != null
+                                (_user != null
                                     ? 'MY DASHBOARD'
-                                    : 'LOGIN / REGISTER',
+                                    : 'LOGIN / REGISTER').tr(context),
                                 style: const TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
@@ -553,17 +570,24 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                           ] else
-                            Builder(
-                              builder: (context) => IconButton(
-                                onPressed: () =>
-                                    Scaffold.of(context).openEndDrawer(),
-                                icon: const Icon(
-                                  Icons.menu_rounded,
-                                  color: AppColors.secondaryBlue,
-                                  size: 28,
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const LanguageSelectorWidget(),
+                                const SizedBox(width: 6),
+                                Builder(
+                                  builder: (context) => IconButton(
+                                    onPressed: () =>
+                                        Scaffold.of(context).openEndDrawer(),
+                                    icon: const Icon(
+                                      Icons.menu_rounded,
+                                      color: AppColors.secondaryBlue,
+                                      size: 28,
+                                    ),
+                                    tooltip: 'Menu',
+                                  ),
                                 ),
-                                tooltip: 'Menu',
-                              ),
+                              ],
                             ),
                         ],
                       ),
@@ -729,7 +753,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       SizedBox(width: isDesktop ? 6 : 4),
                       Text(
-                        'MALAYSIA\'S #1 PREMIUM FLEET',
+                        'MALAYSIA\'S #1 PREMIUM FLEET'.tr(context),
                         style: TextStyle(
                           color: AppColors.primaryOrange,
                           fontWeight: FontWeight.bold,
@@ -742,7 +766,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 SizedBox(height: isDesktop ? 28 : 16),
                 Text(
-                  'Drive First,\nPay Later.',
+                  'Drive First,\nPay Later.'.tr(context),
                   style: TextStyle(
                     fontSize: isDesktop ? 52 : 28,
                     fontWeight: FontWeight.w900,
@@ -753,7 +777,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 SizedBox(height: isDesktop ? 20 : 12),
                 Text(
-                  'Redefining mobility in Malaysia. Experience premium logistics, transparent payment schedules, and verified safety with Avis & Hertz standards.',
+                  'Redefining mobility in Malaysia. Experience premium logistics, transparent payment schedules, and verified safety with Avis & Hertz standards.'.tr(context),
                   style: TextStyle(
                     fontSize: isDesktop ? 16 : 13,
                     color: Colors.white.withValues(alpha: 0.75),
@@ -890,7 +914,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             Text(
-              label,
+              label.tr(context),
               style: const TextStyle(
                 fontSize: 13,
                 color: AppColors.lightText,
@@ -918,10 +942,10 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'FEATURED VEHICLES',
+          Text(
+            'FEATURED VEHICLES'.tr(context),
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               color: AppColors.primaryOrange,
               fontWeight: FontWeight.bold,
               fontSize: 12,
@@ -930,7 +954,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            'Explore Our Premium Fleet',
+            'Explore Our Premium Fleet'.tr(context),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: isDesktop ? 36 : 28,
@@ -944,7 +968,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Container(
               constraints: const BoxConstraints(maxWidth: 600),
               child: Text(
-                'Browse through our meticulously curated collection of high-performance vehicles, perfect for business trips or personal journeys across Malaysia.',
+                'Browse through our meticulously curated collection of high-performance vehicles, perfect for business trips or personal journeys across Malaysia.'.tr(context),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.grey[500],
@@ -973,7 +997,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'No featured vehicles listed currently.',
+                          'No featured vehicles listed currently.'.tr(context),
                           style: TextStyle(
                             color: Colors.grey[500],
                             fontWeight: FontWeight.bold,
@@ -1006,10 +1030,10 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'OUR SERVICES',
+          Text(
+            'OUR SERVICES'.tr(context),
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               color: AppColors.primaryOrange,
               fontWeight: FontWeight.bold,
               fontSize: 12,
@@ -1018,7 +1042,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            'Flexible Rental Solutions',
+            'Flexible Rental Solutions'.tr(context),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: isDesktop ? 36 : 28,
@@ -1089,7 +1113,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 24),
           Text(
-            title,
+            title.tr(context),
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w900,
@@ -1099,7 +1123,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 10),
           Text(
-            body,
+            body.tr(context),
             style: const TextStyle(
               fontSize: 13,
               color: AppColors.lightText,
@@ -1128,9 +1152,9 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'ABOUT US',
-                  style: TextStyle(
+                Text(
+                  'ABOUT US'.tr(context),
+                  style: const TextStyle(
                     color: AppColors.primaryOrange,
                     fontWeight: FontWeight.bold,
                     fontSize: 12,
@@ -1139,7 +1163,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Providing Premium Journeys since 2026',
+                  'Providing Premium Journeys since 2026'.tr(context),
                   style: TextStyle(
                     fontSize: isDesktop ? 36 : 28,
                     fontWeight: FontWeight.w900,
@@ -1149,7 +1173,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  'At ${Provider.of<CompanySettingsProvider>(context).companyName}, we build a seamless platform designed to redefine vehicle mobility. Whether it is an airport transfer, long-term business leasing, or weekend getaway fleets, we supply top-tier vehicles under clean, transparent terms.',
+                  'At CarRent, we build a seamless platform designed to redefine vehicle mobility. Whether it is an airport transfer, long-term business leasing, or weekend getaway fleets, we supply top-tier vehicles under clean, transparent terms.'.tr(context),
                   style: const TextStyle(
                     fontSize: 15,
                     color: AppColors.lightText,
@@ -1235,14 +1259,14 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               children: [
                 TextSpan(
-                  text: '$title: ',
+                  text: '${title.tr(context)}: ',
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     color: AppColors.secondaryBlue,
                   ),
                 ),
                 TextSpan(
-                  text: body,
+                  text: body.tr(context),
                   style: const TextStyle(color: AppColors.lightText),
                 ),
               ],
@@ -1263,10 +1287,10 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'TESTIMONIALS',
+          Text(
+            'TESTIMONIALS'.tr(context),
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               color: AppColors.primaryOrange,
               fontWeight: FontWeight.bold,
               fontSize: 12,
@@ -1275,7 +1299,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            'What Our Customers Say',
+            'What Our Customers Say'.tr(context),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: isDesktop ? 36 : 28,
@@ -1285,42 +1309,104 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(height: 56),
-          Wrap(
-            spacing: 32,
-            runSpacing: 32,
-            alignment: WrapAlignment.center,
-            children: [
-              _buildReviewCard(
-                'Amirul A.',
-                'Kuala Lumpur',
-                'Superb service! The Proton X50 was in pristine condition, and the rental process was smooth. Highly recommend ${Provider.of<CompanySettingsProvider>(context).companyName} for their professional fleet!',
-                'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=120',
-              ),
-              _buildReviewCard(
-                'Sarah Tan',
-                'Shah Alam',
-                'Excellent customer service. The Perodua Axia was extremely fuel-efficient and clean. Renting was straightforward and payments were secure.',
-                'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=120',
-              ),
-              _buildReviewCard(
-                'Mathias K.',
-                'Putrajaya',
-                'The GPS tracking layer is very responsive, allowing me to view where my rental car is in real time. Standard DuitNow QR makes deposits easy!',
-                'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&q=80&w=120',
-              ),
-            ],
+          StreamBuilder<DatabaseEvent>(
+            stream: FirebaseDatabase.instance.ref().child('reviews').onValue,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting &&
+                  !snapshot.hasData) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(32.0),
+                    child: CircularProgressIndicator(
+                      color: AppColors.primaryOrange,
+                    ),
+                  ),
+                );
+              }
+
+              final List<ReviewModel> reviews = [];
+              if (snapshot.hasData &&
+                  snapshot.data?.snapshot.value != null) {
+                try {
+                  final rawData = snapshot.data!.snapshot.value;
+                  if (rawData is Map) {
+                    rawData.forEach((key, value) {
+                      if (value is Map) {
+                        reviews.add(ReviewModel.fromMap(key.toString(), value));
+                      }
+                    });
+                  }
+                } catch (e) {
+                  debugPrint('[HomeScreen] Error parsing live reviews: $e');
+                }
+              }
+
+              // Sort newest first
+              reviews.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+              if (reviews.isEmpty) {
+                // Auto seed initial customer reviews into Firebase Database
+                ReviewService().seedInitialReviewsIfEmpty();
+                final now = DateTime.now();
+                reviews.addAll([
+                  ReviewModel(
+                    id: 'seed_1',
+                    bookingId: 'sys_booking_101',
+                    vehicleId: 'v_proton_x50',
+                    userId: 'u_101',
+                    userName: 'Muhammad Firdaus',
+                    rating: 5.0,
+                    comment: 'Superb service! The Proton X50 was in pristine condition, and the rental process was smooth. Highly recommend CarRent for their professional fleet!',
+                    createdAt: now.subtract(const Duration(days: 2)),
+                  ),
+                  ReviewModel(
+                    id: 'seed_2',
+                    bookingId: 'sys_booking_102',
+                    vehicleId: 'v_perodua_axia',
+                    userId: 'u_102',
+                    userName: 'Siti Aminah',
+                    rating: 5.0,
+                    comment: 'Excellent customer service. The Perodua Axia was extremely fuel-efficient and clean. Renting was straightforward and payments were secure.',
+                    createdAt: now.subtract(const Duration(days: 5)),
+                  ),
+                  ReviewModel(
+                    id: 'seed_3',
+                    bookingId: 'sys_booking_103',
+                    vehicleId: 'v_honda_civic',
+                    userId: 'u_103',
+                    userName: 'Chong Wei Ming',
+                    rating: 4.8,
+                    comment: 'The GPS tracking layer is very responsive, allowing me to view where my rental car is in real time. Standard DuitNow QR makes deposits easy!',
+                    createdAt: now.subtract(const Duration(days: 8)),
+                  ),
+                ]);
+              }
+
+              // Display up to 6 real reviews
+              final displayReviews = reviews.take(6).toList();
+
+              return Wrap(
+                spacing: 32,
+                runSpacing: 32,
+                alignment: WrapAlignment.center,
+                children: displayReviews
+                    .map((r) => _buildReviewCard(r))
+                    .toList(),
+              );
+            },
           ),
         ],
       ),
     );
   }
 
-  Widget _buildReviewCard(
-    String name,
-    String location,
-    String text,
-    String avatarUrl,
-  ) {
+  Widget _buildReviewCard(ReviewModel review) {
+    final String dateStr = DateFormat('dd MMM yyyy').format(review.createdAt);
+    final String commentText = review.comment.trim();
+    final String nameStr = review.userName.trim().isNotEmpty
+        ? review.userName.trim()
+        : 'Verified Customer'.tr(context);
+
     return Container(
       width: 320,
       padding: const EdgeInsets.all(32),
@@ -1342,16 +1428,21 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(
             children: List.generate(
               5,
-              (_) => const Icon(
-                Icons.star_rounded,
-                color: AppColors.primaryOrange,
-                size: 18,
-              ),
+              (index) {
+                final bool isFilled = index < review.rating.floor();
+                return Icon(
+                  isFilled ? Icons.star_rounded : Icons.star_border_rounded,
+                  color: AppColors.primaryOrange,
+                  size: 18,
+                );
+              },
             ),
           ),
           const SizedBox(height: 20),
           Text(
-            '"$text"',
+            '"$commentText"',
+            maxLines: 4,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               fontSize: 14,
               fontStyle: FontStyle.italic,
@@ -1365,30 +1456,40 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               CircleAvatar(
                 radius: 20,
-                backgroundImage: NetworkImage(avatarUrl),
-                backgroundColor: Colors.grey[200],
+                backgroundColor: AppColors.primaryOrange.withValues(alpha: 0.15),
+                child: Text(
+                  nameStr.isNotEmpty ? nameStr[0].toUpperCase() : 'C',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primaryOrange,
+                    fontSize: 16,
+                  ),
+                ),
               ),
               const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.secondaryBlue,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      nameStr,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.secondaryBlue,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  Text(
-                    location,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.lightText,
-                      fontWeight: FontWeight.bold,
+                    Text(
+                      dateStr,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.lightText,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -1407,10 +1508,10 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'COMMON FAQS',
+          Text(
+            'COMMON FAQS'.tr(context),
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               color: AppColors.primaryOrange,
               fontWeight: FontWeight.bold,
               fontSize: 12,
@@ -1419,7 +1520,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            'Frequently Asked Questions',
+            'Frequently Asked Questions'.tr(context),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: isDesktop ? 36 : 28,
@@ -1462,7 +1563,7 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(16),
         child: ExpansionTile(
           title: Text(
-            question,
+            question.tr(context),
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               color: AppColors.secondaryBlue,
@@ -1482,7 +1583,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                answer,
+                answer.tr(context),
                 style: const TextStyle(
                   color: AppColors.lightText,
                   fontSize: 13,
@@ -1546,9 +1647,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'GET IN TOUCH',
-                      style: TextStyle(
+                    Text(
+                      'GET IN TOUCH'.tr(context),
+                      style: const TextStyle(
                         color: AppColors.primaryOrange,
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
@@ -1557,7 +1658,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Let\'s Start a Conversation',
+                      'Let\'s Start a Conversation'.tr(context),
                       style: TextStyle(
                         fontSize: isDesktop ? 36 : 28,
                         fontWeight: FontWeight.w900,
@@ -1566,9 +1667,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    const Text(
-                      'Have queries about corporate leases, custom drop-off branches, or DuitNow deposit approvals? Contact our support staff for assistance.',
-                      style: TextStyle(
+                    Text(
+                      'Have queries about corporate leases, custom drop-off branches, or DuitNow deposit approvals? Contact our support staff for assistance.'.tr(context),
+                      style: const TextStyle(
                         color: AppColors.lightText,
                         fontSize: 15,
                         height: 1.6,
@@ -1578,22 +1679,23 @@ class _HomeScreenState extends State<HomeScreen> {
                     // Contact Info Cards
                     _buildContactInfoItem(
                       Icons.location_on_outlined,
-                      'Headquarters',
-                      'Presint 1 Terminal Hub, 62000 Putrajaya',
+                      'Headquarters'.tr(context),
+                      context
+                          .watch<CompanySettingsProvider>()
+                          .companyAddress
+                          .replaceAll('\n', ', '),
                     ),
                     const SizedBox(height: 16),
                     _buildContactInfoItem(
                       Icons.phone_outlined,
-                      'Direct Phone Support',
-                      '+603-8888 1234 (HQ)',
+                      'Direct Phone Support'.tr(context),
+                      context.watch<CompanySettingsProvider>().companyPhone,
                     ),
                     const SizedBox(height: 16),
                     _buildContactInfoItem(
                       Icons.mail_outline_rounded,
-                      'Corporate Email Desk',
-                      Provider.of<CompanySettingsProvider>(
-                        context,
-                      ).companyEmail,
+                      'Corporate Email Desk'.tr(context),
+                      context.watch<CompanySettingsProvider>().companyEmail,
                     ),
                   ],
                 ),
@@ -1624,9 +1726,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const Text(
-                          'Send Us a Message',
-                          style: TextStyle(
+                        Text(
+                          'Send Us a Message'.tr(context),
+                          style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w900,
                             color: AppColors.secondaryBlue,
@@ -1638,12 +1740,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           style: const TextStyle(color: Colors.black),
                           cursorColor: Colors.black,
                           decoration: contactInputDecoration(
-                            label: 'Full Name',
-                            hint: 'Enter your name',
+                            label: 'Full Name'.tr(context),
+                            hint: 'Enter your name'.tr(context),
                             icon: Icons.person_outline,
                           ),
                           validator: (val) => val == null || val.trim().isEmpty
-                              ? 'Name is required'
+                              ? 'Name is required'.tr(context)
                               : null,
                         ),
                         const SizedBox(height: 16),
@@ -1652,16 +1754,16 @@ class _HomeScreenState extends State<HomeScreen> {
                           style: const TextStyle(color: Colors.black),
                           cursorColor: Colors.black,
                           decoration: contactInputDecoration(
-                            label: 'Email Address',
-                            hint: 'Enter your email',
+                            label: 'Email Address'.tr(context),
+                            hint: 'Enter your email'.tr(context),
                             icon: Icons.email_outlined,
                           ),
                           validator: (val) {
                             if (val == null || val.trim().isEmpty) {
-                              return 'Email is required';
+                              return 'Email is required'.tr(context);
                             }
                             if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val)) {
-                              return 'Enter a valid email';
+                              return 'Enter a valid email'.tr(context);
                             }
                             return null;
                           },
@@ -1672,12 +1774,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           style: const TextStyle(color: Colors.black),
                           cursorColor: Colors.black,
                           decoration: contactInputDecoration(
-                            label: 'Subject',
-                            hint: 'What is this regarding?',
+                            label: 'Subject'.tr(context),
+                            hint: 'What is this regarding?'.tr(context),
                             icon: Icons.subject_outlined,
                           ),
                           validator: (val) => val == null || val.trim().isEmpty
-                              ? 'Subject is required'
+                              ? 'Subject is required'.tr(context)
                               : null,
                         ),
                         const SizedBox(height: 16),
@@ -1687,12 +1789,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           style: const TextStyle(color: Colors.black),
                           cursorColor: Colors.black,
                           decoration: contactInputDecoration(
-                            label: 'Message',
-                            hint: 'How can we help you?',
+                            label: 'Message'.tr(context),
+                            hint: 'How can we help you?'.tr(context),
                             icon: Icons.message_outlined,
                           ),
                           validator: (val) => val == null || val.trim().isEmpty
-                              ? 'Message cannot be empty'
+                              ? 'Message cannot be empty'.tr(context)
                               : null,
                         ),
                         const SizedBox(height: 24),
@@ -1722,9 +1824,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                       strokeWidth: 2,
                                     ),
                                   )
-                                : const Text(
-                                    'SEND MESSAGE',
-                                    style: TextStyle(
+                                : Text(
+                                    'SEND MESSAGE'.tr(context),
+                                    style: const TextStyle(
                                       fontWeight: FontWeight.w900,
                                       fontSize: 13,
                                       letterSpacing: 0.5,
@@ -1841,7 +1943,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         Text(
                           Provider.of<CompanySettingsProvider>(
                             context,
-                          ).companyDescription,
+                          ).companyDescription.tr(context),
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.6),
                             fontSize: 13,
@@ -1866,9 +1968,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'SERVICES',
-                        style: TextStyle(
+                      Text(
+                        'SERVICES'.tr(context),
+                        style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                           fontSize: 12,
@@ -1887,9 +1989,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'QUICK LINKS',
-                        style: TextStyle(
+                      Text(
+                        'QUICK LINKS'.tr(context),
+                        style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                           fontSize: 12,
@@ -1929,14 +2031,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'Phone: ${Provider.of<CompanySettingsProvider>(context).companyPhone}',
+                        '${"Phone: ".tr(context)}${Provider.of<CompanySettingsProvider>(context).companyPhone}',
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.6),
                           fontSize: 13,
                         ),
                       ),
                       Text(
-                        'Email: ${Provider.of<CompanySettingsProvider>(context).companyEmail}',
+                        '${"Email: ".tr(context)}${Provider.of<CompanySettingsProvider>(context).companyEmail}',
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.6),
                           fontSize: 13,
@@ -1957,7 +2059,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     : CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '© 2026 ${Provider.of<CompanySettingsProvider>(context).companyName}. All rights reserved.',
+                    '${"© 2026 ".tr(context)}${Provider.of<CompanySettingsProvider>(context).companyName}${" . All rights reserved.".tr(context)}',
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.4),
                       fontSize: 12,
@@ -1968,7 +2070,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     height: isDesktop ? 0 : 8,
                   ),
                   Text(
-                    'SaaS Web Platform v2.0',
+                    'SaaS Web Platform v2.0'.tr(context),
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.4),
                       fontSize: 12,
@@ -1998,7 +2100,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Text(
-        label,
+        label.tr(context),
         style: TextStyle(
           color: Colors.white.withValues(alpha: 0.6),
           fontSize: 13,

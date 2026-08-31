@@ -7,6 +7,7 @@ import '../../../services/database_service.dart';
 import '../../../widgets/loading_widget.dart';
 import '../../../widgets/reward_points_slider.dart';
 import '../../../services/company_settings_provider.dart';
+import '../../../l10n/app_translations.dart';
 
 class RewardPointsView extends StatefulWidget {
   const RewardPointsView({super.key});
@@ -122,7 +123,7 @@ class _RewardPointsViewState extends State<RewardPointsView>
                           final bool isNarrow = constraints.maxWidth < 360;
 
                           final addChip = ChoiceChip(
-                            label: const Center(child: Text('Add Points')),
+                            label: Center(child: Text('Add Points'.tr(context))),
                             selected: isAdding,
                             selectedColor: Colors.blue.withValues(alpha: 0.15),
                             backgroundColor: chipBg,
@@ -140,7 +141,7 @@ class _RewardPointsViewState extends State<RewardPointsView>
                           );
 
                           final deductChip = ChoiceChip(
-                            label: const Center(child: Text('Deduct Points')),
+                            label: Center(child: Text('Deduct Points'.tr(context))),
                             selected: !isAdding,
                             selectedColor: Colors.redAccent.withValues(
                               alpha: 0.15,
@@ -197,9 +198,9 @@ class _RewardPointsViewState extends State<RewardPointsView>
                         maxLines: 2,
                         style: TextStyle(color: textPrimary),
                         decoration: InputDecoration(
-                          labelText: 'Reason for Adjustment',
+                          labelText: 'Reason for Adjustment'.tr(context),
                           labelStyle: TextStyle(color: textSecondary),
-                          hintText: 'e.g. Loyalty program bonus, correction...',
+                          hintText: 'e.g. Loyalty program bonus, correction...'.tr(context),
                           hintStyle: TextStyle(
                             color: textSecondary.withValues(alpha: 0.7),
                           ),
@@ -212,7 +213,7 @@ class _RewardPointsViewState extends State<RewardPointsView>
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: Text('Cancel', style: TextStyle(color: textSecondary)),
+                  child: Text('Cancel'.tr(context), style: TextStyle(color: textSecondary)),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
@@ -284,7 +285,7 @@ class _RewardPointsViewState extends State<RewardPointsView>
                       }
                     }
                   },
-                  child: const Text('Apply Adjust'),
+                  child: Text('Apply Adjust'.tr(context)),
                 ),
               ],
             );
@@ -330,7 +331,7 @@ class _RewardPointsViewState extends State<RewardPointsView>
             children: [
               // Header
               Text(
-                'Reward Points Manager',
+                'Reward Points Manager'.tr(context),
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w900,
@@ -338,7 +339,7 @@ class _RewardPointsViewState extends State<RewardPointsView>
                 ),
               ),
               Text(
-                'Monitor customer reward points balance, adjustments, and global transaction logs.',
+                'Monitor customer reward points balance, adjustments, and global transaction logs.'.tr(context),
                 style: TextStyle(fontSize: 12, color: textSecondary),
               ),
               const SizedBox(height: 24),
@@ -461,9 +462,9 @@ class _RewardPointsViewState extends State<RewardPointsView>
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
                   ),
-                  tabs: const [
-                    Tab(text: 'Customer Balances'),
-                    Tab(text: 'Global Activity Ledger'),
+                  tabs: [
+                    Tab(text: 'Customer Balances'.tr(context)),
+                    Tab(text: 'Global Activity Ledger'.tr(context)),
                   ],
                 ),
               ),
@@ -509,10 +510,10 @@ class _RewardPointsViewState extends State<RewardPointsView>
     required Color borderColor,
   }) {
     if (_loadingCustomers) {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(32.0),
-          child: LoadingWidget(message: 'Loading customer loyalty list...'),
+          padding: const EdgeInsets.all(32.0),
+          child: LoadingWidget(message: 'Loading customer loyalty list...'.tr(context)),
         ),
       );
     }
@@ -540,7 +541,7 @@ class _RewardPointsViewState extends State<RewardPointsView>
                       size: 18,
                       color: textSecondary,
                     ),
-                    hintText: 'Search customer by name or email...',
+                    hintText: 'Search customer by name or email...'.tr(context),
                     hintStyle: TextStyle(
                       color: textSecondary.withValues(alpha: 0.7),
                     ),
@@ -569,7 +570,7 @@ class _RewardPointsViewState extends State<RewardPointsView>
                 child: Padding(
                   padding: const EdgeInsets.all(32.0),
                   child: Text(
-                    'No customers found matching search filter.',
+                    'No customers found matching search filter.'.tr(context),
                     style: TextStyle(color: textSecondary),
                   ),
                 ),
@@ -703,7 +704,7 @@ class _RewardPointsViewState extends State<RewardPointsView>
                                               color: textPrimary,
                                             ),
                                             label: Text(
-                                              'Adjust',
+                                              'Adjust'.tr(context),
                                               style: TextStyle(
                                                 fontSize: 11,
                                                 color: textPrimary,
@@ -1115,7 +1116,7 @@ class _RewardPointsViewState extends State<RewardPointsView>
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  title.toUpperCase(),
+                  title.tr(context).toUpperCase(),
                   style: TextStyle(
                     fontSize: isCompactMobile ? 9 : 10,
                     fontWeight: FontWeight.bold,

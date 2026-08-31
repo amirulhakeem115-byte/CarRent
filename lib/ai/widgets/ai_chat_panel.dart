@@ -7,6 +7,8 @@ import '../../services/receipt_service.dart';
 import '../../models/booking_model.dart';
 import '../../models/vehicle_model.dart';
 import '../../screens/auth/customer/booking_screen.dart';
+import '../../l10n/app_translations.dart';
+import '../../providers/language_provider.dart';
 import '../services/ai_service.dart';
 import 'ai_message_bubble.dart';
 import 'typing_indicator.dart';
@@ -298,112 +300,135 @@ class _AIChatPanelState extends State<AIChatPanel>
                 ))
         : BorderRadius.zero;
 
-    return FadeTransition(
-      opacity: _fadeController,
-      child: ClipRRect(
-        borderRadius: radius,
-        child: Container(
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF0F172A) : Colors.white,
-            borderRadius: radius,
-            boxShadow: widget.onClose != null
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.18),
-                      blurRadius: 32,
-                      offset: const Offset(0, -6),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Stack(
-            children: [
-              Row(
-                children: [
-                  // 1. Pinned Chats & History sidebar (desktop/tablet split mode)
-                  if (showPermanentSidebar)
-                    Container(
-                      width: 220,
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? const Color(0xFF1E293B)
-                            : const Color(0xFFF8FAFC),
-                        border: Border(
-                          right: BorderSide(
-                            color: isDark
-                                ? const Color(0xFF334155)
-                                : const Color(0xFFE2E8F0),
-                          ),
-                        ),
+    final isArabic = Provider.of<LanguageProvider>(context, listen: true).isArabic;
+
+    return Directionality(
+      textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
+      child: FadeTransition(
+        opacity: _fadeController,
+        child: ClipRRect(
+          borderRadius: radius,
+          child: Container(
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0F172A) : Colors.white,
+              borderRadius: radius,
+              boxShadow: widget.onClose != null
+                  ? [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.18),
+                        blurRadius: 32,
+                        offset: const Offset(0, -6),
                       ),
-                      child: _buildSidebar(isDark),
-                    ),
-
-                  // 2. Chat Pane
-                  Expanded(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.max,
-                      children: [
-                        _buildHeader(isDark, showPermanentSidebar),
-                        Expanded(child: _buildBody(isDark)),
-                        _buildQuickChips(isDark),
-                        _buildInputBar(isDark),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-
-              // 3. Mobile overlay sidebar (prevents width squeezing overflow)
-              if (showSidebarOverlay) ...[
-                Positioned.fill(
-                  child: GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _showSidebar = false;
-                      });
-                    },
-                    child: Container(
-                      color: Colors.black.withValues(alpha: 0.35),
-                    ),
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: SizedBox(
-                    width: mobileSidebarWidth.clamp(240.0, 320.0),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: Container(
+                    ]
+                  : null,
+            ),
+            child: Stack(
+              children: [
+                Row(
+                  children: [
+                    // 1. Pinned Chats & History sidebar (desktop/tablet split mode)
+                    if (showPermanentSidebar)
+                      Container(
+                        width: 220,
                         decoration: BoxDecoration(
                           color: isDark
                               ? const Color(0xFF1E293B)
                               : const Color(0xFFF8FAFC),
                           border: Border(
-                            right: BorderSide(
-                              color: isDark
-                                  ? const Color(0xFF334155)
-                                  : const Color(0xFFE2E8F0),
-                            ),
+                            right: isArabic
+                                ? BorderSide.none
+                                : BorderSide(
+                                    color: isDark
+                                        ? const Color(0xFF334155)
+                                        : const Color(0xFFE2E8F0),
+                                  ),
+                            left: isArabic
+                                ? BorderSide(
+                                    color: isDark
+                                        ? const Color(0xFF334155)
+                                        : const Color(0xFFE2E8F0),
+                                  )
+                                : BorderSide.none,
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.2),
-                              blurRadius: 16,
-                              offset: const Offset(2, 0),
-                            ),
-                          ],
                         ),
-                        child: SafeArea(
-                          bottom: false,
-                          child: _buildSidebar(isDark),
+                        child: _buildSidebar(isDark),
+                      ),
+
+                    // 2. Chat Pane
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.max,
+                        children: [
+                          _buildHeader(isDark, showPermanentSidebar),
+                          Expanded(child: _buildBody(isDark)),
+                          _buildQuickChips(isDark),
+                          _buildInputBar(isDark),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                // 3. Mobile overlay sidebar (prevents width squeezing overflow)
+                if (showSidebarOverlay) ...[
+                  Positioned.fill(
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _showSidebar = false;
+                        });
+                      },
+                      child: Container(
+                        color: Colors.black.withValues(alpha: 0.35),
+                      ),
+                    ),
+                  ),
+                  Align(
+                    alignment: isArabic ? Alignment.centerRight : Alignment.centerLeft,
+                    child: SizedBox(
+                      width: mobileSidebarWidth.clamp(240.0, 320.0),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? const Color(0xFF1E293B)
+                                : const Color(0xFFF8FAFC),
+                            border: Border(
+                              right: isArabic
+                                  ? BorderSide.none
+                                  : BorderSide(
+                                      color: isDark
+                                          ? const Color(0xFF334155)
+                                          : const Color(0xFFE2E8F0),
+                                    ),
+                              left: isArabic
+                                  ? BorderSide(
+                                      color: isDark
+                                          ? const Color(0xFF334155)
+                                          : const Color(0xFFE2E8F0),
+                                    )
+                                  : BorderSide.none,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.2),
+                                blurRadius: 16,
+                                offset: Offset(isArabic ? -2 : 2, 0),
+                              ),
+                            ],
+                          ),
+                          child: SafeArea(
+                            bottom: false,
+                            child: _buildSidebar(isDark),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -433,9 +458,9 @@ class _AIChatPanelState extends State<AIChatPanel>
               minimumSize: const Size(double.infinity, 44),
             ),
             icon: const Icon(Icons.add_rounded, size: 18),
-            label: const Text(
-              'New Chat',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            label: Text(
+              'New Chat'.tr(context),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
             ),
             onPressed: () {
               context.read<AIService>().createNewSession();
@@ -466,16 +491,16 @@ class _AIChatPanelState extends State<AIChatPanel>
                 context.read<AIService>().setSearchQuery(val);
               },
               style: TextStyle(fontSize: 12, color: textCol),
-              decoration: const InputDecoration(
-                hintText: 'Search chats...',
-                hintStyle: TextStyle(fontSize: 12, color: Colors.grey),
-                prefixIcon: Icon(
+              decoration: InputDecoration(
+                hintText: 'Search chats...'.tr(context),
+                hintStyle: const TextStyle(fontSize: 12, color: Colors.grey),
+                prefixIcon: const Icon(
                   Icons.search_rounded,
                   size: 16,
                   color: Colors.grey,
                 ),
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.only(bottom: 10),
+                contentPadding: const EdgeInsets.only(bottom: 10),
               ),
             ),
           ),
@@ -487,10 +512,10 @@ class _AIChatPanelState extends State<AIChatPanel>
             builder: (context, ai, _) {
               final sessions = ai.filteredSessions;
               if (sessions.isEmpty) {
-                return const Center(
+                return Center(
                   child: Text(
-                    'No chats found',
-                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                    'No chats found'.tr(context),
+                    style: const TextStyle(fontSize: 11, color: Colors.grey),
                   ),
                 );
               }
@@ -528,7 +553,7 @@ class _AIChatPanelState extends State<AIChatPanel>
         dense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 10),
         title: Text(
-          session.title,
+          session.title.tr(context),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
@@ -626,7 +651,7 @@ class _AIChatPanelState extends State<AIChatPanel>
                     });
                   },
                   splashRadius: 20,
-                  tooltip: 'Chat History',
+                  tooltip: 'Chat History'.tr(context),
                 ),
                 const SizedBox(width: 6),
               ],
@@ -671,7 +696,7 @@ class _AIChatPanelState extends State<AIChatPanel>
                             maxWidth: isAdmin ? 180 : 230,
                           ),
                           child: Text(
-                            'CARENT AI Operator',
+                            'CARENT AI Operator'.tr(context),
                             maxLines: hasLargeText ? 2 : 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -699,9 +724,9 @@ class _AIChatPanelState extends State<AIChatPanel>
                                 ),
                               ),
                             ),
-                            child: const Text(
-                              'Admin Mode',
-                              style: TextStyle(
+                            child: Text(
+                              'Admin Mode'.tr(context),
+                              style: const TextStyle(
                                 fontSize: 9,
                                 fontWeight: FontWeight.bold,
                                 color: AppColors.primaryOrange,
@@ -725,8 +750,8 @@ class _AIChatPanelState extends State<AIChatPanel>
                         Expanded(
                           child: Text(
                             isNarrowMobile
-                                ? 'Connected'
-                                : 'Connected · Live Data Feed',
+                                ? 'Connected'.tr(context)
+                                : 'Connected · Live Data Feed'.tr(context),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -742,7 +767,7 @@ class _AIChatPanelState extends State<AIChatPanel>
               ),
               // Clear button
               Tooltip(
-                message: 'Clear conversation',
+                message: 'Clear conversation'.tr(context),
                 child: IconButton(
                   icon: Icon(
                     Icons.refresh_rounded,
@@ -756,7 +781,7 @@ class _AIChatPanelState extends State<AIChatPanel>
               // Close button (only when used as a modal)
               if (widget.onClose != null)
                 Tooltip(
-                  message: 'Close',
+                  message: 'Close'.tr(context),
                   child: IconButton(
                     icon: Icon(
                       Icons.close_rounded,
@@ -869,7 +894,7 @@ class _AIChatPanelState extends State<AIChatPanel>
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      welcome.message,
+                      welcome.message.tr(context),
                       style: TextStyle(
                         fontSize: 13,
                         height: 1.55,
@@ -890,7 +915,7 @@ class _AIChatPanelState extends State<AIChatPanel>
               Icon(Icons.bolt_rounded, size: 14, color: labelCol),
               const SizedBox(width: 4),
               Text(
-                'POPULAR ACTIONS',
+                'POPULAR ACTIONS'.tr(context),
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
@@ -949,7 +974,7 @@ class _AIChatPanelState extends State<AIChatPanel>
       color: cardBg,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
-        onTap: () => _sendMessage(cmd.query),
+        onTap: () => _sendMessage(cmd.label.tr(context)),
         borderRadius: BorderRadius.circular(14),
         hoverColor: cmd.color.withValues(alpha: 0.08),
         splashColor: cmd.color.withValues(alpha: 0.15),
@@ -980,7 +1005,7 @@ class _AIChatPanelState extends State<AIChatPanel>
               SizedBox(width: isDarkMobile ? 8 : 10),
               Expanded(
                 child: Text(
-                  cmd.label,
+                  cmd.label.tr(context),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -1055,7 +1080,7 @@ class _AIChatPanelState extends State<AIChatPanel>
                 return Padding(
                   padding: const EdgeInsets.only(right: 6),
                   child: InkWell(
-                    onTap: () => _sendMessage(cmd.query),
+                    onTap: () => _sendMessage(cmd.label.tr(context)),
                     borderRadius: BorderRadius.circular(20),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -1073,9 +1098,7 @@ class _AIChatPanelState extends State<AIChatPanel>
                           Icon(cmd.icon, color: cmd.color, size: 11),
                           const SizedBox(width: 5),
                           Text(
-                            cmd.label.substring(
-                              2,
-                            ), // Strip the icon emoji prefix
+                            cmd.label.tr(context),
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
@@ -1155,7 +1178,7 @@ class _AIChatPanelState extends State<AIChatPanel>
                       color: textCol,
                     ),
                     decoration: InputDecoration(
-                      hintText: 'Ask me anything...',
+                      hintText: 'Ask me anything...'.tr(context),
                       hintStyle: TextStyle(fontSize: 13, color: hintCol),
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,

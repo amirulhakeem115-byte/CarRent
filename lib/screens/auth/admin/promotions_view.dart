@@ -12,6 +12,7 @@ import '../../../services/vehicle_service.dart';
 import '../../../widgets/loading_widget.dart';
 import '../../../widgets/app_image.dart';
 import '../../../widgets/mouse_scroll_translator.dart';
+import '../../../l10n/app_translations.dart';
 
 class PromotionsView extends StatefulWidget {
   const PromotionsView({super.key});
@@ -104,17 +105,19 @@ class _PromotionsViewState extends State<PromotionsView> {
     }
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadData({bool forceRefresh = false}) async {
     if (!mounted) return;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (_promotions.isEmpty) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
 
     try {
       final results = await Future.wait([
-        _promotionService.getPromotions(forceRefresh: true),
-        _vehicleService.getVehicles(),
+        _promotionService.getPromotions(forceRefresh: forceRefresh),
+        _vehicleService.getVehicles(forceRefresh: forceRefresh),
       ]);
 
       if (mounted) {
@@ -128,7 +131,7 @@ class _PromotionsViewState extends State<PromotionsView> {
         });
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted && _promotions.isEmpty) {
         setState(() {
           _error = 'Failed to load promotions: $e';
           _loading = false;
@@ -188,9 +191,9 @@ class _PromotionsViewState extends State<PromotionsView> {
         children: [
           Expanded(
             child: _loading
-                ? const Center(
+                ? Center(
                     child: LoadingWidget(
-                      message: 'Loading promotions & discounts...',
+                      message: 'Loading promotions & discounts...'.tr(context),
                     ),
                   )
                 : _error != null
@@ -204,11 +207,11 @@ class _PromotionsViewState extends State<PromotionsView> {
                           size: 48,
                         ),
                         const SizedBox(height: 12),
-                        Text(_error!),
+                        Text(_error!.tr(context)),
                         const SizedBox(height: 12),
                         ElevatedButton(
                           onPressed: _loadData,
-                          child: const Text('Retry'),
+                          child: Text('Retry'.tr(context)),
                         ),
                       ],
                     ),
@@ -258,9 +261,9 @@ class _PromotionsViewState extends State<PromotionsView> {
 
         final cards = [
           _buildStatCard(
-            title: 'Active Promotions',
+            title: 'Active Promotions'.tr(context),
             value: '$_activeCount',
-            subtitle: '$_totalViews Views • $_totalClicks Clicks',
+            subtitle: '$_totalViews ${"Views".tr(context)} • $_totalClicks ${"Clicks".tr(context)}',
             icon: Icons.local_offer_rounded,
             color: AppColors.primaryOrange,
             isDark: isDark,
@@ -268,9 +271,9 @@ class _PromotionsViewState extends State<PromotionsView> {
             androidTightMode: isAndroidPhone,
           ),
           _buildStatCard(
-            title: 'Bookings Converted',
+            title: 'Bookings Converted'.tr(context),
             value: '$_totalBookings',
-            subtitle: 'Successful promo bookings',
+            subtitle: 'Successful promo bookings'.tr(context),
             icon: Icons.directions_car_filled_rounded,
             color: const Color(0xFF10B981),
             isDark: isDark,
@@ -278,9 +281,9 @@ class _PromotionsViewState extends State<PromotionsView> {
             androidTightMode: isAndroidPhone,
           ),
           _buildStatCard(
-            title: 'Revenue Generated',
+            title: 'Revenue Generated'.tr(context),
             value: 'RM ${_totalRevenue.toStringAsFixed(0)}',
-            subtitle: 'RM ${_totalDiscount.toStringAsFixed(0)} discounts saved',
+            subtitle: 'RM ${_totalDiscount.toStringAsFixed(0)} ${"discounts saved".tr(context)}',
             icon: Icons.payments_rounded,
             color: const Color(0xFF3B82F6),
             isDark: isDark,
@@ -368,7 +371,7 @@ class _PromotionsViewState extends State<PromotionsView> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  title,
+                  title.tr(context),
                   style: TextStyle(
                     fontSize: androidTightMode ? 11 : (compactMode ? 12 : 13),
                     color: isDark
@@ -441,7 +444,7 @@ class _PromotionsViewState extends State<PromotionsView> {
                       });
                     },
                     decoration: InputDecoration(
-                      hintText: 'Search by promo name or code...',
+                      hintText: 'Search by promo name or code...'.tr(context),
                       hintStyle: TextStyle(
                         fontSize: 13,
                         color: isDark
@@ -498,7 +501,7 @@ class _PromotionsViewState extends State<PromotionsView> {
                           ].map((status) {
                             return DropdownMenuItem(
                               value: status,
-                              child: Text('Filter: $status'),
+                              child: Text('Filter: $status'.tr(context)),
                             );
                           }).toList(),
                       onChanged: (val) {
@@ -527,9 +530,9 @@ class _PromotionsViewState extends State<PromotionsView> {
             ),
             onPressed: () => _openPromotionDialog(),
             icon: const Icon(Icons.add_rounded, size: 20),
-            label: const Text(
-              'Create Promotion',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            label: Text(
+              'Create Promotion'.tr(context),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             ),
           ),
         ],
@@ -557,7 +560,7 @@ class _PromotionsViewState extends State<PromotionsView> {
           ),
           const SizedBox(height: 16),
           Text(
-            'No Promotions Found',
+            'No Promotions Found'.tr(context),
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -566,7 +569,7 @@ class _PromotionsViewState extends State<PromotionsView> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Create a promotional discount to boost customer bookings.',
+            'Create a promotional discount to boost customer bookings.'.tr(context),
             style: TextStyle(
               fontSize: 13,
               color: isDark ? Colors.white60 : Colors.grey[600],
@@ -580,7 +583,7 @@ class _PromotionsViewState extends State<PromotionsView> {
             ),
             onPressed: () => _openPromotionDialog(),
             icon: const Icon(Icons.add),
-            label: const Text('Add First Promotion'),
+            label: Text('Add First Promotion'.tr(context)),
           ),
         ],
       ),
@@ -618,7 +621,7 @@ class _PromotionsViewState extends State<PromotionsView> {
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          'Scroll right to see more columns',
+                          'Scroll right to see more columns'.tr(context),
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
@@ -658,11 +661,11 @@ class _PromotionsViewState extends State<PromotionsView> {
                       ),
                       dataRowMinHeight: 70,
                       dataRowMaxHeight: 85,
-                      columns: const [
+                      columns: [
                         DataColumn(
                           label: Text(
-                            'PROMOTION NAME',
-                            style: TextStyle(
+                            'PROMOTION NAME'.tr(context),
+                            style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 12,
                             ),
@@ -670,8 +673,8 @@ class _PromotionsViewState extends State<PromotionsView> {
                         ),
                         DataColumn(
                           label: Text(
-                            'DISCOUNT VALUE',
-                            style: TextStyle(
+                            'DISCOUNT VALUE'.tr(context),
+                            style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 12,
                             ),
@@ -679,8 +682,8 @@ class _PromotionsViewState extends State<PromotionsView> {
                         ),
                         DataColumn(
                           label: Text(
-                            'VALIDITY PERIOD',
-                            style: TextStyle(
+                            'VALIDITY PERIOD'.tr(context),
+                            style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 12,
                             ),
@@ -688,8 +691,8 @@ class _PromotionsViewState extends State<PromotionsView> {
                         ),
                         DataColumn(
                           label: Text(
-                            'STATUS',
-                            style: TextStyle(
+                            'STATUS'.tr(context),
+                            style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 12,
                             ),
@@ -697,8 +700,8 @@ class _PromotionsViewState extends State<PromotionsView> {
                         ),
                         DataColumn(
                           label: Text(
-                            'CREATED / UPDATED',
-                            style: TextStyle(
+                            'CREATED / UPDATED'.tr(context),
+                            style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 12,
                             ),
@@ -706,8 +709,8 @@ class _PromotionsViewState extends State<PromotionsView> {
                         ),
                         DataColumn(
                           label: Text(
-                            'ACTIONS',
-                            style: TextStyle(
+                            'ACTIONS'.tr(context),
+                            style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 12,
                             ),
@@ -760,9 +763,9 @@ class _PromotionsViewState extends State<PromotionsView> {
                   color: AppColors.primaryOrange.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Text(
-                  'AUTO-APPLY',
-                  style: TextStyle(
+                child: Text(
+                  'AUTO-APPLY'.tr(context),
+                  style: const TextStyle(
                     fontSize: 9,
                     fontWeight: FontWeight.bold,
                     color: AppColors.primaryOrange,
@@ -816,7 +819,7 @@ class _PromotionsViewState extends State<PromotionsView> {
         ),
         if (promo.maximumDiscount != null && promo.maximumDiscount! > 0)
           Text(
-            'Max: RM ${promo.maximumDiscount!.toStringAsFixed(2)}',
+            '${"Max:".tr(context)} RM ${promo.maximumDiscount!.toStringAsFixed(2)}',
             style: TextStyle(
               fontSize: 10,
               color: isDark ? Colors.white60 : Colors.grey[600],
@@ -825,7 +828,7 @@ class _PromotionsViewState extends State<PromotionsView> {
         if (promo.minimumBookingAmount != null &&
             promo.minimumBookingAmount! > 0)
           Text(
-            'Min spend: RM ${promo.minimumBookingAmount!.toStringAsFixed(2)}',
+            '${"Min spend:".tr(context)} RM ${promo.minimumBookingAmount!.toStringAsFixed(2)}',
             style: TextStyle(
               fontSize: 10,
               color: isDark ? Colors.white60 : Colors.grey[600],
@@ -842,14 +845,14 @@ class _PromotionsViewState extends State<PromotionsView> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          'Start: ${format.format(promo.startDate)}',
+          '${"Start:".tr(context)} ${format.format(promo.startDate)}',
           style: TextStyle(
             fontSize: 11,
             color: isDark ? Colors.white70 : Colors.black87,
           ),
         ),
         Text(
-          'End:   ${format.format(promo.endDate)}',
+          '${"End:".tr(context)}   ${format.format(promo.endDate)}',
           style: TextStyle(
             fontSize: 11,
             color: isDark ? Colors.white70 : Colors.black87,
@@ -896,7 +899,7 @@ class _PromotionsViewState extends State<PromotionsView> {
           ),
           const SizedBox(width: 6),
           Text(
-            label,
+            label.tr(context),
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.bold,
@@ -915,14 +918,14 @@ class _PromotionsViewState extends State<PromotionsView> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          'Created: ${format.format(promo.createdAt)}',
+          '${"Created:".tr(context)} ${format.format(promo.createdAt)}',
           style: TextStyle(
             fontSize: 10,
             color: isDark ? Colors.white60 : Colors.grey[600],
           ),
         ),
         Text(
-          'Updated: ${format.format(promo.updatedAt)}',
+          '${"Updated:".tr(context)} ${format.format(promo.updatedAt)}',
           style: TextStyle(
             fontSize: 10,
             color: isDark ? Colors.white60 : Colors.grey[600],
@@ -1147,14 +1150,14 @@ class _PromotionsViewState extends State<PromotionsView> {
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: const Text('Delete Promotion'),
+          title: Text('Delete Promotion'.tr(context)),
           content: Text(
-            'Are you sure you want to delete "${promo.name}"? This action cannot be undone.',
+            '${"Are you sure you want to delete".tr(context)} "${promo.name}"? ${"This action cannot be undone.".tr(context)}',
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
+              child: Text('Cancel'.tr(context)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -1162,14 +1165,15 @@ class _PromotionsViewState extends State<PromotionsView> {
               ),
               onPressed: () async {
                 final messenger = ScaffoldMessenger.of(context);
+                final deletedMsg = 'Promotion deleted successfully.'.tr(context);
                 Navigator.pop(ctx);
                 try {
                   await _promotionService.deletePromotion(promo.id);
                   if (mounted) {
                     await _loadData();
                     messenger.showSnackBar(
-                      const SnackBar(
-                        content: Text('Promotion deleted successfully.'),
+                      SnackBar(
+                        content: Text(deletedMsg),
                       ),
                     );
                   }
@@ -1184,9 +1188,9 @@ class _PromotionsViewState extends State<PromotionsView> {
                   }
                 }
               },
-              child: const Text(
-                'Delete',
-                style: TextStyle(color: Colors.white),
+              child: Text(
+                'Delete'.tr(context),
+                style: const TextStyle(color: Colors.white),
               ),
             ),
           ],
@@ -1538,9 +1542,9 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              'LIVE PROMOTIONAL BANNER PREVIEW (16:9)',
-              style: TextStyle(
+            Text(
+              'LIVE PROMOTIONAL BANNER PREVIEW (16:9)'.tr(context),
+              style: const TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 0.5,
@@ -1553,9 +1557,9 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                 color: AppColors.primaryOrange.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: const Text(
-                'Customer App Preview',
-                style: TextStyle(
+              child: Text(
+                'Customer App Preview'.tr(context),
+                style: const TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
                   color: AppColors.primaryOrange,
@@ -1768,8 +1772,8 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
           const SizedBox(width: 10),
           Text(
             widget.existing != null
-                ? 'Edit Promotion & Banner'
-                : 'Create New Promotion Banner',
+                ? 'Edit Promotion & Banner'.tr(context)
+                : 'Create New Promotion Banner'.tr(context),
             style: TextStyle(
               fontWeight: FontWeight.bold,
               color: isDark ? Colors.white : AppColors.secondaryBlue,
@@ -1857,13 +1861,13 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                 TextFormField(
                   controller: _nameController,
                   onChanged: (_) => setState(() {}),
-                  decoration: const InputDecoration(
-                    labelText: 'Promotion Title *',
+                  decoration: InputDecoration(
+                    labelText: 'Promotion Title *'.tr(context),
                     hintText: 'e.g., EID MEGA CELEBRATION SALE',
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                   ),
                   validator: (v) => (v == null || v.trim().isEmpty)
-                      ? 'Please enter promotion name'
+                      ? 'Please enter promotion name'.tr(context)
                       : null,
                 ),
                 const SizedBox(height: 14),
@@ -1871,11 +1875,11 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                 TextFormField(
                   controller: _subtitleController,
                   onChanged: (_) => setState(() {}),
-                  decoration: const InputDecoration(
-                    labelText: 'Banner Subtitle (Optional)',
+                  decoration: InputDecoration(
+                    labelText: 'Banner Subtitle (Optional)'.tr(context),
                     hintText:
                         'e.g., Enjoy 20% OFF all vehicle rentals across Malaysia!',
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -1887,12 +1891,12 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                       child: TextFormField(
                         controller: _bannerUrlController,
                         onChanged: (_) => setState(() {}),
-                        decoration: const InputDecoration(
-                          labelText: 'Banner Image URL or Base64 *',
+                        decoration: InputDecoration(
+                          labelText: 'Banner Image URL or Base64 *'.tr(context),
                           hintText:
                               'https://images.unsplash.com/... or upload image file',
-                          border: OutlineInputBorder(),
-                          suffixIcon: Icon(Icons.image),
+                          border: const OutlineInputBorder(),
+                          suffixIcon: const Icon(Icons.image),
                         ),
                       ),
                     ),
@@ -1908,7 +1912,7 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                         ),
                       ),
                       icon: const Icon(Icons.cloud_upload_rounded, size: 18),
-                      label: const Text('Upload'),
+                      label: Text('Upload'.tr(context)),
                     ),
                   ],
                 ),
@@ -1922,14 +1926,14 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                 TextFormField(
                   controller: _descController,
                   maxLines: 2,
-                  decoration: const InputDecoration(
-                    labelText: 'Full Description *',
+                  decoration: InputDecoration(
+                    labelText: 'Full Description *'.tr(context),
                     hintText:
                         'e.g., Celebrate the festive season with family road trips! Get 20% off all fleet rentals.',
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                   ),
                   validator: (v) => (v == null || v.trim().isEmpty)
-                      ? 'Please enter description'
+                      ? 'Please enter description'.tr(context)
                       : null,
                 ),
                 const SizedBox(height: 16),
@@ -1941,18 +1945,18 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                       flex: 1,
                       child: DropdownButtonFormField<String>(
                         initialValue: _discountType,
-                        decoration: const InputDecoration(
-                          labelText: 'Discount Type *',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: 'Discount Type *'.tr(context),
+                          border: const OutlineInputBorder(),
                         ),
-                        items: const [
+                        items: [
                           DropdownMenuItem(
                             value: 'percentage',
-                            child: Text('Percentage (%)'),
+                            child: Text('Percentage (%)'.tr(context)),
                           ),
                           DropdownMenuItem(
                             value: 'fixed',
-                            child: Text('Fixed Amount (RM)'),
+                            child: Text('Fixed Amount (RM)'.tr(context)),
                           ),
                         ],
                         onChanged: (val) {
@@ -2006,10 +2010,10 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                       child: InkWell(
                         onTap: _selectStartDate,
                         child: InputDecorator(
-                          decoration: const InputDecoration(
-                            labelText: 'Start Date *',
-                            border: OutlineInputBorder(),
-                            suffixIcon: Icon(Icons.calendar_today, size: 20),
+                          decoration: InputDecoration(
+                            labelText: 'Start Date *'.tr(context),
+                            border: const OutlineInputBorder(),
+                            suffixIcon: const Icon(Icons.calendar_today, size: 20),
                           ),
                           child: Text(format.format(_startDate)),
                         ),
@@ -2020,10 +2024,10 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                       child: InkWell(
                         onTap: _selectEndDate,
                         child: InputDecorator(
-                          decoration: const InputDecoration(
-                            labelText: 'End Date *',
-                            border: OutlineInputBorder(),
-                            suffixIcon: Icon(Icons.calendar_today, size: 20),
+                          decoration: InputDecoration(
+                            labelText: 'End Date *'.tr(context),
+                            border: const OutlineInputBorder(),
+                            suffixIcon: const Icon(Icons.calendar_today, size: 20),
                           ),
                           child: Text(format.format(_endDate)),
                         ),
@@ -2038,12 +2042,12 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                   children: [
                     Expanded(
                       child: SwitchListTile(
-                        title: const Text(
-                          'Active Status',
-                          style: TextStyle(fontSize: 14),
+                        title: Text(
+                          'Active Status'.tr(context),
+                          style: const TextStyle(fontSize: 14),
                         ),
                         subtitle: Text(
-                          _active ? 'Active' : 'Inactive',
+                          _active ? 'Active'.tr(context) : 'Inactive'.tr(context),
                           style: const TextStyle(fontSize: 12),
                         ),
                         value: _active,
@@ -2053,13 +2057,13 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                     ),
                     Expanded(
                       child: SwitchListTile(
-                        title: const Text(
-                          'Auto Apply',
-                          style: TextStyle(fontSize: 14),
+                        title: Text(
+                          'Auto Apply'.tr(context),
+                          style: const TextStyle(fontSize: 14),
                         ),
-                        subtitle: const Text(
-                          'Auto apply to eligible bookings',
-                          style: TextStyle(fontSize: 11),
+                        subtitle: Text(
+                          'Auto apply to eligible bookings'.tr(context),
+                          style: const TextStyle(fontSize: 11),
                         ),
                         value: _autoApply,
                         activeThumbColor: AppColors.primaryOrange,
@@ -2074,12 +2078,12 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                 TextFormField(
                   controller: _promoCodeController,
                   textCapitalization: TextCapitalization.characters,
-                  decoration: const InputDecoration(
-                    labelText: 'Promotion Code (Optional)',
+                  decoration: InputDecoration(
+                    labelText: 'Promotion Code (Optional)'.tr(context),
                     hintText: 'e.g., SUMMER2026',
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                     helperText:
-                        'Leave empty for auto-apply promotions without promo code requirement.',
+                        'Leave empty for auto-apply promotions without promo code requirement.'.tr(context),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -2093,10 +2097,10 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
                         ),
-                        decoration: const InputDecoration(
-                          labelText: 'Min Booking (RM)',
+                        decoration: InputDecoration(
+                          labelText: 'Min Booking (RM)'.tr(context),
                           hintText: 'e.g. 150.00',
-                          border: OutlineInputBorder(),
+                          border: const OutlineInputBorder(),
                         ),
                       ),
                     ),
@@ -2107,10 +2111,10 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
                         ),
-                        decoration: const InputDecoration(
-                          labelText: 'Max Discount Cap (RM)',
+                        decoration: InputDecoration(
+                          labelText: 'Max Discount Cap (RM)'.tr(context),
                           hintText: 'e.g. 50.00',
-                          border: OutlineInputBorder(),
+                          border: const OutlineInputBorder(),
                         ),
                       ),
                     ),
@@ -2119,9 +2123,9 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                 const SizedBox(height: 20),
 
                 // 8. Vehicle Types Filter
-                const Text(
-                  'Applicable Vehicle Types (Optional)',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                Text(
+                  'Applicable Vehicle Types (Optional)'.tr(context),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 ),
                 const SizedBox(height: 6),
                 Wrap(
@@ -2130,7 +2134,7 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                   children: _availableCategories.map((type) {
                     final isSelected = _selectedVehicleTypes.contains(type);
                     return FilterChip(
-                      label: Text(type),
+                      label: Text(type.tr(context)),
                       selected: isSelected,
                       selectedColor: AppColors.primaryOrange.withValues(
                         alpha: 0.2,
@@ -2151,9 +2155,9 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                 const SizedBox(height: 16),
 
                 // 9. Vehicle Brands Filter
-                const Text(
-                  'Applicable Vehicle Brands (Optional)',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                Text(
+                  'Applicable Vehicle Brands (Optional)'.tr(context),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 ),
                 const SizedBox(height: 6),
                 Wrap(
@@ -2184,9 +2188,9 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
 
                 // 10. Specific Vehicles Filter
                 if (widget.vehicles.isNotEmpty) ...[
-                  const Text(
-                    'Specific Vehicles (Optional)',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  Text(
+                    'Specific Vehicles (Optional)'.tr(context),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                   ),
                   const SizedBox(height: 6),
                   Container(
@@ -2226,11 +2230,11 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                 TextFormField(
                   controller: _termsController,
                   maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'Terms & Conditions (One per line)',
+                  decoration: InputDecoration(
+                    labelText: 'Terms & Conditions (One per line)'.tr(context),
                     hintText:
                         'e.g.,\nValid for registered users.\nApplicable on rentals 2+ days.\nCannot combine with other offers.',
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -2242,7 +2246,7 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
       actions: [
         TextButton(
           onPressed: _submitting ? null : () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text('Cancel'.tr(context)),
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
@@ -2261,7 +2265,7 @@ class _PromotionFormDialogState extends State<PromotionFormDialog> {
                   ),
                 )
               : Text(
-                  widget.existing != null ? 'Save Changes' : 'Create Promotion',
+                  widget.existing != null ? 'Save Changes'.tr(context) : 'Create Promotion'.tr(context),
                 ),
         ),
       ],

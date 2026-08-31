@@ -13,8 +13,8 @@
     },
 
     "vehicles": {
-      ".read": "auth != null",
-      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'Admin' || root.child('users').child(auth.uid).child('role').val() == 'employee' || root.child('users').child(auth.uid).child('role').val() == 'Employee')"
+      ".read": true,
+      ".write": "auth != null"
     },
 
     "branches": {
@@ -43,12 +43,9 @@
     },
 
     "notifications": {
-      ".indexOn": ["userId", "relatedId", "type"],
-      ".read": "auth != null && query.orderByChild == 'userId' && (query.equalTo == auth.uid || (query.equalTo == 'admin' && (root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'Admin')))",
-      "$notificationId": {
-        ".read": "auth != null && (data.child('userId').val() == auth.uid || (data.child('userId').val() == 'admin' && (root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'Admin')))",
-        ".write": "auth != null && ((!data.exists() && (newData.child('userId').val() == auth.uid || newData.child('userId').val() == 'admin')) || (data.exists() && (data.child('userId').val() == auth.uid || root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'Admin')))"
-      }
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["userId", "relatedId", "type"]
     },
 
     "tracking": {
@@ -57,12 +54,12 @@
     },
 
     "reviews": {
-      ".read": "auth != null",
+      ".read": true,
       ".write": "auth != null",
       ".indexOn": ["vehicleId", "userId", "bookingId"],
       "$reviewId": {
-        ".read": "auth != null",
-        ".write": "auth != null && (data.child('userId').val() == auth.uid || !data.exists() || root.child('users').child(auth.uid).child('role').val() == 'admin')"
+        ".read": true,
+        ".write": "auth != null && (data.child('userId').val() == auth.uid || !data.exists() || root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'Admin')"
       }
     },
 
@@ -139,6 +136,21 @@
     "promotions": {
       ".read": true,
       ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'Admin' || root.child('users').child(auth.uid).child('role').val() == 'super_admin' || root.child('users').child(auth.uid).child('role').val() == 'SUPER_ADMIN')"
+    },
+
+    "vehicleExpenses": {
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'Admin' || root.child('users').child(auth.uid).child('role').val() == 'super_admin' || root.child('users').child(auth.uid).child('role').val() == 'SUPER_ADMIN' || root.child('users').child(auth.uid).child('role').val() == 'employee' || root.child('users').child(auth.uid).child('role').val() == 'Employee')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'Admin' || root.child('users').child(auth.uid).child('role').val() == 'super_admin' || root.child('users').child(auth.uid).child('role').val() == 'SUPER_ADMIN' || root.child('users').child(auth.uid).child('role').val() == 'employee' || root.child('users').child(auth.uid).child('role').val() == 'Employee')"
+    },
+
+    "bookingHold": {
+      ".read": true,
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'admin' || root.child('users').child(auth.uid).child('role').val() == 'Admin' || root.child('users').child(auth.uid).child('role').val() == 'super_admin' || root.child('users').child(auth.uid).child('role').val() == 'SUPER_ADMIN' || root.child('users').child(auth.uid).child('role').val() == 'employee' || root.child('users').child(auth.uid).child('role').val() == 'Employee')"
+    },
+
+    "vehicleHolds": {
+      ".read": true,
+      ".write": "auth != null"
     }
   }
 }

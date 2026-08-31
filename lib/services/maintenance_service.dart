@@ -9,26 +9,54 @@ class MaintenanceService {
     'maintenance_jobs',
   );
 
+  List<MaintenanceJobModel>? _cachedMaintenanceJobs;
+
+  void invalidateCache() {
+    _cachedMaintenanceJobs = null;
+  }
+
   Future<List<MaintenanceJobModel>> getMaintenanceJobs({
     bool forceRefresh = false,
   }) async {
+    if (!forceRefresh &&
+        _cachedMaintenanceJobs != null &&
+        _cachedMaintenanceJobs!.isNotEmpty) {
+      debugPrint(
+        '[MaintenanceService] Returning warm cached maintenance jobs (${_cachedMaintenanceJobs!.length} items)',
+      );
+      return _cachedMaintenanceJobs!;
+    }
+
     List<MaintenanceJobModel> jobs = [];
+    final perfSw = Stopwatch()..start();
+    debugPrint('[PERF] Starting maintenance jobs query');
     try {
       final snapshot = await _db.get().timeout(const Duration(seconds: 10));
-      if (snapshot.exists) {
+      if (snapshot.exists && snapshot.value != null) {
         final Map<dynamic, dynamic> data =
             snapshot.value as Map<dynamic, dynamic>;
         data.forEach((key, value) {
-          jobs.add(
-            MaintenanceJobModel.fromMap(
-              key.toString(),
-              value as Map<dynamic, dynamic>,
-            ),
-          );
+          if (value is Map) {
+            jobs.add(
+              MaintenanceJobModel.fromMap(
+                key.toString(),
+                value,
+              ),
+            );
+          }
         });
       }
+      _cachedMaintenanceJobs = jobs;
+      perfSw.stop();
+      debugPrint(
+        '[PERF] Maintenance jobs query completed: ${perfSw.elapsedMilliseconds}ms (${jobs.length} items)',
+      );
     } catch (e) {
-      debugPrint('Error getting maintenance jobs: $e');
+      perfSw.stop();
+      debugPrint('[PERF] Maintenance jobs query FAILED in ${perfSw.elapsedMilliseconds}ms: $e');
+      if (_cachedMaintenanceJobs != null && _cachedMaintenanceJobs!.isNotEmpty) {
+        return _cachedMaintenanceJobs!;
+      }
     }
     return jobs;
   }
@@ -36,18 +64,21 @@ class MaintenanceService {
   Stream<List<MaintenanceJobModel>> getMaintenanceJobsStream() {
     return _db.onValue.map((event) {
       List<MaintenanceJobModel> jobs = [];
-      if (event.snapshot.exists) {
+      if (event.snapshot.exists && event.snapshot.value != null) {
         final Map<dynamic, dynamic> data =
             event.snapshot.value as Map<dynamic, dynamic>;
         data.forEach((key, value) {
-          jobs.add(
-            MaintenanceJobModel.fromMap(
-              key.toString(),
-              value as Map<dynamic, dynamic>,
-            ),
-          );
+          if (value is Map) {
+            jobs.add(
+              MaintenanceJobModel.fromMap(
+                key.toString(),
+                value,
+              ),
+            );
+          }
         });
       }
+      _cachedMaintenanceJobs = jobs;
       return jobs;
     });
   }

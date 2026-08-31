@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../constants/colors.dart';
@@ -6,6 +7,7 @@ import '../../../models/maintenance_job_model.dart';
 import '../../../services/vehicle_service.dart';
 import '../../../services/maintenance_service.dart';
 import '../../../widgets/loading_widget.dart';
+import '../../../l10n/app_translations.dart';
 
 class VehicleMaintenanceView extends StatefulWidget {
   const VehicleMaintenanceView({super.key});
@@ -27,9 +29,13 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
+  StreamSubscription<List<MaintenanceJobModel>>? _jobsSub;
+  StreamSubscription<List<VehicleModel>>? _vehiclesSub;
+
   @override
   void initState() {
     super.initState();
+    _subscribeToLiveData();
     _loadData();
     _searchController.addListener(() {
       setState(
@@ -38,30 +44,62 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
     });
   }
 
+  void _subscribeToLiveData() {
+    _jobsSub?.cancel();
+    _jobsSub = _maintenanceService.getMaintenanceJobsStream().listen((jList) {
+      if (mounted) {
+        setState(() {
+          _jobs = jList;
+          _loading = false;
+        });
+      }
+    });
+
+    _vehiclesSub?.cancel();
+    _vehiclesSub = _vehicleService.getVehiclesStream().listen((vList) {
+      if (mounted) {
+        setState(() {
+          _vehicles = vList;
+        });
+      }
+    });
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
+    _jobsSub?.cancel();
+    _vehiclesSub?.cancel();
     super.dispose();
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadData({bool forceRefresh = false}) async {
     if (!mounted) return;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (_jobs.isEmpty) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
-      _jobs = await _maintenanceService
-          .getMaintenanceJobs(forceRefresh: true)
-          .timeout(const Duration(seconds: 10));
-      _vehicles = await _vehicleService
-          .getVehicles(forceRefresh: true)
-          .timeout(const Duration(seconds: 10));
+      final results = await Future.wait([
+        _maintenanceService.getMaintenanceJobs(forceRefresh: forceRefresh),
+        _vehicleService.getVehicles(forceRefresh: forceRefresh),
+      ]);
+      if (mounted) {
+        setState(() {
+          _jobs = results[0] as List<MaintenanceJobModel>;
+          _vehicles = results[1] as List<VehicleModel>;
+          _loading = false;
+        });
+      }
     } catch (e) {
       debugPrint('Error loading maintenance data: $e');
-      setState(
-        () => _error = 'Failed to load maintenance records. Please try again.',
-      );
+      if (mounted && _jobs.isEmpty) {
+        setState(
+          () => _error = 'Failed to load maintenance records. Please try again.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -71,14 +109,14 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Log'),
-        content: const Text(
-          'Are you sure you want to remove this maintenance record?',
+        title: Text('Delete Log'.tr(context)),
+        content: Text(
+          'Are you sure you want to remove this maintenance record?'.tr(context),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text('Cancel'.tr(context)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -86,7 +124,7 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
+            child: Text('Delete'.tr(context)),
           ),
         ],
       ),
@@ -105,8 +143,8 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
   void _showAddEditJobDialog({MaintenanceJobModel? job}) {
     if (_vehicles.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Cannot schedule maintenance. Fleet is empty.'),
+        SnackBar(
+          content: Text('Cannot schedule maintenance. Fleet is empty.'.tr(context)),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -149,7 +187,7 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                 borderRadius: BorderRadius.circular(24),
               ),
               title: Text(
-                isEdit ? 'Edit Maintenance Record' : 'Schedule Maintenance',
+                isEdit ? 'Edit Maintenance Record'.tr(context) : 'Schedule Maintenance'.tr(context),
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: isDarkDialog ? Colors.white : Colors.black,
@@ -165,8 +203,8 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                       DropdownButtonFormField<VehicleModel>(
                         initialValue: selectedVehicle,
                         isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Select Vehicle',
+                        decoration: InputDecoration(
+                          labelText: 'Select Vehicle'.tr(context),
                         ),
                         items: _vehicles.map((v) {
                           return DropdownMenuItem(
@@ -187,18 +225,18 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                       const SizedBox(height: 12),
                       TextField(
                         controller: titleController,
-                        decoration: const InputDecoration(
-                          labelText: 'Service / Repair Title',
-                          hintText: 'e.g., Oil Change, Tyre Alignment',
+                        decoration: InputDecoration(
+                          labelText: 'Service / Repair Title'.tr(context),
+                          hintText: 'e.g., Oil Change, Tyre Alignment'.tr(context),
                         ),
                       ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: descriptionController,
                         maxLines: 2,
-                        decoration: const InputDecoration(
-                          labelText: 'Description / Notes',
-                          hintText: 'Explain issue or service details...',
+                        decoration: InputDecoration(
+                          labelText: 'Description / Notes'.tr(context),
+                          hintText: 'Explain issue or service details...'.tr(context),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -207,9 +245,9 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
                         ),
-                        decoration: const InputDecoration(
-                          labelText: 'Est. Cost (RM)',
-                          hintText: 'e.g., 250.00',
+                        decoration: InputDecoration(
+                          labelText: 'Est. Cost (RM)'.tr(context),
+                          hintText: 'e.g., 250.00'.tr(context),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -249,9 +287,9 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text(
-                                      'Start Date',
-                                      style: TextStyle(
+                                    Text(
+                                      'Start Date'.tr(context),
+                                      style: const TextStyle(
                                         fontSize: 10,
                                         color: Colors.grey,
                                         fontWeight: FontWeight.bold,
@@ -308,9 +346,9 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text(
-                                      'End Date',
-                                      style: TextStyle(
+                                    Text(
+                                      'End Date'.tr(context),
+                                      style: const TextStyle(
                                         fontSize: 10,
                                         color: Colors.grey,
                                         fontWeight: FontWeight.bold,
@@ -344,7 +382,7 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
                         initialValue: status,
-                        decoration: const InputDecoration(labelText: 'Status'),
+                        decoration: InputDecoration(labelText: 'Status'.tr(context)),
                         items:
                             [
                               'Scheduled',
@@ -352,7 +390,7 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                               'Completed',
                               'Cancelled',
                             ].map((s) {
-                              return DropdownMenuItem(value: s, child: Text(s));
+                              return DropdownMenuItem(value: s, child: Text(s.tr(context)));
                             }).toList(),
                         onChanged: (val) {
                           if (val != null) setDialogState(() => status = val);
@@ -360,13 +398,13 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                       ),
                       const SizedBox(height: 12),
                       SwitchListTile(
-                        title: const Text(
-                          'Show to Customers',
-                          style: TextStyle(fontSize: 14),
+                        title: Text(
+                          'Show to Customers'.tr(context),
+                          style: const TextStyle(fontSize: 14),
                         ),
-                        subtitle: const Text(
-                          'Allow customers to view this record in vehicle details',
-                          style: TextStyle(fontSize: 11, color: Colors.grey),
+                        subtitle: Text(
+                          'Allow customers to view this record in vehicle details'.tr(context),
+                          style: const TextStyle(fontSize: 11, color: Colors.grey),
                         ),
                         value: showToCustomer,
                         activeThumbColor: AppColors.primaryOrange,
@@ -380,7 +418,7 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
+                  child: Text('Cancel'.tr(context)),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
@@ -430,7 +468,7 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                     Navigator.pop(context);
                     _loadData();
                   },
-                  child: Text(isEdit ? 'Save' : 'Schedule'),
+                  child: Text(isEdit ? 'Save'.tr(context) : 'Schedule'.tr(context)),
                 ),
               ],
             );
@@ -514,7 +552,7 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Vehicle Maintenance Log',
+                'Vehicle Maintenance Log'.tr(context),
                 style: TextStyle(
                   fontSize: isDesktop ? 22 : 20,
                   fontWeight: FontWeight.w900,
@@ -522,7 +560,7 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                 ),
               ),
               Text(
-                'Track fleet repairs, scheduled tune-ups, and cost reports.',
+                'Track fleet repairs, scheduled tune-ups, and cost reports.'.tr(context),
                 style: TextStyle(fontSize: 12, color: textSecondary),
               ),
               const SizedBox(height: 12),
@@ -542,9 +580,9 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                   ),
                   onPressed: () => _showAddEditJobDialog(),
                   icon: const Icon(Icons.add, size: 18),
-                  label: const Text(
-                    'Schedule Service',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                  label: Text(
+                    'Schedule Service'.tr(context),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -620,7 +658,7 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                   controller: _searchController,
                   style: TextStyle(color: textPrimary),
                   decoration: InputDecoration(
-                    hintText: 'Search vehicle, title, or notes...',
+                    hintText: 'Search vehicle, title, or notes...'.tr(context),
                     hintStyle: TextStyle(color: textSecondary),
                     prefixIcon: Icon(
                       Icons.search,
@@ -677,7 +715,7 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'No service logs found matching filters.',
+                          'No service logs found matching filters.'.tr(context),
                           style: TextStyle(color: textSecondary),
                         ),
                       ],
@@ -759,7 +797,7 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  label,
+                  label.tr(context),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -803,49 +841,49 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
         columns: [
           DataColumn(
             label: Text(
-              'Vehicle',
+              'Vehicle'.tr(context),
               style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
             ),
           ),
           DataColumn(
             label: Text(
-              'Title',
+              'Title'.tr(context),
               style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
             ),
           ),
           DataColumn(
             label: Text(
-              'Cost (RM)',
+              'Cost (RM)'.tr(context),
               style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
             ),
           ),
           DataColumn(
             label: Text(
-              'Start Date',
+              'Start Date'.tr(context),
               style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
             ),
           ),
           DataColumn(
             label: Text(
-              'End Date',
+              'End Date'.tr(context),
               style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
             ),
           ),
           DataColumn(
             label: Text(
-              'Status',
+              'Status'.tr(context),
               style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
             ),
           ),
           DataColumn(
             label: Text(
-              'Description',
+              'Description'.tr(context),
               style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
             ),
           ),
           DataColumn(
             label: Text(
-              'Actions',
+              'Actions'.tr(context),
               style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
             ),
           ),
@@ -891,7 +929,7 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    job.status.toUpperCase(),
+                    job.status.tr(context).toUpperCase(),
                     style: TextStyle(
                       color: statusColor,
                       fontSize: 9,
@@ -941,7 +979,7 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                             return DropdownMenuItem(
                               value: s,
                               child: Text(
-                                s,
+                                s.tr(context),
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: textPrimary,
@@ -1027,7 +1065,7 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      job.status.toUpperCase(),
+                      job.status.tr(context).toUpperCase(),
                       style: TextStyle(
                         color: statusColor,
                         fontSize: 9,
@@ -1070,7 +1108,7 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   Text(
-                    'Status: ',
+                    'Status: '.tr(context),
                     style: TextStyle(fontSize: 12, color: textSecondary),
                   ),
                   DropdownButton<String>(
@@ -1098,7 +1136,7 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
                           return DropdownMenuItem(
                             value: s,
                             child: Text(
-                              s,
+                              s.tr(context),
                               style: TextStyle(
                                 fontSize: 12,
                                 color: textPrimary,
@@ -1163,7 +1201,7 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
               return DropdownMenuItem(
                 value: s,
                 child: Text(
-                  s,
+                  s.tr(context),
                   style: TextStyle(color: textPrimary, fontSize: 13),
                 ),
               );
@@ -1199,7 +1237,7 @@ class _VehicleMaintenanceViewState extends State<VehicleMaintenanceView> {
           DropdownMenuItem(
             value: 'All',
             child: Text(
-              'All Vehicles',
+              'All Vehicles'.tr(context),
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 13,

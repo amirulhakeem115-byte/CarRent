@@ -1,14 +1,19 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_database/firebase_database.dart';
 import '../../../models/booking_model.dart';
 import '../../../models/vehicle_model.dart';
+import '../../../models/payment_model.dart';
 import '../../../services/booking_service.dart';
+import '../../../services/payment_service.dart';
 import '../../../services/vehicle_service.dart';
 import '../../../widgets/loading_widget.dart';
-import '../../../widgets/return_video_evidence_widget.dart';
+import '../../../widgets/booking_source_badge.dart';
+import '../../../widgets/staff_quick_booking_modal_sheet.dart';
 import '../../../constants/colors.dart';
+import '../../../l10n/app_translations.dart';
 
 class BookingsView extends StatefulWidget {
   const BookingsView({super.key});
@@ -20,15 +25,17 @@ class BookingsView extends StatefulWidget {
 class _BookingsViewState extends State<BookingsView> {
   final BookingService _bookingService = BookingService();
   final VehicleService _vehicleService = VehicleService();
+  final PaymentService _paymentService = PaymentService();
 
   List<BookingModel> _bookings = [];
   List<VehicleModel> _vehicles = [];
+  List<PaymentModel> _payments = [];
   bool _loading = true;
   String _selectedFilter =
       'All'; // 'All', 'Pending', 'Approved', 'Ongoing', 'Completed', 'Cancelled', 'Overdue'
   String _selectedAdminTab = 'Bookings'; // 'Bookings', 'Active Rentals'
   String _activeRentalDateFilter =
-      'Today'; // 'Today', 'Tomorrow', 'Next 7 Days', 'Custom Date'
+      'All'; // 'All', 'Today', 'Tomorrow', 'Next 7 Days', 'Custom Date'
   DateTime? _customRentalDate;
   String? _error;
   final TextEditingController _searchController = TextEditingController();
@@ -36,6 +43,7 @@ class _BookingsViewState extends State<BookingsView> {
 
   StreamSubscription<List<BookingModel>>? _bookingsSubscription;
   StreamSubscription<List<VehicleModel>>? _vehiclesSubscription;
+  StreamSubscription<List<PaymentModel>>? _paymentsSubscription;
 
   @override
   void initState() {
@@ -70,6 +78,15 @@ class _BookingsViewState extends State<BookingsView> {
         });
       }
     });
+
+    _paymentsSubscription?.cancel();
+    _paymentsSubscription = _paymentService.getPaymentsStream().listen((pList) {
+      if (mounted) {
+        setState(() {
+          _payments = pList;
+        });
+      }
+    });
   }
 
   @override
@@ -77,25 +94,33 @@ class _BookingsViewState extends State<BookingsView> {
     _searchController.dispose();
     _bookingsSubscription?.cancel();
     _vehiclesSubscription?.cancel();
+    _paymentsSubscription?.cancel();
     super.dispose();
   }
 
-  Future<void> _loadBookings() async {
+  Future<void> _loadBookings({bool forceRefresh = false}) async {
     if (!mounted) return;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (_bookings.isEmpty) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
-      _bookings = await _bookingService
-          .getBookings(forceRefresh: true)
-          .timeout(const Duration(seconds: 10));
+      final results = await Future.wait([
+        _bookingService.getBookings(forceRefresh: forceRefresh),
+        _paymentService.getPayments(forceRefresh: forceRefresh),
+      ]);
+      _bookings = results[0] as List<BookingModel>;
+      _payments = results[1] as List<PaymentModel>;
       _bookings.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     } catch (e) {
       debugPrint('Error loading bookings: $e');
-      setState(() {
-        _error = 'Failed to load booking records. Please try again.';
-      });
+      if (_bookings.isEmpty) {
+        setState(() {
+          _error = 'Failed to load booking records. Please try again.';
+        });
+      }
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -183,6 +208,31 @@ class _BookingsViewState extends State<BookingsView> {
         final hideTransitionStateSection = isCompleted || isCancelled;
         final statusColor = _getBookingStatusColor(booking.status, isDark);
 
+        final double overdueCharge = overdue['isOverdue'] == true ? (overdue['charges'] as double) : 0.0;
+        final double totalAmount = booking.isOpenRental
+            ? _getDynamicPrice(booking)
+            : (booking.totalPrice + overdueCharge);
+
+        final bookingPayments = _payments.where((p) {
+          if (p.bookingId != booking.id) return false;
+          final s = p.status.toLowerCase();
+          final ps = (p.paymentStatus ?? '').toLowerCase();
+          return s == 'approved' || s == 'paid' || ps == 'approved' || ps == 'paid';
+        }).toList();
+
+        double amountPaid = bookingPayments.fold(0.0, (sum, p) => sum + p.amount);
+        if (bookingPayments.isEmpty &&
+            (bStat == 'approved' ||
+                bStat == 'confirmed' ||
+                bStat == 'active' ||
+                bStat == 'ongoing' ||
+                bStat == 'completed')) {
+          amountPaid = booking.depositAmount;
+        }
+
+        final double discount = booking.discountAmount + booking.promotionDiscountAmount;
+        final double remainingBalance = math.max(0.0, totalAmount - amountPaid - discount);
+
         return Padding(
           padding: EdgeInsets.only(
             top: 24,
@@ -205,13 +255,14 @@ class _BookingsViewState extends State<BookingsView> {
                   spacing: 8,
                   children: [
                     Text(
-                      'Reservation Specification',
+                      'Reservation Specification'.tr(context),
                       style: TextStyle(
                         fontSize: isCompactMobile ? 16 : 18,
                         fontWeight: FontWeight.bold,
                         color: textPrimary,
                       ),
                     ),
+                    BookingSourceBadge(bookingSource: booking.bookingSource),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
@@ -222,7 +273,7 @@ class _BookingsViewState extends State<BookingsView> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        booking.status.toUpperCase(),
+                        booking.status.toUpperCase().tr(context),
                         style: TextStyle(
                           color: statusColor,
                           fontSize: isCompactMobile ? 9 : 10,
@@ -233,64 +284,74 @@ class _BookingsViewState extends State<BookingsView> {
                   ],
                 ),
                 const SizedBox(height: 20),
-                _buildDetailRow(context, 'Reservation Ref ID', booking.id),
-                _buildDetailRow(context, 'Vehicle Name', booking.vehicleName),
-                _buildDetailRow(context, 'Customer Name', booking.userName),
-                _buildDetailRow(context, 'Customer Phone', booking.userPhone),
+                _buildDetailRow(context, 'Reservation Ref ID'.tr(context), booking.id),
+                _buildDetailRow(context, 'Vehicle Name'.tr(context), booking.vehicleName),
+                _buildDetailRow(context, 'Customer Name'.tr(context), booking.userName),
+                _buildDetailRow(context, 'Customer Phone'.tr(context), booking.userPhone),
                 _buildDetailRow(
                   context,
-                  'Rental Duration',
+                  'Rental Duration'.tr(context),
                   booking.isOpenRental
-                      ? '${dateFormat.format(booking.pickUpDate)} to OPEN RENTAL (Open Ended)'
-                      : '${dateFormat.format(booking.pickUpDate)} to ${booking.returnDate != null ? dateFormat.format(booking.returnDate!) : ""} (${booking.rentalDays} days)',
+                      ? '${dateFormat.format(booking.pickUpDate)} to OPEN RENTAL (${"Open Ended".tr(context)})'
+                      : '${dateFormat.format(booking.pickUpDate)} to ${booking.returnDate != null ? dateFormat.format(booking.returnDate!) : ""} (${booking.rentalDays} ${"days".tr(context)})',
+                ),
+                const Divider(height: 24),
+                _buildDetailRow(
+                  context,
+                  booking.isOpenRental && bStat == 'active'
+                      ? 'Total Amount (Estimated)'.tr(context)
+                      : 'Total Amount'.tr(context),
+                  'RM ${totalAmount.toStringAsFixed(2)}',
                 ),
                 _buildDetailRow(
                   context,
-                  'Deposit Lodged',
+                  'Amount Paid'.tr(context),
+                  'RM ${amountPaid.toStringAsFixed(2)}',
+                  textColor: Colors.teal,
+                ),
+                _buildDetailRow(
+                  context,
+                  'Discount'.tr(context),
+                  'RM ${discount.toStringAsFixed(2)}',
+                  textColor: Colors.purple,
+                ),
+                _buildDetailRow(
+                  context,
+                  'Remaining Balance'.tr(context),
+                  'RM ${remainingBalance.toStringAsFixed(2)}',
+                  textColor: remainingBalance > 0 ? Colors.orange : Colors.green,
+                ),
+                const Divider(height: 24),
+                _buildDetailRow(
+                  context,
+                  'Deposit Lodged'.tr(context),
                   'RM ${booking.depositAmount.toStringAsFixed(2)}',
-                ),
-                _buildDetailRow(
-                  context,
-                  booking.isOpenRental &&
-                          booking.status.toLowerCase() == 'active'
-                      ? 'Current Estimated Cost'
-                      : 'Total Cost',
-                  booking.isOpenRental &&
-                          booking.status.toLowerCase() == 'active'
-                      ? 'RM ${_getDynamicPrice(booking).toStringAsFixed(2)} (for ${_getElapsedDays(booking)} days)'
-                      : 'RM ${booking.totalPrice.toStringAsFixed(2)}',
                 ),
                 if (overdue['isOverdue'] == true) ...[
                   _buildDetailRow(
                     context,
-                    '⚠️ Overdue Duration',
-                    '${overdue['days']} days, ${overdue['hours']} hours',
+                    '⚠️ Overdue Duration'.tr(context),
+                    '${overdue['days']} ${"days".tr(context)}, ${overdue['hours']} ${"hours".tr(context)}',
                     textColor: Colors.redAccent,
                   ),
                   _buildDetailRow(
                     context,
-                    '⚠️ Late Fees Accrued',
+                    '⚠️ Late Fees Accrued'.tr(context),
                     'RM ${overdue['charges'].toStringAsFixed(2)}',
-                    textColor: Colors.redAccent,
-                  ),
-                  _buildDetailRow(
-                    context,
-                    '⚠️ Current Total',
-                    'RM ${(booking.totalPrice + overdue['charges']).toStringAsFixed(2)}',
                     textColor: Colors.redAccent,
                   ),
                 ],
                 if (booking.notes != null && booking.notes!.isNotEmpty)
                   _buildDetailRow(
                     context,
-                    'Special Remarks',
+                    'Special Remarks'.tr(context),
                     booking.notes!,
                     isItalic: true,
                   ),
                 if (!hideTransitionStateSection) ...[
                   const Divider(height: 32),
                   Text(
-                    'Transition Rental State',
+                    'Transition Rental State'.tr(context),
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
@@ -314,7 +375,7 @@ class _BookingsViewState extends State<BookingsView> {
                             Navigator.pop(context);
                             _updateStatus(booking, 'approved');
                           },
-                          child: const Text('Approve Reservation'),
+                          child: Text('Approve Reservation'.tr(context)),
                         ),
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
@@ -325,7 +386,7 @@ class _BookingsViewState extends State<BookingsView> {
                             Navigator.pop(context);
                             _updateStatus(booking, 'rejected');
                           },
-                          child: const Text('Reject & Deny'),
+                          child: Text('Reject & Deny'.tr(context)),
                         ),
                       ],
                       if (booking.status == 'approved' ||
@@ -342,8 +403,8 @@ class _BookingsViewState extends State<BookingsView> {
                           },
                           child: Text(
                             booking.isOpenRental
-                                ? 'Vehicle Picked Up'
-                                : 'Handover Keys (Active)',
+                                ? 'Vehicle Picked Up'.tr(context)
+                                : 'Handover Keys (Active)'.tr(context),
                           ),
                         ),
                       ],
@@ -364,11 +425,23 @@ class _BookingsViewState extends State<BookingsView> {
                           },
                           child: Text(
                             booking.isOpenRental
-                                ? 'Complete Return Inspection'
-                                : 'Inspect & Complete Return',
+                                ? 'Complete Return Inspection'.tr(context)
+                                : 'Inspect & Complete Return'.tr(context),
                           ),
                         ),
                       ],
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryOrange,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _showApplyDiscountDialog(booking);
+                        },
+                        icon: const Icon(Icons.local_offer_rounded, size: 16),
+                        label: Text('Apply Discount'.tr(context)),
+                      ),
                       if (booking.status != 'cancelled' &&
                           booking.status != 'completed' &&
                           booking.status != 'rejected') ...[
@@ -381,7 +454,7 @@ class _BookingsViewState extends State<BookingsView> {
                             Navigator.pop(context);
                             _updateStatus(booking, 'cancelled');
                           },
-                          child: const Text('Cancel Booking'),
+                          child: Text('Cancel Booking'.tr(context)),
                         ),
                       ],
                     ],
@@ -390,7 +463,7 @@ class _BookingsViewState extends State<BookingsView> {
                     booking.extensionRequest!['status'] == 'pending') ...[
                   const Divider(height: 32),
                   Text(
-                    'Extension Request Details',
+                    'Extension Request Details'.tr(context),
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
@@ -400,7 +473,7 @@ class _BookingsViewState extends State<BookingsView> {
                   const SizedBox(height: 8),
                   _buildDetailRow(
                     context,
-                    'Requested Return',
+                    'Requested Return'.tr(context),
                     DateFormat('dd MMM yyyy hh:mm a').format(
                       DateTime.parse(
                         booking.extensionRequest!['newReturnDate'],
@@ -409,7 +482,7 @@ class _BookingsViewState extends State<BookingsView> {
                   ),
                   _buildDetailRow(
                     context,
-                    'Additional Cost',
+                    'Additional Cost'.tr(context),
                     'RM ${booking.extensionRequest!['additionalCost'].toStringAsFixed(2)}',
                   ),
                   const SizedBox(height: 12),
@@ -428,7 +501,7 @@ class _BookingsViewState extends State<BookingsView> {
                           await _bookingService.approveExtension(booking.id);
                           _loadBookings();
                         },
-                        child: const Text('Approve Extension'),
+                        child: Text('Approve Extension'.tr(context)),
                       ),
                       OutlinedButton(
                         style: OutlinedButton.styleFrom(
@@ -441,16 +514,11 @@ class _BookingsViewState extends State<BookingsView> {
                           await _bookingService.rejectExtension(booking.id);
                           _loadBookings();
                         },
-                        child: const Text('Reject Extension'),
+                        child: Text('Reject Extension'.tr(context)),
                       ),
                     ],
                   ),
                 ],
-                const SizedBox(height: 16),
-                ReturnVideoEvidenceWidget(
-                  booking: booking,
-                  isAdminView: true,
-                ),
               ],
             ),
           ),
@@ -540,8 +608,8 @@ class _BookingsViewState extends State<BookingsView> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(
-        child: LoadingWidget(message: 'Loading booking archives...'),
+      return Center(
+        child: LoadingWidget(message: 'Loading booking archives...'.tr(context)),
       );
     }
 
@@ -557,7 +625,7 @@ class _BookingsViewState extends State<BookingsView> {
             ),
             const SizedBox(height: 16),
             Text(
-              _error!,
+              _error!.tr(context),
               style: const TextStyle(
                 fontSize: 16,
                 color: AppColors.secondaryBlue,
@@ -567,7 +635,7 @@ class _BookingsViewState extends State<BookingsView> {
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: _loadBookings,
-              child: const Text('Retry'),
+              child: Text('Retry'.tr(context)),
             ),
           ],
         ),
@@ -624,24 +692,77 @@ class _BookingsViewState extends State<BookingsView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                _selectedAdminTab == 'Bookings'
-                    ? 'Reservation Registry'
-                    : 'Active Rentals',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  color: textPrimary,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _selectedAdminTab == 'Bookings'
+                          ? 'Reservation Registry'.tr(context)
+                          : 'Active Rentals'.tr(context),
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: textPrimary,
+                      ),
+                    ),
+                    Text(
+                      _selectedAdminTab == 'Bookings'
+                          ? 'Audit rental schedules, verify security deposits, and handover keys.'.tr(context)
+                          : 'Track currently active rentals with pickup-return visibility.'.tr(context),
+                      style: TextStyle(fontSize: 12, color: textSecondary),
+                    ),
+                  ],
                 ),
               ),
-              Text(
-                _selectedAdminTab == 'Bookings'
-                    ? 'Audit rental schedules, verify security deposits, and handover keys.'
-                    : 'Track currently active rentals with pickup-return visibility.',
-                style: TextStyle(fontSize: 12, color: textSecondary),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                    onPressed: () {
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (ctx) => StaffQuickBookingModalSheet(
+                          initialSource: 'phone',
+                          onBookingCreated: _loadBookings,
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.phone_in_talk_rounded, size: 16),
+                    label: Text('Phone Booking'.tr(context), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  ),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.purple,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                    onPressed: () {
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (ctx) => StaffQuickBookingModalSheet(
+                          initialSource: 'walkIn',
+                          onBookingCreated: _loadBookings,
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.directions_walk_rounded, size: 16),
+                    label: Text('Walk-in Booking'.tr(context), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  ),
+                ],
               ),
             ],
           ),
@@ -729,7 +850,7 @@ class _BookingsViewState extends State<BookingsView> {
                             style: TextStyle(color: textPrimary),
                             decoration: InputDecoration(
                               hintText:
-                                  'Search by booking ID, vehicle model, or customer name...',
+                                  'Search by booking ID, vehicle model, or customer name...'.tr(context),
                               hintStyle: TextStyle(color: textSecondary),
                               prefixIcon: Icon(
                                 Icons.search,
@@ -759,7 +880,7 @@ class _BookingsViewState extends State<BookingsView> {
                           style: TextStyle(color: textPrimary),
                           decoration: InputDecoration(
                             hintText:
-                                'Search by booking ID, vehicle or customer...',
+                                'Search by booking ID, vehicle or customer...'.tr(context),
                             hintStyle: TextStyle(color: textSecondary),
                             prefixIcon: Icon(
                               Icons.search,
@@ -860,7 +981,7 @@ class _BookingsViewState extends State<BookingsView> {
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            'No active rentals found for this date filter.',
+                            'No active rentals found for this date filter.'.tr(context),
                             style: TextStyle(color: textSecondary),
                           ),
                         ],
@@ -938,7 +1059,7 @@ class _BookingsViewState extends State<BookingsView> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  label,
+                  label.tr(context),
                   style: TextStyle(
                     color: textSecondary,
                     fontSize: 10,
@@ -969,179 +1090,300 @@ class _BookingsViewState extends State<BookingsView> {
     required Color textPrimary,
     required Color textSecondary,
   }) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
-        headingRowColor: WidgetStateProperty.all(
-          isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-        ),
-        dividerThickness: 1,
-        columns: [
-          DataColumn(
-            label: Text(
-              'Booking ID',
-              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
-            ),
+    final borderColor = isDark ? const Color(0xFF334155) : Colors.grey.shade200;
+    final headerBg = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final dateFormat = DateFormat('dd MMM yyyy');
+
+    return Column(
+      children: [
+        // Responsive Header Row
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            color: headerBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            border: Border(bottom: BorderSide(color: borderColor)),
           ),
-          DataColumn(
-            label: Text(
-              'Customer',
-              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
-            ),
-          ),
-          DataColumn(
-            label: Text(
-              'Vehicle',
-              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
-            ),
-          ),
-          DataColumn(
-            label: Text(
-              'Pickup Date',
-              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
-            ),
-          ),
-          DataColumn(
-            label: Text(
-              'Return Date',
-              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
-            ),
-          ),
-          DataColumn(
-            label: Text(
-              'Amount (RM)',
-              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
-            ),
-          ),
-          DataColumn(
-            label: Text(
-              'Status',
-              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
-            ),
-          ),
-          DataColumn(
-            label: Text(
-              'Actions',
-              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
-            ),
-          ),
-        ],
-        rows: bookings.map((b) {
-          final Color statusColor = _getBookingStatusColor(b.status, isDark);
-          final bStat = b.status.toLowerCase();
-          final dateFormat = DateFormat('yyyy-MM-dd');
-          return DataRow(
-            cells: [
-              DataCell(
-                Text(
-                  b.id.substring(0, b.id.length > 8 ? 8 : b.id.length),
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: textPrimary,
-                  ),
+          child: Row(
+            children: [
+              Expanded(
+                flex: 10,
+                child: Text(
+                  'Booking Ref'.tr(context),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: textPrimary),
                 ),
               ),
-              DataCell(Text(b.userName, style: TextStyle(color: textPrimary))),
-              DataCell(
-                Text(b.vehicleName, style: TextStyle(color: textPrimary)),
-              ),
-              DataCell(
-                Text(
-                  dateFormat.format(b.pickUpDate),
-                  style: TextStyle(color: textSecondary),
+              Expanded(
+                flex: 14,
+                child: Text(
+                  'Customer Name'.tr(context),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: textPrimary),
                 ),
               ),
-              DataCell(
-                Text(
-                  b.isOpenRental
-                      ? 'OPEN RENTAL'
-                      : (b.returnDate != null
-                            ? dateFormat.format(b.returnDate!)
-                            : ""),
-                  style: TextStyle(
-                    color: b.isOpenRental ? Colors.green : textSecondary,
-                    fontWeight: b.isOpenRental
-                        ? FontWeight.bold
-                        : FontWeight.normal,
-                  ),
+              Expanded(
+                flex: 13,
+                child: Text(
+                  'Vehicle'.tr(context),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: textPrimary),
                 ),
               ),
-              DataCell(
-                Text(
-                  'RM ${b.totalPrice.toStringAsFixed(2)}',
-                  style: TextStyle(color: textPrimary),
+              Expanded(
+                flex: 11,
+                child: Text(
+                  'Pickup Date'.tr(context),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: textPrimary),
                 ),
               ),
-              DataCell(
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    b.status.toUpperCase(),
-                    style: TextStyle(
-                      color: statusColor,
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+              Expanded(
+                flex: 11,
+                child: Text(
+                  'Return Date'.tr(context),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: textPrimary),
                 ),
               ),
-              DataCell(
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: Icon(
-                        Icons.visibility_outlined,
-                        color: textPrimary,
-                        size: 18,
-                      ),
-                      onPressed: () => _showBookingDetails(b),
-                    ),
-                    if (bStat == 'return requested' ||
-                        bStat == 'awaiting return inspection' ||
-                        bStat == 'active' ||
-                        bStat == 'ongoing' ||
-                        bStat == 'overdue') ...[
-                      const SizedBox(width: 8),
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.teal,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                        ),
-                        onPressed: () => _showReturnInspectionDialog(b),
-                        icon: const Icon(Icons.check_circle_outline, size: 12),
-                        label: Text(
-                          b.isOpenRental
-                              ? 'Complete Return Inspection'
-                              : 'Inspect & Complete',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
+              Expanded(
+                flex: 10,
+                child: Text(
+                  'Total'.tr(context),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: textPrimary),
+                ),
+              ),
+              Expanded(
+                flex: 9,
+                child: Text(
+                  'Paid'.tr(context),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: textPrimary),
+                ),
+              ),
+              Expanded(
+                flex: 9,
+                child: Text(
+                  'Remaining'.tr(context),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: textPrimary),
+                ),
+              ),
+              Expanded(
+                flex: 9,
+                child: Text(
+                  'Status'.tr(context),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: textPrimary),
+                ),
+              ),
+              SizedBox(
+                width: 70,
+                child: Text(
+                  'Actions'.tr(context),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: textPrimary),
                 ),
               ),
             ],
-          );
-        }).toList(),
-      ),
+          ),
+        ),
+
+        // Item Rows (Zero Horizontal Scroll)
+        ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: bookings.length,
+          separatorBuilder: (ctx, i) => Divider(height: 1, color: borderColor),
+          itemBuilder: (ctx, i) {
+            final b = bookings[i];
+            final Color statusColor = _getBookingStatusColor(b.status, isDark);
+            final bStat = b.status.toLowerCase();
+
+            final bookingPayments = _payments.where((p) {
+              if (p.bookingId != b.id) return false;
+              final s = p.status.toLowerCase();
+              final ps = (p.paymentStatus ?? '').toLowerCase();
+              return s == 'approved' || s == 'paid' || ps == 'approved' || ps == 'paid';
+            }).toList();
+
+            double amountPaid = bookingPayments.fold(0.0, (sum, p) => sum + p.amount);
+            if (bookingPayments.isEmpty &&
+                (bStat == 'approved' ||
+                    bStat == 'confirmed' ||
+                    bStat == 'active' ||
+                    bStat == 'ongoing' ||
+                    bStat == 'completed')) {
+              amountPaid = b.depositAmount;
+            }
+
+            final double totalAmount = b.isOpenRental && bStat == 'active'
+                ? _getDynamicPrice(b)
+                : b.totalPrice;
+            final double discount = b.discountAmount + b.promotionDiscountAmount;
+            final double remaining = math.max(0.0, totalAmount - amountPaid - discount);
+
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  // 1. Booking Ref
+                  Expanded(
+                    flex: 10,
+                    child: Tooltip(
+                      message: b.id,
+                      child: Text(
+                        '#${b.id.toUpperCase()}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                          color: textPrimary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                  // 2. Customer Name
+                  Expanded(
+                    flex: 14,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          b.userName.isNotEmpty ? b.userName : 'Customer',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                            color: textPrimary,
+                          ),
+                          softWrap: true,
+                        ),
+                        const SizedBox(height: 2),
+                        BookingSourceBadge(bookingSource: b.bookingSource, compact: true),
+                      ],
+                    ),
+                  ),
+                  // 3. Vehicle
+                  Expanded(
+                    flex: 13,
+                    child: Text(
+                      b.vehicleName,
+                      style: TextStyle(fontSize: 12, color: textPrimary),
+                      softWrap: true,
+                    ),
+                  ),
+                  // 4. Pickup Date
+                  Expanded(
+                    flex: 11,
+                    child: Text(
+                      dateFormat.format(b.pickUpDate),
+                      style: TextStyle(fontSize: 11, color: textSecondary),
+                    ),
+                  ),
+                  // 5. Return Date or OPEN RENTAL
+                  Expanded(
+                    flex: 11,
+                    child: Text(
+                      b.isOpenRental
+                          ? 'OPEN RENTAL'
+                          : (b.returnDate != null
+                              ? dateFormat.format(b.returnDate!)
+                              : "OPEN RENTAL"),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: b.isOpenRental ? Colors.teal : textSecondary,
+                        fontWeight: b.isOpenRental ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                  // 6. Total Amount
+                  Expanded(
+                    flex: 10,
+                    child: Text(
+                      'RM ${totalAmount.toStringAsFixed(2)}',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: textPrimary),
+                    ),
+                  ),
+                  // 7. Paid
+                  Expanded(
+                    flex: 9,
+                    child: Text(
+                      'RM ${amountPaid.toStringAsFixed(2)}',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.teal),
+                    ),
+                  ),
+                  // 8. Remaining
+                  Expanded(
+                    flex: 9,
+                    child: Text(
+                      'RM ${remaining.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: remaining > 0 ? Colors.orange : Colors.green,
+                      ),
+                    ),
+                  ),
+                  // 9. Status
+                  Expanded(
+                    flex: 9,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          b.status.toUpperCase(),
+                          style: TextStyle(
+                            color: statusColor,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                  ),
+                  // 10. Actions
+                  SizedBox(
+                    width: 70,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            Icons.visibility_outlined,
+                            color: AppColors.primaryOrange,
+                            size: 18,
+                          ),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          tooltip: 'Booking Details',
+                          onPressed: () => _showBookingDetails(b),
+                        ),
+                        if (bStat == 'return requested' ||
+                            bStat == 'awaiting return inspection' ||
+                            bStat == 'active' ||
+                            bStat == 'ongoing' ||
+                            bStat == 'overdue') ...[
+                          const SizedBox(width: 4),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.fact_check_outlined,
+                              color: Colors.teal,
+                              size: 18,
+                            ),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            tooltip: 'Return Inspection',
+                            onPressed: () => _showReturnInspectionDialog(b),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 
@@ -1192,7 +1434,7 @@ class _BookingsViewState extends State<BookingsView> {
                     Text(
                       b.isOpenRental
                           ? '${dateFormat.format(b.pickUpDate)} → OPEN RENTAL'
-                          : '${dateFormat.format(b.pickUpDate)} → ${b.returnDate != null ? dateFormat.format(b.returnDate!) : ""}',
+                          : '${dateFormat.format(b.pickUpDate)} → ${b.returnDate != null ? dateFormat.format(b.returnDate!) : "OPEN RENTAL"}',
                       style: TextStyle(
                         fontSize: 12,
                         color: b.isOpenRental ? Colors.green : textSecondary,
@@ -1557,18 +1799,7 @@ class _BookingsViewState extends State<BookingsView> {
   }
 
   bool _isActiveRentalStatus(String status) {
-    final normalized = status.trim().toLowerCase();
-    return normalized == 'approved' ||
-        normalized == 'confirmed' ||
-        normalized == 'on the way' ||
-        normalized == 'ontheway' ||
-        normalized == 'on_the_way' ||
-        normalized == 'active' ||
-        normalized == 'ongoing' ||
-        normalized == 'return requested' ||
-        normalized == 'awaiting return inspection' ||
-        normalized == 'awaiting final payment' ||
-        normalized == 'overdue';
+    return BookingService.isActiveBooking(status);
   }
 
   DateTime _dateOnly(DateTime date) {
@@ -1576,20 +1807,37 @@ class _BookingsViewState extends State<BookingsView> {
   }
 
   bool _matchesActiveRentalDateFilter(BookingModel booking) {
+    if (_activeRentalDateFilter == 'All') return true;
+
     final pickupDate = _dateOnly(booking.pickUpDate);
+    final returnDate = booking.returnDate != null ? _dateOnly(booking.returnDate!) : null;
     final today = _dateOnly(DateTime.now());
 
     switch (_activeRentalDateFilter) {
       case 'Today':
-        return pickupDate == today;
+        if (pickupDate == today) return true;
+        if (returnDate != null && !pickupDate.isAfter(today) && !returnDate.isBefore(today)) return true;
+        if (returnDate == null && !pickupDate.isAfter(today)) return true;
+        return false;
       case 'Tomorrow':
-        return pickupDate == today.add(const Duration(days: 1));
+        final tomorrow = today.add(const Duration(days: 1));
+        if (pickupDate == tomorrow) return true;
+        if (returnDate != null && !pickupDate.isAfter(tomorrow) && !returnDate.isBefore(tomorrow)) return true;
+        if (returnDate == null && !pickupDate.isAfter(tomorrow)) return true;
+        return false;
       case 'Next 7 Days':
         final end = today.add(const Duration(days: 6));
-        return !pickupDate.isBefore(today) && !pickupDate.isAfter(end);
+        if (!pickupDate.isBefore(today) && !pickupDate.isAfter(end)) return true;
+        if (returnDate != null && !pickupDate.isAfter(end) && !returnDate.isBefore(today)) return true;
+        if (returnDate == null && !pickupDate.isAfter(end)) return true;
+        return false;
       case 'Custom Date':
         if (_customRentalDate == null) return true;
-        return pickupDate == _dateOnly(_customRentalDate!);
+        final target = _dateOnly(_customRentalDate!);
+        if (pickupDate == target) return true;
+        if (returnDate != null && !pickupDate.isAfter(target) && !returnDate.isBefore(target)) return true;
+        if (returnDate == null && !pickupDate.isAfter(target)) return true;
+        return false;
       default:
         return true;
     }
@@ -1680,7 +1928,7 @@ class _BookingsViewState extends State<BookingsView> {
     required Color textSecondary,
     required Color borderColor,
   }) {
-    final options = ['Today', 'Tomorrow', 'Next 7 Days', 'Custom Date'];
+    final options = ['All', 'Today', 'Tomorrow', 'Next 7 Days', 'Custom Date'];
     return Container(
       decoration: BoxDecoration(
         color: cardColor,
@@ -1695,10 +1943,10 @@ class _BookingsViewState extends State<BookingsView> {
         children: [
           for (final option in options)
             ChoiceChip(
-              label: Text(option),
+              label: Text(option.tr(context)),
               selected: _activeRentalDateFilter == option,
               selectedColor: AppColors.primaryOrange.withValues(
-                alpha: isDark ? 0.25 : 0.15,
+                alpha: isDark ? 0.25 : 0.12,
               ),
               labelStyle: TextStyle(
                 color: _activeRentalDateFilter == option
@@ -1747,7 +1995,7 @@ class _BookingsViewState extends State<BookingsView> {
               icon: const Icon(Icons.calendar_month_outlined, size: 16),
               label: Text(
                 _customRentalDate == null
-                    ? 'Pick date'
+                    ? 'Pick date'.tr(context)
                     : DateFormat('dd MMM yyyy').format(_customRentalDate!),
               ),
             ),
@@ -1762,116 +2010,156 @@ class _BookingsViewState extends State<BookingsView> {
     required Color textPrimary,
     required Color textSecondary,
   }) {
-    final dateFormat = DateFormat('yyyy-MM-dd');
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
-        headingRowColor: WidgetStateProperty.all(
-          isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-        ),
-        dividerThickness: 1,
-        columns: [
-          DataColumn(
-            label: Text(
-              'Customer',
-              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
-            ),
+    final borderColor = isDark ? const Color(0xFF334155) : Colors.grey.shade200;
+    final headerBg = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final dateFormat = DateFormat('dd MMM yyyy');
+
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            color: headerBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            border: Border(bottom: BorderSide(color: borderColor)),
           ),
-          DataColumn(
-            label: Text(
-              'Vehicle',
-              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
-            ),
-          ),
-          DataColumn(
-            label: Text(
-              'Pickup Date',
-              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
-            ),
-          ),
-          DataColumn(
-            label: Text(
-              'Return Date',
-              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
-            ),
-          ),
-          DataColumn(
-            label: Text(
-              'Booking Status',
-              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
-            ),
-          ),
-          DataColumn(
-            label: Text(
-              'Remaining Days',
-              style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary),
-            ),
-          ),
-        ],
-        rows: rentals.map((rental) {
-          final statusColor = _getBookingStatusColor(rental.status, isDark);
-          return DataRow(
-            cells: [
-              DataCell(
-                Text(rental.userName, style: TextStyle(color: textPrimary)),
-              ),
-              DataCell(
-                Text(rental.vehicleName, style: TextStyle(color: textPrimary)),
-              ),
-              DataCell(
-                Text(
-                  dateFormat.format(rental.pickUpDate),
-                  style: TextStyle(color: textSecondary),
+          child: Row(
+            children: [
+              Expanded(
+                flex: 16,
+                child: Text(
+                  'Customer',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: textPrimary),
                 ),
               ),
-              DataCell(
-                Text(
-                  rental.returnDate == null
-                      ? 'OPEN RENTAL'
-                      : dateFormat.format(rental.returnDate!),
-                  style: TextStyle(
-                    color: rental.returnDate == null
-                        ? Colors.green
-                        : textSecondary,
-                    fontWeight: rental.returnDate == null
-                        ? FontWeight.bold
-                        : FontWeight.normal,
-                  ),
+              Expanded(
+                flex: 16,
+                child: Text(
+                  'Vehicle',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: textPrimary),
                 ),
               ),
-              DataCell(
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    rental.status.toUpperCase(),
-                    style: TextStyle(
-                      color: statusColor,
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+              Expanded(
+                flex: 14,
+                child: Text(
+                  'Pickup Date',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: textPrimary),
                 ),
               ),
-              DataCell(
-                Text(
-                  _remainingDaysText(rental),
-                  style: TextStyle(
-                    color: textPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
+              Expanded(
+                flex: 14,
+                child: Text(
+                  'Return Date',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: textPrimary),
+                ),
+              ),
+              Expanded(
+                flex: 14,
+                child: Text(
+                  'Booking Status',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: textPrimary),
+                ),
+              ),
+              Expanded(
+                flex: 14,
+                child: Text(
+                  'Remaining Days',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: textPrimary),
                 ),
               ),
             ],
-          );
-        }).toList(),
-      ),
+          ),
+        ),
+        ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: rentals.length,
+          separatorBuilder: (ctx, i) => Divider(height: 1, color: borderColor),
+          itemBuilder: (ctx, i) {
+            final rental = rentals[i];
+            final statusColor = _getBookingStatusColor(rental.status, isDark);
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 16,
+                    child: Text(
+                      rental.userName,
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: textPrimary),
+                      softWrap: true,
+                    ),
+                  ),
+                  Expanded(
+                    flex: 16,
+                    child: Text(
+                      rental.vehicleName,
+                      style: TextStyle(fontSize: 12, color: textPrimary),
+                      softWrap: true,
+                    ),
+                  ),
+                  Expanded(
+                    flex: 14,
+                    child: Text(
+                      dateFormat.format(rental.pickUpDate),
+                      style: TextStyle(fontSize: 12, color: textSecondary),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 14,
+                    child: Text(
+                      rental.returnDate == null
+                          ? 'OPEN RENTAL'
+                          : dateFormat.format(rental.returnDate!),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: rental.returnDate == null
+                            ? Colors.teal
+                            : textSecondary,
+                        fontWeight: rental.returnDate == null
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 14,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          rental.status.toUpperCase(),
+                          style: TextStyle(
+                            color: statusColor,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 14,
+                    child: Text(
+                      _remainingDaysText(rental),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 
@@ -1913,17 +2201,17 @@ class _BookingsViewState extends State<BookingsView> {
               children: [
                 const SizedBox(height: 4),
                 Text(
-                  'Vehicle: ${rental.vehicleName}',
+                  '${"Vehicle:".tr(context)} ${rental.vehicleName}',
                   style: TextStyle(fontSize: 12, color: textSecondary),
                 ),
                 Text(
-                  'Pickup: ${dateFormat.format(rental.pickUpDate)}',
+                  '${"Pickup:".tr(context)} ${dateFormat.format(rental.pickUpDate)}',
                   style: TextStyle(fontSize: 12, color: textSecondary),
                 ),
                 Text(
                   rental.returnDate == null
-                      ? 'Return: OPEN RENTAL'
-                      : 'Return: ${dateFormat.format(rental.returnDate!)}',
+                      ? '${"Return:".tr(context)} ${"OPEN RENTAL".tr(context)}'
+                      : '${"Return:".tr(context)} ${dateFormat.format(rental.returnDate!)}',
                   style: TextStyle(
                     fontSize: 12,
                     color: rental.returnDate == null
@@ -1936,7 +2224,7 @@ class _BookingsViewState extends State<BookingsView> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Remaining: ${_remainingDaysText(rental)}',
+                  '${"Remaining:".tr(context)} ${_remainingDaysText(rental)}',
                   style: TextStyle(
                     fontSize: 12,
                     color: textPrimary,
@@ -1954,7 +2242,7 @@ class _BookingsViewState extends State<BookingsView> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    rental.status.toUpperCase(),
+                    rental.status.toUpperCase().tr(context),
                     style: TextStyle(
                       color: statusColor,
                       fontSize: 9,
@@ -1968,6 +2256,126 @@ class _BookingsViewState extends State<BookingsView> {
           ),
         );
       },
+    );
+  }
+
+
+
+  void _showApplyDiscountDialog(BookingModel booking) {
+    final discountController = TextEditingController(
+      text: booking.discountAmount > 0
+          ? booking.discountAmount.toStringAsFixed(2)
+          : '',
+    );
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : AppColors.secondaryBlue;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Apply Discount'.tr(context),
+          style: TextStyle(fontWeight: FontWeight.bold, color: textColor),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${"Booking Ref".tr(context)}: #${booking.id.toUpperCase()}',
+              style: TextStyle(fontWeight: FontWeight.bold, color: textColor),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${"Customer Name".tr(context)}: ${booking.userName}',
+              style: TextStyle(fontSize: 12, color: textColor.withValues(alpha: 0.8)),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Discount Amount (RM):'.tr(context),
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: textColor),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: discountController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              autofocus: true,
+              style: TextStyle(color: textColor),
+              decoration: InputDecoration(
+                prefixText: 'RM ',
+                hintText: 'e.g. 30.00',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel'.tr(context)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryOrange,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              final discountVal =
+                  double.tryParse(discountController.text.trim()) ?? 0.0;
+              if (discountVal < 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Discount amount cannot be negative.'),
+                  ),
+                );
+                return;
+              }
+              Navigator.pop(ctx);
+              setState(() => _loading = true);
+              try {
+                await FirebaseDatabase.instance
+                    .ref()
+                    .child('bookings')
+                    .child(booking.id)
+                    .update({
+                  'discountAmount': discountVal,
+                  'updatedAt': DateTime.now().toIso8601String(),
+                });
+                _loadBookings();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Discount of RM ${discountVal.toStringAsFixed(2)} applied successfully.',
+                      ),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                setState(() => _loading = false);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to apply discount: $e'),
+                      backgroundColor: Colors.redAccent,
+                    ),
+                  );
+                }
+              }
+            },
+            child: Text('Save Discount'.tr(context)),
+          ),
+        ],
+      ),
     );
   }
 }

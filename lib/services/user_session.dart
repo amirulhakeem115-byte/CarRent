@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
 import '../models/user_model.dart';
+import '../providers/language_provider.dart';
 import 'booking_lifecycle_manager.dart';
 
 class UserSession {
@@ -75,6 +76,10 @@ class UserSession {
         _role = user.role;
         _roleController.add(_role);
         
+        if (user.preferredLanguage.isNotEmpty) {
+          LanguageProvider().syncUserLanguage(user.preferredLanguage);
+        }
+        
         BookingLifecycleManager().startPeriodicCheck();
         return _userModel;
       } else {
@@ -128,6 +133,9 @@ class UserSession {
     _roleFuture = null;
     _userFuture = null;
     _roleController.add(user.role);
+    if (user.preferredLanguage.isNotEmpty) {
+      LanguageProvider().syncUserLanguage(user.preferredLanguage);
+    }
     BookingLifecycleManager().startPeriodicCheck();
     debugPrint('[UserSession] Force set user and role to: ${user.role} for uid: ${user.id}');
   }

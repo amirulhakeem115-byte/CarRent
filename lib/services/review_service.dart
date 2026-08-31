@@ -1,11 +1,18 @@
 import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import '../models/review_model.dart';
 
 class ReviewService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref().child('reviews');
+  static bool _hasAttemptedSeed = false;
 
-  Future<void> submitReview(ReviewModel review) async {
+  static bool canManageComments(String? role) {
+    final normalized = (role ?? '').trim().toLowerCase();
+    return normalized == 'admin' || normalized == 'employee' || normalized == 'manager';
+  }
+
+  Future<String> submitReview(ReviewModel review) async {
     try {
       if (review.bookingId.isNotEmpty) {
         final duplicate = await hasSubmittedReview(review.bookingId);
@@ -14,9 +21,21 @@ class ReviewService {
         }
       }
       final newRef = _db.push();
-      await newRef.set(review.toMap()).timeout(const Duration(seconds: 5));
+      final map = review.toMap();
+      await newRef.set(map).timeout(const Duration(seconds: 5));
+      return newRef.key ?? '';
     } catch (e) {
       debugPrint('Error submitting review: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteReview(String reviewId) async {
+    try {
+      if (reviewId.isEmpty) return;
+      await _db.child(reviewId).remove().timeout(const Duration(seconds: 5));
+    } catch (e) {
+      debugPrint('Error deleting review: $e');
       rethrow;
     }
   }
@@ -51,8 +70,17 @@ class ReviewService {
             final model = (vehData['model'] ?? '').toString();
             final defaults = _generateDefaultReviews(vehicleId, brand, model);
             for (var r in defaults) {
-              await submitReview(r);
-              reviews.add(r);
+              final newKey = await submitReview(r);
+              reviews.add(ReviewModel(
+                id: newKey,
+                bookingId: r.bookingId,
+                vehicleId: r.vehicleId,
+                userId: r.userId,
+                userName: r.userName,
+                rating: r.rating,
+                comment: r.comment,
+                createdAt: r.createdAt,
+              ));
             }
           }
         } catch (e) {
@@ -203,5 +231,65 @@ class ReviewService {
     }
     reviews.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return reviews;
+  }
+
+  Future<void> seedInitialReviewsIfEmpty() async {
+    // 1. Check if user is authenticated. If null (guest visitor), skip seeding completely and silently.
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      return;
+    }
+
+    // 2. Idempotence: skip if already attempted in current app session
+    if (_hasAttemptedSeed) {
+      return;
+    }
+    _hasAttemptedSeed = true;
+
+    try {
+      final snapshot = await _db.get().timeout(const Duration(seconds: 5));
+      if (!snapshot.exists || snapshot.value == null) {
+        final now = DateTime.now();
+        final initialReviews = [
+          ReviewModel(
+            id: '',
+            bookingId: 'sys_booking_101',
+            vehicleId: 'v_proton_x50',
+            userId: 'u_101',
+            userName: 'Muhammad Firdaus',
+            rating: 5.0,
+            comment: 'Superb service! The Proton X50 was in pristine condition, and the rental process was smooth. Highly recommend CarRent for their professional fleet!',
+            createdAt: now.subtract(const Duration(days: 2)),
+          ),
+          ReviewModel(
+            id: '',
+            bookingId: 'sys_booking_102',
+            vehicleId: 'v_perodua_axia',
+            userId: 'u_102',
+            userName: 'Siti Aminah',
+            rating: 5.0,
+            comment: 'Excellent customer service. The Perodua Axia was extremely fuel-efficient and clean. Renting was straightforward and payments were secure.',
+            createdAt: now.subtract(const Duration(days: 5)),
+          ),
+          ReviewModel(
+            id: '',
+            bookingId: 'sys_booking_103',
+            vehicleId: 'v_honda_civic',
+            userId: 'u_103',
+            userName: 'Chong Wei Ming',
+            rating: 4.8,
+            comment: 'The GPS tracking layer is very responsive, allowing me to view where my rental car is in real time. Standard DuitNow QR makes deposits easy!',
+            createdAt: now.subtract(const Duration(days: 8)),
+          ),
+        ];
+
+        for (final r in initialReviews) {
+          final newRef = _db.push();
+          await newRef.set(r.toMap());
+        }
+      }
+    } catch (e) {
+      debugPrint('[ReviewService] Error seeding initial reviews: $e');
+    }
   }
 }

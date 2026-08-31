@@ -197,18 +197,29 @@ class PaymentService {
     }
   }
 
+  List<PaymentModel>? _cachedPayments;
+
+  void invalidateCache() {
+    _cachedPayments = null;
+  }
+
   Future<List<PaymentModel>> getPayments({bool forceRefresh = false}) async {
+    if (!forceRefresh &&
+        _cachedPayments != null &&
+        _cachedPayments!.isNotEmpty) {
+      debugPrint(
+        '[PaymentService] Returning warm cached payments (${_cachedPayments!.length} items)',
+      );
+      return _cachedPayments!;
+    }
+
     List<PaymentModel> payments = [];
+    final perfSw = Stopwatch()..start();
+    debugPrint('[PERF] Starting payments query');
     final currentUid = FirebaseAuth.instance.currentUser?.uid;
     if (currentUid == null) return payments;
 
     final currentRole = await UserRoleCache.getRole(currentUid);
-    debugPrint(
-      '[PaymentService] [getPayments${forceRefresh ? ' forceRefresh' : ''}] Accessing path: payments',
-    );
-    debugPrint(
-      '[PaymentService] [getPayments${forceRefresh ? ' forceRefresh' : ''}] Current UID: $currentUid, Current Role: $currentRole',
-    );
 
     try {
       final DataSnapshot snapshot;
@@ -222,23 +233,31 @@ class PaymentService {
             .timeout(const Duration(seconds: 10));
       }
 
-      if (snapshot.exists) {
+      if (snapshot.exists && snapshot.value != null) {
         final Map<dynamic, dynamic> data =
             snapshot.value as Map<dynamic, dynamic>;
         data.forEach((key, value) {
-          payments.add(
-            PaymentModel.fromMap(
-              key.toString(),
-              value as Map<dynamic, dynamic>,
-            ),
-          );
+          if (value is Map) {
+            payments.add(
+              PaymentModel.fromMap(
+                key.toString(),
+                value,
+              ),
+            );
+          }
         });
       }
+      _cachedPayments = payments;
+      perfSw.stop();
       debugPrint(
-        '[PaymentService] [getPayments] Payments count loaded: ${payments.length}',
+        '[PERF] Payments query completed: ${perfSw.elapsedMilliseconds}ms (${payments.length} items)',
       );
     } catch (e) {
-      debugPrint('[PaymentService] [getPayments] Error getting payments: $e');
+      perfSw.stop();
+      debugPrint('[PERF] Payments query FAILED in ${perfSw.elapsedMilliseconds}ms: $e');
+      if (_cachedPayments != null && _cachedPayments!.isNotEmpty) {
+        return _cachedPayments!;
+      }
       rethrow;
     }
 
@@ -255,6 +274,14 @@ class PaymentService {
     final controller = StreamController<List<PaymentModel>>.broadcast();
     StreamSubscription? sub;
 
+    if (_cachedPayments != null && _cachedPayments!.isNotEmpty) {
+      scheduleMicrotask(() {
+        if (!controller.isClosed && _cachedPayments != null) {
+          controller.add(_cachedPayments!);
+        }
+      });
+    }
+
     UserRoleCache.getRole(currentUid)
         .then((currentRole) {
           if (controller.isClosed) return;
@@ -270,30 +297,41 @@ class PaymentService {
             (event) {
               if (controller.isClosed) return;
               List<PaymentModel> payments = [];
-              if (event.snapshot.exists) {
+              if (event.snapshot.exists && event.snapshot.value != null) {
                 final Map<dynamic, dynamic> data =
                     event.snapshot.value as Map<dynamic, dynamic>;
                 data.forEach((key, value) {
-                  payments.add(
-                    PaymentModel.fromMap(
-                      key.toString(),
-                      value as Map<dynamic, dynamic>,
-                    ),
-                  );
+                  if (value is Map) {
+                    payments.add(
+                      PaymentModel.fromMap(
+                        key.toString(),
+                        value,
+                      ),
+                    );
+                  }
                 });
               }
               payments.sort((a, b) => b.paymentDate.compareTo(a.paymentDate));
+              _cachedPayments = payments;
               controller.add(payments);
             },
             onError: (e) {
               debugPrint('[PaymentService] getPaymentsStream error: $e');
-              if (!controller.isClosed) controller.add([]);
+              if (!controller.isClosed && _cachedPayments != null) {
+                controller.add(_cachedPayments!);
+              } else if (!controller.isClosed) {
+                controller.add([]);
+              }
             },
           );
         })
         .catchError((e) {
           debugPrint('[PaymentService] getPaymentsStream role fetch error: $e');
-          if (!controller.isClosed) controller.add([]);
+          if (!controller.isClosed && _cachedPayments != null) {
+            controller.add(_cachedPayments!);
+          } else if (!controller.isClosed) {
+            controller.add([]);
+          }
         });
 
     controller.onCancel = () => sub?.cancel();
@@ -347,6 +385,75 @@ class PaymentService {
     }
     payments.sort((a, b) => b.paymentDate.compareTo(a.paymentDate));
     return payments;
+  }
+
+  Stream<List<PaymentModel>> getPaymentsForBookingStream(String bookingId) {
+    return _db
+        .orderByChild('bookingId')
+        .equalTo(bookingId)
+        .onValue
+        .map((event) {
+      final List<PaymentModel> list = [];
+      if (event.snapshot.exists && event.snapshot.value is Map) {
+        final Map<dynamic, dynamic> data =
+            event.snapshot.value as Map<dynamic, dynamic>;
+        data.forEach((key, value) {
+          if (value is Map) {
+            list.add(PaymentModel.fromMap(key.toString(), value));
+          }
+        });
+      }
+      list.sort((a, b) => b.paymentDate.compareTo(a.paymentDate));
+      return list;
+    });
+  }
+
+  Future<void> recordManualAdminPayment({
+    required String bookingId,
+    required String userId,
+    required double amount,
+    required String paymentMethod,
+    String? notes,
+    String? adminName,
+  }) async {
+    final now = DateTime.now();
+    final newRef = _db.push();
+    final paymentData = {
+      'id': newRef.key!,
+      'bookingId': bookingId,
+      'userId': userId,
+      'customerUid': userId,
+      'amount': amount,
+      'depositAmount': 0.0,
+      'balanceAmount': 0.0,
+      'paymentMethod': paymentMethod,
+      'status': 'Approved',
+      'paymentStatus': 'Approved',
+      'paymentDate': now.toIso8601String(),
+      'verifiedAt': now.toIso8601String(),
+      'verifiedBy': adminName ?? 'admin',
+      'transactionId': 'MANUAL-${now.millisecondsSinceEpoch}',
+      'notes': notes ?? 'Manual payment recorded by admin',
+      'rewardPointsAwarded': false,
+    };
+    await newRef.set(paymentData).timeout(const Duration(seconds: 10));
+
+    try {
+      await _notificationService.createNotification(
+        userId: userId,
+        title: 'Payment Recorded',
+        message:
+            'A payment of RM ${amount.toStringAsFixed(2)} ($paymentMethod) was recorded for your booking.',
+        type: 'payment',
+        category: 'Payments',
+        icon: '💳',
+        color: '0xFF10B981',
+        relatedId: newRef.key!,
+        actionRoute: 'Dashboard',
+      );
+    } catch (e) {
+      debugPrint('Error sending manual payment notification: $e');
+    }
   }
 
   Future<void> updatePaymentStatus(

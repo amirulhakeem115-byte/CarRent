@@ -8,6 +8,7 @@ import '../models/promotion_model.dart';
 import '../services/promotion_service.dart';
 import '../widgets/app_image.dart';
 import '../screens/auth/customer/customer_responsive_shell.dart';
+import '../l10n/app_translations.dart';
 
 class HeroPromotionCarousel extends StatefulWidget {
   final List<PromotionModel> promotions;
@@ -119,7 +120,7 @@ class _HeroPromotionCarouselState extends State<HeroPromotionCarousel> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'FEATURED OFFERS & PROMOTIONS',
+                    'FEATURED OFFERS & PROMOTIONS'.tr(context),
                     style: TextStyle(
                       color: isDark ? Colors.white : AppColors.secondaryBlue,
                       fontSize: 12,
@@ -405,7 +406,7 @@ class _HeroPromotionCarouselState extends State<HeroPromotionCarousel> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Valid until ${DateFormat('dd MMM').format(promo.endDate)}',
+                        '${'Valid until'.tr(context)} ${DateFormat('dd MMM').format(promo.endDate)}',
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.7),
                           fontSize: 11,
@@ -432,12 +433,12 @@ class _HeroPromotionCarouselState extends State<HeroPromotionCarousel> {
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: const Row(
+                            child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
-                                  'View Offer',
-                                  style: TextStyle(
+                                  'View Offer'.tr(context),
+                                  style: const TextStyle(
                                     color: AppColors.secondaryBlue,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 12,

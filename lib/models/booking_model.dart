@@ -52,9 +52,20 @@ class BookingModel {
   final String? receivedByEmployeeId;
   final String? receivedByEmployeeName;
 
-  // Return Video Evidence fields
-  final Map<String, dynamic>? returnVideos;
-  final bool returnVideoSkipped;
+  // Booking Source field ('system', 'whatsapp', 'phone', 'walkIn')
+  final String bookingSource;
+
+  // Passport & Driving License fields
+  final String? passportNumber;
+  final String? drivingLicenseNumber;
+
+  // Delivery fields
+  final double deliveryFee;
+  final bool isDelivery;
+  final String? deliveryAddress;
+  final DateTime? deliveryDate;
+  final String? deliveryTime;
+  final String deliveryStatus;
 
   BookingModel({
     required this.id,
@@ -64,10 +75,10 @@ class BookingModel {
     required this.userName,
     required this.userPhone,
     required this.pickUpDate,
-    this.returnDate,
-    required this.totalPrice,
-    required this.depositAmount,
-    required this.status,
+    DateTime? returnDate,
+    this.totalPrice = 0.0,
+    this.depositAmount = 0.0,
+    this.status = 'Pending',
     this.notes,
     required this.createdAt,
     this.updatedAt,
@@ -81,7 +92,7 @@ class BookingModel {
     this.pickupReminderSent = false,
     this.returnReminderSent = false,
     this.customerStatus,
-    this.paymentMethod,
+    this.paymentMethod = 'Online',
     this.extensionRequest,
     this.returnInspection,
     this.lateFees = 0.0,
@@ -99,14 +110,43 @@ class BookingModel {
     this.handedOverByEmployeeName,
     this.receivedByEmployeeId,
     this.receivedByEmployeeName,
-    this.returnVideos,
-    this.returnVideoSkipped = false,
-  });
+    this.bookingSource = 'system',
+    this.passportNumber,
+    this.drivingLicenseNumber,
+    this.deliveryFee = 0.0,
+    this.isDelivery = false,
+    this.deliveryAddress,
+    this.deliveryDate,
+    this.deliveryTime,
+    this.deliveryStatus = 'Scheduled',
+  }) : returnDate = isOpenRental ? null : returnDate;
 
-  factory BookingModel.fromMap(
-    String id,
-    Map<dynamic, dynamic> data,
-  ) {
+  String get normalizedBookingSource {
+    final s = bookingSource.toLowerCase().trim();
+    if (s == 'phone' || s == 'phone call' || s == 'phone_call') return 'phone';
+    if (s == 'walkin' || s == 'walk_in' || s == 'walk-in') return 'walkIn';
+    if (s == 'whatsapp' || s == 'wa') return 'whatsapp';
+    return 'system';
+  }
+
+  String get bookingSourceLabel {
+    switch (normalizedBookingSource) {
+      case 'phone':
+        return 'Phone Call';
+      case 'walkIn':
+        return 'Walk-in';
+      case 'whatsapp':
+        return 'WhatsApp';
+      case 'system':
+      default:
+        return 'System App';
+    }
+  }
+
+  factory BookingModel.fromMap(String id, Map<dynamic, dynamic> data) {
+    final isOpen = data['isOpenRental'] ?? false;
+    final rawReturnDate = data['returnDate'];
+
     return BookingModel(
       id: id,
       vehicleId: data['vehicleId'] ?? '',
@@ -114,25 +154,23 @@ class BookingModel {
       userId: data['userId'] ?? '',
       userName: data['userName'] ?? '',
       userPhone: data['userPhone'] ?? '',
-      pickUpDate: DateTime.parse(
-        data['pickUpDate'] ?? DateTime.now().toIso8601String(),
-      ),
-      returnDate: data['returnDate'] != null
-          ? DateTime.parse(data['returnDate'] as String)
+      pickUpDate: data['pickUpDate'] != null
+          ? DateTime.parse(data['pickUpDate'] as String)
+          : DateTime.now(),
+      returnDate: rawReturnDate != null
+          ? DateTime.parse(rawReturnDate as String)
           : null,
-      totalPrice: (data['totalPrice'] ?? 0).toDouble(),
-      depositAmount: (data['depositAmount'] ?? 0).toDouble(),
-      status: data['status'] ?? 'pending',
+      totalPrice: (data['totalPrice'] ?? 0.0).toDouble(),
+      depositAmount: (data['depositAmount'] ?? 0.0).toDouble(),
+      status: data['status'] ?? 'Pending',
       notes: data['notes'],
-      createdAt: DateTime.parse(
-        data['createdAt'] ?? DateTime.now().toIso8601String(),
-      ),
+      createdAt: data['createdAt'] != null
+          ? DateTime.parse(data['createdAt'] as String)
+          : DateTime.now(),
       updatedAt: data['updatedAt'] != null
-          ? DateTime.parse(data['updatedAt'])
+          ? DateTime.parse(data['updatedAt'] as String)
           : null,
-      pointsRedeemed: data['pointsRedeemed'] is int
-          ? data['pointsRedeemed'] as int
-          : int.tryParse(data['pointsRedeemed']?.toString() ?? '') ?? 0,
+      pointsRedeemed: data['pointsRedeemed'] ?? 0,
       discountAmount: (data['discountAmount'] ?? 0.0).toDouble(),
       pointsRedeemedProcessed: data['pointsRedeemedProcessed'] ?? false,
       rewardPointsAwarded: data['rewardPointsAwarded'] ?? false,
@@ -142,16 +180,16 @@ class BookingModel {
       pickupReminderSent: data['pickupReminderSent'] ?? false,
       returnReminderSent: data['returnReminderSent'] ?? false,
       customerStatus: data['customerStatus'],
-      paymentMethod: data['paymentMethod'],
+      paymentMethod: data['paymentMethod'] ?? 'Online',
       extensionRequest: data['extensionRequest'] != null
-          ? Map<String, dynamic>.from(data['extensionRequest'] as Map)
+          ? Map<String, dynamic>.from(data['extensionRequest'])
           : null,
       returnInspection: data['returnInspection'] != null
-          ? Map<String, dynamic>.from(data['returnInspection'] as Map)
+          ? Map<String, dynamic>.from(data['returnInspection'])
           : null,
       lateFees: (data['lateFees'] ?? 0.0).toDouble(),
       finalAmount: (data['finalAmount'] ?? 0.0).toDouble(),
-      isOpenRental: data['isOpenRental'] ?? false,
+      isOpenRental: isOpen,
       actualPickupTimestamp: data['actualPickupTimestamp'] != null
           ? DateTime.parse(data['actualPickupTimestamp'] as String)
           : null,
@@ -161,17 +199,25 @@ class BookingModel {
       promotionId: data['promotionId'],
       promotionCode: data['promotionCode'],
       promotionName: data['promotionName'],
-      promotionDiscountAmount: (data['promotionDiscountAmount'] ?? 0.0).toDouble(),
+      promotionDiscountAmount:
+          (data['promotionDiscountAmount'] ?? 0.0).toDouble(),
       assignedEmployeeId: data['assignedEmployeeId'] ?? data['assignedStaffId'] ?? data['employeeId'],
       assignedEmployeeName: data['assignedEmployeeName'] ?? data['assignedStaffName'],
       handedOverByEmployeeId: data['handedOverByEmployeeId'],
       handedOverByEmployeeName: data['handedOverByEmployeeName'],
       receivedByEmployeeId: data['receivedByEmployeeId'],
       receivedByEmployeeName: data['receivedByEmployeeName'],
-      returnVideos: data['returnVideos'] != null
-          ? Map<String, dynamic>.from(data['returnVideos'] as Map)
+      bookingSource: data['bookingSource']?.toString() ?? 'system',
+      passportNumber: data['passportNumber'] ?? data['idNumber'],
+      drivingLicenseNumber: data['drivingLicenseNumber'] ?? data['licenseNumber'],
+      deliveryFee: (data['deliveryFee'] ?? 0.0).toDouble(),
+      isDelivery: data['isDelivery'] ?? false,
+      deliveryAddress: data['deliveryAddress'],
+      deliveryDate: data['deliveryDate'] != null
+          ? DateTime.parse(data['deliveryDate'] as String)
           : null,
-      returnVideoSkipped: data['returnVideoSkipped'] ?? false,
+      deliveryTime: data['deliveryTime'],
+      deliveryStatus: data['deliveryStatus'] ?? 'Scheduled',
     );
   }
 
@@ -183,7 +229,7 @@ class BookingModel {
       'userName': userName,
       'userPhone': userPhone,
       'pickUpDate': pickUpDate.toIso8601String(),
-      'returnDate': returnDate?.toIso8601String(),
+      'returnDate': (isOpenRental || returnDate == null) ? null : returnDate!.toIso8601String(),
       'totalPrice': totalPrice,
       'depositAmount': depositAmount,
       'status': status,
@@ -218,57 +264,39 @@ class BookingModel {
       'handedOverByEmployeeName': handedOverByEmployeeName,
       'receivedByEmployeeId': receivedByEmployeeId,
       'receivedByEmployeeName': receivedByEmployeeName,
-      'returnVideos': returnVideos,
-      'returnVideoSkipped': returnVideoSkipped,
+      'bookingSource': bookingSource,
+      'passportNumber': passportNumber,
+      'drivingLicenseNumber': drivingLicenseNumber,
+      'deliveryFee': deliveryFee,
+      'isDelivery': isDelivery,
+      'deliveryAddress': deliveryAddress,
+      'deliveryDate': deliveryDate?.toIso8601String(),
+      'deliveryTime': deliveryTime,
+      'deliveryStatus': deliveryStatus,
     };
   }
 
-  List<Map<String, dynamic>> get returnVideosList {
-    if (returnVideos == null || returnVideos!.isEmpty) return [];
-    final list = <Map<String, dynamic>>[];
-    returnVideos!.forEach((k, v) {
-      if (v is Map) {
-        final map = Map<String, dynamic>.from(v);
-        if (!map.containsKey('videoId')) map['videoId'] = k;
-        list.add(map);
-      }
-    });
-    list.sort((a, b) {
-      final tA = a['uploadedAt']?.toString() ?? '';
-      final tB = b['uploadedAt']?.toString() ?? '';
-      return tA.compareTo(tB);
-    });
-    return list;
-  }
-
-  Map<String, dynamic>? get customerReturnVideo {
-    final list = returnVideosList;
-    for (final v in list) {
-      if ((v['uploaderRole']?.toString().toLowerCase() ?? '') == 'customer') {
-        return v;
-      }
-    }
-    return null;
-  }
-
-  Map<String, dynamic>? get employeeReturnVideo {
-    final list = returnVideosList;
-    for (final v in list) {
-      if ((v['uploaderRole']?.toString().toLowerCase() ?? '') == 'employee') {
-        return v;
-      }
-    }
-    return null;
-  }
-
-  bool get hasCustomerReturnVideo => customerReturnVideo != null;
-  bool get hasEmployeeReturnVideo => employeeReturnVideo != null;
-  bool get hasAnyReturnVideo => returnVideosList.isNotEmpty;
-
   int get rentalDays {
-    if (isOpenRental) return 1;
-    if (returnDate == null) return 0;
+    if (isOpenRental) {
+      final start = actualPickupTimestamp ?? pickUpDate;
+      final end = actualReturnTimestamp ?? DateTime.now();
+      if (end.isBefore(start)) return 1;
+      final hrs = end.difference(start).inHours;
+      final days = (hrs / 24).ceil();
+      return days <= 0 ? 1 : days;
+    }
+    if (returnDate == null) return 1;
     final diff = returnDate!.difference(pickUpDate).inDays;
     return diff <= 0 ? 1 : diff;
+  }
+
+  double calculateAccruedTotal(double pricePerDay) {
+    if (status.trim().toLowerCase() == 'completed' && finalAmount > 0) {
+      return finalAmount;
+    }
+    final days = rentalDays;
+    final gross = days * pricePerDay;
+    final net = gross - discountAmount - promotionDiscountAmount + lateFees;
+    return net < 0 ? 0.0 : net;
   }
 }

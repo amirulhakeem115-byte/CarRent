@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart' hide Path;
 import 'package:intl/intl.dart';
 import 'dart:ui' as ui;
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -25,9 +26,13 @@ import '../../../services/notification_service.dart';
 import '../../../models/notification_model.dart';
 import '../../../services/tracking_service.dart';
 import '../../../services/user_session.dart';
+import '../../../services/booking_hold_service.dart';
+import '../../../widgets/language_selector_widget.dart';
+import '../../../l10n/app_translations.dart';
 
 import 'vehicles_screen.dart';
 import 'bookings_screen.dart';
+import 'delivery_screen.dart';
 import 'payments_screen.dart';
 import 'customers_screen.dart';
 import 'employees_screen.dart';
@@ -38,6 +43,8 @@ import 'qr_settings_view.dart';
 import 'company_settings_view.dart';
 import 'admin_profile_view.dart';
 import 'reports_view.dart';
+import 'admin_reviews_view.dart';
+import 'vehicle_financial_reports_view.dart';
 import 'admin_tracking_view.dart';
 import 'admin_notifications_view.dart';
 import 'reward_points_view.dart';
@@ -92,6 +99,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Timer? _refreshTimer;
 
   String _activeTab = 'Dashboard';
+  final Map<String, Widget> _cachedSubviews = {};
   String? _aiFilteredPeriod;
   String? _aiFilteredType;
   StreamSubscription? _reviewsSubscription;
@@ -171,6 +179,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (route == 'vehicle maintenance') return 'Vehicle Maintenance';
     if (route == 'locations' || route == 'branches') return 'Locations';
     if (route == 'reports') return 'Reports';
+    if (route == 'vehicle financial reports' || route == 'financial reports') {
+      return 'Vehicle Financial Reports';
+    }
+    if (route == 'reviews' || route == 'customer reviews' || route == 'comments') {
+      return 'Customer Reviews';
+    }
     if (route == 'support' ||
         route == 'support inbox' ||
         route == 'support desk') {
@@ -364,8 +378,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       }
     });
 
-    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
-      if (mounted) {
+    _refreshTimer = Timer.periodic(const Duration(seconds: 60), (timer) {
+      if (mounted && (_bookings.isNotEmpty || _vehicles.isNotEmpty)) {
         setState(() {});
       }
     });
@@ -397,6 +411,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               }
             }
           }
+          _loading = false;
+          if (_bookings.isNotEmpty) {
+            _error = null;
+          }
         });
       }
     });
@@ -412,6 +430,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           _availableCars = _vehicles
               .where((v) => v.status.toLowerCase() == 'available')
               .length;
+          _loading = false;
+          if (_vehicles.isNotEmpty) {
+            _error = null;
+          }
         });
       }
     });
@@ -445,6 +467,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             }
           }
           _monthlyRevenue = monthlyRev;
+          _loading = false;
+          if (_payments.isNotEmpty) {
+            _error = null;
+          }
         });
       }
     });
@@ -455,6 +481,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         setState(() {
           _users = usersList;
           _totalCustomers = _users.where((u) => u.role == 'customer').length;
+          _loading = false;
+          if (_users.isNotEmpty) {
+            _error = null;
+          }
         });
       }
     });
@@ -719,8 +749,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         attempt++;
         try {
           debugPrint(
-            '[AdminDashboard] Querying dashboard data (Attempt $attempt of $maxAttempts)...',
+            '[PERF] [AdminDashboard] Starting parallel dashboard statistics query (Attempt $attempt of $maxAttempts)...',
           );
+          final perfParallel = Stopwatch()..start();
           final results = await Future.wait([
             _databaseService.getUsers(),
             _vehicleService.getVehicles(),
@@ -728,6 +759,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             _paymentService.getPayments(),
             _maintenanceService.getMaintenanceJobs(),
           ]).timeout(const Duration(seconds: 15));
+          perfParallel.stop();
+          debugPrint(
+            '[PERF] [AdminDashboard] Total parallel dashboard statistics query completed in ${perfParallel.elapsedMilliseconds}ms',
+          );
 
           if (mounted) {
             setState(() {
@@ -805,6 +840,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
       if (success) {
         _checkMaintenanceDue();
+        if (mounted) {
+          setState(() {
+            _error = null;
+            _loading = false;
+          });
+        }
       } else {
         _logDiagnosticFailure(
           'Query Execution',
@@ -813,12 +854,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           stopwatch.elapsedMilliseconds,
         );
         debugPrint(
-          '[AdminDashboard] Non-fatal background fetch notice (live streams remain active): $lastException',
+          '[ADMIN DASHBOARD FIREBASE ERROR DEBUG] Query failure exact details: $lastException',
         );
+        if (lastStackTrace != null) {
+          debugPrint(
+            '[ADMIN DASHBOARD FIREBASE ERROR DEBUG] Stack trace:\n$lastStackTrace',
+          );
+        }
         if (mounted) {
           setState(() {
-            _error =
-                'Failed to load dashboard statistics. Please check your connection and try again.';
+            if (_bookings.isEmpty &&
+                _vehicles.isEmpty &&
+                _payments.isEmpty &&
+                _users.isEmpty) {
+              _error =
+                  'Failed to load dashboard statistics. Please check your connection and try again.';
+            } else {
+              _error = null;
+            }
             _loading = false;
           });
         }
@@ -836,9 +889,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         fatalSt,
         stopwatch.elapsedMilliseconds,
       );
+      debugPrint(
+        '[ADMIN DASHBOARD FIREBASE ERROR DEBUG] Fatal init flow exception: $fatalErr\n$fatalSt',
+      );
       if (mounted) {
         setState(() {
-          _error = 'Failed to load dashboard statistics. Please try again.';
+          if (_bookings.isEmpty &&
+              _vehicles.isEmpty &&
+              _payments.isEmpty &&
+              _users.isEmpty) {
+            _error = 'Failed to load dashboard statistics. Please try again.';
+          } else {
+            _error = null;
+          }
           _loading = false;
         });
       }
@@ -916,9 +979,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header skeleton card
+          // Available Cars Skeleton Card
           Container(
-            height: 90,
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: cardBg,
@@ -927,39 +989,96 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 color: isDark ? const Color(0xFF334155) : Colors.grey[200]!,
               ),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: shimmerBg,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Container(
-                      width: 180,
-                      height: 18,
+                      width: 140,
+                      height: 20,
                       decoration: BoxDecoration(
                         color: shimmerBg,
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
-                    const SizedBox(height: 8),
                     Container(
-                      width: 120,
-                      height: 12,
+                      width: 80,
+                      height: 14,
                       decoration: BoxDecoration(
                         color: shimmerBg,
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 16),
+                Column(
+                  children: List.generate(
+                    2,
+                    (idx) => Container(
+                      height: 48,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: shimmerBg,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Active Bookings Skeleton Card
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isDark ? const Color(0xFF334155) : Colors.grey[200]!,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      width: 140,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: shimmerBg,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    Container(
+                      width: 80,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: shimmerBg,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Column(
+                  children: List.generate(
+                    2,
+                    (idx) => Container(
+                      height: 56,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: shimmerBg,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -1277,22 +1396,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     _setActiveTabFromMobileIndex(index);
                   });
                 },
-                items: const [
+                items: [
                   BottomNavigationBarItem(
-                    icon: Icon(Icons.home_rounded),
-                    label: 'Home',
+                    icon: const Icon(Icons.home_rounded),
+                    label: 'Home'.tr(context),
                   ),
                   BottomNavigationBarItem(
-                    icon: Icon(Icons.calendar_today_rounded),
-                    label: 'Bookings',
+                    icon: const Icon(Icons.calendar_today_rounded),
+                    label: 'Bookings'.tr(context),
                   ),
                   BottomNavigationBarItem(
-                    icon: Icon(Icons.notifications_rounded),
-                    label: 'Alerts',
+                    icon: const Icon(Icons.notifications_rounded),
+                    label: 'Alerts'.tr(context),
                   ),
                   BottomNavigationBarItem(
-                    icon: Icon(Icons.person_rounded),
-                    label: 'Profile',
+                    icon: const Icon(Icons.person_rounded),
+                    label: 'Profile'.tr(context),
                   ),
                 ],
               )
@@ -1311,10 +1430,29 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             physics: const ClampingScrollPhysics(
               parent: AlwaysScrollableScrollPhysics(),
             ),
-            padding: const EdgeInsets.all(24),
+            padding: EdgeInsets.all(isDesktop ? 24 : 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                _buildAvailableCarsSection(isDesktop),
+                const SizedBox(height: 24),
+                isDesktop
+                    ? Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: _buildActiveBookingsSection(isDesktop)),
+                          const SizedBox(width: 24),
+                          Expanded(child: _buildDeliveryBookingsSection(isDesktop)),
+                        ],
+                      )
+                    : Column(
+                        children: [
+                          _buildActiveBookingsSection(isDesktop),
+                          const SizedBox(height: 24),
+                          _buildDeliveryBookingsSection(isDesktop),
+                        ],
+                      ),
+                const SizedBox(height: 24),
                 _buildTopStatsGrid(isDesktop),
                 const SizedBox(height: 24),
                 _buildMiddleSection(isDesktop),
@@ -1326,25 +1464,44 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         );
         break;
       case 'Cars':
-        tabContent = const Expanded(child: VehiclesView());
+        tabContent = _cachedSubviews['Cars'] ??= const Expanded(
+          child: VehiclesView(),
+        );
         break;
       case 'Bookings':
-        tabContent = const Expanded(child: BookingsView());
+        tabContent = _cachedSubviews['Bookings'] ??= const Expanded(
+          child: BookingsView(),
+        );
+        break;
+      case 'Delivery':
+      case 'Delivery Bookings':
+        tabContent = _cachedSubviews['Delivery'] ??= const Expanded(
+          child: DeliveryView(),
+        );
         break;
       case 'Customers':
-        tabContent = const Expanded(child: CustomersView());
+        tabContent = _cachedSubviews['Customers'] ??= const Expanded(
+          child: CustomersView(),
+        );
         break;
       case 'Employees':
-        tabContent = const Expanded(child: EmployeesView());
+        tabContent = _cachedSubviews['Employees'] ??= const Expanded(
+          child: EmployeesView(),
+        );
         break;
       case 'Payments':
-        tabContent = const Expanded(child: PaymentsView());
+        tabContent = _cachedSubviews['Payments'] ??= const Expanded(
+          child: PaymentsView(),
+        );
         break;
       case 'Reward Points':
-        tabContent = const Expanded(child: RewardPointsView());
+        tabContent = _cachedSubviews['Reward Points'] ??= const Expanded(
+          child: RewardPointsView(),
+        );
         break;
       case 'Promotions & Discounts':
-        tabContent = const Expanded(child: PromotionsView());
+        tabContent = _cachedSubviews['Promotions & Discounts'] ??=
+            const Expanded(child: PromotionsView());
         break;
       case 'Vehicle Tracking':
         tabContent = Expanded(
@@ -1355,10 +1512,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         );
         break;
       case 'Vehicle Maintenance':
-        tabContent = const Expanded(child: VehicleMaintenanceView());
+        tabContent = _cachedSubviews['Vehicle Maintenance'] ??= const Expanded(
+          child: VehicleMaintenanceView(),
+        );
         break;
       case 'Locations':
-        tabContent = const Expanded(child: BranchesView());
+        tabContent = _cachedSubviews['Locations'] ??= const Expanded(
+          child: BranchesView(),
+        );
         break;
       case 'Reports':
         tabContent = Expanded(
@@ -1381,20 +1542,40 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         );
         break;
+      case 'Vehicle Financial Reports':
+        tabContent = _cachedSubviews['Vehicle Financial Reports'] ??= const Expanded(
+          child: VehicleFinancialReportsView(),
+        );
+        break;
+      case 'Customer Reviews':
+        tabContent = _cachedSubviews['Customer Reviews'] ??= const Expanded(
+          child: AdminReviewsView(),
+        );
+        break;
       case 'Support Inbox':
-        tabContent = const Expanded(child: SupportInboxView());
+        tabContent = _cachedSubviews['Support Inbox'] ??= const Expanded(
+          child: SupportInboxView(),
+        );
         break;
       case 'QR Payment Settings':
-        tabContent = const Expanded(child: QrSettingsView());
+        tabContent = _cachedSubviews['QR Payment Settings'] ??= const Expanded(
+          child: QrSettingsView(),
+        );
         break;
       case 'Company Settings':
-        tabContent = const Expanded(child: CompanySettingsView());
+        tabContent = _cachedSubviews['Company Settings'] ??= const Expanded(
+          child: CompanySettingsView(),
+        );
         break;
       case 'Admin Profile':
-        tabContent = Expanded(child: AdminProfileView(onLogout: _logout));
+        tabContent = _cachedSubviews['Admin Profile'] ??= Expanded(
+          child: AdminProfileView(onLogout: _logout),
+        );
         break;
       case 'AI Assistant':
-        tabContent = const Expanded(child: AdminAIAssistantView());
+        tabContent = _cachedSubviews['AI Assistant'] ??= const Expanded(
+          child: AdminAIAssistantView(),
+        );
         break;
       case 'Notifications':
         tabContent = Expanded(
@@ -1479,6 +1660,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   () => setState(() => _activeTab = 'Bookings'),
                 ),
                 _buildSidebarTile(
+                  Icons.local_shipping_outlined,
+                  'Delivery Bookings',
+                  () => setState(() => _activeTab = 'Delivery Bookings'),
+                ),
+                _buildSidebarTile(
                   Icons.people_outline_rounded,
                   'Customers',
                   () => setState(() => _activeTab = 'Customers'),
@@ -1522,6 +1708,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   Icons.assessment_outlined,
                   'Reports',
                   () => setState(() => _activeTab = 'Reports'),
+                ),
+                _buildSidebarTile(
+                  Icons.account_balance_wallet_outlined,
+                  'Vehicle Financial Reports',
+                  () => setState(() => _activeTab = 'Vehicle Financial Reports'),
+                ),
+                _buildSidebarTile(
+                  Icons.rate_review_outlined,
+                  'Customer Reviews',
+                  () => setState(() => _activeTab = 'Customer Reviews'),
                 ),
                 _buildSidebarTile(
                   Icons.psychology_outlined,
@@ -1598,7 +1794,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     fontSize: 13,
                   ),
                   child: Text(
-                    title,
+                    title.tr(context),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -1616,18 +1812,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final difference = now.difference(dateTime);
 
     if (difference.inSeconds < 60) {
-      return 'Just now';
+      return 'Just now'.tr(context);
     } else if (difference.inMinutes < 60) {
       final mins = difference.inMinutes;
-      return '$mins ${mins == 1 ? "minute" : "minutes"} ago';
+      return '$mins ${mins == 1 ? "minute ago".tr(context) : "minutes ago".tr(context)}';
     } else if (difference.inHours < 24) {
       final hours = difference.inHours;
-      return '$hours ${hours == 1 ? "hour" : "hours"} ago';
+      return '$hours ${hours == 1 ? "hour ago".tr(context) : "hours ago".tr(context)}';
     } else if (difference.inDays < 7) {
       final days = difference.inDays;
-      return '$days ${days == 1 ? "day" : "days"} ago';
+      return '$days ${days == 1 ? "day ago".tr(context) : "days ago".tr(context)}';
     } else {
-      return DateFormat('dd MMM, hh:mm a').format(dateTime);
+      return DateFormat('dd MMM, hh:mm a').format(dateTime).tr(context);
     }
   }
 
@@ -1669,9 +1865,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     children: [
                       if (isDesktop)
                         Text(
-                          _activeTab == 'Dashboard'
-                              ? 'Dashboard Overview'
-                              : _activeTab,
+                          (_activeTab == 'Dashboard'
+                                  ? 'Dashboard Overview'
+                                  : _activeTab)
+                              .tr(context),
                           style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.w900,
@@ -1689,9 +1886,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             alignment: Alignment.centerLeft,
                             fit: BoxFit.scaleDown,
                             child: Text(
-                              _activeTab == 'Dashboard'
-                                  ? 'Dashboard Overview'
-                                  : _activeTab,
+                              (_activeTab == 'Dashboard'
+                                      ? 'Dashboard Overview'
+                                      : _activeTab)
+                                  .tr(context),
                               style: TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.w900,
@@ -1706,7 +1904,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       if (_activeTab == 'Dashboard')
                         if (isDesktop)
                           Text(
-                            'Welcome back, ${_adminUser?.fullName ?? "Administrator"} 👋',
+                            '${"Welcome back, ".tr(context)}${_adminUser?.fullName ?? "Administrator".tr(context)} 👋',
                             style: TextStyle(
                               fontSize: 12,
                               color: isDark
@@ -1723,7 +1921,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               alignment: Alignment.centerLeft,
                               fit: BoxFit.scaleDown,
                               child: Text(
-                                'Welcome back, ${_adminUser?.fullName ?? "Administrator"} 👋',
+                                '${"Welcome back, ".tr(context)}${_adminUser?.fullName ?? "Administrator".tr(context)} 👋',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: isDark
@@ -1786,19 +1984,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 const SizedBox(width: 16),
               ],
 
-              // Refresh Button
-              if (isDesktop)
-                IconButton(
-                  icon: Icon(
-                    Icons.refresh,
-                    color: isDark
-                        ? const Color(0xFFF8FAFC)
-                        : AppColors.secondaryBlue,
-                  ),
-                  onPressed: _loadDashboardData,
-                  tooltip: 'Refresh Data',
-                ),
-              SizedBox(width: isDesktop ? 16 : 6),
+              // Language Selector (EN / AR)
+              const LanguageSelectorWidget(isCompact: true),
+              SizedBox(width: isDesktop ? 12 : 6),
+
+              // Global Hold Booking Button
+              AdminHoldBookingHeaderButton(isDark: isDark),
+              SizedBox(width: isDesktop ? 12 : 6),
 
               // Notifications Bell
               PopupMenuButton<void>(
@@ -1838,8 +2030,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 children: [
                                   Text(
                                     dropdownUnread > 0
-                                        ? 'Notifications ($dropdownUnread)'
-                                        : 'Notifications',
+                                        ? '${"Notifications".tr(context)} ($dropdownUnread)'
+                                        : 'Notifications'.tr(context),
                                     style: TextStyle(
                                       fontWeight: FontWeight.w900,
                                       fontSize: 15,
@@ -1866,9 +2058,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                         tapTargetSize:
                                             MaterialTapTargetSize.shrinkWrap,
                                       ),
-                                      child: const Text(
-                                        'Mark All Read',
-                                        style: TextStyle(
+                                      child: Text(
+                                        'Mark All Read'.tr(context),
+                                        style: const TextStyle(
                                           color: AppColors.primaryOrange,
                                           fontWeight: FontWeight.bold,
                                           fontSize: 11,
@@ -1902,7 +2094,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                     ),
                                     const SizedBox(height: 12),
                                     Text(
-                                      'No notifications yet',
+                                      'No notifications yet'.tr(context),
                                       style: TextStyle(
                                         color: isDark
                                             ? const Color(0xFFCBD5E1)
@@ -1989,7 +2181,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                                     CrossAxisAlignment.start,
                                                 children: [
                                                   Text(
-                                                    notif.title,
+                                                    notif.title.tr(context),
                                                     style: TextStyle(
                                                       fontWeight: notif.isRead
                                                           ? FontWeight.bold
@@ -2005,7 +2197,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                                   ),
                                                   const SizedBox(height: 4),
                                                   Text(
-                                                    notif.message,
+                                                    notif.message.tr(context),
                                                     maxLines: 2,
                                                     overflow:
                                                         TextOverflow.ellipsis,
@@ -2090,7 +2282,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                     ? const Color(0xFF0F172A)
                                     : Colors.grey[50],
                                 child: Text(
-                                  'View All Notifications',
+                                  'View All Notifications'.tr(context),
                                   style: TextStyle(
                                     color: isDark
                                         ? const Color(0xFFF8FAFC)
@@ -2204,7 +2396,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   ),
                                 ),
                                 Text(
-                                  'Super Administrator',
+                                  'Super Administrator'.tr(context),
                                   style: TextStyle(
                                     fontSize: 9,
                                     color: _isDark
@@ -2232,12 +2424,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Confirm Logout'),
-          content: const Text('Do you want to log out?'),
+          title: Text('Confirm Logout'.tr(context)),
+          content: Text('Do you want to log out?'.tr(context)),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('No'),
+              child: Text('No'.tr(context)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -2245,7 +2437,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 foregroundColor: Colors.white,
               ),
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Yes'),
+              child: Text('Yes'.tr(context)),
             ),
           ],
         );
@@ -2263,6 +2455,1112 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
+  String _getDurationText(BookingModel booking) {
+    final start = booking.actualPickupTimestamp ?? booking.pickUpDate;
+    final now = DateTime.now();
+    if (now.isBefore(start)) {
+      final diff = start.difference(now);
+      if (diff.inHours < 24) {
+        return 'Starts in ${diff.inHours}h';
+      }
+      return 'Starts in ${diff.inDays}d';
+    }
+    final diff = now.difference(start);
+    if (diff.inMinutes < 60) {
+      final mins = diff.inMinutes.clamp(1, 59);
+      return '$mins ${mins == 1 ? "min" : "mins"}';
+    } else if (diff.inHours < 24) {
+      final hrs = diff.inHours;
+      return '$hrs ${hrs == 1 ? "hour" : "hours"}';
+    } else {
+      final days = diff.inDays;
+      return '$days ${days == 1 ? "day" : "days"}';
+    }
+  }
+
+  Widget _buildAvailableCarsSection(bool isDesktop) {
+    final availableCars = _vehicles
+        .where((v) => v.status.toLowerCase() == 'available')
+        .toList();
+    final cardBg = Theme.of(context).cardColor;
+    final borderColor =
+        _isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header Row
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.directions_car_filled_rounded,
+                  color: Color(0xFF15803D),
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'Available Cars'.tr(context),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                          color: _isDark
+                              ? const Color(0xFFF8FAFC)
+                              : AppColors.secondaryBlue,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDCFCE7),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${availableCars.length} ${"Available".tr(context)}',
+                        style: const TextStyle(
+                          color: Color(0xFF15803D),
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 4),
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    _activeTab = 'Cars';
+                  });
+                },
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'View All'.tr(context),
+                        style: const TextStyle(
+                          color: AppColors.primaryOrange,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(width: 1),
+                      Icon(
+                        Directionality.of(context) == ui.TextDirection.rtl
+                            ? Icons.chevron_left_rounded
+                            : Icons.chevron_right_rounded,
+                        color: AppColors.primaryOrange,
+                        size: 16,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (availableCars.isEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 32),
+              alignment: Alignment.center,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.directions_car_outlined,
+                    size: 40,
+                    color: Colors.grey[400],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No available cars'.tr(context),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: _isDark
+                          ? const Color(0xFFCBD5E1)
+                          : Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: availableCars.length,
+              separatorBuilder: (context, index) => Divider(
+                height: 20,
+                color: _isDark ? const Color(0xFF334155) : Colors.grey[200]!,
+              ),
+              itemBuilder: (context, index) {
+                final car = availableCars[index];
+                final locationName = car.branchName.isNotEmpty
+                    ? car.branchName
+                    : (car.branchId.isNotEmpty ? car.branchId : 'Kuala Lumpur');
+
+                return InkWell(
+                  onTap: () {
+                    setState(() {
+                      _activeTab = 'Cars';
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            width: 60,
+                            height: 46,
+                            color: _isDark
+                                ? const Color(0xFF0F172A)
+                                : Colors.grey[100],
+                            child: AppImage(
+                              imageSrc: car.mainImage,
+                              placeholder: const Icon(
+                                Icons.directions_car,
+                                size: 24,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${car.brand} ${car.model}',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color: _isDark
+                                      ? const Color(0xFFF8FAFC)
+                                      : AppColors.secondaryBlue,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 3),
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.location_on,
+                                    size: 13,
+                                    color: Color(0xFFEF4444),
+                                  ),
+                                  const SizedBox(width: 2),
+                                  Expanded(
+                                    child: Text(
+                                      locationName,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: _isDark
+                                            ? const Color(0xFFCBD5E1)
+                                            : Colors.grey[600],
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFDCFCE7),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            'Available'.tr(context),
+                            style: const TextStyle(
+                              color: Color(0xFF15803D),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActiveBookingsSection(bool isDesktop) {
+    final activeBookings = _bookings
+        .where((b) => BookingService.isActiveBooking(b.status))
+        .toList();
+    final cardBg = Theme.of(context).cardColor;
+    final borderColor =
+        _isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header Row
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFEDD5),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.key_rounded,
+                  color: Color(0xFFC2410C),
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'Active Bookings'.tr(context),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                          color: _isDark
+                              ? const Color(0xFFF8FAFC)
+                              : AppColors.secondaryBlue,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFEDD5),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${activeBookings.length} ${"Active".tr(context)}',
+                        style: const TextStyle(
+                          color: Color(0xFFC2410C),
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 4),
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    _activeTab = 'Bookings';
+                  });
+                },
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'View All'.tr(context),
+                        style: const TextStyle(
+                          color: AppColors.primaryOrange,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(width: 1),
+                      Icon(
+                        Directionality.of(context) == ui.TextDirection.rtl
+                            ? Icons.chevron_left_rounded
+                            : Icons.chevron_right_rounded,
+                        color: AppColors.primaryOrange,
+                        size: 16,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (activeBookings.isEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 32),
+              alignment: Alignment.center,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.calendar_month_outlined,
+                    size: 40,
+                    color: Colors.grey[400],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No active bookings'.tr(context),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: _isDark
+                          ? const Color(0xFFCBD5E1)
+                          : Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: activeBookings.length,
+              separatorBuilder: (context, index) => Divider(
+                height: 20,
+                color: _isDark ? const Color(0xFF334155) : Colors.grey[200]!,
+              ),
+              itemBuilder: (context, index) {
+                final booking = activeBookings[index];
+                VehicleModel? vehicle;
+                try {
+                  vehicle = _vehicles.firstWhere((v) => v.id == booking.vehicleId);
+                } catch (_) {}
+
+                final plateNumber = vehicle?.plateNumber ?? '';
+                final bookingIdDisplay = booking.id.length > 6
+                    ? booking.id.substring(0, 6).toUpperCase()
+                    : booking.id.toUpperCase();
+                final bookingNumberText = plateNumber.isNotEmpty
+                    ? 'Booking #$bookingIdDisplay • $plateNumber'
+                    : 'Booking #$bookingIdDisplay';
+
+                final customerName = booking.userName.isNotEmpty
+                    ? booking.userName
+                    : _getCustomerName(booking.userId);
+
+                final durationText = _getDurationText(booking);
+
+                // Determine Status Badge Colors
+                final statusLower = booking.status.trim().toLowerCase();
+                Color badgeBg;
+                Color badgeText;
+                String displayStatus = booking.status.toUpperCase();
+
+                if (statusLower == 'overdue') {
+                  badgeBg = const Color(0xFFFEE2E2);
+                  badgeText = const Color(0xFFDC2626);
+                } else if (statusLower == 'completed') {
+                  badgeBg = const Color(0xFFDCFCE7);
+                  badgeText = const Color(0xFF166534);
+                } else if (statusLower == 'cancelled' || statusLower == 'rejected') {
+                  badgeBg = const Color(0xFFFCE7F3);
+                  badgeText = const Color(0xFFBE185D);
+                } else if (statusLower == 'active' || statusLower == 'ongoing') {
+                  badgeBg = const Color(0xFFDBEAFE);
+                  badgeText = const Color(0xFF1E40AF);
+                } else {
+                  badgeBg = const Color(0xFFFEF3C7);
+                  badgeText = const Color(0xFFB45309);
+                }
+
+                return InkWell(
+                  onTap: () => _showBookingDetailsDialog(booking),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isCompact = constraints.maxWidth < 550;
+
+                        if (isCompact) {
+                          // Mobile compact layout
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      width: 60,
+                                      height: 60,
+                                      color: _isDark
+                                          ? const Color(0xFF0F172A)
+                                          : Colors.grey[100],
+                                      child: AppImage(
+                                        imageSrc: vehicle?.mainImage ?? '',
+                                        placeholder: const Icon(
+                                          Icons.directions_car,
+                                          size: 24,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          booking.vehicleName,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                            color: _isDark
+                                                ? const Color(0xFFF8FAFC)
+                                                : AppColors.secondaryBlue,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.person_outline,
+                                              size: 13,
+                                              color: Colors.grey[600],
+                                            ),
+                                            const SizedBox(width: 3),
+                                            Expanded(
+                                              child: Text(
+                                                customerName,
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: _isDark
+                                                      ? const Color(0xFFCBD5E1)
+                                                      : Colors.grey[700],
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.confirmation_number_outlined,
+                                              size: 13,
+                                              color: Colors.grey[600],
+                                            ),
+                                            const SizedBox(width: 3),
+                                            Expanded(
+                                              child: Text(
+                                                bookingNumberText,
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: Colors.grey[600],
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: badgeBg,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      displayStatus,
+                                      style: TextStyle(
+                                        color: badgeText,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Flexible(
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.calendar_today_outlined,
+                                          size: 13,
+                                          color: Colors.grey[600],
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Flexible(
+                                          child: Text(
+                                            DateFormat('dd MMM yyyy').format(booking.pickUpDate),
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey[700],
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Flexible(
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.access_time_rounded,
+                                          size: 13,
+                                          color: Colors.grey[600],
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Flexible(
+                                          child: Text(
+                                            durationText,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey[700],
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          );
+                        }
+
+                        // Desktop / Wide layout
+                        return Row(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                width: 64,
+                                height: 52,
+                                color: _isDark
+                                    ? const Color(0xFF0F172A)
+                                    : Colors.grey[100],
+                                child: AppImage(
+                                  imageSrc: vehicle?.mainImage ?? '',
+                                  placeholder: const Icon(
+                                    Icons.directions_car,
+                                    size: 24,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 4,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    booking.vehicleName,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      color: _isDark
+                                          ? const Color(0xFFF8FAFC)
+                                          : AppColors.secondaryBlue,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.person_outline,
+                                        size: 13,
+                                        color: Colors.grey[600],
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          customerName,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: _isDark
+                                                ? const Color(0xFFCBD5E1)
+                                                : Colors.grey[700],
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.confirmation_number_outlined,
+                                        size: 13,
+                                        color: Colors.grey[600],
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          bookingNumberText,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.grey[600],
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 3,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.calendar_today_outlined,
+                                        size: 13,
+                                        color: Colors.grey[600],
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          DateFormat('dd MMM yyyy').format(booking.pickUpDate),
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: _isDark
+                                                ? const Color(0xFFCBD5E1)
+                                                : Colors.grey[700],
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.access_time_rounded,
+                                        size: 13,
+                                        color: Colors.grey[600],
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          durationText,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: _isDark
+                                                ? const Color(0xFFCBD5E1)
+                                                : Colors.grey[700],
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: badgeBg,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                displayStatus,
+                                style: TextStyle(
+                                  color: badgeText,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDeliveryBookingsSection(bool isDesktop) {
+    final deliveryBookings = _bookings
+        .where((b) => b.isDelivery)
+        .toList();
+    final cardBg = Theme.of(context).cardColor;
+    final borderColor =
+        _isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header Row
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3E8FF),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.local_shipping_rounded,
+                  color: Colors.purple,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'Delivery Bookings'.tr(context),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                          color: _isDark
+                              ? const Color(0xFFF8FAFC)
+                              : AppColors.secondaryBlue,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF3E8FF),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${deliveryBookings.length} ${"Deliveries".tr(context)}',
+                        style: const TextStyle(
+                          color: Colors.purple,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 4),
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    _activeTab = 'Delivery Bookings';
+                  });
+                },
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'View All'.tr(context),
+                        style: const TextStyle(
+                          color: AppColors.primaryOrange,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(width: 1),
+                      Icon(
+                        Directionality.of(context) == ui.TextDirection.rtl
+                            ? Icons.chevron_left_rounded
+                            : Icons.chevron_right_rounded,
+                        color: AppColors.primaryOrange,
+                        size: 16,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (deliveryBookings.isEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 32),
+              alignment: Alignment.center,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.local_shipping_outlined,
+                    size: 40,
+                    color: Colors.grey[400],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No delivery bookings'.tr(context),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: _isDark
+                          ? const Color(0xFFCBD5E1)
+                          : Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: math.min(deliveryBookings.length, 5),
+              separatorBuilder: (context, index) => Divider(
+                height: 20,
+                color: _isDark ? const Color(0xFF334155) : Colors.grey[200]!,
+              ),
+              itemBuilder: (context, index) {
+                final booking = deliveryBookings[index];
+                VehicleModel? vehicle;
+                try {
+                  vehicle = _vehicles.firstWhere((v) => v.id == booking.vehicleId);
+                } catch (_) {}
+
+                final delStatus = booking.deliveryStatus.isEmpty
+                    ? 'Scheduled'
+                    : booking.deliveryStatus;
+                Color badgeText = Colors.blue;
+                Color badgeBg = Colors.blue.withValues(alpha: 0.1);
+                if (delStatus == 'Out for Delivery') {
+                  badgeText = AppColors.primaryOrange;
+                  badgeBg = AppColors.primaryOrange.withValues(alpha: 0.1);
+                } else if (delStatus == 'Delivered') {
+                  badgeText = Colors.green;
+                  badgeBg = Colors.green.withValues(alpha: 0.1);
+                } else if (delStatus == 'Cancelled') {
+                  badgeText = Colors.redAccent;
+                  badgeBg = Colors.redAccent.withValues(alpha: 0.1);
+                }
+
+                final delRef = '#DEL-${booking.id.substring(0, booking.id.length > 6 ? 6 : booking.id.length).toUpperCase()}';
+                final dateStr = DateFormat('dd MMM yyyy').format(booking.deliveryDate ?? booking.pickUpDate);
+
+                return Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        width: 55,
+                        height: 45,
+                        color: _isDark
+                            ? const Color(0xFF0F172A)
+                            : Colors.grey[100],
+                        child: AppImage(
+                          imageSrc: vehicle?.mainImage ?? '',
+                          placeholder: const Icon(
+                            Icons.directions_car,
+                            size: 22,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            booking.vehicleName,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: _isDark
+                                  ? const Color(0xFFF8FAFC)
+                                  : AppColors.secondaryBlue,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            '${booking.userName} • $delRef',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: _isDark
+                                  ? const Color(0xFFCBD5E1)
+                                  : Colors.grey[600],
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            '$dateStr (${booking.deliveryTime ?? "Morning"})',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey[500],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: badgeBg,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        delStatus.toUpperCase(),
+                        style: TextStyle(
+                          color: badgeText,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTopStatsGrid(bool isDesktop) {
     final now = DateTime.now();
 
@@ -2276,17 +3574,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       }
     }).length;
     String vehiclesTrend = vehiclesAddedThisMonth > 0
-        ? '+$vehiclesAddedThisMonth this month'
-        : 'Stable fleet';
+        ? '+$vehiclesAddedThisMonth ${"this month".tr(context)}'
+        : 'Stable fleet'.tr(context);
 
     // 2. Available vehicles percentage
     double availablePct = _totalCars > 0
         ? (_availableCars / _totalCars) * 100
         : 0.0;
-    String availableTrend = '${availablePct.toStringAsFixed(0)}% ready to rent';
+    String availableTrend = '${availablePct.toStringAsFixed(0)}% ${"ready to rent".tr(context)}';
 
     // 3. Active Bookings
-    String bookingsTrend = 'Ongoing rentals';
+    String bookingsTrend = 'Ongoing rentals'.tr(context);
 
     // 4. Monthly Revenue dynamic comparison
     double lastMonthRev = 0.0;
@@ -2307,8 +3605,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       revChange = ((_monthlyRevenue - lastMonthRev) / lastMonthRev) * 100;
     }
     String revenueTrend = revChange >= 0
-        ? '+${revChange.toStringAsFixed(1)}% vs last month'
-        : '${revChange.toStringAsFixed(1)}% vs last month';
+        ? '+${revChange.toStringAsFixed(1)}% ${"vs last month".tr(context)}'
+        : '${revChange.toStringAsFixed(1)}% ${"vs last month".tr(context)}';
 
     // 5. Total Customers registered this month
     int customersThisMonth = _users.where((u) {
@@ -2321,13 +3619,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       }
     }).length;
     String customersTrend = customersThisMonth > 0
-        ? '+$customersThisMonth this month'
-        : 'Stable userbase';
+        ? '+$customersThisMonth ${"this month".tr(context)}'
+        : 'Stable userbase'.tr(context);
 
     // 6. Pending Payments action required
     String paymentsTrend = _pendingPaymentsCount > 0
-        ? 'Requires approval'
-        : 'All cleared';
+        ? 'Requires approval'.tr(context)
+        : 'All cleared'.tr(context);
 
     return GridView.count(
       crossAxisCount: isDesktop
@@ -2450,7 +3748,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  label,
+                  label.tr(context),
                   style: TextStyle(
                     color: Colors.grey,
                     fontSize: isCompactMobile ? 10 : 11,
@@ -2585,7 +3883,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Revenue Overview',
+                'Revenue Overview'.tr(context),
                 style: TextStyle(
                   fontWeight: FontWeight.w900,
                   fontSize: 16,
@@ -2604,9 +3902,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(color: Colors.grey[200]!),
                 ),
-                child: const Text(
-                  'Monthly',
-                  style: TextStyle(
+                child: Text(
+                  'Monthly'.tr(context),
+                  style: const TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
                     color: Colors.grey,
@@ -2660,7 +3958,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Bookings Status',
+                'Bookings Status'.tr(context),
                 style: TextStyle(
                   fontWeight: FontWeight.w900,
                   fontSize: 16,
@@ -2679,9 +3977,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(color: Colors.grey[200]!),
                 ),
-                child: const Text(
-                  'This Year',
-                  style: TextStyle(
+                child: Text(
+                  'This Year'.tr(context),
+                  style: const TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
                     color: Colors.grey,
@@ -2709,9 +4007,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text(
-                            'Total',
-                            style: TextStyle(
+                          Text(
+                            'Total'.tr(context),
+                            style: const TextStyle(
                               fontSize: 10,
                               color: Colors.grey,
                               fontWeight: FontWeight.bold,
@@ -2727,9 +4025,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   : AppColors.secondaryBlue,
                             ),
                           ),
-                          const Text(
-                            'Bookings',
-                            style: TextStyle(
+                          Text(
+                            'Bookings'.tr(context),
+                            style: const TextStyle(
                               fontSize: 8,
                               color: Colors.grey,
                               fontWeight: FontWeight.bold,
@@ -2818,7 +4116,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  label,
+                  label.tr(context),
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
@@ -2947,7 +4245,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'Live Vehicle Tracking',
+                      'Live Vehicle Tracking'.tr(context),
                       style: TextStyle(
                         fontWeight: FontWeight.w900,
                         fontSize: 15,
@@ -2980,7 +4278,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          '${trackedVehicles.length} Active',
+                          '${trackedVehicles.length} ${"Active".tr(context)}',
                           style: const TextStyle(
                             color: Colors.green,
                             fontSize: 9,
@@ -3005,9 +4303,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           color: Colors.grey[300],
                         ),
                         const SizedBox(height: 8),
-                        const Text(
-                          'No active tracked vehicles',
-                          style: TextStyle(
+                        Text(
+                          'No active tracked vehicles'.tr(context),
+                          style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             color: Colors.grey,
                           ),
@@ -3281,7 +4579,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Recent Bookings',
+                'Recent Bookings'.tr(context),
                 style: TextStyle(
                   fontWeight: FontWeight.w900,
                   fontSize: 16,
@@ -3292,9 +4590,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ),
               TextButton(
                 onPressed: () => setState(() => _activeTab = 'Bookings'),
-                child: const Text(
-                  'View All',
-                  style: TextStyle(
+                child: Text(
+                  'View All'.tr(context),
+                  style: const TextStyle(
                     color: AppColors.primaryOrange,
                     fontWeight: FontWeight.bold,
                     fontSize: 12,
@@ -3306,7 +4604,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           const SizedBox(height: 12),
           Expanded(
             child: recentBookings.isEmpty
-                ? const Center(child: Text('No bookings available'))
+                ? Center(child: Text('No bookings available'.tr(context)))
                 : ListView.separated(
                     itemCount: recentBookings.length,
                     separatorBuilder: (_, index) => const Divider(height: 1),
@@ -3332,78 +4630,81 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         statusColor = Colors.red;
                       }
 
-                      return ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Container(
-                            width: 48,
-                            height: 36,
-                            color: _isDark
-                                ? const Color(0xFF111827)
-                                : Colors.grey[100],
-                            child: AppImage(
-                              imageSrc: vehicleImg,
-                              placeholder: const Icon(
-                                Icons.directions_car,
-                                color: Colors.grey,
-                                size: 20,
-                              ),
-                            ),
-                          ),
-                        ),
-                        title: Text(
-                          booking.vehicleName,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                            color: _isDark
-                                ? const Color(0xFFF8FAFC)
-                                : AppColors.secondaryBlue,
-                          ),
-                        ),
-                        subtitle: Text(
-                          '${booking.userName} • ${DateFormat('dd MMM').format(booking.pickUpDate)}',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey,
-                          ),
-                        ),
-                        trailing: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'RM ${booking.totalPrice.toStringAsFixed(0)}',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                                color: _isDark
-                                    ? const Color(0xFFF8FAFC)
-                                    : AppColors.secondaryBlue,
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: statusColor.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                booking.status.toUpperCase(),
-                                style: TextStyle(
-                                  color: statusColor,
-                                  fontSize: 8,
-                                  fontWeight: FontWeight.bold,
+                      return Material(
+                        color: Colors.transparent,
+                        child: ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              width: 48,
+                              height: 36,
+                              color: _isDark
+                                  ? const Color(0xFF111827)
+                                  : Colors.grey[100],
+                              child: AppImage(
+                                imageSrc: vehicleImg,
+                                placeholder: const Icon(
+                                  Icons.directions_car,
+                                  color: Colors.grey,
+                                  size: 20,
                                 ),
                               ),
                             ),
-                          ],
+                          ),
+                          title: Text(
+                            booking.vehicleName,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              color: _isDark
+                                  ? const Color(0xFFF8FAFC)
+                                  : AppColors.secondaryBlue,
+                            ),
+                          ),
+                          subtitle: Text(
+                            '${booking.userName} • ${DateFormat('dd MMM').format(booking.pickUpDate)}',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          trailing: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'RM ${booking.totalPrice.toStringAsFixed(0)}',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                  color: _isDark
+                                      ? const Color(0xFFF8FAFC)
+                                      : AppColors.secondaryBlue,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: statusColor.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  booking.status.toUpperCase(),
+                                  style: TextStyle(
+                                    color: statusColor,
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          onTap: () => _showBookingDetailsDialog(booking),
                         ),
-                        onTap: () => _showBookingDetailsDialog(booking),
                       );
                     },
                   ),
@@ -3433,7 +4734,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+          Text(label.tr(context), style: const TextStyle(fontSize: 10, color: Colors.grey)),
           Text(
             value,
             style: TextStyle(
@@ -3467,7 +4768,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Quick Actions',
+            'Quick Actions'.tr(context),
             style: TextStyle(
               fontWeight: FontWeight.w900,
               fontSize: 16,
@@ -3542,9 +4843,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ),
               onPressed: _showSendNotificationDialog,
               icon: const Icon(Icons.campaign, size: 18),
-              label: const Text(
-                'Send Broadcast Notification',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              label: Text(
+                'Send Broadcast Notification'.tr(context),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
               ),
             ),
           ),
@@ -3569,9 +4870,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Maintenance Alerts',
-                      style: TextStyle(
+                    Text(
+                      'Maintenance Alerts'.tr(context),
+                      style: const TextStyle(
                         fontWeight: FontWeight.w900,
                         fontSize: 16,
                         color: AppColors.secondaryBlue,
@@ -3580,9 +4881,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     TextButton(
                       onPressed: () =>
                           setState(() => _activeTab = 'Vehicle Maintenance'),
-                      child: const Text(
-                        'View All',
-                        style: TextStyle(
+                      child: Text(
+                        'View All'.tr(context),
+                        style: const TextStyle(
                           color: AppColors.primaryOrange,
                           fontWeight: FontWeight.bold,
                           fontSize: 12,
@@ -3604,39 +4905,42 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           ? Colors.orange
                           : Colors.blue;
 
-                      return ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        dense: true,
-                        title: Text(
-                          job.vehicleName,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                            color: AppColors.secondaryBlue,
-                          ),
-                        ),
-                        subtitle: Text(
-                          '${job.title} • Due: ${job.endDate}',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey,
-                          ),
-                        ),
-                        trailing: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: statusColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            job.status.toUpperCase(),
-                            style: TextStyle(
-                              color: statusColor,
-                              fontSize: 8,
+                      return Material(
+                        color: Colors.transparent,
+                        child: ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                          title: Text(
+                            job.vehicleName,
+                            style: const TextStyle(
                               fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              color: AppColors.secondaryBlue,
+                            ),
+                          ),
+                          subtitle: Text(
+                            '${job.title} • Due: ${job.endDate}',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          trailing: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: statusColor.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              job.status.toUpperCase(),
+                              style: TextStyle(
+                                color: statusColor,
+                                fontSize: 8,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ),
@@ -3666,7 +4970,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Recent Payments',
+                'Recent Payments'.tr(context),
                 style: TextStyle(
                   fontWeight: FontWeight.w900,
                   fontSize: 16,
@@ -3677,9 +4981,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ),
               TextButton(
                 onPressed: () => setState(() => _activeTab = 'Payments'),
-                child: const Text(
-                  'View All',
-                  style: TextStyle(
+                child: Text(
+                  'View All'.tr(context),
+                  style: const TextStyle(
                     color: AppColors.primaryOrange,
                     fontWeight: FontWeight.bold,
                     fontSize: 12,
@@ -3691,7 +4995,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           const SizedBox(height: 8),
           Expanded(
             child: recentPayments.isEmpty
-                ? const Center(child: Text('No payments found'))
+                ? Center(child: Text('No payments found'.tr(context)))
                 : ListView.separated(
                     itemCount: recentPayments.length,
                     separatorBuilder: (_, index) => const Divider(height: 1),
@@ -3708,56 +5012,59 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           ? Colors.orange
                           : Colors.green;
 
-                      return ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(
-                          vName,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                            color: AppColors.secondaryBlue,
-                          ),
-                        ),
-                        subtitle: Text(
-                          '$custName • ${DateFormat('dd MMM').format(payment.paymentDate)}',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey,
-                          ),
-                        ),
-                        trailing: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'RM ${payment.amount.toStringAsFixed(0)}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                                color: AppColors.secondaryBlue,
-                              ),
+                      return Material(
+                        color: Colors.transparent,
+                        child: ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            vName,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              color: AppColors.secondaryBlue,
                             ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: statusColor.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                isPending ? 'PENDING' : 'PAID',
-                                style: TextStyle(
-                                  color: statusColor,
-                                  fontSize: 8,
+                          ),
+                          subtitle: Text(
+                            '$custName • ${DateFormat('dd MMM').format(payment.paymentDate)}',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          trailing: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'RM ${payment.amount.toStringAsFixed(0)}',
+                                style: const TextStyle(
                                   fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                  color: AppColors.secondaryBlue,
                                 ),
                               ),
-                            ),
-                          ],
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: statusColor.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  isPending ? 'PENDING' : 'PAID',
+                                  style: TextStyle(
+                                    color: statusColor,
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          onTap: () => _showPaymentDetailsDialog(payment),
                         ),
-                        onTap: () => _showPaymentDetailsDialog(payment),
                       );
                     },
                   ),
@@ -3819,7 +5126,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                label,
+                label.tr(context),
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 11,
@@ -4276,35 +5583,38 @@ class BookingSelectionDialogContent extends StatelessWidget {
       itemCount: bookings.length,
       itemBuilder: (context, index) {
         final booking = bookings[index];
-        return ListTile(
-          title: Text(
-            booking.vehicleName,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-          ),
-          subtitle: Text(
-            'Customer: ${booking.userName} | RM ${booking.totalPrice.toStringAsFixed(0)}',
-            style: const TextStyle(fontSize: 11),
-          ),
-          trailing: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: booking.status == 'pending'
-                  ? Colors.orange.withValues(alpha: 0.1)
-                  : Colors.green.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(4),
+        return Material(
+          color: Colors.transparent,
+          child: ListTile(
+            title: Text(
+              booking.vehicleName,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
             ),
-            child: Text(
-              booking.status.toUpperCase(),
-              style: TextStyle(
+            subtitle: Text(
+              'Customer: ${booking.userName} | RM ${booking.totalPrice.toStringAsFixed(0)}',
+              style: const TextStyle(fontSize: 11),
+            ),
+            trailing: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
                 color: booking.status == 'pending'
-                    ? Colors.orange
-                    : Colors.green,
-                fontSize: 8,
-                fontWeight: FontWeight.bold,
+                    ? Colors.orange.withValues(alpha: 0.1)
+                    : Colors.green.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                booking.status.toUpperCase(),
+                style: TextStyle(
+                  color: booking.status == 'pending'
+                      ? Colors.orange
+                      : Colors.green,
+                  fontSize: 8,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
+            onTap: () => onSelected(booking),
           ),
-          onTap: () => onSelected(booking),
         );
       },
     );
@@ -4497,4 +5807,202 @@ class BookingStatusDoughnutPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class AdminHoldBookingHeaderButton extends StatefulWidget {
+  final bool isDark;
+  const AdminHoldBookingHeaderButton({super.key, required this.isDark});
+
+  @override
+  State<AdminHoldBookingHeaderButton> createState() =>
+      _AdminHoldBookingHeaderButtonState();
+}
+
+class _AdminHoldBookingHeaderButtonState
+    extends State<AdminHoldBookingHeaderButton> {
+  final BookingHoldService _holdService = BookingHoldService();
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _handleHoldButtonTap(
+    bool isHoldActive,
+    String remainingTime,
+  ) async {
+    if (isHoldActive) {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Release Booking Hold?'),
+          content: Text(
+            'The booking hold is currently active ($remainingTime remaining).\n\nDo you want to release the hold early and allow customers to book again immediately?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Keep Active'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryOrange,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Release Hold Now'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm == true) {
+        await _holdService.releaseHold();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Booking Hold released successfully!'.tr(context)),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      }
+    } else {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Row(
+            children: [
+              const Icon(
+                Icons.pause_circle_filled_rounded,
+                color: Colors.orange,
+                size: 26,
+              ),
+              const SizedBox(width: 8),
+              Text('Hold Booking?'.tr(context)),
+            ],
+          ),
+          content: Text(
+            'Activating a booking hold will temporarily pause all new customer bookings across the platform for exactly 5 minutes.\n\nExisting bookings will not be affected. Employees and Admins can continue operating normally.'.tr(context),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text('Cancel'.tr(context)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text('Activate 5-Min Hold'.tr(context)),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm == true) {
+        await _holdService.activateHold(duration: const Duration(minutes: 5));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Global Booking Hold activated for 5 minutes!'.tr(context),
+              ),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<Map<String, dynamic>>(
+      stream: _holdService.getBookingHoldStream(),
+      builder: (context, snapshot) {
+        final eval = BookingHoldService.evaluateHoldData(snapshot.data);
+        final bool isHoldActive = eval['isHoldActive'] == true;
+        final String remainingTime = eval['formattedRemainingTime'] ?? '05:00';
+
+        if (isHoldActive) {
+          return InkWell(
+            onTap: () => _handleHoldButtonTap(true, remainingTime),
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.redAccent.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.redAccent, width: 1.5),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.timer_outlined,
+                    size: 16,
+                    color: Colors.redAccent,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${"Booking Hold Active".tr(context)} - $remainingTime',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.redAccent,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return InkWell(
+          onTap: () => _handleHoldButtonTap(false, '00:00'),
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.primaryOrange.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.primaryOrange, width: 1.2),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.pause_circle_filled_rounded,
+                  size: 16,
+                  color: AppColors.primaryOrange,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Hold Booking'.tr(context),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.primaryOrange,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 }

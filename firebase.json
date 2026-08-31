@@ -1,4 +1,7 @@
 {
+  "database": {
+    "rules": "firebase_database_rules.json"
+  },
   "hosting": {
     "public": "build/web",  
     "ignore": [

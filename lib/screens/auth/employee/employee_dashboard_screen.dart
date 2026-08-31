@@ -13,9 +13,12 @@ import '../../../services/user_session.dart';
 import '../../../widgets/loading_widget.dart';
 import '../../../widgets/app_logo.dart';
 import '../../../widgets/app_image.dart';
-import '../../../widgets/return_video_evidence_widget.dart';
-import '../../../widgets/upload_video_modal_sheet.dart';
+import '../../../widgets/booking_source_badge.dart';
+import '../../../widgets/staff_quick_booking_modal_sheet.dart';
+import '../admin/admin_reviews_view.dart';
 import '../login_screen.dart';
+import '../../../l10n/app_translations.dart';
+import '../../../widgets/language_selector_widget.dart';
 
 class EmployeeDashboardScreen extends StatefulWidget {
   const EmployeeDashboardScreen({super.key});
@@ -516,6 +519,8 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
                     ],
                   ),
                   const Spacer(),
+                  const LanguageSelectorWidget(),
+                  const SizedBox(width: 12),
                   CircleAvatar(
                     backgroundColor: AppColors.primaryOrange.withValues(alpha: 0.15),
                     child: Text(
@@ -529,13 +534,13 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(_employeeUser?.fullName ?? 'Employee', style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white : AppColors.secondaryBlue)),
-                        Text('Employee ID: ${_employeeUser?.employeeId.isNotEmpty == true ? _employeeUser!.employeeId : "EMP-STAFF"}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                        Text(_employeeUser?.fullName ?? 'Employee'.tr(context), style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white : AppColors.secondaryBlue)),
+                        Text('${'Employee ID:'.tr(context)} ${_employeeUser?.employeeId.isNotEmpty == true ? _employeeUser!.employeeId : "EMP-STAFF"}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
                       ],
                     ),
                   IconButton(
                     icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
-                    tooltip: 'Logout',
+                    tooltip: 'Logout'.tr(context),
                     onPressed: _logout,
                   ),
                 ],
@@ -556,6 +561,7 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
                   _buildSidebarItem(Icons.dashboard_outlined, 'Overview', _activeTab == 'Overview'),
                   _buildSidebarItem(Icons.assignment_outlined, 'All Queue Tasks', _activeTab == 'All Queue Tasks'),
                   _buildSidebarItem(Icons.directions_car_outlined, 'Fleet Vehicles', _activeTab == 'Fleet Vehicles'),
+                  _buildSidebarItem(Icons.rate_review_outlined, 'Customer Reviews', _activeTab == 'Customer Reviews'),
                   _buildSidebarItem(Icons.person_outline, 'My Profile', _activeTab == 'My Profile'),
                 ],
               ),
@@ -584,11 +590,11 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
                   if (index == 3) _activeTab = 'My Profile';
                 });
               },
-              items: const [
-                BottomNavigationBarItem(icon: Icon(Icons.dashboard_outlined), label: 'Overview'),
-                BottomNavigationBarItem(icon: Icon(Icons.assignment_outlined), label: 'Queue'),
-                BottomNavigationBarItem(icon: Icon(Icons.directions_car_outlined), label: 'Fleet'),
-                BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Profile'),
+              items: [
+                BottomNavigationBarItem(icon: const Icon(Icons.dashboard_outlined), label: 'Overview'.tr(context)),
+                BottomNavigationBarItem(icon: const Icon(Icons.assignment_outlined), label: 'Queue'.tr(context)),
+                BottomNavigationBarItem(icon: const Icon(Icons.directions_car_outlined), label: 'Fleet'.tr(context)),
+                BottomNavigationBarItem(icon: const Icon(Icons.person_outline), label: 'Profile'.tr(context)),
               ],
             )
           : null,
@@ -606,7 +612,7 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
     return ListTile(
       leading: Icon(icon, color: isSelected ? AppColors.primaryOrange : Colors.white70),
       title: Text(
-        title,
+        title.tr(context),
         style: TextStyle(
           color: isSelected ? AppColors.primaryOrange : Colors.white,
           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
@@ -652,6 +658,8 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
       return _buildAllQueueTasksTab(isDesktop: isDesktop, cardColor: cardColor, textPrimary: textPrimary, borderColor: borderColor);
     } else if (_activeTab == 'Fleet Vehicles') {
       return _buildFleetVehiclesTab(isDesktop: isDesktop, cardColor: cardColor, textPrimary: textPrimary, borderColor: borderColor);
+    } else if (_activeTab == 'Customer Reviews') {
+      return const AdminReviewsView();
     } else if (_activeTab == 'My Profile') {
       return _buildMyProfileTab(isDesktop: isDesktop, cardColor: cardColor, textPrimary: textPrimary, borderColor: borderColor);
     } else {
@@ -699,16 +707,63 @@ class _EmployeeDashboardScreenState extends State<EmployeeDashboardScreen> {
       children: [
         Row(
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Operational Overview', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textPrimary)),
+                  const SizedBox(height: 4),
+                  const Text('Live Firebase Metrics, Handover Cards & Employee Statistics', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                ],
+              ),
+            ),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
-                Text('Operational Overview', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textPrimary)),
-                const SizedBox(height: 4),
-                const Text('Live Firebase Metrics, Handover Cards & Employee Statistics', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  ),
+                  onPressed: () {
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (ctx) => StaffQuickBookingModalSheet(
+                        initialSource: 'phone',
+                        onBookingCreated: _loadData,
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.phone_in_talk_rounded, size: 15),
+                  label: const Text('Phone Booking', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                ),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.purple,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  ),
+                  onPressed: () {
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (ctx) => StaffQuickBookingModalSheet(
+                        initialSource: 'walkIn',
+                        onBookingCreated: _loadData,
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.directions_walk_rounded, size: 15),
+                  label: const Text('Walk-in Booking', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                ),
+                IconButton(icon: const Icon(Icons.refresh), tooltip: 'Refresh Realtime Data', onPressed: _loadData),
               ],
             ),
-            const Spacer(),
-            IconButton(icon: const Icon(Icons.refresh), tooltip: 'Refresh Realtime Data', onPressed: _loadData),
           ],
         ),
         const SizedBox(height: 20),
@@ -1705,10 +1760,12 @@ class _TaskWorkflowModalSheet extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('$taskType Task Details', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textPrimary)),
-                      Text('Booking ID: #${booking.id.substring(0, 8).toUpperCase()}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      Text('Booking ID: #${booking.id.substring(0, booking.id.length > 8 ? 8 : booking.id.length).toUpperCase()}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
                     ],
                   ),
                 ),
+                BookingSourceBadge(bookingSource: booking.bookingSource),
+                const SizedBox(width: 8),
                 IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
               ],
             ),
@@ -1736,28 +1793,6 @@ class _TaskWorkflowModalSheet extends StatelessWidget {
             Text('Scheduled Time: ${_formatDate(taskType == 'Return' ? booking.returnDate : booking.pickUpDate)}', style: const TextStyle(fontSize: 13, color: Colors.grey)),
             Text('Target Location: $location', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textPrimary)),
             Text('Current Booking Status: ${booking.status.toUpperCase()}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: themeColor)),
-            // Return Video Evidence Section (For Return Task)
-            if (taskType == 'Return') ...[
-              const SizedBox(height: 16),
-              ReturnVideoEvidenceWidget(
-                booking: booking,
-                isEmployeeView: true,
-                onUploadClick: () {
-                  Navigator.pop(context);
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (ctx) => UploadVideoModalSheet(
-                      booking: booking,
-                      uploaderId: booking.assignedEmployeeId ?? 'EMP-STAFF',
-                      uploaderName: 'Staff Employee',
-                      uploaderRole: 'employee',
-                    ),
-                  );
-                },
-              ),
-            ],
             const SizedBox(height: 24),
 
             // Allowed Employee Actions Workflow

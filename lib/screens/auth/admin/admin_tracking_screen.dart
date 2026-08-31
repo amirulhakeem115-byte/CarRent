@@ -6,6 +6,7 @@ import '../../../services/vehicle_service.dart';
 import '../../../services/tracking_service.dart';
 import '../customer/tracking_screen.dart';
 import '../../../widgets/loading_widget.dart';
+import '../../../l10n/app_translations.dart';
 
 class AdminTrackingScreen extends StatefulWidget {
   const AdminTrackingScreen({super.key});
@@ -151,9 +152,9 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'FLEET MANAGEMENT',
-                          style: TextStyle(
+                        Text(
+                          'FLEET MANAGEMENT'.tr(context),
+                          style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                             color: AppColors.primaryOrange,
@@ -161,9 +162,9 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        const Text(
-                          'Active Telematics',
-                          style: TextStyle(
+                        Text(
+                          'Active Telematics'.tr(context),
+                          style: const TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.w900,
                             color: AppColors.secondaryBlue,
@@ -178,7 +179,7 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
                             });
                           },
                           decoration: InputDecoration(
-                            hintText: 'Search active vehicles...',
+                            hintText: 'Search active vehicles...'.tr(context),
                             prefixIcon: const Icon(Icons.search),
                             filled: true,
                             fillColor: Colors.white,
@@ -192,7 +193,7 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
                         Expanded(
                           child: filtered.isEmpty
                               ? Center(
-                                  child: Text('No matching active rentals.', style: TextStyle(color: Colors.grey[500])),
+                                  child: Text('No matching active rentals.'.tr(context), style: TextStyle(color: Colors.grey[500])),
                                 )
                               : ListView.separated(
                                   itemCount: filtered.length,

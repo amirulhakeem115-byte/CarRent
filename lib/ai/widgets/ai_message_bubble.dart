@@ -7,6 +7,7 @@ import '../../constants/colors.dart';
 import '../../models/vehicle_model.dart';
 import '../../screens/auth/customer/vehicle_details_screen.dart';
 import '../../screens/auth/customer/booking_screen.dart';
+import '../../l10n/app_translations.dart';
 import '../models/ai_message.dart';
 import '../services/ai_service.dart';
 import '../../widgets/app_image.dart';
@@ -104,13 +105,13 @@ class AIMessageBubble extends StatelessWidget {
                           InkWell(
                             onTap: () => context.read<AIService>().copyToClipboard(context, message.message),
                             borderRadius: BorderRadius.circular(4),
-                            child: const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               child: Row(
                                 children: [
-                                  Icon(Icons.copy_rounded, size: 10, color: Colors.grey),
-                                  SizedBox(width: 3),
-                                  Text('Copy', style: TextStyle(fontSize: 9, color: Colors.grey, fontWeight: FontWeight.w600)),
+                                  const Icon(Icons.copy_rounded, size: 10, color: Colors.grey),
+                                  const SizedBox(width: 3),
+                                  Text('Copy'.tr(context), style: const TextStyle(fontSize: 9, color: Colors.grey, fontWeight: FontWeight.w600)),
                                 ],
                               ),
                             ),
@@ -119,13 +120,13 @@ class AIMessageBubble extends StatelessWidget {
                           InkWell(
                             onTap: () => context.read<AIService>().shareMessage(context, message.message),
                             borderRadius: BorderRadius.circular(4),
-                            child: const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               child: Row(
                                 children: [
-                                  Icon(Icons.share_rounded, size: 10, color: Colors.grey),
-                                  SizedBox(width: 3),
-                                  Text('Share', style: TextStyle(fontSize: 9, color: Colors.grey, fontWeight: FontWeight.w600)),
+                                  const Icon(Icons.share_rounded, size: 10, color: Colors.grey),
+                                  const SizedBox(width: 3),
+                                  Text('Share'.tr(context), style: const TextStyle(fontSize: 9, color: Colors.grey, fontWeight: FontWeight.w600)),
                                 ],
                               ),
                             ),
@@ -147,7 +148,7 @@ class AIMessageBubble extends StatelessWidget {
           if (!isUser && message.metadata?['options'] != null) ...[
             const SizedBox(height: 10),
             Padding(
-              padding: const EdgeInsets.only(left: 36),
+              padding: const EdgeInsetsDirectional.only(start: 36),
               child: Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -158,7 +159,7 @@ class AIMessageBubble extends StatelessWidget {
                     backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
                     side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                     label: Text(
-                      optionName.toString(),
+                      optionName.toString().tr(context),
                       style: TextStyle(
                         fontSize: 11,
                         color: isDark ? Colors.white : AppColors.secondaryBlue,
@@ -198,7 +199,7 @@ class AIMessageBubble extends StatelessWidget {
           if (!isUser && message.metadata?['request_date'] != null) ...[
             const SizedBox(height: 10),
             Padding(
-              padding: const EdgeInsets.only(left: 36),
+              padding: const EdgeInsetsDirectional.only(start: 36),
               child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryOrange,
@@ -209,9 +210,9 @@ class AIMessageBubble extends StatelessWidget {
                 ),
                 icon: const Icon(Icons.calendar_month_rounded, size: 16, color: Colors.white),
                 label: Text(
-                  message.metadata?['request_date'] == 'pickup' 
+                  (message.metadata?['request_date'] == 'pickup' 
                       ? 'Select Pick-up Date' 
-                      : 'Select Return Date',
+                      : 'Select Return Date').tr(context),
                   style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                 ),
                 onPressed: () async {
@@ -256,7 +257,7 @@ class AIMessageBubble extends StatelessWidget {
           if (!isUser && action == 'redeem_rewards_slider') ...[
             const SizedBox(height: 10),
             Padding(
-              padding: const EdgeInsets.only(left: 36),
+              padding: const EdgeInsetsDirectional.only(start: 36),
               child: _buildRewardPointsSliderCard(context, isDark),
             ),
           ],
@@ -265,7 +266,7 @@ class AIMessageBubble extends StatelessWidget {
           if (!isUser && summary != null) ...[
             const SizedBox(height: 10),
             Padding(
-              padding: const EdgeInsets.only(left: 36),
+              padding: const EdgeInsetsDirectional.only(start: 36),
               child: _buildSummaryCard(context, Map<String, dynamic>.from(summary), isDark),
             ),
           ],
@@ -274,7 +275,7 @@ class AIMessageBubble extends StatelessWidget {
           if (!isUser && report != null) ...[
             const SizedBox(height: 10),
             Padding(
-              padding: const EdgeInsets.only(left: 36),
+              padding: const EdgeInsetsDirectional.only(start: 36),
               child: _buildReportCard(context, Map<String, dynamic>.from(report), isDark),
             ),
           ],
@@ -283,7 +284,7 @@ class AIMessageBubble extends StatelessWidget {
           if (!isUser && comparison != null) ...[
             const SizedBox(height: 10),
             Padding(
-              padding: const EdgeInsets.only(left: 36),
+              padding: const EdgeInsetsDirectional.only(start: 36),
               child: _buildComparisonCard(context, Map<String, dynamic>.from(comparison), isDark),
             ),
           ],
@@ -292,7 +293,7 @@ class AIMessageBubble extends StatelessWidget {
           if (!isUser && (action == 'upload_license' || action == 'upload_id' || action == 'upload_receipt')) ...[
             const SizedBox(height: 10),
             Padding(
-              padding: const EdgeInsets.only(left: 36),
+              padding: const EdgeInsetsDirectional.only(start: 36),
               child: _buildFileUploadCard(context, action!, isDark),
             ),
           ],
@@ -304,7 +305,7 @@ class AIMessageBubble extends StatelessWidget {
               height: 240,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.only(left: 36, right: 4),
+                padding: const EdgeInsetsDirectional.only(start: 36, end: 4),
                 itemCount: vehicles.length,
                 separatorBuilder: (context, idx) => const SizedBox(width: 12),
                 itemBuilder: (context, index) {
@@ -342,7 +343,7 @@ class AIMessageBubble extends StatelessWidget {
     final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
     final borderCol = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
     final isReceipt = action == 'upload_receipt';
-    final title = isReceipt ? 'Submit Payment Proof' : 'Upload Profile Document';
+    final title = isReceipt ? 'Submit Payment Proof'.tr(context) : 'Upload Profile Document'.tr(context);
 
     final referenceController = TextEditingController();
 
@@ -371,12 +372,12 @@ class AIMessageBubble extends StatelessWidget {
                 TextField(
                   controller: referenceController,
                   style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 12),
-                  decoration: const InputDecoration(
-                    labelText: 'Transaction Reference ID *',
-                    labelStyle: TextStyle(fontSize: 11),
-                    hintText: 'e.g. Ref: 12345678',
-                    border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: InputDecoration(
+                    labelText: 'Transaction Reference ID *'.tr(context),
+                    labelStyle: const TextStyle(fontSize: 11),
+                    hintText: 'e.g. Ref: 12345678'.tr(context),
+                    border: const OutlineInputBorder(),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -389,7 +390,7 @@ class AIMessageBubble extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 10),
                 ),
                 icon: const Icon(Icons.file_upload, size: 16),
-                label: Text(fileName ?? 'Pick File / Capture Image', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                label: Text(fileName ?? 'Pick File / Capture Image'.tr(context), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                 onPressed: () async {
                   final picker = ImagePicker();
                   final XFile? image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
@@ -416,7 +417,7 @@ class AIMessageBubble extends StatelessWidget {
                       final ref = referenceController.text.trim();
                       if (ref.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Please enter transaction reference ID')),
+                          SnackBar(content: Text('Please enter transaction reference ID'.tr(context))),
                         );
                         return;
                       }
@@ -426,7 +427,7 @@ class AIMessageBubble extends StatelessWidget {
                       context.read<AIService>().sendMessage("Uploaded document: $docType [base64:$base64String]");
                     }
                   },
-                  child: const Text('Submit Verification', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                  child: Text('Submit Verification'.tr(context), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                 ),
               ],
             ],
@@ -473,7 +474,7 @@ class AIMessageBubble extends StatelessWidget {
               children: [
                 const Icon(Icons.compare_arrows_rounded, color: Colors.indigo, size: 16),
                 const SizedBox(width: 8),
-                Text('VEHICLE COMPARISON', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: titleCol)),
+                Text('VEHICLE COMPARISON'.tr(context), style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: titleCol)),
               ],
             ),
           ),
@@ -487,15 +488,15 @@ class AIMessageBubble extends StatelessWidget {
               },
               children: [
                 TableRow(children: [
-                  const Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Text('Spec', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: Colors.grey))),
+                  Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Text('Spec'.tr(context), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: Colors.grey))),
                   Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Text(c1['model'] ?? 'Car 1', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: titleCol))),
                   Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Text(c2['model'] ?? 'Car 2', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: titleCol))),
                 ]),
-                _compRow('Price/Day', 'RM ${c1['pricePerDay']}', 'RM ${c2['pricePerDay']}', textCol),
-                _compRow('Category', c1['category'], c2['category'], textCol),
-                _compRow('Seats', '${c1['seats']}', '${c2['seats']}', textCol),
-                _compRow('Transmission', c1['transmission'], c2['transmission'], textCol),
-                _compRow('Fuel', c1['fuelType'], c2['fuelType'], textCol),
+                _compRow(context, 'Price/Day', 'RM ${c1['pricePerDay']}', 'RM ${c2['pricePerDay']}', textCol),
+                _compRow(context, 'Category', c1['category'], c2['category'], textCol),
+                _compRow(context, 'Seats', '${c1['seats']}', '${c2['seats']}', textCol),
+                _compRow(context, 'Transmission', c1['transmission'], c2['transmission'], textCol),
+                _compRow(context, 'Fuel', c1['fuelType'], c2['fuelType'], textCol),
               ],
             ),
           ),
@@ -542,11 +543,11 @@ class AIMessageBubble extends StatelessWidget {
     );
   }
 
-  TableRow _compRow(String spec, String v1, String v2, Color color) {
+  TableRow _compRow(BuildContext context, String spec, String v1, String v2, Color color) {
     return TableRow(children: [
-      Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Text(spec, style: const TextStyle(fontSize: 9, color: Colors.grey))),
-      Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Text(v1, style: TextStyle(fontSize: 9, color: color))),
-      Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Text(v2, style: TextStyle(fontSize: 9, color: color))),
+      Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Text(spec.tr(context), style: const TextStyle(fontSize: 9, color: Colors.grey))),
+      Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Text(v1.tr(context), style: TextStyle(fontSize: 9, color: color))),
+      Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Text(v2.tr(context), style: TextStyle(fontSize: 9, color: color))),
     ]);
   }
 
@@ -600,7 +601,7 @@ class AIMessageBubble extends StatelessWidget {
                 const Icon(Icons.receipt_long_rounded, color: AppColors.primaryOrange, size: 16),
                 const SizedBox(width: 8),
                 Text(
-                  'RESERVATION SUMMARY',
+                  'RESERVATION SUMMARY'.tr(context),
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
@@ -643,16 +644,16 @@ class AIMessageBubble extends StatelessWidget {
                   ],
                 ),
                 const Divider(height: 20),
-                _priceDetailRow('Daily Rental', 'RM ${pricePerDay.toStringAsFixed(0)}', textCol),
-                _priceDetailRow('Base Price ($days days)', 'RM ${totalPrice.toStringAsFixed(2)}', textCol),
+                _priceDetailRow(context, 'Daily Rental', 'RM ${pricePerDay.toStringAsFixed(0)}', textCol),
+                _priceDetailRow(context, 'Base Price ($days days)', 'RM ${totalPrice.toStringAsFixed(2)}', textCol),
                 if (discount > 0)
-                  _priceDetailRow('Loyalty Discount', '- RM ${discount.toStringAsFixed(2)}', Colors.green, isBold: true),
-                _priceDetailRow('Tax (6% SST)', 'RM 0.00', textCol),
+                  _priceDetailRow(context, 'Loyalty Discount', '- RM ${discount.toStringAsFixed(2)}', Colors.green, isBold: true),
+                _priceDetailRow(context, 'Tax (6% SST)', 'RM 0.00', textCol),
                 const Divider(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Total amount', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: titleCol)),
+                    Text('Total amount'.tr(context), style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: titleCol)),
                     Text('RM ${total.toStringAsFixed(2)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: AppColors.primaryOrange)),
                   ],
                 ),
@@ -660,14 +661,14 @@ class AIMessageBubble extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Deposit due now (30%)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primaryOrange)),
+                    Text('Deposit due now (30%)'.tr(context), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primaryOrange)),
                     Text('RM ${deposit.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppColors.primaryOrange)),
                   ],
                 ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Remaining balance', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                    Text('Remaining balance'.tr(context), style: const TextStyle(fontSize: 10, color: Colors.grey)),
                     Text('RM ${balance.toStringAsFixed(2)}', style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
                   ],
                 ),
@@ -690,7 +691,7 @@ class AIMessageBubble extends StatelessWidget {
                   onPressed: () {
                     context.read<AIService>().sendMessage('Confirm Booking');
                   },
-                  child: const Text('Confirm Booking', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  child: Text('Confirm Booking'.tr(context), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                 ),
                 const SizedBox(height: 6),
                 Row(
@@ -705,7 +706,7 @@ class AIMessageBubble extends StatelessWidget {
                         onPressed: () {
                           context.read<AIService>().sendMessage('Edit Details');
                         },
-                        child: const Text('Edit', style: TextStyle(fontSize: 11, color: AppColors.primaryOrange, fontWeight: FontWeight.bold)),
+                        child: Text('Edit'.tr(context), style: const TextStyle(fontSize: 11, color: AppColors.primaryOrange, fontWeight: FontWeight.bold)),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -714,7 +715,7 @@ class AIMessageBubble extends StatelessWidget {
                         onPressed: () {
                           context.read<AIService>().sendMessage('Cancel Checkout');
                         },
-                        child: const Text('Cancel', style: TextStyle(fontSize: 11, color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                        child: Text('Cancel'.tr(context), style: const TextStyle(fontSize: 11, color: Colors.redAccent, fontWeight: FontWeight.bold)),
                       ),
                     ),
                   ],
@@ -727,13 +728,13 @@ class AIMessageBubble extends StatelessWidget {
     );
   }
 
-  Widget _priceDetailRow(String label, String value, Color color, {bool isBold = false}) {
+  Widget _priceDetailRow(BuildContext context, String label, String value, Color color, {bool isBold = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+          Text(label.tr(context), style: const TextStyle(fontSize: 11, color: Colors.grey)),
           Text(value, style: TextStyle(fontSize: 11, fontWeight: isBold ? FontWeight.bold : FontWeight.normal, color: color)),
         ],
       ),
@@ -784,7 +785,7 @@ class AIMessageBubble extends StatelessWidget {
                 const Icon(Icons.analytics_rounded, color: Colors.teal, size: 16),
                 const SizedBox(width: 8),
                 Text(
-                  'SYSTEM REPORT SUMMARY',
+                  'SYSTEM REPORT SUMMARY'.tr(context),
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
@@ -801,17 +802,17 @@ class AIMessageBubble extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Timeframe: ${data['timeframe']}',
+                  '${'Timeframe'.tr(context)}: ${data['timeframe']}',
                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: titleCol),
                 ),
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Expanded(child: _kpiTile('Total Revenue', 'RM ${rev.toStringAsFixed(0)}', Colors.green, isDark)),
+                    Expanded(child: _kpiTile(context, 'Total Revenue', 'RM ${rev.toStringAsFixed(0)}', Colors.green, isDark)),
                     const SizedBox(width: 8),
-                    Expanded(child: _kpiTile('Bookings', '$bookings Count', Colors.orange, isDark)),
+                    Expanded(child: _kpiTile(context, 'Bookings', '$bookings Count', Colors.orange, isDark)),
                     const SizedBox(width: 8),
-                    Expanded(child: _kpiTile('Utilization', data['utilizationRate'] ?? '0%', Colors.blue, isDark)),
+                    Expanded(child: _kpiTile(context, 'Utilization', data['utilizationRate'] ?? '0%', Colors.blue, isDark)),
                   ],
                 ),
               ],
@@ -833,7 +834,7 @@ class AIMessageBubble extends StatelessWidget {
                           elevation: 0,
                         ),
                         icon: const Icon(Icons.picture_as_pdf_rounded, size: 12),
-                        label: const Text('Export PDF', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+                        label: Text('Export PDF'.tr(context), style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
                         onPressed: () {
                           context.read<AIService>().sendMessage('Export PDF');
                         },
@@ -850,7 +851,7 @@ class AIMessageBubble extends StatelessWidget {
                           elevation: 0,
                         ),
                         icon: const Icon(Icons.table_view_rounded, size: 12),
-                        label: const Text('Export Excel', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+                        label: Text('Export Excel'.tr(context), style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
                         onPressed: () {
                           context.read<AIService>().sendMessage('Export Excel');
                         },
@@ -870,7 +871,7 @@ class AIMessageBubble extends StatelessWidget {
                     onPressed: () {
                       context.read<AIService>().sendMessage('View Details');
                     },
-                    child: const Text('View Details', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+                    child: Text('View Details'.tr(context), style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],
@@ -881,7 +882,7 @@ class AIMessageBubble extends StatelessWidget {
     );
   }
 
-  Widget _kpiTile(String label, String value, Color color, bool isDark) {
+  Widget _kpiTile(BuildContext context, String label, String value, Color color, bool isDark) {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
@@ -892,7 +893,7 @@ class AIMessageBubble extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(fontSize: 8, color: Colors.grey, fontWeight: FontWeight.w600)),
+          Text(label.tr(context), style: const TextStyle(fontSize: 8, color: Colors.grey, fontWeight: FontWeight.w600)),
           const SizedBox(height: 4),
           Text(value, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: color)),
         ],
@@ -1015,7 +1016,7 @@ class AIMessageBubble extends StatelessWidget {
                     ),
                     const SizedBox(width: 3),
                     Text(
-                      vehicle.transmission,
+                      vehicle.transmission.tr(context),
                       style: TextStyle(
                         fontSize: 9,
                         color: isDark ? Colors.white54 : Colors.black45,
@@ -1029,7 +1030,7 @@ class AIMessageBubble extends StatelessWidget {
                     ),
                     const SizedBox(width: 3),
                     Text(
-                      '${vehicle.seats} Seats',
+                      '${vehicle.seats} ${'Seats'.tr(context)}',
                       style: TextStyle(
                         fontSize: 9,
                         color: isDark ? Colors.white54 : Colors.black45,
@@ -1039,7 +1040,7 @@ class AIMessageBubble extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Fuel: ${vehicle.fuelType}',
+                  '${'Fuel'.tr(context)}: ${vehicle.fuelType.tr(context)}',
                   style: TextStyle(
                     fontSize: 9,
                     color: isDark ? Colors.white54 : Colors.black45,
@@ -1047,7 +1048,7 @@ class AIMessageBubble extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'RM ${vehicle.pricePerDay.toStringAsFixed(0)}/day',
+                  'RM ${vehicle.pricePerDay.toStringAsFixed(0)}/${'day'.tr(context)}',
                   style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w900,
@@ -1073,7 +1074,7 @@ class AIMessageBubble extends StatelessWidget {
                             ),
                           );
                         },
-                        child: const Text('View', style: TextStyle(fontSize: 9, color: AppColors.primaryOrange, fontWeight: FontWeight.bold)),
+                        child: Text('View'.tr(context), style: const TextStyle(fontSize: 9, color: AppColors.primaryOrange, fontWeight: FontWeight.bold)),
                       ),
                     ),
                     const SizedBox(width: 4),
@@ -1107,7 +1108,7 @@ class AIMessageBubble extends StatelessWidget {
                             );
                           }
                         } : null,
-                        child: Text(isSelectionMode ? 'Select' : 'Book Now', style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)),
+                        child: Text((isSelectionMode ? 'Select' : 'Book Now').tr(context), style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)),
                       ),
                     ),
                   ],
@@ -1156,7 +1157,7 @@ class AIMessageBubble extends StatelessWidget {
           : (isDark ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B)),
     );
 
-    final text = message.message;
+    final text = message.message.tr(context);
     final List<InlineSpan> spans = [];
 
     final lines = text.split('\n');
@@ -1164,9 +1165,9 @@ class AIMessageBubble extends StatelessWidget {
       final line = lines[i];
       if (line.trim().startsWith('•')) {
         spans.add(const TextSpan(text: '  • ', style: TextStyle(fontWeight: FontWeight.bold)));
-        _parseInlineText(line.trim().substring(1).trim(), spans, isUser, isDark);
+        _parseInlineText(context, line.trim().substring(1).trim(), spans, isUser, isDark);
       } else {
-        _parseInlineText(line, spans, isUser, isDark);
+        _parseInlineText(context, line, spans, isUser, isDark);
       }
       if (i < lines.length - 1) {
         spans.add(const TextSpan(text: '\n'));
@@ -1181,24 +1182,25 @@ class AIMessageBubble extends StatelessWidget {
     );
   }
 
-  void _parseInlineText(String text, List<InlineSpan> spans, bool isUser, bool isDark) {
+  void _parseInlineText(BuildContext context, String text, List<InlineSpan> spans, bool isUser, bool isDark) {
+    final translatedText = text.tr(context);
     final regExp = RegExp(r'\*\*(.*?)\*\*|\*(.*?)\*');
     int start = 0;
 
-    for (final match in regExp.allMatches(text)) {
+    for (final match in regExp.allMatches(translatedText)) {
       if (match.start > start) {
-        spans.add(TextSpan(text: text.substring(start, match.start)));
+        spans.add(TextSpan(text: translatedText.substring(start, match.start).tr(context)));
       }
       final matchText = match.group(1) ?? match.group(2) ?? '';
       spans.add(TextSpan(
-        text: matchText,
+        text: matchText.tr(context),
         style: const TextStyle(fontWeight: FontWeight.bold),
       ));
       start = match.end;
     }
 
-    if (start < text.length) {
-      spans.add(TextSpan(text: text.substring(start)));
+    if (start < translatedText.length) {
+      spans.add(TextSpan(text: translatedText.substring(start).tr(context)));
     }
   }
 

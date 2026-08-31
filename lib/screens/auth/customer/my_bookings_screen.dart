@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_database/firebase_database.dart';
+import '../../../l10n/app_translations.dart';
 import '../../../models/booking_model.dart';
 import '../../../models/payment_model.dart';
 import '../../../models/review_model.dart';
@@ -19,8 +21,7 @@ import 'contact_support_screen.dart';
 import '../../../services/notification_service.dart';
 import '../../../services/user_role_cache.dart';
 import '../../../services/reward_service.dart';
-import '../../../widgets/return_video_evidence_widget.dart';
-import '../../../widgets/upload_video_modal_sheet.dart';
+import 'make_payment_screen.dart';
 
 /// Simple data holder for a step in the booking progress tracker.
 class _TrackerStep {
@@ -394,7 +395,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
               SizedBox(
                 width: 64,
                 child: Text(
-                  step.label,
+                  step.label.tr(context),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 9,
@@ -509,7 +510,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Ref ID: #${booking.id.substring(0, booking.id.length > 8 ? 8 : booking.id.length).toUpperCase()}',
+                        '${'Ref ID:'.tr(context)} #${booking.id.substring(0, booking.id.length > 8 ? 8 : booking.id.length).toUpperCase()}',
                         style: TextStyle(
                           color: _subColor,
                           fontSize: 11,
@@ -526,11 +527,14 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                           ),
                           const SizedBox(width: 6),
                           Expanded(
-                            child: Text(
-                              booking.isOpenRental
-                                  ? '${dateFormat.format(booking.pickUpDate)} to ♾ Open Rental'
-                                  : '${dateFormat.format(booking.pickUpDate)} to ${booking.returnDate != null ? dateFormat.format(booking.returnDate!) : ""}',
-                              style: TextStyle(color: _subColor, fontSize: 11),
+                            child: Directionality(
+                              textDirection: ui.TextDirection.ltr,
+                              child: Text(
+                                booking.isOpenRental
+                                    ? '${dateFormat.format(booking.pickUpDate)} ${'to'.tr(context)} ♾ ${'Open Rental'.tr(context)}'
+                                    : '${dateFormat.format(booking.pickUpDate)} ${'to'.tr(context)} ${booking.returnDate != null ? dateFormat.format(booking.returnDate!) : ""}',
+                                style: TextStyle(color: _subColor, fontSize: 11),
+                              ),
                             ),
                           ),
                         ],
@@ -551,7 +555,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        booking.status.toUpperCase(),
+                        booking.status.toUpperCase().tr(context),
                         style: TextStyle(
                           color: statusColor,
                           fontSize: 9,
@@ -584,9 +588,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      overdue['isOverdue'] == true
+                      (overdue['isOverdue'] == true
                           ? 'CURRENT TOTAL AMOUNT'
-                          : 'TOTAL COST',
+                          : 'TOTAL COST').tr(context),
                       style: TextStyle(
                         fontSize: 8,
                         color: _subColor,
@@ -599,27 +603,33 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                       runSpacing: 6,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Text(
-                          booking.status == 'Awaiting Final Payment'
-                              ? 'RM ${booking.finalAmount.toStringAsFixed(2)}'
-                              : (booking.isOpenRental && _isOngoing(booking)
-                                    ? 'RM ${(_getDynamicPrice(booking) + (overdue['charges'] as num)).toStringAsFixed(2)}'
-                                    : 'RM ${(booking.totalPrice + (overdue['charges'] as num)).toStringAsFixed(2)}'),
-                          style: TextStyle(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 14,
-                            color: overdue['isOverdue'] == true
-                                ? Colors.redAccent
-                                : AppColors.primaryOrange,
+                        Directionality(
+                          textDirection: ui.TextDirection.ltr,
+                          child: Text(
+                            booking.status == 'Awaiting Final Payment'
+                                ? 'RM ${booking.finalAmount.toStringAsFixed(2)}'
+                                : (booking.isOpenRental && _isOngoing(booking)
+                                      ? 'RM ${(_getDynamicPrice(booking) + (overdue['charges'] as num)).toStringAsFixed(2)}'
+                                      : 'RM ${(booking.totalPrice + (overdue['charges'] as num)).toStringAsFixed(2)}'),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 14,
+                              color: overdue['isOverdue'] == true
+                                  ? Colors.redAccent
+                                  : AppColors.primaryOrange,
+                            ),
                           ),
                         ),
                         if (booking.isOpenRental && _isOngoing(booking))
-                          Text(
-                            '(Est. for ${_getElapsedDays(booking)} days)',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: _subColor,
+                          Directionality(
+                            textDirection: ui.TextDirection.ltr,
+                            child: Text(
+                              '${'(Est. for '.tr(context)}${_getElapsedDays(booking)}${' days)'.tr(context)}',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: _subColor,
+                              ),
                             ),
                           ),
                         if (booking.discountAmount > 0)
@@ -641,12 +651,15 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                                   size: 10,
                                 ),
                                 const SizedBox(width: 2),
-                                Text(
-                                  '-RM ${booking.discountAmount.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    color: Colors.green,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.bold,
+                                Directionality(
+                                  textDirection: ui.TextDirection.ltr,
+                                  child: Text(
+                                    '-RM ${booking.discountAmount.toStringAsFixed(2)}',
+                                    style: const TextStyle(
+                                      color: Colors.green,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -657,7 +670,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                     if (booking.isOpenRental && _isOngoing(booking)) ...[
                       const SizedBox(height: 2),
                       Text(
-                        'Active Duration: ${_getElapsedHours(booking)} hours elapsed',
+                        '${'Active Duration:'.tr(context)} ${_getElapsedHours(booking)} ${'hours elapsed'.tr(context)}',
                         style: TextStyle(
                           fontSize: 9,
                           fontWeight: FontWeight.bold,
@@ -678,7 +691,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                           const SizedBox(width: 4),
                           Flexible(
                             child: Text(
-                              'Overdue: ${overdue['days']}d ${overdue['hours']}h (+RM ${overdue['charges'].toStringAsFixed(2)})',
+                              '${'Overdue:'.tr(context)} ${overdue['days']}d ${overdue['hours']}h (+RM ${overdue['charges'].toStringAsFixed(2)})',
                               style: const TextStyle(
                                 color: Colors.redAccent,
                                 fontSize: 9.5,
@@ -709,7 +722,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                       _buildActionButton(
                         onPressed: () => _payNowExistingBooking(booking),
                         icon: Icons.payment_rounded,
-                        label: 'Pay Final Invoice',
+                        label: 'Pay Final Invoice'.tr(context),
                         backgroundColor: Colors.green,
                         foregroundColor: Colors.white,
                       ),
@@ -720,7 +733,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                           () => _payNowExistingBooking(booking),
                         ),
                         icon: Icons.payment_rounded,
-                        label: 'Pay Now',
+                        label: 'Pay Now'.tr(context),
                         backgroundColor: AppColors.primaryOrange,
                         foregroundColor: Colors.white,
                       ),
@@ -731,7 +744,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                           () => _confirmCancelBooking(booking),
                         ),
                         icon: Icons.close,
-                        label: 'Cancel Request',
+                        label: 'Cancel Request'.tr(context),
                         backgroundColor: null,
                         foregroundColor: Colors.redAccent,
                         outlinedColor: Colors.redAccent,
@@ -741,10 +754,44 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                       _buildActionButton(
                         onPressed: () => _submitReview(booking),
                         icon: Icons.star_rounded,
-                        label: 'Submit Review',
+                        label: 'Submit Review'.tr(context),
                         backgroundColor: Colors.green,
                         foregroundColor: Colors.white,
                       ),
+                    if (bStatus == 'active' ||
+                        bStatus == 'ongoing' ||
+                        bStatus == 'approved' ||
+                        bStatus == 'confirmed' ||
+                        bStatus == 'overdue' ||
+                        booking.isOpenRental)
+                      _buildActionButton(
+                        onPressed: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => MakePaymentScreen(
+                                booking: booking,
+                                existingPayments: _payments,
+                              ),
+                            ),
+                          );
+                          if (result == true) {
+                            _loadBookings();
+                          }
+                        },
+                        icon: Icons.payments_rounded,
+                        label: 'Partial Payment'.tr(context),
+                        backgroundColor: AppColors.primaryOrange,
+                        foregroundColor: Colors.white,
+                      ),
+                    _buildActionButton(
+                      onPressed: () => _showPaymentHistoryDialog(booking),
+                      icon: Icons.history_rounded,
+                      label: 'Payment Log'.tr(context),
+                      backgroundColor: null,
+                      foregroundColor: _textColor,
+                      outlinedColor: _borderColor,
+                    ),
                   ],
                 );
 
@@ -752,7 +799,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                     ? _buildActionButton(
                         onPressed: () => _showReceiptOptions(booking),
                         icon: Icons.receipt_long_rounded,
-                        label: 'Receipt',
+                        label: 'Receipt'.tr(context),
                         backgroundColor: null,
                         foregroundColor: AppColors.primaryOrange,
                         outlinedColor: AppColors.primaryOrange,
@@ -910,7 +957,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
-        badgeText,
+        badgeText.tr(context),
         style: TextStyle(
           color: badgeColor,
           fontSize: 8,
@@ -979,18 +1026,18 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
           side: BorderSide(color: _borderColor),
         ),
         title: Text(
-          'Cancel Reservation',
+          'Cancel Reservation'.tr(context),
           style: TextStyle(fontWeight: FontWeight.bold, color: _textColor),
         ),
         content: Text(
-          'Are you sure you want to cancel this booking? This will result in a loss of $pointsToLose loyalty points and cannot be undone.',
+          '${'Are you sure you want to cancel this booking? This will result in a loss of '.tr(context)}$pointsToLose${' loyalty points and cannot be undone.'.tr(context)}',
           style: TextStyle(color: _textColor),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text(
-              'No',
+              'No'.tr(context),
               style: TextStyle(
                 color: _isDark ? const Color(0xFF94A3B8) : Colors.grey,
               ),
@@ -1002,9 +1049,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              'Cancel Booking',
-              style: TextStyle(fontWeight: FontWeight.bold),
+            child: Text(
+              'Cancel Booking'.tr(context),
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -1111,10 +1158,10 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
               fontSize: 13,
             ),
             tabs: [
-              _buildTabItem('Upcoming', 0, upcomingList.length),
-              _buildTabItem('Ongoing', 1, ongoingList.length),
-              _buildTabItem('Completed', 2, completedList.length),
-              _buildTabItem('Cancelled', 3, cancelledList.length),
+              _buildTabItem('Upcoming'.tr(context), 0, upcomingList.length),
+              _buildTabItem('Ongoing'.tr(context), 1, ongoingList.length),
+              _buildTabItem('Completed'.tr(context), 2, completedList.length),
+              _buildTabItem('Cancelled'.tr(context), 3, cancelledList.length),
             ],
           ),
         ),
@@ -1126,25 +1173,25 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
               children: [
                 _buildTabList(
                   upcomingList,
-                  'No upcoming bookings.',
+                  'No upcoming bookings.'.tr(context),
                   isDesktop,
                   0,
                 ),
                 _buildTabList(
                   ongoingList,
-                  'No ongoing bookings.',
+                  'No ongoing bookings.'.tr(context),
                   isDesktop,
                   1,
                 ),
                 _buildTabList(
                   completedList,
-                  'No completed bookings.',
+                  'No completed bookings.'.tr(context),
                   isDesktop,
                   2,
                 ),
                 _buildTabList(
                   cancelledList,
-                  'No cancelled reservations.',
+                  'No cancelled reservations.'.tr(context),
                   isDesktop,
                   3,
                 ),
@@ -1164,7 +1211,10 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text('$label ($count)'),
+          Directionality(
+            textDirection: ui.TextDirection.ltr,
+            child: Text('$label ($count)'),
+          ),
           if (showBadge && badgeCount > 0) ...[
             const SizedBox(width: 6),
             Container(
@@ -1245,9 +1295,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                     vertical: 12,
                   ),
                 ),
-                child: const Text(
-                  'Browse Cars',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                child: Text(
+                  'Browse Cars'.tr(context),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                 ),
               ),
             ],
@@ -1263,23 +1313,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
       itemBuilder: (context, index) {
         return _buildBookingCard(list[index], isDesktop);
       },
-    );
-  }
-
-  void _showReturnVideoUploadModal(BookingModel booking) {
-    final uid = _authService.currentUser?.uid ?? booking.userId;
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => UploadVideoModalSheet(
-        booking: booking,
-        uploaderId: uid,
-        uploaderName: booking.userName.isNotEmpty ? booking.userName : 'Customer',
-        uploaderRole: 'customer',
-        onUploaded: _loadBookings,
-        onSkipped: _loadBookings,
-      ),
     );
   }
 
@@ -1407,7 +1440,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Receipt Options',
+              'Receipt Options'.tr(context),
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -1416,13 +1449,13 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
             ),
             const SizedBox(height: 6),
             Text(
-              'Booking ID: #${booking.id.toUpperCase()}',
+              '${'Booking ID:'.tr(context)} #${booking.id.toUpperCase()}',
               style: TextStyle(fontSize: 11, color: _subColor),
             ),
             const SizedBox(height: 16),
             ListTile(
               leading: Icon(Icons.visibility_outlined, color: _textColor),
-              title: Text('View Receipt', style: TextStyle(color: _textColor)),
+              title: Text('View Receipt'.tr(context), style: TextStyle(color: _textColor)),
               onTap: () {
                 Navigator.pop(ctx);
                 ReceiptService().viewReceipt(context, booking.id);
@@ -1433,7 +1466,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                 Icons.picture_as_pdf_outlined,
                 color: AppColors.primaryOrange,
               ),
-              title: Text('Download PDF', style: TextStyle(color: _textColor)),
+              title: Text('Download PDF'.tr(context), style: TextStyle(color: _textColor)),
               onTap: () {
                 Navigator.pop(ctx);
                 ReceiptService().downloadReceipt(context, booking.id);
@@ -1461,9 +1494,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
         const SizedBox(height: 8),
         const Divider(color: Colors.white10),
         const SizedBox(height: 8),
-        const Text(
-          'RENTAL SELF-SERVICE OPTIONS',
-          style: TextStyle(
+        Text(
+          'RENTAL SELF-SERVICE OPTIONS'.tr(context),
+          style: const TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.bold,
             color: AppColors.primaryOrange,
@@ -1487,12 +1520,15 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    'Extension request pending approval until ${DateFormat('dd MMM yyyy hh:mm a').format(DateTime.parse(booking.extensionRequest!['newReturnDate']))}',
-                    style: const TextStyle(
-                      color: Colors.orange,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
+                  child: Directionality(
+                    textDirection: ui.TextDirection.ltr,
+                    child: Text(
+                      '${'Extension request pending approval until '.tr(context)}${DateFormat('dd MMM yyyy hh:mm a').format(DateTime.parse(booking.extensionRequest!['newReturnDate']))}',
+                      style: const TextStyle(
+                        color: Colors.orange,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
@@ -1514,11 +1550,11 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    booking.status == 'Awaiting Return Inspection'
+                    (booking.status == 'Awaiting Return Inspection'
                         ? 'Return request submitted. Please wait for the Admin to inspect the vehicle.'
                         : (booking.status == 'Awaiting Final Payment'
                               ? 'Inspection completed. Awaiting final payment.'
-                              : 'Return request submitted. Awaiting Admin inspection & completion.'),
+                              : 'Return request submitted. Awaiting Admin inspection & completion.')).tr(context),
                     style: const TextStyle(
                       color: Colors.blue,
                       fontSize: 10,
@@ -1541,9 +1577,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                     ? null
                     : () => _showExtensionSheet(booking),
                 icon: const Icon(Icons.add_alarm, size: 12),
-                label: const Text(
-                  'Extend Booking',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                label: Text(
+                  'Extend Booking'.tr(context),
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryOrange,
@@ -1564,7 +1600,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                   : () => _confirmReturnVehicle(booking),
               icon: const Icon(Icons.keyboard_return, size: 12),
               label: Text(
-                booking.isOpenRental ? 'Return Car' : 'Return Vehicle',
+                (booking.isOpenRental ? 'Return Car' : 'Return Vehicle').tr(context),
                 style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
@@ -1589,7 +1625,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                   : () => _markOnMyWay(booking),
               icon: const Icon(Icons.directions_run, size: 12),
               label: Text(
-                isOnMyWay ? 'On My Way!' : "I'm On My Way",
+                (isOnMyWay ? 'On My Way!' : "I'm On My Way").tr(context),
                 style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
@@ -1609,28 +1645,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
               ),
             ),
             ElevatedButton.icon(
-              onPressed: () => _showReturnVideoUploadModal(booking),
-              icon: const Icon(Icons.videocam_rounded, size: 12),
-              label: Text(
-                booking.hasCustomerReturnVideo ? 'Return Video Evidence' : 'Upload Return Video',
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: booking.hasCustomerReturnVideo ? Colors.teal : AppColors.primaryOrange,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-            ElevatedButton.icon(
               onPressed: () {
                 Navigator.push(
                   context,
@@ -1640,9 +1654,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                 );
               },
               icon: const Icon(Icons.support_agent, size: 12),
-              label: const Text(
-                'Contact Support',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+              label: Text(
+                'Contact Support'.tr(context),
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blueGrey,
@@ -1657,12 +1671,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
               ),
             ),
           ],
-        ),
-        const SizedBox(height: 14),
-        ReturnVideoEvidenceWidget(
-          booking: booking,
-          isCustomerView: true,
-          onUploadClick: () => _showReturnVideoUploadModal(booking),
         ),
       ],
     );
@@ -1744,7 +1752,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Request Extension',
+                    'Request Extension'.tr(context),
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -1753,7 +1761,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Current Return: ${booking.returnDate != null ? DateFormat('dd MMM yyyy hh:mm a').format(booking.returnDate!) : "Open Rental"}',
+                    '${'Current Return:'.tr(context)} ${booking.returnDate != null ? DateFormat('dd MMM yyyy hh:mm a').format(booking.returnDate!) : "Open Rental".tr(context)}',
                     style: TextStyle(fontSize: 11, color: textSec),
                   ),
                   const SizedBox(height: 16),
@@ -1833,18 +1841,18 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                           color: Colors.redAccent.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Row(
+                        child: Row(
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.error_outline,
                               color: Colors.redAccent,
                               size: 14,
                             ),
-                            SizedBox(width: 8),
+                            const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                'Vehicle is not available for this period. Please try another date/time.',
-                                style: TextStyle(
+                                'Vehicle is not available for this period. Please try another date/time.'.tr(context),
+                                style: const TextStyle(
                                   color: Colors.redAccent,
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
@@ -1870,14 +1878,14 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  'Additional Duration',
+                                  'Additional Duration'.tr(context),
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: textSec,
                                   ),
                                 ),
                                 Text(
-                                  '$addDays Days ($hours Hours)',
+                                  '$addDays ${(addDays == 1 ? 'Day' : 'Days').tr(context)} ($hours ${(hours == 1 ? 'Hour' : 'Hours').tr(context)})',
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
@@ -1891,7 +1899,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  'Daily Rate',
+                                  'Daily Rate'.tr(context),
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: textSec,
@@ -1912,7 +1920,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  'Additional Cost',
+                                  'Additional Cost'.tr(context),
                                   style: const TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
@@ -1954,8 +1962,8 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                         ),
                         child: Text(
                           addCost > 0
-                              ? 'Proceed to Payment (RM ${addCost.toStringAsFixed(2)})'
-                              : 'Select a valid extension date',
+                              ? '${"Proceed to Payment".tr(context)} (RM ${addCost.toStringAsFixed(2)})'
+                              : 'Select a valid extension date'.tr(context),
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
@@ -1983,18 +1991,18 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
           side: BorderSide(color: _borderColor),
         ),
         title: Text(
-          'Return Vehicle',
+          'Return Vehicle'.tr(context),
           style: TextStyle(fontWeight: FontWeight.bold, color: _textColor),
         ),
         content: Text(
-          'Are you sure you want to request a return for this vehicle? This will notify the Admin to schedule an inspection.',
+          'Are you sure you want to request a return for this vehicle? This will notify the Admin to schedule an inspection.'.tr(context),
           style: TextStyle(color: _textColor),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text(
-              'Cancel',
+              'Cancel'.tr(context),
               style: TextStyle(
                 color: _isDark ? const Color(0xFF94A3B8) : Colors.grey,
               ),
@@ -2006,9 +2014,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              'Request Return',
-              style: TextStyle(fontWeight: FontWeight.bold),
+            child: Text(
+              'Request Return'.tr(context),
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -2021,8 +2029,8 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
         _loadBookings();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Return request submitted successfully.'),
+            SnackBar(
+              content: Text('Return request submitted successfully.'.tr(context)),
               backgroundColor: Colors.green,
             ),
           );
@@ -2031,7 +2039,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to request return: $e'),
+              content: Text('${"Failed to request return: ".tr(context)}$e'),
               backgroundColor: Colors.redAccent,
             ),
           );
@@ -2128,8 +2136,8 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
       _loadBookings();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Admin notified that you're on your way!"),
+          SnackBar(
+            content: Text("Admin notified that you're on your way!".tr(context)),
             backgroundColor: Colors.green,
           ),
         );
@@ -2138,7 +2146,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Failed to update status: $e"),
+            content: Text("${"Failed to update status: ".tr(context)}$e"),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -2174,5 +2182,99 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     }
     final days = _getElapsedDays(booking);
     return days * booking.totalPrice;
+  }
+
+
+
+
+
+  void _showPaymentHistoryDialog(BookingModel booking) {
+    final bookingPayments =
+        _payments.where((p) => p.bookingId == booking.id).toList();
+    bookingPayments.sort((a, b) => b.paymentDate.compareTo(a.paymentDate));
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            'Payment Log — #${booking.id.substring(0, booking.id.length > 8 ? 8 : booking.id.length).toUpperCase()}',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          content: SizedBox(
+            width: 400,
+            child: bookingPayments.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.all(24.0),
+                    child: Text(
+                      'No payments recorded for this booking yet.',
+                      textAlign: TextAlign.center,
+                    ),
+                  )
+                : ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: bookingPayments.length,
+                    separatorBuilder: (ctx, idx) => const Divider(height: 12),
+                    itemBuilder: (context, index) {
+                      final p = bookingPayments[index];
+                      final isApproved =
+                          p.paymentStatus?.toLowerCase() == 'approved' ||
+                          p.status.toLowerCase() == 'approved' ||
+                          p.status.toLowerCase() == 'paid';
+                      final statusColor =
+                          isApproved ? Colors.green : Colors.orange;
+
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: CircleAvatar(
+                          backgroundColor: statusColor.withValues(alpha: 0.1),
+                          child: Icon(
+                            Icons.payment_rounded,
+                            color: statusColor,
+                            size: 20,
+                          ),
+                        ),
+                        title: Text(
+                          'RM ${p.amount.toStringAsFixed(2)}',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          '${p.paymentMethod} • ${DateFormat('dd MMM yyyy, hh:mm a').format(p.paymentDate)}',
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                        trailing: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            (p.paymentStatus ?? p.status).toUpperCase(),
+                            style: TextStyle(
+                              color: statusColor,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
   }
 }

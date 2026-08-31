@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
@@ -5,10 +6,12 @@ import '../../../models/vehicle_model.dart';
 import '../../../models/branch_model.dart';
 import '../../../services/vehicle_service.dart';
 import '../../../services/branch_service.dart';
+import '../../../services/booking_hold_service.dart';
 import '../../../constants/colors.dart';
 import '../../../widgets/app_image.dart';
 import '../../../widgets/animated_widgets.dart';
 import '../../../widgets/skeleton_loaders.dart';
+import '../../../l10n/app_translations.dart';
 
 class VehiclesView extends StatefulWidget {
   const VehiclesView({super.key});
@@ -26,6 +29,9 @@ class _VehiclesViewState extends State<VehiclesView> {
   bool _loading = false;
   String? _error;
 
+  StreamSubscription<List<VehicleModel>>? _vehiclesSub;
+  StreamSubscription<List<BranchModel>>? _branchesSub;
+
   String _searchQuery = '';
   String _categoryFilter = 'All'; // 'All', 'Economy', 'Sedan', 'SUV', 'MPV'
   String _statusFilter = 'All'; // 'All', 'Available', 'Booked', 'Maintenance'
@@ -34,6 +40,7 @@ class _VehiclesViewState extends State<VehiclesView> {
   @override
   void initState() {
     super.initState();
+    _subscribeToLiveData();
     _loadData();
     _searchController.addListener(() {
       setState(() {
@@ -42,9 +49,32 @@ class _VehiclesViewState extends State<VehiclesView> {
     });
   }
 
+  void _subscribeToLiveData() {
+    _vehiclesSub?.cancel();
+    _vehiclesSub = _vehicleService.getVehiclesStream().listen((vList) {
+      if (mounted) {
+        setState(() {
+          _vehicles = vList;
+          _loading = false;
+        });
+      }
+    });
+
+    _branchesSub?.cancel();
+    _branchesSub = _branchService.getBranchesStream().listen((bList) {
+      if (mounted) {
+        setState(() {
+          _branches = bList;
+        });
+      }
+    });
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
+    _vehiclesSub?.cancel();
+    _branchesSub?.cancel();
     super.dispose();
   }
 
@@ -52,9 +82,9 @@ class _VehiclesViewState extends State<VehiclesView> {
     if (!mounted) return;
     try {
       final results = await Future.wait([
-        _vehicleService.getVehicles(applyStatusSync: false, forceRefresh: true),
-        _branchService.getBranches(forceRefresh: true),
-      ]).timeout(const Duration(seconds: 4));
+        _vehicleService.getVehicles(applyStatusSync: false, forceRefresh: false),
+        _branchService.getBranches(forceRefresh: false),
+      ]);
       if (mounted) {
         setState(() {
           _vehicles = results[0] as List<VehicleModel>;
@@ -91,14 +121,14 @@ class _VehiclesViewState extends State<VehiclesView> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Vehicle'),
-        content: const Text(
-          'Are you sure you want to remove this vehicle from the database?',
+        title: Text('Delete Vehicle'.tr(context)),
+        content: Text(
+          'Are you sure you want to remove this vehicle from the database?'.tr(context),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text('Cancel'.tr(context)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -106,7 +136,7 @@ class _VehiclesViewState extends State<VehiclesView> {
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
+            child: Text('Delete'.tr(context)),
           ),
         ],
       ),
@@ -190,7 +220,7 @@ class _VehiclesViewState extends State<VehiclesView> {
             ElevatedButton.icon(
               onPressed: _loadData,
               icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Retry Loading'),
+              label: Text('Retry Loading'.tr(context)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryOrange,
                 foregroundColor: Colors.white,
@@ -269,7 +299,7 @@ class _VehiclesViewState extends State<VehiclesView> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Fleet Inventory',
+                            'Fleet Inventory'.tr(context),
                             style: TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.w900,
@@ -277,7 +307,7 @@ class _VehiclesViewState extends State<VehiclesView> {
                             ),
                           ),
                           Text(
-                            'Manage vehicle assets, pricing models, and branch allocations.',
+                            'Manage vehicle assets, pricing models, and branch allocations.'.tr(context),
                             style: TextStyle(
                               fontSize: 12,
                               color: textSecondary,
@@ -297,7 +327,7 @@ class _VehiclesViewState extends State<VehiclesView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Fleet Inventory',
+                          'Fleet Inventory'.tr(context),
                           style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.w900,
@@ -305,7 +335,7 @@ class _VehiclesViewState extends State<VehiclesView> {
                           ),
                         ),
                         Text(
-                          'Manage vehicle assets, pricing models, and branch allocations.',
+                          'Manage vehicle assets, pricing models, and branch allocations.'.tr(context),
                           style: TextStyle(fontSize: 12, color: textSecondary),
                         ),
                       ],
@@ -389,7 +419,7 @@ class _VehiclesViewState extends State<VehiclesView> {
                           controller: _searchController,
                           style: TextStyle(color: textPrimary),
                           decoration: InputDecoration(
-                            hintText: 'Search by make/ model/ plate number',
+                            hintText: 'Search by make/ model/ plate number'.tr(context),
                             hintStyle: TextStyle(
                               color: textSecondary.withValues(alpha: 0.7),
                             ),
@@ -427,7 +457,7 @@ class _VehiclesViewState extends State<VehiclesView> {
                         controller: _searchController,
                         style: TextStyle(color: textPrimary),
                         decoration: InputDecoration(
-                          hintText: 'Search by make/ model/ plate number',
+                          hintText: 'Search by make/ model/ plate number'.tr(context),
                           hintStyle: TextStyle(
                             color: textSecondary.withValues(alpha: 0.7),
                           ),
@@ -488,7 +518,7 @@ class _VehiclesViewState extends State<VehiclesView> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'No fleet assets found matching filters.',
+                          'No fleet assets found matching filters.'.tr(context),
                           style: TextStyle(color: textSecondary),
                         ),
                       ],
@@ -503,17 +533,17 @@ class _VehiclesViewState extends State<VehiclesView> {
                     final vehicle = filteredVehicles[index];
 
                     Color statusColor = Colors.green;
-                    String statusLabel = 'AVAILABLE';
+                    String statusLabel = 'AVAILABLE'.tr(context);
                     final statusLower = vehicle.status.toLowerCase();
                     if (statusLower == 'maintenance') {
                       statusColor = Colors.redAccent;
-                      statusLabel = 'MAINTENANCE';
+                      statusLabel = 'MAINTENANCE'.tr(context);
                     } else if (statusLower == 'booked') {
                       statusColor = Colors.orange;
-                      statusLabel = 'BOOKED';
+                      statusLabel = 'BOOKED'.tr(context);
                     } else if (statusLower == 'inactive') {
                       statusColor = Colors.grey;
-                      statusLabel = 'INACTIVE';
+                      statusLabel = 'INACTIVE'.tr(context);
                     }
 
                     return FadeInUp(
@@ -590,7 +620,7 @@ class _VehiclesViewState extends State<VehiclesView> {
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
-                                          'Plate: ${vehicle.plateNumber} | Category: ${vehicle.category} | Hub: ${vehicle.branchName.isNotEmpty ? vehicle.branchName : "General Hub"}',
+                                          '${"Plate:".tr(context)} ${vehicle.plateNumber} | ${"Category:".tr(context)} ${vehicle.category.tr(context)} | ${"Hub:".tr(context)} ${vehicle.branchName.isNotEmpty ? vehicle.branchName : "General Hub".tr(context)}',
                                           style: TextStyle(
                                             color: textSecondary,
                                             fontSize: 12,
@@ -600,7 +630,7 @@ class _VehiclesViewState extends State<VehiclesView> {
                                         Row(
                                           children: [
                                             Text(
-                                              'RM ${vehicle.pricePerDay.toStringAsFixed(0)} / day',
+                                              'RM ${vehicle.pricePerDay.toStringAsFixed(0)} ${"/ day".tr(context)}',
                                               style: const TextStyle(
                                                 fontWeight: FontWeight.bold,
                                                 color: AppColors.primaryOrange,
@@ -609,7 +639,7 @@ class _VehiclesViewState extends State<VehiclesView> {
                                             ),
                                             const SizedBox(width: 24),
                                             Text(
-                                              'Change Status:',
+                                              'Change Status:'.tr(context),
                                               style: TextStyle(
                                                 fontSize: 11,
                                                 color: textSecondary,
@@ -631,6 +661,7 @@ class _VehiclesViewState extends State<VehiclesView> {
                                   ),
                                   Column(
                                     children: [
+                                      _buildHoldVehicleButton(vehicle),
                                       IconButton(
                                         icon: Icon(
                                           Icons.edit_outlined,
@@ -715,7 +746,7 @@ class _VehiclesViewState extends State<VehiclesView> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    'Plate: ${vehicle.plateNumber} | Category: ${vehicle.category}\nHub: ${vehicle.branchName.isNotEmpty ? vehicle.branchName : "General Hub"}',
+                                    '${"Plate:".tr(context)} ${vehicle.plateNumber} | ${"Category:".tr(context)} ${vehicle.category.tr(context)}\n${"Hub:".tr(context)} ${vehicle.branchName.isNotEmpty ? vehicle.branchName : "General Hub".tr(context)}',
                                     style: TextStyle(
                                       color: textSecondary,
                                       fontSize: 12,
@@ -723,7 +754,7 @@ class _VehiclesViewState extends State<VehiclesView> {
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    'RM ${vehicle.pricePerDay.toStringAsFixed(0)} / day',
+                                    'RM ${vehicle.pricePerDay.toStringAsFixed(0)} ${"/ day".tr(context)}',
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                       color: AppColors.primaryOrange,
@@ -738,7 +769,7 @@ class _VehiclesViewState extends State<VehiclesView> {
                                       Row(
                                         children: [
                                           Text(
-                                            'Status:',
+                                            'Status:'.tr(context),
                                             style: TextStyle(
                                               fontSize: 11,
                                               color: textSecondary,
@@ -757,6 +788,7 @@ class _VehiclesViewState extends State<VehiclesView> {
                                       ),
                                       Row(
                                         children: [
+                                          _buildHoldVehicleButton(vehicle),
                                           IconButton(
                                             icon: Icon(
                                               Icons.edit_outlined,
@@ -802,9 +834,9 @@ class _VehiclesViewState extends State<VehiclesView> {
       ),
       onPressed: () => _showAddEditVehicleDialog(),
       icon: const Icon(Icons.add, size: 18),
-      label: const Text(
-        'Add Vehicle',
-        style: TextStyle(fontWeight: FontWeight.bold),
+      label: Text(
+        'Add Vehicle'.tr(context),
+        style: const TextStyle(fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -832,7 +864,7 @@ class _VehiclesViewState extends State<VehiclesView> {
           fontSize: 13,
         ),
         items: ['All', 'Economy', 'Sedan', 'SUV', 'MPV'].map((s) {
-          return DropdownMenuItem(value: s, child: Text(s));
+          return DropdownMenuItem(value: s, child: Text(s.tr(context)));
         }).toList(),
         onChanged: (val) {
           if (val != null) {
@@ -870,7 +902,7 @@ class _VehiclesViewState extends State<VehiclesView> {
         items: ['All', 'Available', 'Booked', 'Maintenance', 'Inactive'].map((
           s,
         ) {
-          return DropdownMenuItem(value: s, child: Text(s));
+          return DropdownMenuItem(value: s, child: Text(s.tr(context)));
         }).toList(),
         onChanged: (val) {
           if (val != null) {
@@ -955,11 +987,11 @@ class _VehiclesViewState extends State<VehiclesView> {
               }
             }
           },
-          items: const [
-            DropdownMenuItem(value: 'Available', child: Text('Available')),
-            DropdownMenuItem(value: 'Booked', child: Text('Booked')),
-            DropdownMenuItem(value: 'Maintenance', child: Text('Maintenance')),
-            DropdownMenuItem(value: 'Inactive', child: Text('Inactive')),
+          items: [
+            DropdownMenuItem(value: 'Available', child: Text('Available'.tr(context))),
+            DropdownMenuItem(value: 'Booked', child: Text('Booked'.tr(context))),
+            DropdownMenuItem(value: 'Maintenance', child: Text('Maintenance'.tr(context))),
+            DropdownMenuItem(value: 'Inactive', child: Text('Inactive'.tr(context))),
           ],
         ),
       ),
@@ -1012,7 +1044,7 @@ class _VehiclesViewState extends State<VehiclesView> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  label,
+                  label.tr(context),
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -1036,6 +1068,115 @@ class _VehiclesViewState extends State<VehiclesView> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildHoldVehicleButton(VehicleModel vehicle) {
+    return StreamBuilder<Map<String, dynamic>>(
+      stream: BookingHoldService().getVehicleHoldStream(vehicle.id),
+      builder: (context, snapshot) {
+        final eval = BookingHoldService.evaluateVehicleHoldData(snapshot.data);
+        final bool isHeld = eval['isHoldActive'] == true;
+        final String remaining = eval['formattedRemainingTime'] ?? '05:00';
+
+        if (isHeld) {
+          return IconButton(
+            tooltip: 'Active Hold ($remaining) - Tap to Release',
+            icon: const Icon(
+              Icons.timer_outlined,
+              color: Colors.redAccent,
+              size: 20,
+            ),
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: Text('Release Vehicle Hold?'.tr(context)),
+                  content: Text(
+                    'Vehicle ${vehicle.brand} ${vehicle.model} is currently held ($remaining remaining).\nDo you want to release the hold now?',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: Text('Cancel'.tr(context)),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryOrange,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: Text('Release Hold'.tr(context)),
+                    ),
+                  ],
+                ),
+              );
+
+              if (confirm == true) {
+                await BookingHoldService().clearVehicleHold(vehicle.id);
+                if (mounted) {
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text('Hold released for ${vehicle.model}'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              }
+            },
+          );
+        }
+
+        return IconButton(
+          tooltip: 'Hold Vehicle (5 Mins)',
+          icon: const Icon(
+            Icons.pause_circle_outline_rounded,
+            color: Colors.orange,
+            size: 20,
+          ),
+          onPressed: () async {
+            final messenger = ScaffoldMessenger.of(context);
+            final confirm = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: Text('Hold ${vehicle.brand} ${vehicle.model}?'),
+                content: const Text(
+                  'Activating hold will temporarily block all customer bookings for this vehicle for 5 minutes.\n\nVehicle hold will be saved to Firebase and auto-expire in 5 minutes.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: Text('Cancel'.tr(context)),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.redAccent,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: Text('Hold 5 Mins'.tr(context)),
+                  ),
+                ],
+              ),
+            );
+
+            if (confirm == true) {
+              await BookingHoldService().activateVehicleHold(vehicle.id);
+              if (mounted) {
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Vehicle ${vehicle.model} held for 5 minutes in Firebase!',
+                    ),
+                    backgroundColor: Colors.redAccent,
+                  ),
+                );
+              }
+            }
+          },
+        );
+      },
     );
   }
 }
@@ -1191,7 +1332,7 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       title: Text(
-        isEdit ? 'Edit Vehicle Spec' : 'Add New Vehicle',
+        isEdit ? 'Edit Vehicle Spec'.tr(context) : 'Add New Vehicle'.tr(context),
         style: TextStyle(
           fontWeight: FontWeight.bold,
           color: isDarkDialog ? Colors.white : Colors.black,
@@ -1266,7 +1407,7 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Upload Car Photo',
+                                'Upload Car Photo'.tr(context),
                                 style: TextStyle(
                                   color: Colors.grey[500],
                                   fontSize: 12,
@@ -1280,11 +1421,11 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
               const SizedBox(height: 16),
 
               // Gallery Section
-              const Align(
+              Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  'Gallery Images',
-                  style: TextStyle(
+                  'Gallery Images'.tr(context),
+                  style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 12,
                     color: AppColors.secondaryBlue,
@@ -1403,108 +1544,108 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
 
               TextField(
                 controller: _brandController,
-                decoration: const InputDecoration(
-                  labelText: 'Brand / Make (e.g. Proton)',
+                decoration: InputDecoration(
+                  labelText: 'Brand / Make (e.g. Proton)'.tr(context),
                 ),
               ),
               TextField(
                 controller: _modelController,
-                decoration: const InputDecoration(
-                  labelText: 'Model (e.g. Saga)',
+                decoration: InputDecoration(
+                  labelText: 'Model (e.g. Saga)'.tr(context),
                 ),
               ),
               TextField(
                 controller: _yearController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Manufacture Year',
+                decoration: InputDecoration(
+                  labelText: 'Manufacture Year'.tr(context),
                 ),
               ),
               TextField(
                 controller: _plateController,
-                decoration: const InputDecoration(labelText: 'Plate Number'),
+                decoration: InputDecoration(labelText: 'Plate Number'.tr(context)),
               ),
               TextField(
                 controller: _colorController,
-                decoration: const InputDecoration(labelText: 'Exterior Color'),
+                decoration: InputDecoration(labelText: 'Exterior Color'.tr(context)),
               ),
               TextField(
                 controller: _priceController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Rental Rate Per Day (RM)',
+                decoration: InputDecoration(
+                  labelText: 'Rental Rate Per Day (RM)'.tr(context),
                 ),
               ),
               TextField(
                 controller: _mileageController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Mileage (km)'),
+                decoration: InputDecoration(labelText: 'Mileage (km)'.tr(context)),
               ),
               TextField(
                 controller: _descController,
                 maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: 'Short Description',
+                decoration: InputDecoration(
+                  labelText: 'Short Description'.tr(context),
                 ),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 initialValue: _category,
-                decoration: const InputDecoration(labelText: 'Category'),
+                decoration: InputDecoration(labelText: 'Category'.tr(context)),
                 items: ['Economy', 'Sedan', 'SUV', 'MPV']
-                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                    .map((c) => DropdownMenuItem(value: c, child: Text(c.tr(context))))
                     .toList(),
                 onChanged: (val) => setState(() => _category = val!),
               ),
               DropdownButtonFormField<String>(
                 initialValue: _transmission,
-                decoration: const InputDecoration(labelText: 'Transmission'),
+                decoration: InputDecoration(labelText: 'Transmission'.tr(context)),
                 items: ['Automatic', 'Manual']
-                    .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                    .map((t) => DropdownMenuItem(value: t, child: Text(t.tr(context))))
                     .toList(),
                 onChanged: (val) => setState(() => _transmission = val!),
               ),
               DropdownButtonFormField<String>(
                 initialValue: _fuelType,
-                decoration: const InputDecoration(labelText: 'Fuel Type'),
+                decoration: InputDecoration(labelText: 'Fuel Type'.tr(context)),
                 items: ['Petrol', 'Diesel', 'Hybrid', 'Electric']
-                    .map((f) => DropdownMenuItem(value: f, child: Text(f)))
+                    .map((f) => DropdownMenuItem(value: f, child: Text(f.tr(context))))
                     .toList(),
                 onChanged: (val) => setState(() => _fuelType = val!),
               ),
               DropdownButtonFormField<int>(
                 initialValue: _seats,
-                decoration: const InputDecoration(labelText: 'Seats Count'),
+                decoration: InputDecoration(labelText: 'Seats Count'.tr(context)),
                 items: [4, 5, 7, 8]
                     .map(
                       (s) =>
-                          DropdownMenuItem(value: s, child: Text('$s Seats')),
+                          DropdownMenuItem(value: s, child: Text('$s Seats'.tr(context))),
                     )
                     .toList(),
                 onChanged: (val) => setState(() => _seats = val!),
               ),
               DropdownButtonFormField<String>(
                 initialValue: _status,
-                decoration: const InputDecoration(labelText: 'Vehicle Status'),
-                items: const [
+                decoration: InputDecoration(labelText: 'Vehicle Status'.tr(context)),
+                items: [
                   DropdownMenuItem(
                     value: 'Available',
-                    child: Text('Available'),
+                    child: Text('Available'.tr(context)),
                   ),
-                  DropdownMenuItem(value: 'Booked', child: Text('Booked')),
+                  DropdownMenuItem(value: 'Booked', child: Text('Booked'.tr(context))),
                   DropdownMenuItem(
                     value: 'Maintenance',
-                    child: Text('Under Maintenance'),
+                    child: Text('Under Maintenance'.tr(context)),
                   ),
-                  DropdownMenuItem(value: 'Inactive', child: Text('Inactive')),
+                  DropdownMenuItem(value: 'Inactive', child: Text('Inactive'.tr(context))),
                 ],
                 onChanged: (val) => setState(() => _status = val!),
               ),
               if (widget.branches.isNotEmpty)
                 DropdownButtonFormField<BranchModel>(
                   initialValue: _selectedBranch,
-                  decoration: const InputDecoration(
-                    labelText: 'Assigned Branch Hub',
+                  decoration: InputDecoration(
+                    labelText: 'Assigned Branch Hub'.tr(context),
                   ),
                   items: widget.branches
                       .map(
@@ -1520,7 +1661,7 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text('Cancel'.tr(context)),
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
@@ -1604,7 +1745,7 @@ class _VehicleFormDialogState extends State<VehicleFormDialog> {
             if (!context.mounted) return;
             Navigator.pop(context, true);
           },
-          child: Text(isEdit ? 'Save Changes' : 'Add Vehicle'),
+          child: Text(isEdit ? 'Save Changes'.tr(context) : 'Add Vehicle'.tr(context)),
         ),
       ],
     );

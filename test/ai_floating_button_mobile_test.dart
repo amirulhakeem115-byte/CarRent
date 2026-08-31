@@ -12,10 +12,10 @@ void main() {
         home: MediaQuery(
           data: const MediaQueryData(size: Size(390, 844)),
           child: MovableAIFloatingButtonOverlay(
-            child: const SizedBox.shrink(),
             onTap: () {},
             isOpen: false,
             isVisible: true,
+            child: const SizedBox.shrink(),
           ),
         ),
       ),

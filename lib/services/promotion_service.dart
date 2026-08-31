@@ -35,12 +35,10 @@ class PromotionService {
       .child('promotions');
 
   List<PromotionModel>? _cachedPromotions;
-  DateTime? _lastFetchTime;
 
   /// Clear memory cache
   void clearCache() {
     _cachedPromotions = null;
-    _lastFetchTime = null;
   }
 
   /// Verify authenticated Admin role before executing write operations
@@ -132,7 +130,17 @@ class PromotionService {
 
       final list = map.values.toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      _cachedPromotions = list;
       controller.add(list);
+    }
+
+    // Immediately emit warm cached promotions if available
+    if (_cachedPromotions != null && _cachedPromotions!.isNotEmpty) {
+      scheduleMicrotask(() {
+        if (!controller.isClosed && _cachedPromotions != null) {
+          controller.add(_cachedPromotions!);
+        }
+      });
     }
 
     primarySub = _primaryDb.onValue.listen(
@@ -175,8 +183,7 @@ class PromotionService {
   }) async {
     if (!forceRefresh &&
         _cachedPromotions != null &&
-        _lastFetchTime != null &&
-        DateTime.now().difference(_lastFetchTime!).inSeconds < 30) {
+        _cachedPromotions!.isNotEmpty) {
       return _cachedPromotions!;
     }
 
@@ -192,12 +199,11 @@ class PromotionService {
 
     try {
       final snapshot = await _primaryDb.get().timeout(
-        const Duration(seconds: 5),
+        const Duration(seconds: 2),
       );
       if (snapshot.exists && snapshot.value != null) {
         final list = _parseSnapshot(snapshot);
         _cachedPromotions = list;
-        _lastFetchTime = DateTime.now();
         return list;
       }
     } on FirebaseException catch (e) {
@@ -214,12 +220,11 @@ class PromotionService {
         '[FIREBASE TRACE] Screen="Promotions", Function="getPromotions", Path="company_settings/promotions", Operation="Read", UID="$uid", Role="$role"',
       );
       final snapshot = await _fallbackDb.get().timeout(
-        const Duration(seconds: 5),
+        const Duration(seconds: 2),
       );
       if (snapshot.exists && snapshot.value != null) {
         final list = _parseSnapshot(snapshot);
         _cachedPromotions = list;
-        _lastFetchTime = DateTime.now();
         return list;
       }
     } catch (e) {
@@ -810,8 +815,20 @@ class PromotionService {
     }
   }
 
-  /// Seed preset banners if no promotions exist
+  /// Seed preset banners if no promotions exist (Admin only)
   Future<void> seedDefaultPromotions() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    try {
+      final role = await UserRoleCache.getRole(user.uid);
+      if (role.toLowerCase() != 'admin' &&
+          role.toLowerCase() != 'super_admin') {
+        return; // Only admins can write to /promotions
+      }
+    } catch (_) {
+      return;
+    }
+
     final existing = await getPromotions();
     if (existing.isNotEmpty) return;
 

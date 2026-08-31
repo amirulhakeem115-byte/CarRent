@@ -21,6 +21,7 @@ import '../../../services/file_download_helper.dart'
     if (dart.library.html) '../../../services/file_download_web.dart'
     as download_helper;
 import '../../../services/company_settings_provider.dart';
+import '../../../l10n/app_translations.dart';
 
 class CustomersView extends StatefulWidget {
   const CustomersView({super.key});
@@ -58,11 +59,26 @@ class _CustomersViewState extends State<CustomersView> {
     return size < min ? min : size;
   }
 
+  StreamSubscription<List<UserModel>>? _usersSub;
+
   @override
   void initState() {
     super.initState();
+    _subscribeToLiveData();
     _loadData();
     _searchController.addListener(_onSearchChanged);
+  }
+
+  void _subscribeToLiveData() {
+    _usersSub?.cancel();
+    _usersSub = _databaseService.getUsersStream().listen((uList) {
+      if (mounted) {
+        setState(() {
+          _users = uList;
+          _loading = false;
+        });
+      }
+    });
   }
 
   void _onSearchChanged() {
@@ -74,37 +90,36 @@ class _CustomersViewState extends State<CustomersView> {
   @override
   void dispose() {
     _searchController.dispose();
+    _usersSub?.cancel();
     super.dispose();
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadData({bool forceRefresh = false}) async {
     if (!mounted) return;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (_users.isEmpty) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
-      final allUsers = await _databaseService
-          .getUsers(forceRefresh: true)
-          .timeout(const Duration(seconds: 10));
-      final allBookings = await _bookingService.getBookings().timeout(
-        const Duration(seconds: 10),
-      );
-      final allPayments = await _paymentService.getPayments().timeout(
-        const Duration(seconds: 10),
-      );
+      final results = await Future.wait([
+        _databaseService.getUsers(forceRefresh: forceRefresh),
+        _bookingService.getBookings(forceRefresh: forceRefresh),
+        _paymentService.getPayments(forceRefresh: forceRefresh),
+      ]);
 
       if (mounted) {
         setState(() {
-          _users = allUsers;
-          _bookings = allBookings;
-          _payments = allPayments;
+          _users = results[0] as List<UserModel>;
+          _bookings = results[1] as List<BookingModel>;
+          _payments = results[2] as List<PaymentModel>;
           _loading = false;
         });
       }
     } catch (e) {
       debugPrint('Error loading user registry records: $e');
-      if (mounted) {
+      if (mounted && _users.isEmpty) {
         setState(() {
           _error =
               'Failed to load user registry records. Check permissions or network.';
@@ -456,8 +471,8 @@ class _CustomersViewState extends State<CustomersView> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(
-        child: LoadingWidget(message: 'Syncing registry users...'),
+      return Center(
+        child: LoadingWidget(message: 'Syncing registry users...'.tr(context)),
       );
     }
 
@@ -473,7 +488,7 @@ class _CustomersViewState extends State<CustomersView> {
             ),
             const SizedBox(height: 16),
             Text(
-              _error!,
+              _error!.tr(context),
               style: const TextStyle(
                 fontSize: 16,
                 color: AppColors.secondaryBlue,
@@ -483,7 +498,7 @@ class _CustomersViewState extends State<CustomersView> {
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: _loadData,
-              child: const Text('Retry Registry Sync'),
+              child: Text('Retry Registry Sync'.tr(context)),
             ),
           ],
         ),
@@ -530,7 +545,7 @@ class _CustomersViewState extends State<CustomersView> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'User Management',
+                            'User Management'.tr(context),
                             style: TextStyle(
                               fontSize: _fs(22, min: 18),
                               fontWeight: FontWeight.w900,
@@ -538,7 +553,7 @@ class _CustomersViewState extends State<CustomersView> {
                             ),
                           ),
                           Text(
-                            'Audit registration credentials, manage user roles, account active statuses, and driving licenses.',
+                            'Audit registration credentials, manage user roles, account active statuses, and driving licenses.'.tr(context),
                             style: TextStyle(
                               fontSize: _fs(12, min: 10),
                               color: textSecondary,
@@ -558,7 +573,7 @@ class _CustomersViewState extends State<CustomersView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'User Management',
+                          'User Management'.tr(context),
                           style: TextStyle(
                             fontSize: _fs(22, min: 18),
                             fontWeight: FontWeight.w900,
@@ -566,7 +581,7 @@ class _CustomersViewState extends State<CustomersView> {
                           ),
                         ),
                         Text(
-                          'Audit registration credentials, manage user roles, account active statuses, and driving licenses.',
+                          'Audit registration credentials, manage user roles, account active statuses, and driving licenses.'.tr(context),
                           style: TextStyle(
                             fontSize: _fs(12, min: 10),
                             color: textSecondary,
@@ -665,7 +680,7 @@ class _CustomersViewState extends State<CustomersView> {
                           style: TextStyle(color: textPrimary),
                           decoration: InputDecoration(
                             hintText:
-                                'Search registry by user name or email...',
+                                'Search registry by user name or email...'.tr(context),
                             hintStyle: TextStyle(
                               color: textSecondary.withValues(alpha: 0.7),
                             ),
@@ -696,7 +711,7 @@ class _CustomersViewState extends State<CustomersView> {
                         controller: _searchController,
                         style: TextStyle(color: textPrimary),
                         decoration: InputDecoration(
-                          hintText: 'Search registry by user name or email...',
+                          hintText: 'Search registry by user name or email...'.tr(context),
                           hintStyle: TextStyle(
                             color: textSecondary.withValues(alpha: 0.7),
                           ),
@@ -742,7 +757,7 @@ class _CustomersViewState extends State<CustomersView> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'No registered users match selected search query or filters.',
+                          'No registered users match selected search query or filters.'.tr(context),
                           style: TextStyle(
                             color: textSecondary,
                             fontWeight: FontWeight.bold,
@@ -825,7 +840,7 @@ class _CustomersViewState extends State<CustomersView> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  label,
+                  label.tr(context),
                   style: TextStyle(
                     color: textSecondary,
                     fontSize: _fs(10, min: 8),
@@ -868,7 +883,7 @@ class _CustomersViewState extends State<CustomersView> {
           onPressed: _exportExcel,
           icon: const Icon(Icons.table_view_outlined, size: 18),
           label: Text(
-            'Export Excel',
+            'Export Excel'.tr(context),
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: _fs(14, min: 11),
@@ -887,7 +902,7 @@ class _CustomersViewState extends State<CustomersView> {
           onPressed: _exportPdf,
           icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
           label: Text(
-            'Export PDF',
+            'Export PDF'.tr(context),
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: _fs(14, min: 11),
@@ -922,7 +937,7 @@ class _CustomersViewState extends State<CustomersView> {
             style: TextStyle(color: textPrimary, fontWeight: FontWeight.bold),
             underline: const SizedBox(),
             items: ['All', 'Admin', 'Customer'].map((r) {
-              return DropdownMenuItem(value: r, child: Text(r));
+              return DropdownMenuItem(value: r, child: Text('Role: $r'.tr(context)));
             }).toList(),
             onChanged: (val) {
               if (val != null) setState(() => _filterRole = val);
@@ -944,7 +959,7 @@ class _CustomersViewState extends State<CustomersView> {
             items: ['All', 'Active', 'Disabled'].map((s) {
               return DropdownMenuItem(
                 value: s,
-                child: Text(s == 'Disabled' ? 'Disabled/Suspended' : s),
+                child: Text('Status: $s'.tr(context)),
               );
             }).toList(),
             onChanged: (val) {
@@ -966,7 +981,7 @@ class _CustomersViewState extends State<CustomersView> {
             underline: const SizedBox(),
             items: ['All', 'Unprovided', 'Pending', 'Approved', 'Rejected'].map(
               (l) {
-                return DropdownMenuItem(value: l, child: Text('License: $l'));
+                return DropdownMenuItem(value: l, child: Text('License: $l'.tr(context)));
               },
             ).toList(),
             onChanged: (val) {
@@ -1008,7 +1023,7 @@ class _CustomersViewState extends State<CustomersView> {
 
         Text header(String label) {
           return Text(
-            label,
+            label.tr(context),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
@@ -1266,119 +1281,122 @@ class _CustomersViewState extends State<CustomersView> {
         if (u.licenseStatus == 'rejected') licenseColor = Colors.red;
         if (u.licenseStatus == 'unprovided') licenseColor = Colors.grey;
 
-        return ListTile(
-          dense: _isPhoneLayout(),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 8,
-          ),
-          leading: CircleAvatar(
-            backgroundColor: AppColors.secondaryBlue.withValues(
-              alpha: isDark ? 0.2 : 0.1,
+        return Material(
+          color: Colors.transparent,
+          child: ListTile(
+            dense: _isPhoneLayout(),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 8,
             ),
-            backgroundImage: getAppImageProvider(u.profileImage),
-            child: u.profileImage.isEmpty
-                ? Icon(Icons.person, size: 14, color: textPrimary)
-                : null,
-          ),
-          title: Text(
-            u.fullName,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: _fs(13, min: 11),
-              color: textPrimary,
+            leading: CircleAvatar(
+              backgroundColor: AppColors.secondaryBlue.withValues(
+                alpha: isDark ? 0.2 : 0.1,
+              ),
+              backgroundImage: getAppImageProvider(u.profileImage),
+              child: u.profileImage.isEmpty
+                  ? Icon(Icons.person, size: 14, color: textPrimary)
+                  : null,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 2),
-              Text(
-                u.email,
-                style: TextStyle(
-                  fontSize: _fs(11, min: 9),
+            title: Text(
+              u.fullName,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: _fs(13, min: 11),
+                color: textPrimary,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 2),
+                Text(
+                  u.email,
+                  style: TextStyle(
+                    fontSize: _fs(11, min: 9),
+                    color: textSecondary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: u.role == 'admin'
+                            ? Colors.purple.withValues(alpha: 0.15)
+                            : Colors.blue.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        u.role.toUpperCase(),
+                        style: TextStyle(
+                          color: u.role == 'admin' ? Colors.purple : Colors.blue,
+                          fontSize: _fs(8, min: 7),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _isUserAccountActive(u)
+                            ? Colors.green.withValues(alpha: 0.15)
+                            : Colors.red.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        _getDisplayAccountStatus(u),
+                        style: TextStyle(
+                          color: u.isActive ? Colors.green : Colors.red,
+                          fontSize: _fs(8, min: 7),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            trailing: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: licenseColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    u.licenseStatus.toUpperCase(),
+                    style: TextStyle(
+                      color: licenseColor,
+                      fontSize: _fs(8, min: 7),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  size: _fs(12, min: 10),
                   color: textSecondary,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: u.role == 'admin'
-                          ? Colors.purple.withValues(alpha: 0.15)
-                          : Colors.blue.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      u.role.toUpperCase(),
-                      style: TextStyle(
-                        color: u.role == 'admin' ? Colors.purple : Colors.blue,
-                        fontSize: _fs(8, min: 7),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _isUserAccountActive(u)
-                          ? Colors.green.withValues(alpha: 0.15)
-                          : Colors.red.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      _getDisplayAccountStatus(u),
-                      style: TextStyle(
-                        color: u.isActive ? Colors.green : Colors.red,
-                        fontSize: _fs(8, min: 7),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
+            onTap: () => _showSpecsDialog(u),
           ),
-          trailing: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: licenseColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  u.licenseStatus.toUpperCase(),
-                  style: TextStyle(
-                    color: licenseColor,
-                    fontSize: _fs(8, min: 7),
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Icon(
-                Icons.arrow_forward_ios,
-                size: _fs(12, min: 10),
-                color: textSecondary,
-              ),
-            ],
-          ),
-          onTap: () => _showSpecsDialog(u),
         );
       },
     );
@@ -1645,9 +1663,9 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
                 ),
                 tabAlignment: isNarrow ? TabAlignment.start : TabAlignment.fill,
                 tabs: [
-                  const Tab(text: 'Profile & Access'),
-                  Tab(text: 'Bookings (${userBookings.length})'),
-                  Tab(text: 'Payments (${userPayments.length})'),
+                  Tab(text: 'Profile & Access'.tr(context)),
+                  Tab(text: '${"Bookings".tr(context)} (${userBookings.length})'),
+                  Tab(text: '${"Payments".tr(context)} (${userPayments.length})'),
                 ],
               ),
               const SizedBox(height: 16),
@@ -1679,7 +1697,7 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
                     ),
                     onPressed: () => Navigator.pop(context),
                     child: Text(
-                      'Cancel',
+                      'Cancel'.tr(context),
                       style: TextStyle(fontSize: _fs(13, min: 11)),
                     ),
                   ),
@@ -1699,7 +1717,7 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
                       );
                     },
                     child: Text(
-                      'Save Registry Settings',
+                      'Save Registry Settings'.tr(context),
                       style: TextStyle(fontSize: _fs(13, min: 11)),
                     ),
                   ),
@@ -1740,7 +1758,7 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
         children: [
           // Access Controls row
           Text(
-            'SYSTEM ACCOUNT SECURITY CONTROLS',
+            'SYSTEM ACCOUNT SECURITY CONTROLS'.tr(context),
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: _fs(10, min: 8),
@@ -1756,7 +1774,7 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
                 dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
                 style: TextStyle(color: textPrimary),
                 decoration: InputDecoration(
-                  labelText: 'System Access Role',
+                  labelText: 'System Access Role'.tr(context),
                   labelStyle: TextStyle(
                     color: textSecondary,
                     fontSize: _fs(12, min: 10),
@@ -1765,11 +1783,11 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
                     borderSide: BorderSide(color: borderColor),
                   ),
                 ),
-                items: const [
-                  DropdownMenuItem(value: 'customer', child: Text('Customer')),
+                items: [
+                  DropdownMenuItem(value: 'customer', child: Text('Customer'.tr(context))),
                   DropdownMenuItem(
                     value: 'admin',
-                    child: Text('Admin Manager'),
+                    child: Text('Admin Manager'.tr(context)),
                   ),
                 ],
                 onChanged: (val) {
@@ -1786,7 +1804,7 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
                 dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
                 style: TextStyle(color: textPrimary),
                 decoration: InputDecoration(
-                  labelText: 'Account Login Status',
+                  labelText: 'Account Login Status'.tr(context),
                   labelStyle: TextStyle(
                     color: textSecondary,
                     fontSize: _fs(12, min: 10),
@@ -1795,18 +1813,18 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
                     borderSide: BorderSide(color: borderColor),
                   ),
                 ),
-                items: const [
+                items: [
                   DropdownMenuItem(
                     value: 'Active',
-                    child: Text('Active (Allow Access)'),
+                    child: Text('Active (Allow Access)'.tr(context)),
                   ),
                   DropdownMenuItem(
                     value: 'Disabled',
-                    child: Text('Disabled (Block Access)'),
+                    child: Text('Disabled (Block Access)'.tr(context)),
                   ),
                   DropdownMenuItem(
                     value: 'Suspended',
-                    child: Text('Suspended (Block Access)'),
+                    child: Text('Suspended (Block Access)'.tr(context)),
                   ),
                 ],
                 onChanged: (val) {
@@ -1840,7 +1858,7 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
 
           // User details block
           Text(
-            'USER REGISTRATION PARAMETERS',
+            'USER REGISTRATION PARAMETERS'.tr(context),
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: _fs(10, min: 8),
@@ -1861,7 +1879,7 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
 
           // ID/Passport Verification section
           Text(
-            'NATIONAL ID / PASSPORT VERIFICATION DETAILS',
+            'NATIONAL ID / PASSPORT VERIFICATION DETAILS'.tr(context),
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: _fs(10, min: 8),
@@ -1886,7 +1904,7 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
                       child: Text(
                         widget.user.idNumber.isNotEmpty
                             ? '${widget.user.idType}: ${widget.user.idNumber}'
-                            : 'No ID/Passport number provided',
+                            : 'No ID/Passport number provided'.tr(context),
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: _fs(13, min: 11),
@@ -1907,7 +1925,7 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        widget.user.idStatus.toUpperCase(),
+                        widget.user.idStatus.toUpperCase().tr(context),
                         style: TextStyle(
                           color: idBadgeColor,
                           fontSize: _fs(9, min: 8),
@@ -1919,7 +1937,7 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Uploaded on: ${widget.user.idUploadDate.isNotEmpty ? widget.user.idUploadDate : "N/A"}',
+                  'Uploaded on: ${widget.user.idUploadDate.isNotEmpty ? widget.user.idUploadDate : "N/A"}'.tr(context),
                   style: TextStyle(
                     color: textSecondary,
                     fontSize: _fs(12, min: 10),
@@ -2030,7 +2048,7 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
 
           // License Verification section
           Text(
-            'DRIVING LICENSE VERIFICATION DETAILS',
+            'DRIVING LICENSE VERIFICATION DETAILS'.tr(context),
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: _fs(10, min: 8),
@@ -2053,9 +2071,9 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
                   children: [
                     Expanded(
                       child: Text(
-                        widget.user.licenseNumber != null
-                            ? 'License: ${widget.user.licenseNumber}'
-                            : 'No license number provided',
+                        widget.user.licenseNumber != null && widget.user.licenseNumber!.isNotEmpty
+                            ? '${"License:".tr(context)} ${widget.user.licenseNumber}'
+                            : 'No license number provided'.tr(context),
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: _fs(13, min: 11),
@@ -2076,7 +2094,7 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        widget.user.licenseStatus.toUpperCase(),
+                        widget.user.licenseStatus.toUpperCase().tr(context),
                         style: TextStyle(
                           color: licenseColor,
                           fontSize: _fs(9, min: 8),
@@ -2096,7 +2114,7 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
                 if (widget.user.licenseUploadDate.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(
-                    'Uploaded on: ${widget.user.licenseUploadDate}',
+                    'Uploaded on: ${widget.user.licenseUploadDate}'.tr(context),
                     style: TextStyle(
                       color: textSecondary,
                       fontSize: _fs(11, min: 9),
@@ -2283,7 +2301,7 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
           Expanded(
             flex: 4,
             child: Text(
-              label,
+              label.tr(context),
               style: TextStyle(
                 fontSize: _fs(12, min: 10),
                 color: textSecondary,
@@ -2331,7 +2349,7 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
             ),
             const SizedBox(height: 12),
             Text(
-              'No booking reservations registered for this user.',
+              'No booking reservations registered for this user.'.tr(context),
               style: TextStyle(
                 color: textSecondary,
                 fontSize: _fs(13, min: 11),
@@ -2366,7 +2384,7 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
             ? 'Open Rental'
             : (b.returnDate != null
                   ? DateFormat('dd MMM yy').format(b.returnDate!)
-                  : "");
+                  : "Open Rental");
 
         return Card(
           margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
@@ -2376,11 +2394,13 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
             side: BorderSide(color: borderColor),
           ),
           elevation: 0,
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 4,
-            ),
+          child: Material(
+            color: Colors.transparent,
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 4,
+              ),
             title: Row(
               children: [
                 Expanded(
@@ -2443,7 +2463,8 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
               ),
             ),
           ),
-        );
+        ),
+      );
       },
     );
   }
@@ -2465,7 +2486,7 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
             Icon(Icons.payment_outlined, size: 48, color: textSecondary),
             const SizedBox(height: 12),
             Text(
-              'No payment transaction history found for this user.',
+              'No payment transaction history found for this user.'.tr(context),
               style: TextStyle(
                 color: textSecondary,
                 fontSize: _fs(13, min: 11),
@@ -2501,74 +2522,58 @@ class _UserSpecsDialogState extends State<_UserSpecsDialog> {
             side: BorderSide(color: borderColor),
           ),
           elevation: 0,
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 4,
-            ),
-            title: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'RM ${p.amount.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: _fs(13, min: 11),
-                      color: textPrimary,
+          child: Material(
+            color: Colors.transparent,
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 4,
+              ),
+              title: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'RM ${p.amount.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: _fs(13, min: 11),
+                        color: textPrimary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    p.paymentMethod.toUpperCase(),
+                  const SizedBox(width: 8),
+                  Text(
+                    payDate,
                     style: TextStyle(
+                      fontSize: _fs(11, min: 9),
                       color: textSecondary,
-                      fontSize: _fs(10, min: 8),
-                      fontWeight: FontWeight.bold,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.end,
                   ),
+                ],
+              ),
+              subtitle: Text(
+                'Ref ID: #${p.id.substring(0, p.id.length > 8 ? 8 : p.id.length).toUpperCase()}',
+                style: TextStyle(
+                  color: textSecondary.withValues(alpha: 0.8),
+                  fontSize: _fs(10, min: 8),
+                  fontWeight: FontWeight.bold,
                 ),
-              ],
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 4),
-                Text(
-                  'Settled Date: $payDate',
-                  style: TextStyle(
-                    fontSize: _fs(11, min: 9),
-                    color: textSecondary,
-                  ),
+              ),
+              trailing: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
                 ),
-                Text(
-                  'Tx Ref: #${p.id.substring(0, p.id.length > 8 ? 8 : p.id.length).toUpperCase()}',
+                child: Text(
+                  p.status.toUpperCase(),
                   style: TextStyle(
-                    color: textSecondary.withValues(alpha: 0.8),
-                    fontSize: _fs(10, min: 8),
+                    color: statusColor,
+                    fontSize: _fs(8, min: 7),
                     fontWeight: FontWeight.bold,
                   ),
-                ),
-              ],
-            ),
-            trailing: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                p.status.toUpperCase(),
-                style: TextStyle(
-                  color: statusColor,
-                  fontSize: _fs(8, min: 7),
-                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),

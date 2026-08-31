@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:intl/intl.dart';
@@ -12,6 +13,7 @@ import '../../../services/booking_service.dart';
 import '../../../services/payment_service.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/database_service.dart';
+import '../../../services/booking_hold_service.dart';
 import '../../../services/reward_service.dart';
 import '../../../services/notification_service.dart';
 import '../../../models/promotion_model.dart';
@@ -28,7 +30,9 @@ import '../../../services/receipt_service.dart';
 import 'customer_responsive_shell.dart';
 import 'booking_confirmation_screen.dart';
 import 'vehicle_details_screen.dart';
+import 'profile_screen.dart';
 import '../../../services/payment_restriction_service.dart';
+import '../../../l10n/app_translations.dart';
 import 'booking_date_utils.dart';
 
 class BookingScreen extends StatefulWidget {
@@ -158,6 +162,12 @@ class _BookingScreenState extends State<BookingScreen> {
   DateTime? _activeBookingCreatedAt;
   String? _step2ValidationMessage;
 
+  bool _isDeliveryChoice = false;
+  final TextEditingController _deliveryAddressController =
+      TextEditingController();
+  DateTime? _deliveryDate;
+  String? _deliveryTime;
+
   Set<DateTime> _blockedDates = {};
   StreamSubscription<Set<DateTime>>? _blockedDatesSubscription;
 
@@ -172,14 +182,13 @@ class _BookingScreenState extends State<BookingScreen> {
       now: now,
     );
 
+    _isOpenRental = widget.existingBooking?.isOpenRental ?? true;
     _pickupDate = widget.existingBooking?.pickUpDate ?? normalizedPickup;
-    _returnDate =
-        widget.existingBooking?.returnDate ??
-        widget.prefilledReturnDate ??
-        _pickupDate!.add(const Duration(days: 1));
+    _returnDate = _isOpenRental
+        ? null
+        : (widget.existingBooking?.returnDate ?? widget.prefilledReturnDate);
     _activeBookingId = widget.existingBooking?.id;
     _activeBookingCreatedAt = widget.existingBooking?.createdAt;
-    _isOpenRental = widget.existingBooking?.isOpenRental ?? false;
 
     if (widget.existingBooking != null) {
       _currentStep = 3;
@@ -263,12 +272,6 @@ class _BookingScreenState extends State<BookingScreen> {
             _userPhone = profile.phone;
             _accountStatus = profile.accountStatus;
             _availablePoints = profile.rewardPoints;
-            final isPrem =
-                CompanySettingsProvider().determineLevel(_availablePoints) ==
-                'Premium';
-            if (!isPrem) {
-              _isOpenRental = false;
-            }
           });
         }
       }
@@ -728,123 +731,8 @@ class _BookingScreenState extends State<BookingScreen> {
     }
   }
 
-  Future<void> _selectReturnDate() async {
-    if (_pickupDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select pick-up date first')),
-      );
-      return;
-    }
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final pNorm = DateTime(
-      _pickupDate!.year,
-      _pickupDate!.month,
-      _pickupDate!.day,
-    );
-
-    DateTime? firstBlockedAfterPickup;
-    DateTime check = pNorm.add(const Duration(days: 1));
-    for (int i = 0; i < 90; i++) {
-      if (_blockedDates.contains(check)) {
-        firstBlockedAfterPickup = check;
-        break;
-      }
-      check = check.add(const Duration(days: 1));
-    }
-
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _pickupDate!.add(const Duration(days: 1)),
-      firstDate: _pickupDate!.add(const Duration(days: 1)),
-      lastDate: _pickupDate!.add(const Duration(days: 90)),
-      selectableDayPredicate: (DateTime day) {
-        final dNorm = DateTime(day.year, day.month, day.day);
-
-        // Date cannot be blocked itself
-        if (_blockedDates.contains(dNorm)) {
-          return false;
-        }
-
-        // If there is a blocked date between pickupDate and day, disable day!
-        if (firstBlockedAfterPickup != null &&
-            !dNorm.isBefore(firstBlockedAfterPickup)) {
-          return false;
-        }
-
-        return true;
-      },
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: isDark
-                ? const ColorScheme.dark(
-                    primary: AppColors.primaryOrange,
-                    onPrimary: Colors.white,
-                    surface: Color(0xFF1E293B),
-                    onSurface: Color(0xFFF8FAFC),
-                  )
-                : const ColorScheme.light(
-                    primary: AppColors.primaryOrange,
-                    onPrimary: Colors.white,
-                    onSurface: AppColors.secondaryBlue,
-                  ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (!mounted) return;
-    if (picked != null) {
-      final rNorm = DateTime(picked.year, picked.month, picked.day);
-      if (_blockedDates.contains(rNorm)) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'This vehicle is already booked for the selected date.',
-            ),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-        return;
-      }
-
-      setState(() {
-        _returnDate = picked;
-        _updateDateTimes();
-      });
-    }
-  }
-
   bool _isAccountRestrictedByStatus() {
     return BookingService.isAccountRestricted(_accountStatus);
-  }
-
-  bool _validateStep2DateTimeBeforeProceed() {
-    String? message;
-
-    if (_pickupDate == null && !_isOpenRental && _returnDate == null) {
-      message =
-          'Please fill in pick-up date, pick-up time, and return date/time before proceeding to payment.';
-    } else if (_pickupDate == null) {
-      message = 'Please fill in the pick-up date before proceeding to payment.';
-    } else if (_pickupTime == null) {
-      message = 'Please fill in the pick-up time before proceeding to payment.';
-    } else if (!_isOpenRental && _returnDate == null) {
-      message =
-          'Please fill in the return date and time before proceeding to payment.';
-    }
-
-    if (message == null) {
-      setState(() {
-        _step2ValidationMessage = null;
-      });
-      return true;
-    }
-
-    setState(() {
-      _step2ValidationMessage = message;
-    });
-    return false;
   }
 
   void _triggerPaymentFlow() {
@@ -983,7 +871,7 @@ class _BookingScreenState extends State<BookingScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Open Rental Booking',
+                  'Open Rental Booking'.tr(context),
                   maxLines: 2,
                   softWrap: true,
                   overflow: TextOverflow.ellipsis,
@@ -996,14 +884,14 @@ class _BookingScreenState extends State<BookingScreen> {
             ],
           ),
           content: Text(
-            'As a Premium Member, you are eligible for Open Rental with no upfront payment. The final amount will be calculated and invoiced upon vehicle return.',
+            'As a Premium Member, you are eligible for Open Rental with no upfront payment. The final amount will be calculated and invoiced upon vehicle return.'.tr(context),
             style: TextStyle(color: textColor, fontSize: 13, height: 1.4),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
               child: Text(
-                'Cancel',
+                'Cancel'.tr(context),
                 style: TextStyle(
                   color: isDark ? const Color(0xFF94A3B8) : Colors.grey,
                   fontWeight: FontWeight.bold,
@@ -1028,9 +916,9 @@ class _BookingScreenState extends State<BookingScreen> {
                   paymentTime: DateFormat('HH:mm:ss').format(DateTime.now()),
                 );
               },
-              child: const Text(
-                'Confirm Booking',
-                style: TextStyle(fontWeight: FontWeight.bold),
+              child: Text(
+                'Confirm Booking'.tr(context),
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
           ],
@@ -1060,7 +948,7 @@ class _BookingScreenState extends State<BookingScreen> {
                 ),
               ),
               title: Text(
-                'Select Your Bank',
+                'Select Your Bank'.tr(context),
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: titleColor,
@@ -1070,7 +958,7 @@ class _BookingScreenState extends State<BookingScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Choose your preferred FPX online banking bank portal to authorize payment:',
+                    'Choose your preferred FPX online banking bank portal to authorize payment:'.tr(context),
                     style: TextStyle(color: textColor, fontSize: 13),
                   ),
                   const SizedBox(height: 16),
@@ -1094,7 +982,7 @@ class _BookingScreenState extends State<BookingScreen> {
                             : Colors.white,
                         value: _selectedBank,
                         hint: Text(
-                          'Choose a bank',
+                          'Choose a bank'.tr(context),
                           style: TextStyle(
                             color: isDark ? Colors.white60 : Colors.black54,
                           ),
@@ -1126,7 +1014,7 @@ class _BookingScreenState extends State<BookingScreen> {
                 TextButton(
                   onPressed: () => Navigator.pop(context),
                   child: Text(
-                    'CANCEL',
+                    'CANCEL'.tr(context),
                     style: TextStyle(
                       color: isDark ? const Color(0xFF94A3B8) : Colors.grey,
                     ),
@@ -1142,9 +1030,9 @@ class _BookingScreenState extends State<BookingScreen> {
                           _simulateFPXGateway();
                         }
                       : null,
-                  child: const Text(
-                    'PROCEED',
-                    style: TextStyle(
+                  child: Text(
+                    'PROCEED'.tr(context),
+                    style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
                     ),
@@ -1390,18 +1278,18 @@ class _BookingScreenState extends State<BookingScreen> {
             ),
           ),
           title: Text(
-            'Cash Payment Confirmation',
+            'Cash Payment Confirmation'.tr(context),
             style: TextStyle(fontWeight: FontWeight.bold, color: titleColor),
           ),
           content: Text(
-            'Confirming this booking will place it in an active booked status. You can pay RM ${payAmount.toStringAsFixed(2)} at the branch counter on pickup.',
+            '${"Confirming this booking will place it in an active booked status. You can pay RM ".tr(context)}${payAmount.toStringAsFixed(2)}${" at the branch counter on pickup.".tr(context)}',
             style: TextStyle(color: textColor, fontSize: 13, height: 1.4),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
               child: Text(
-                'CANCEL',
+                'CANCEL'.tr(context),
                 style: TextStyle(
                   color: isDark ? const Color(0xFF94A3B8) : Colors.grey,
                 ),
@@ -1421,9 +1309,9 @@ class _BookingScreenState extends State<BookingScreen> {
                   paymentTime: autoTime,
                 );
               },
-              child: const Text(
-                'CONFIRM',
-                style: TextStyle(
+              child: Text(
+                'CONFIRM'.tr(context),
+                style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                 ),
@@ -2629,6 +2517,14 @@ class _BookingScreenState extends State<BookingScreen> {
     setState(() => _loading = true);
 
     try {
+      final holdStatus =
+          await BookingHoldService().checkVehicleHold(widget.vehicle.id);
+      if (holdStatus['isHoldActive'] == true) {
+        final String msg = holdStatus['message'] ??
+            BookingHoldService.defaultBlockedMessage;
+        throw msg;
+      }
+
       if (_isAccountRestrictedByStatus()) {
         throw BookingService.getAccountRestrictionMessage(_accountStatus);
       }
@@ -2896,13 +2792,19 @@ class _BookingScreenState extends State<BookingScreen> {
         pickUpDate: _pickupDate!,
         returnDate: _isOpenRental ? null : _returnDate,
         isOpenRental: _isOpenRental,
-        totalPrice: _discountedTotal,
-        depositAmount: _depositAmount,
+        totalPrice: widget.vehicle.pricePerDay,
+        depositAmount: 0.0,
         status: 'Confirmed', // Confirmed automatically
         notes: _notesController.text.trim().isNotEmpty
             ? _notesController.text.trim()
-            : (widget.existingBooking?.notes ?? 'AI Operator Guided Booking'),
+            : 'Open Rental Booking',
         createdAt: _activeBookingCreatedAt ?? DateTime.now(),
+        isDelivery: _isDeliveryChoice,
+        deliveryAddress: _isDeliveryChoice ? _deliveryAddressController.text.trim() : null,
+        deliveryDate: _isDeliveryChoice ? (_deliveryDate ?? _pickupDate!) : null,
+        deliveryTime: _isDeliveryChoice ? (_deliveryTime ?? _pickupTime) : null,
+        deliveryFee: 0.0,
+        deliveryStatus: _isDeliveryChoice ? 'Pending' : 'Scheduled',
         pointsRedeemed: _pointsToRedeem,
         discountAmount: _discountAmount,
         promotionId: _appliedPromotion?.id,
@@ -2917,29 +2819,42 @@ class _BookingScreenState extends State<BookingScreen> {
       // Save Booking
       await _bookingService.createBooking(booking);
 
-      // Save Payment record
-      final payment = PaymentModel(
-        id: '',
-        bookingId: booking.id,
-        userId: currentUser.uid,
-        amount: amount,
-        depositAmount: _isOpenRental ? 0.0 : _depositAmount,
-        balanceAmount: _isOpenRental
-            ? 0.0
-            : (_paymentOption == 'Deposit' ? _discountedTotal - amount : 0.0),
-        paymentMethod: _isOpenRental ? 'Open Rental' : _paymentMethod,
-        status: 'Approved', // Auto-approved
-        paymentStatus: 'Approved',
-        transactionId: txId,
-        paymentDate: paymentDate,
-        receiptImage: receiptImage,
-        receiptFile: receiptImage,
-        uploadedAt: DateTime.now().toIso8601String(),
-        customerUid: currentUser.uid,
-        paymentTime: paymentTime,
-      );
+      // Save initial payment record if an initial payment amount was provided
+      if (amount > 0) {
+        final payment = PaymentModel(
+          id: '',
+          bookingId: booking.id,
+          userId: currentUser.uid,
+          amount: amount,
+          depositAmount: _isOpenRental ? 0.0 : _depositAmount,
+          balanceAmount: _isOpenRental
+              ? 0.0
+              : (_paymentOption == 'Deposit' ? _discountedTotal - amount : 0.0),
+          paymentMethod: _isOpenRental ? 'Open Rental' : _paymentMethod,
+          status: 'Approved',
+          paymentStatus: 'Approved',
+          transactionId: txId,
+          paymentDate: paymentDate,
+          receiptImage: receiptImage,
+          receiptFile: receiptImage,
+          uploadedAt: DateTime.now().toIso8601String(),
+          customerUid: currentUser.uid,
+          paymentTime: paymentTime,
+        );
 
-      await _paymentService.createPayment(payment);
+        await _paymentService.createPayment(payment);
+      }
+
+      // Notify Admins
+      await NotificationService().notifyAllAdmins(
+        title: "New Open Rental Booking",
+        message: "$activeUserName booked ${widget.vehicle.brand} ${widget.vehicle.model} (Open Rental${_isDeliveryChoice ? ' - Delivery Requested' : ''}).",
+        type: 'booking',
+        icon: '🚗',
+        color: '0xFF3B82F6',
+        relatedId: booking.id,
+        actionRoute: 'Bookings',
+      );
 
       // Deduct reward points immediately if any were redeemed
       if (_pointsToRedeem > 0) {
@@ -3030,7 +2945,7 @@ class _BookingScreenState extends State<BookingScreen> {
           },
         ),
         title: Text(
-          _currentStep == 2 ? 'Rent Reservation Checkout' : 'Payment Details',
+          _currentStep == 2 ? 'Rent Reservation Checkout'.tr(context) : 'Payment Details'.tr(context),
           style: TextStyle(
             color: isDark ? const Color(0xFFF8FAFC) : AppColors.secondaryBlue,
             fontWeight: FontWeight.bold,
@@ -3050,7 +2965,7 @@ class _BookingScreenState extends State<BookingScreen> {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    'Secure Payment',
+                    'Secure Payment'.tr(context),
                     style: TextStyle(
                       color: isDark ? Colors.greenAccent : Colors.green,
                       fontSize: 11,
@@ -3065,9 +2980,9 @@ class _BookingScreenState extends State<BookingScreen> {
       body: SafeArea(
         top: false,
         child: _loading
-            ? const Center(
+            ? Center(
                 child: LoadingWidget(
-                  message: 'Processing your reservation booking...',
+                  message: 'Processing your reservation booking...'.tr(context),
                 ),
               )
             : SingleChildScrollView(
@@ -3109,7 +3024,7 @@ class _BookingScreenState extends State<BookingScreen> {
         children: [
           _progressNode(
             '1',
-            'Select Car',
+            'Select Car'.tr(context),
             false,
             primaryColor,
             textColorMuted,
@@ -3118,7 +3033,7 @@ class _BookingScreenState extends State<BookingScreen> {
           _progressDivider(primaryColor),
           _progressNode(
             '2',
-            'Booking Details',
+            'Booking Details'.tr(context),
             _currentStep == 2,
             primaryColor,
             _currentStep == 2 ? textColorActive : textColorMuted,
@@ -3127,7 +3042,7 @@ class _BookingScreenState extends State<BookingScreen> {
           _progressDivider(_currentStep == 3 ? primaryColor : mutedColor),
           _progressNode(
             '3',
-            'Payment',
+            'Payment'.tr(context),
             _currentStep == 3,
             primaryColor,
             _currentStep == 3 ? textColorActive : textColorMuted,
@@ -3194,13 +3109,160 @@ class _BookingScreenState extends State<BookingScreen> {
     );
   }
 
+  Future<bool> _validateCustomerProfileBeforeBooking() async {
+    final user = _authService.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please log in to complete your booking.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return false;
+    }
+
+    try {
+      final profile = await _databaseService.getUser(user.uid);
+      if (profile == null) return true;
+
+      final missing = profile.missingProfileFields;
+      if (missing.isNotEmpty) {
+        if (!mounted) return false;
+        await _showMissingProfileInfoModal(missing);
+        return false;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Error validating profile: $e');
+      return true;
+    }
+  }
+
+  Future<void> _showMissingProfileInfoModal(List<String> missingFields) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Row(
+            children: [
+              Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.orange,
+                size: 26,
+              ),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Complete Your Information',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'To complete your booking, the following required profile information must be provided:',
+                style: TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? const Color(0xFF0F172A)
+                      : Colors.orange.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.orange.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: missingFields.map((field) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.error_outline_rounded,
+                            color: Colors.orange,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            field,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              color: isDark ? Colors.white : AppColors.secondaryBlue,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryOrange,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _navigateToProfileScreen();
+              },
+              child: const Text(
+                'Complete Profile',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _navigateToProfileScreen() {
+    final shell = CustomerResponsiveShell.of(context);
+    if (shell != null) {
+      shell.setIndex(6);
+      shell.clearCustomBody();
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const ProfileScreen()),
+      );
+    }
+  }
+
   // STEP 2: Booking Details Panel Screen
   Widget _buildStep2BookingDetails(bool isDark) {
-    final settingsProvider = CompanySettingsProvider();
-    final membershipStatus = settingsProvider.getMembershipStatus(
-      _availablePoints,
-    );
-    final isPremium = membershipStatus.currentLevel == 'Premium';
     final dateFormat = DateFormat('yyyy-MM-dd');
     final headingStyle = TextStyle(
       fontWeight: FontWeight.bold,
@@ -3209,10 +3271,69 @@ class _BookingScreenState extends State<BookingScreen> {
     );
     final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
     final borderColor = isDark ? const Color(0xFF334155) : Colors.grey[200]!;
+    final companyPhone = CompanySettingsProvider().companyPhone;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Booking Hold Warning Banner (Live Sync)
+        StreamBuilder<Map<String, dynamic>>(
+          stream: BookingHoldService().getVehicleHoldStream(widget.vehicle.id),
+          builder: (context, snapshot) {
+            final eval = BookingHoldService.evaluateVehicleHoldData(
+              snapshot.data,
+            );
+            if (eval['isHoldActive'] == true) {
+              final remainingTime = eval['formattedRemainingTime'] ?? '05:00';
+              return Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.redAccent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.redAccent, width: 1.5),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.timer_outlined,
+                      color: Colors.redAccent,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Vehicle Temporarily Reserved',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: Colors.redAccent,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'This vehicle is temporarily reserved. Please try again in a few minutes or select another vehicle.\n(Hold expires in $remainingTime)',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark
+                                  ? const Color(0xFFF8FAFC)
+                                  : AppColors.secondaryBlue,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+            return const SizedBox.shrink();
+          },
+        ),
+
         // 1. Vehicle preview
         Container(
           padding: const EdgeInsets.all(16),
@@ -3280,8 +3401,8 @@ class _BookingScreenState extends State<BookingScreen> {
         ),
         const SizedBox(height: 20),
 
-        // 2. Date select
-        Text('Select Rental Dates & Time', style: headingStyle),
+        // 2. Select Pickup Date & Time
+        Text('Select Pickup Date & Time'.tr(context), style: headingStyle),
         const SizedBox(height: 10),
         Row(
           children: [
@@ -3304,7 +3425,7 @@ class _BookingScreenState extends State<BookingScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Pick-up Date',
+                          'Pick-up Date'.tr(context),
                           style: TextStyle(
                             color: isDark
                                 ? const Color(0xFF94A3B8)
@@ -3313,16 +3434,19 @@ class _BookingScreenState extends State<BookingScreen> {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          _pickupDate != null
-                              ? dateFormat.format(_pickupDate!)
-                              : 'Select Date',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: isDark
-                                ? Colors.white
-                                : AppColors.secondaryBlue,
-                            fontSize: 13,
+                        Directionality(
+                          textDirection: ui.TextDirection.ltr,
+                          child: Text(
+                            _pickupDate != null
+                                ? dateFormat.format(_pickupDate!)
+                                : 'Select Date'.tr(context),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: isDark
+                                  ? Colors.white
+                                  : AppColors.secondaryBlue,
+                              fontSize: 13,
+                            ),
                           ),
                         ),
                       ],
@@ -3347,7 +3471,7 @@ class _BookingScreenState extends State<BookingScreen> {
                   child: DropdownButtonFormField<String>(
                     initialValue: _pickupTime,
                     hint: Text(
-                      'Select Time',
+                      'Select Time'.tr(context),
                       style: TextStyle(
                         color: isDark ? Colors.white60 : Colors.black54,
                         fontSize: 13,
@@ -3356,7 +3480,7 @@ class _BookingScreenState extends State<BookingScreen> {
                     dropdownColor: cardColor,
                     isExpanded: true,
                     decoration: InputDecoration(
-                      labelText: 'Pick-up Time',
+                      labelText: 'Pick-up Time'.tr(context),
                       labelStyle: TextStyle(
                         color: isDark
                             ? const Color(0xFF94A3B8)
@@ -3386,358 +3510,27 @@ class _BookingScreenState extends State<BookingScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 16),
-        Text('Return Option', style: headingStyle),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _isOpenRental = false;
-                  });
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color: !_isOpenRental
-                        ? AppColors.primaryOrange.withValues(alpha: 0.1)
-                        : cardColor,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: !_isOpenRental
-                          ? AppColors.primaryOrange
-                          : borderColor,
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Center(
-                    child: Text(
-                      'Fixed Return Date',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: !_isOpenRental
-                            ? AppColors.primaryOrange
-                            : (isDark ? Colors.white : AppColors.secondaryBlue),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: GestureDetector(
-                onTap: isPremium
-                    ? () {
-                        setState(() {
-                          _isOpenRental = true;
-                          _returnDate = null;
-                        });
-                      }
-                    : () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Open Rental is only available for Premium members.',
-                            ),
-                            backgroundColor: Colors.redAccent,
-                          ),
-                        );
-                      },
-                child: Opacity(
-                  opacity: isPremium ? 1.0 : 0.4,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: _isOpenRental
-                          ? Colors.green.withValues(alpha: 0.1)
-                          : cardColor,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: _isOpenRental ? Colors.green : borderColor,
-                        width: 1.5,
-                      ),
-                    ),
-                    child: Center(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.circle,
-                            color: _isOpenRental ? Colors.green : Colors.grey,
-                            size: 10,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Open Rental',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: _isOpenRental
-                                  ? Colors.green
-                                  : (isDark
-                                        ? Colors.white
-                                        : AppColors.secondaryBlue),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        if (!isPremium) ...[
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.redAccent.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Colors.redAccent.withValues(alpha: 0.2),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.lock_outline, color: Colors.redAccent, size: 20),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Open Rental is available only for Premium Members.',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.redAccent,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Divider(
-                  color: Colors.redAccent.withValues(alpha: 0.3),
-                  thickness: 0.5,
-                  height: 1,
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Current Membership',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: isDark ? Colors.white60 : Colors.grey[600],
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${membershipStatus.currentLevel} Member',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: isDark
-                                ? Colors.white
-                                : AppColors.secondaryBlue,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          'Current Reward Points',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: isDark ? Colors.white60 : Colors.grey[600],
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '$_availablePoints pts',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primaryOrange,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  '${membershipStatus.pointsNeededForNext} more points required to unlock Premium.',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontStyle: FontStyle.italic,
-                    color: isDark ? Colors.white70 : Colors.grey[700],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-        ],
-        if (_isOpenRental) ...[
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.green.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.green.withValues(alpha: 0.2)),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.info_outline, color: Colors.green, size: 20),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'This rental will remain active until the vehicle is returned.\nThis booking has no fixed return date.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.green,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ] else ...[
-          Row(
-            children: [
-              Expanded(
-                child: MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  child: GestureDetector(
-                    onTap: _selectReturnDate,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
-                      decoration: BoxDecoration(
-                        color: cardColor,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: borderColor),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Return Date',
-                            style: TextStyle(
-                              color: isDark
-                                  ? const Color(0xFF94A3B8)
-                                  : AppColors.lightText,
-                              fontSize: 10,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _isOpenRental
-                                ? '♾ Open Rental'
-                                : (_returnDate != null
-                                      ? dateFormat.format(_returnDate!)
-                                      : 'Select Date'),
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: isDark
-                                  ? Colors.white
-                                  : AppColors.secondaryBlue,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? const Color(0xFF0F172A)
-                        : AppColors.lightGray,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: borderColor),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Return Time (Auto-matched)',
-                        style: TextStyle(
-                          color: isDark
-                              ? const Color(0xFF94A3B8)
-                              : AppColors.lightText,
-                          fontSize: 10,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _pickupTime ?? 'Select Pickup Time',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: _pickupTime != null
-                              ? (isDark
-                                    ? Colors.white
-                                    : AppColors.secondaryBlue)
-                              : Colors.grey,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
         const SizedBox(height: 12),
+
+        // Open Rental Info Box
         Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.primaryOrange.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: AppColors.primaryOrange.withValues(alpha: 0.3),
-            ),
+            color: Colors.green.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.green.withValues(alpha: 0.2)),
           ),
           child: Row(
             children: [
-              const Icon(
-                Icons.info_outline,
-                color: AppColors.primaryOrange,
-                size: 16,
-              ),
-              const SizedBox(width: 8),
+              const Icon(Icons.all_inclusive_rounded, color: Colors.green, size: 22),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Company Working Hours: ${CompanySettingsProvider().openingTime} - ${CompanySettingsProvider().closingTime}',
+                  'Open Rental Mode: This rental will remain active until the vehicle is returned. There is no fixed return date required.'.tr(context),
                   style: const TextStyle(
                     fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primaryOrange,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.green,
                   ),
                 ),
               ),
@@ -3746,8 +3539,223 @@ class _BookingScreenState extends State<BookingScreen> {
         ),
         const SizedBox(height: 20),
 
-        // 3. Special notes
-        Text('Special Requests / Notes (Optional)', style: headingStyle),
+        // 3. Delivery Option Choice
+        Text('Vehicle Fulfillment Option'.tr(context), style: headingStyle),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _isDeliveryChoice = false;
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: !_isDeliveryChoice
+                        ? AppColors.primaryOrange.withValues(alpha: 0.1)
+                        : cardColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: !_isDeliveryChoice
+                          ? AppColors.primaryOrange
+                          : borderColor,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.storefront_rounded,
+                        color: !_isDeliveryChoice
+                            ? AppColors.primaryOrange
+                            : Colors.grey,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Pick Up at Hub'.tr(context),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: !_isDeliveryChoice
+                              ? AppColors.primaryOrange
+                              : (isDark ? Colors.white : AppColors.secondaryBlue),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _isDeliveryChoice = true;
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: _isDeliveryChoice
+                        ? AppColors.primaryOrange.withValues(alpha: 0.1)
+                        : cardColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _isDeliveryChoice
+                          ? AppColors.primaryOrange
+                          : borderColor,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.local_shipping_outlined,
+                        color: _isDeliveryChoice
+                            ? AppColors.primaryOrange
+                            : Colors.grey,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Delivery to Me'.tr(context),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: _isDeliveryChoice
+                              ? AppColors.primaryOrange
+                              : (isDark ? Colors.white : AppColors.secondaryBlue),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        if (_isDeliveryChoice) ...[
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: cardColor,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: borderColor),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Delivery Location / Address'.tr(context),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: isDark ? Colors.white : AppColors.secondaryBlue,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _deliveryAddressController,
+                  maxLines: 2,
+                  style: TextStyle(
+                    color: isDark ? Colors.white : Colors.black,
+                    fontSize: 13,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Enter full delivery address or drop-off location...'.tr(context),
+                    hintStyle: TextStyle(
+                      color: isDark ? Colors.white30 : Colors.grey,
+                      fontSize: 13,
+                    ),
+                    prefixIcon: const Icon(
+                      Icons.location_on_outlined,
+                      color: AppColors.primaryOrange,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: borderColor),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryOrange.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.primaryOrange.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.info_outline,
+                        color: AppColors.primaryOrange,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Delivery fee depends on your location. Please contact us for delivery availability and pricing.'.tr(context),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.primaryOrange,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Text(
+                                  'Phone:'.tr(context),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.primaryOrange,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Directionality(
+                                  textDirection: ui.TextDirection.ltr,
+                                  child: Text(
+                                    companyPhone,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.primaryOrange,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+
+        // 4. Special Requests / Notes
+        Text('Special Requests / Notes (Optional)'.tr(context), style: headingStyle),
         const SizedBox(height: 10),
         TextField(
           controller: _notesController,
@@ -3757,135 +3765,109 @@ class _BookingScreenState extends State<BookingScreen> {
             fontSize: 13,
           ),
           decoration: InputDecoration(
-            hintText: 'e.g. Need child seat, airport terminal pickup...',
+            hintText: 'e.g. Need child seat, airport terminal pickup'.tr(context),
             hintStyle: TextStyle(
               color: isDark ? Colors.white30 : Colors.grey,
               fontSize: 13,
             ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: borderColor),
+            ),
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 28),
 
-        // 4. Payment option choices (Deposit vs Full)
-        Text('Payment Option', style: headingStyle),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: ChoiceChip(
-                label: const Center(child: Text('Pay Deposit Only')),
-                selected: _paymentOption == 'Deposit',
-                selectedColor: AppColors.primaryOrange.withValues(alpha: 0.25),
-                backgroundColor: isDark
-                    ? const Color(0xFF1E293B)
-                    : AppColors.lightGray,
-                labelStyle: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                  color: _paymentOption == 'Deposit'
-                      ? AppColors.primaryOrange
-                      : (isDark
-                            ? const Color(0xFFCBD5E1)
-                            : AppColors.secondaryBlue),
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(
-                    color: _paymentOption == 'Deposit'
-                        ? AppColors.primaryOrange
-                        : borderColor,
-                  ),
-                ),
-                onSelected: (selected) {
-                  setState(() {
-                    _paymentOption = 'Deposit';
-                  });
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: ChoiceChip(
-                label: const Center(child: Text('Pay Full Amount')),
-                selected: _paymentOption == 'Full',
-                selectedColor: AppColors.primaryOrange.withValues(alpha: 0.25),
-                backgroundColor: isDark
-                    ? const Color(0xFF1E293B)
-                    : AppColors.lightGray,
-                labelStyle: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                  color: _paymentOption == 'Full'
-                      ? AppColors.primaryOrange
-                      : (isDark
-                            ? const Color(0xFFCBD5E1)
-                            : AppColors.secondaryBlue),
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(
-                    color: _paymentOption == 'Full'
-                        ? AppColors.primaryOrange
-                        : borderColor,
-                  ),
-                ),
-                onSelected: (selected) {
-                  setState(() {
-                    _paymentOption = 'Full';
-                  });
-                },
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 32),
-
-        // 5. Button
+        // 5. Complete Booking Button
         SizedBox(
           width: double.infinity,
           height: 52,
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: _isOpenRental
-                  ? Colors.green
-                  : AppColors.primaryOrange,
+              backgroundColor: AppColors.primaryOrange,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),
               elevation: 0,
             ),
-            onPressed:
-                (widget.vehicle.status.toLowerCase() == 'available' ||
-                    _isFinalPayment)
-                ? () {
-                    if (!_validateStep2DateTimeBeforeProceed()) {
-                      return;
-                    }
+            onPressed: () async {
+              if (_pickupDate == null) {
+                setState(() {
+                  _step2ValidationMessage = 'Please select a pickup date.';
+                });
+                return;
+              }
+              if (_pickupTime == null) {
+                setState(() {
+                  _step2ValidationMessage = 'Please select a pickup time.';
+                });
+                return;
+              }
+              if (_isDeliveryChoice &&
+                  _deliveryAddressController.text.trim().isEmpty) {
+                setState(() {
+                  _step2ValidationMessage =
+                      'Please enter your delivery address.';
+                });
+                return;
+              }
 
-                    if (_isOpenRental) {
-                      _showOpenRentalConfirmationDialog();
-                    } else {
-                      setState(() {
-                        _currentStep = 3;
-                      });
-                    }
-                  }
-                : null,
+              // Direct live check against Firebase Realtime Database for vehicle hold
+              final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+              final holdCheck = await BookingHoldService().checkVehicleHold(
+                widget.vehicle.id,
+                isArabic: isArabic,
+              );
+              if (holdCheck['isHoldActive'] == true) {
+                final String msg = holdCheck['message'] ??
+                    BookingHoldService.defaultBlockedMessage;
+                setState(() {
+                  _step2ValidationMessage = msg;
+                });
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(msg),
+                      backgroundColor: Colors.redAccent,
+                      duration: const Duration(seconds: 5),
+                    ),
+                  );
+                }
+                return;
+              }
+
+              setState(() {
+                _step2ValidationMessage = null;
+              });
+
+              final profileValid =
+                  await _validateCustomerProfileBeforeBooking();
+              if (profileValid) {
+                await _processBooking(
+                  status: 'Confirmed',
+                  txId: 'OPEN_RENTAL',
+                  amount: 0.0,
+                  paymentDate: DateTime.now(),
+                );
+              }
+            },
             child: Text(
-              _isOpenRental ? 'Confirm Open Rental' : 'Proceed to Payment',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              'Complete Booking'.tr(context),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
             ),
           ),
         ),
         if (_step2ValidationMessage != null) ...[
-          const SizedBox(height: 10),
-          Text(
-            _step2ValidationMessage!,
-            style: const TextStyle(
-              color: Colors.redAccent,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+          const SizedBox(height: 12),
+          Center(
+            child: Text(
+              _step2ValidationMessage!,
+              style: const TextStyle(
+                color: Colors.redAccent,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
@@ -3905,11 +3887,10 @@ class _BookingScreenState extends State<BookingScreen> {
     final textMuted = isDark ? const Color(0xFF94A3B8) : Colors.grey[500]!;
 
     final safePickupDate = _pickupDate ?? DateTime.now();
-    final safeReturnDate =
-        _returnDate ?? safePickupDate.add(const Duration(days: 1));
+    final safeReturnDate = _isOpenRental ? null : _returnDate;
 
     final pickupDateStr = DateFormat('dd MMM yyyy').format(safePickupDate);
-    final returnDateStr = _isOpenRental
+    final returnDateStr = (_isOpenRental || safeReturnDate == null)
         ? 'Open Rental'
         : DateFormat('dd MMM yyyy').format(safeReturnDate);
 

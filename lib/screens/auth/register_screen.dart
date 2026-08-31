@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../constants/colors.dart';
+import '../../l10n/app_translations.dart';
 import '../../services/auth_service.dart';
 import '../../services/database_service.dart';
 import '../../services/company_settings_provider.dart';
@@ -65,7 +66,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!userModel.isActive) {
         setState(() {
           _error =
-              'Your account has been disabled or suspended. Please contact support.';
+              'Your account has been disabled or suspended. Please contact support.'.tr(context);
           _googleLoading = false;
         });
         await _authService.logout();
@@ -79,7 +80,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Welcome, ${userModel.fullName}!'),
+          content: Text('${"Welcome, ".tr(context)}${userModel.fullName}!'),
           backgroundColor: AppColors.primaryOrange,
         ),
       );
@@ -117,14 +118,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     if (!_agreeToTerms) {
       setState(() {
-        _error = 'You must agree to the Terms & Conditions and Privacy Policy';
+        _error = 'You must agree to the Terms & Conditions and Privacy Policy'.tr(context);
       });
       return;
     }
 
     if (_passwordController.text != _confirmPasswordController.text) {
       setState(() {
-        _error = 'Passwords do not match';
+        _error = 'Passwords do not match'.tr(context);
       });
       return;
     }
@@ -146,8 +147,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Account Created Successfully! Please login.'),
+        SnackBar(
+          content: Text('Account Created Successfully! Please login.'.tr(context)),
           backgroundColor: AppColors.primaryOrange,
         ),
       );
@@ -214,7 +215,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             const SizedBox(height: 16),
           ],
           Text(
-            'Create Account',
+            'Create Account'.tr(context),
             textAlign: isDesktop ? TextAlign.left : TextAlign.center,
             style: TextStyle(
               fontSize: 28,
@@ -224,7 +225,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Join ${context.watch<CompanySettingsProvider>().companyName} today and start your journey.',
+            '${"Join ".tr(context)}${context.watch<CompanySettingsProvider>().companyName}${" today and start your journey.".tr(context)}',
             textAlign: isDesktop ? TextAlign.left : TextAlign.center,
             style: TextStyle(
               fontSize: 14,
@@ -247,7 +248,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '   Full Name',
+                            '   ${"Full Name".tr(context)}',
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
@@ -260,11 +261,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           CustomTextField(
                             controller: _fullNameController,
                             labelText: '',
-                            hintText: 'Enter your full name',
+                            hintText: 'Enter your full name'.tr(context),
                             prefixIcon: Icons.person_outline,
                             validator: (val) =>
                                 val == null || val.trim().isEmpty
-                                ? 'Full Name is required'
+                                ? 'Full Name is required'.tr(context)
                                 : null,
                           ),
                         ],
@@ -276,7 +277,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '   Phone Number',
+                            '   ${"Phone Number".tr(context)}',
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
@@ -289,18 +290,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           CustomTextField(
                             controller: _phoneController,
                             labelText: '',
-                            hintText: 'e.g., +60123456789',
+                            hintText: 'e.g., +60123456789'.tr(context),
                             prefixIcon: Icons.phone_outlined,
                             keyboardType: TextInputType.phone,
                             validator: (val) {
                               if (val == null || val.trim().isEmpty) {
-                                return 'Phone Number is required';
+                                return 'Phone Number is required'.tr(context);
                               }
                               final cleanVal = val.trim();
                               if (!RegExp(
                                 r'^(\+?6?01)[0-46-9]-*[0-9]{7,8}$',
                               ).hasMatch(cleanVal)) {
-                                return 'Enter a valid Malaysian phone number';
+                                return 'Enter a valid Malaysian phone number'.tr(context);
                               }
                               return null;
                             },
@@ -315,7 +316,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '   Full Name',
+                      '   ${"Full Name".tr(context)}',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
@@ -328,15 +329,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     CustomTextField(
                       controller: _fullNameController,
                       labelText: '',
-                      hintText: 'Enter your full name',
+                      hintText: 'Enter your full name'.tr(context),
                       prefixIcon: Icons.person_outline,
                       validator: (val) => val == null || val.trim().isEmpty
-                          ? 'Full Name is required'
+                          ? 'Full Name is required'.tr(context)
                           : null,
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      '   Phone Number',
+                      '   ${"Phone Number".tr(context)}',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
@@ -349,18 +350,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     CustomTextField(
                       controller: _phoneController,
                       labelText: '',
-                      hintText: 'e.g., +60123456789',
+                      hintText: 'e.g., +60123456789'.tr(context),
                       prefixIcon: Icons.phone_outlined,
                       keyboardType: TextInputType.phone,
                       validator: (val) {
                         if (val == null || val.trim().isEmpty) {
-                          return 'Phone Number is required';
+                          return 'Phone Number is required'.tr(context);
                         }
                         final cleanVal = val.trim();
                         if (!RegExp(
                           r'^(\+?6?01)[0-46-9]-*[0-9]{7,8}$',
                         ).hasMatch(cleanVal)) {
-                          return 'Enter a valid Malaysian phone number';
+                          return 'Enter a valid Malaysian phone number'.tr(context);
                         }
                         return null;
                       },
@@ -374,7 +375,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
           // Email Address
           Text(
-            '   Email Address',
+            '   ${"Email Address".tr(context)}',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
@@ -385,15 +386,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
           CustomTextField(
             controller: _emailController,
             labelText: '',
-            hintText: 'Enter your email address',
+            hintText: 'Enter your email address'.tr(context),
             prefixIcon: Icons.email_outlined,
             keyboardType: TextInputType.emailAddress,
             validator: (val) {
               if (val == null || val.trim().isEmpty) {
-                return 'Email is required';
+                return 'Email is required'.tr(context);
               }
               if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(val)) {
-                return 'Enter a valid email';
+                return 'Enter a valid email'.tr(context);
               }
               return null;
             },
@@ -401,7 +402,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
           // Password
           Text(
-            '   Password',
+            '   ${"Password".tr(context)}',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
@@ -412,7 +413,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           CustomTextField(
             controller: _passwordController,
             labelText: '',
-            hintText: 'Min 6 chars, upper, lower, number & symbol',
+            hintText: 'Min 6 chars, upper, lower, number & symbol'.tr(context),
             obscureText: _obscurePassword,
             prefixIcon: Icons.lock_outline,
             suffixIcon: IconButton(
@@ -428,22 +429,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             validator: (val) {
               if (val == null || val.isEmpty) {
-                return 'Password is required';
+                return 'Password is required'.tr(context);
               }
               if (val.length < 6) {
-                return 'Password must be at least 6 characters';
+                return 'Password must be at least 6 characters'.tr(context);
               }
               if (!RegExp(r'[A-Z]').hasMatch(val)) {
-                return 'Password must contain an uppercase letter';
+                return 'Password must contain an uppercase letter'.tr(context);
               }
               if (!RegExp(r'[a-z]').hasMatch(val)) {
-                return 'Password must contain a lowercase letter';
+                return 'Password must contain a lowercase letter'.tr(context);
               }
               if (!RegExp(r'\d').hasMatch(val)) {
-                return 'Password must contain a number';
+                return 'Password must contain a number'.tr(context);
               }
               if (!RegExp(r'[^A-Za-z\d]').hasMatch(val)) {
-                return 'Password must contain a special character';
+                return 'Password must contain a special character'.tr(context);
               }
               return null;
             },
@@ -452,7 +453,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
           // Confirm Password
           Text(
-            '   Confirm Password',
+            '   ${"Confirm Password".tr(context)}',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
@@ -463,7 +464,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           CustomTextField(
             controller: _confirmPasswordController,
             labelText: '',
-            hintText: 'Confirm your password',
+            hintText: 'Confirm your password'.tr(context),
             obscureText: _obscureConfirmPassword,
             prefixIcon: Icons.lock_clock_outlined,
             suffixIcon: IconButton(
@@ -481,10 +482,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             validator: (val) {
               if (val == null || val.isEmpty) {
-                return 'Please confirm your password';
+                return 'Please confirm your password'.tr(context);
               }
               if (val != _passwordController.text) {
-                return 'Passwords do not match';
+                return 'Passwords do not match'.tr(context);
               }
               return null;
             },
@@ -516,18 +517,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       fontWeight: FontWeight.w600,
                     ),
                     children: [
-                      const TextSpan(text: 'I agree to the '),
-                      const TextSpan(
-                        text: 'Terms & Conditions',
-                        style: TextStyle(
+                      TextSpan(text: 'I agree to the '.tr(context)),
+                      TextSpan(
+                        text: 'Terms & Conditions'.tr(context),
+                        style: const TextStyle(
                           color: AppColors.primaryOrange,
                           decoration: TextDecoration.underline,
                         ),
                       ),
-                      const TextSpan(text: ' and '),
-                      const TextSpan(
-                        text: 'Privacy Policy',
-                        style: TextStyle(
+                      TextSpan(text: ' and '.tr(context)),
+                      TextSpan(
+                        text: 'Privacy Policy'.tr(context),
+                        style: const TextStyle(
                           color: AppColors.primaryOrange,
                           decoration: TextDecoration.underline,
                         ),
@@ -552,7 +553,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ),
               child: Text(
-                _error!,
+                _error!.tr(context),
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: Colors.redAccent,
@@ -587,9 +588,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         strokeWidth: 2,
                       ),
                     )
-                  : const Text(
-                      'Register',
-                      style: TextStyle(
+                  : Text(
+                      'Register'.tr(context),
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 0.5,
@@ -612,7 +613,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Text(
-                  'OR CONTINUE WITH',
+                  'OR CONTINUE WITH'.tr(context),
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
@@ -671,20 +672,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   : Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Image.network(
-                          'https://www.gstatic.com/mobilesdk/160503_mobilesdk/logo/2x/google_g_normal_id_48dp.png',
-                          height: 22,
-                          width: 22,
-                          errorBuilder: (context, error, stackTrace) =>
-                              const Icon(
-                                Icons.g_mobiledata_rounded,
-                                color: AppColors.primaryOrange,
-                                size: 28,
-                              ),
+                        const Icon(
+                          Icons.g_mobiledata_rounded,
+                          color: AppColors.primaryOrange,
+                          size: 32,
                         ),
                         const SizedBox(width: 12),
                         Text(
-                          'Sign up using Google',
+                          'Sign up using Google'.tr(context),
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
@@ -705,7 +700,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                "Already have an account? ",
+                "Already have an account? ".tr(context),
                 style: TextStyle(
                   color: isDark ? const Color(0xFF94A3B8) : Colors.grey[600],
                   fontWeight: FontWeight.w500,
@@ -720,9 +715,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                   );
                 },
-                child: const Text(
-                  'Login',
-                  style: TextStyle(
+                child: Text(
+                  'Login'.tr(context),
+                  style: const TextStyle(
                     color: AppColors.primaryOrange,
                     fontWeight: FontWeight.bold,
                     decoration: TextDecoration.underline,
@@ -736,7 +731,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           _buildBottomGraphic(context, isDark),
           const SizedBox(height: 16),
           Text(
-            '© 2026 ${context.watch<CompanySettingsProvider>().companyName}. All rights reserved.',
+            '${"© 2026 ".tr(context)}${context.watch<CompanySettingsProvider>().companyName}${" . All rights reserved.".tr(context)}',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 11,

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/booking_model.dart';
+import '../models/user_model.dart';
 import 'notification_service.dart';
 import 'vehicle_service.dart';
 import 'reward_service.dart';
@@ -11,6 +12,7 @@ import 'receipt_service.dart';
 import 'promotion_service.dart';
 import 'company_settings_provider.dart';
 import 'user_role_cache.dart';
+import 'booking_hold_service.dart';
 
 class BookingService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref().child(
@@ -356,8 +358,43 @@ class BookingService {
   }
 
   Future<void> createBooking(BookingModel booking) async {
+    // Perform server-side database check for active vehicle hold right before saving to Firebase
+    final vehicleHoldCheck =
+        await BookingHoldService().checkVehicleHold(booking.vehicleId);
+    if (vehicleHoldCheck['isHoldActive'] == true) {
+      final String msg = vehicleHoldCheck['message'] ??
+          BookingHoldService.defaultBlockedMessage;
+      throw Exception(msg);
+    }
+
     try {
       invalidateCache();
+
+      // Enforce customer profile completeness before creating booking
+      try {
+        final uSnap = await FirebaseDatabase.instance
+            .ref()
+            .child('users')
+            .child(booking.userId)
+            .get();
+        if (uSnap.exists && uSnap.value is Map) {
+          final uModel = UserModel.fromMap(
+            booking.userId,
+            Map<dynamic, dynamic>.from(uSnap.value as Map),
+          );
+          if (!uModel.isProfileCompleteForBooking) {
+            throw Exception(
+              'Profile incomplete. Missing: ${uModel.missingProfileFields.join(', ')}',
+            );
+          }
+        }
+      } catch (uErr) {
+        if (uErr.toString().contains('Profile incomplete')) {
+          rethrow;
+        }
+        debugPrint('Warning: profile validation check error: $uErr');
+      }
+
       final bookingMap = booking.toMap();
       bookingMap['notifiedEvents'] = {'new_booking': true};
 
@@ -365,6 +402,9 @@ class BookingService {
           .child(booking.id)
           .set(bookingMap)
           .timeout(const Duration(seconds: 10));
+
+      // Successfully created booking -> Deactivate/clear active hold for this vehicle
+      await BookingHoldService().clearVehicleHold(booking.vehicleId);
 
       // If promotion was used, record promotion analytics!
       if (booking.promotionId != null && booking.promotionId!.isNotEmpty) {
@@ -442,19 +482,24 @@ class BookingService {
   }
 
   List<BookingModel>? _cachedBookings;
-  DateTime? _bookingsCacheTime;
-  static const Duration _cacheTtl = Duration(seconds: 30);
 
   void invalidateCache() {
     _cachedBookings = null;
-    _bookingsCacheTime = null;
+  }
+
+  Future<void> applyDiscount(String bookingId, double discountAmount) async {
+    invalidateCache();
+    final clampedDiscount = discountAmount.clamp(0.0, 99999.0);
+    await _db.child(bookingId).update({
+      'discountAmount': clampedDiscount,
+      'updatedAt': DateTime.now().toIso8601String(),
+    });
   }
 
   Future<List<BookingModel>> getBookings({bool forceRefresh = false}) async {
     if (!forceRefresh &&
         _cachedBookings != null &&
-        _bookingsCacheTime != null &&
-        DateTime.now().difference(_bookingsCacheTime!) < _cacheTtl) {
+        _cachedBookings!.isNotEmpty) {
       debugPrint(
         '[BookingService] Returning warm cached bookings (${_cachedBookings!.length} items)',
       );
@@ -462,6 +507,8 @@ class BookingService {
     }
 
     List<BookingModel> bookings = [];
+    final perfSw = Stopwatch()..start();
+    debugPrint('[PERF] Starting bookings query');
     final currentUid = FirebaseAuth.instance.currentUser?.uid;
     if (currentUid == null) return bookings;
 
@@ -481,27 +528,33 @@ class BookingService {
             .timeout(const Duration(seconds: 10));
       }
 
-      if (snapshot.exists) {
+      if (snapshot.exists && snapshot.value != null) {
         final Map<dynamic, dynamic> data =
             snapshot.value as Map<dynamic, dynamic>;
         data.forEach((key, value) {
-          bookings.add(
-            BookingModel.fromMap(
-              key.toString(),
-              value as Map<dynamic, dynamic>,
-            ),
-          );
+          if (value is Map) {
+            bookings.add(
+              BookingModel.fromMap(
+                key.toString(),
+                value,
+              ),
+            );
+          }
         });
       }
 
       _cachedBookings = bookings;
-      _bookingsCacheTime = DateTime.now();
 
+      perfSw.stop();
       debugPrint(
-        '[BookingService] [getBookings] Bookings count loaded: ${bookings.length}',
+        '[PERF] Bookings query completed: ${perfSw.elapsedMilliseconds}ms (${bookings.length} items)',
       );
     } catch (e) {
-      debugPrint('[BookingService] [getBookings] Error getting bookings: $e');
+      perfSw.stop();
+      debugPrint('[PERF] Bookings query FAILED in ${perfSw.elapsedMilliseconds}ms: $e');
+      if (_cachedBookings != null && _cachedBookings!.isNotEmpty) {
+        return _cachedBookings!;
+      }
       rethrow;
     }
     return bookings;
@@ -515,6 +568,15 @@ class BookingService {
 
     final controller = StreamController<List<BookingModel>>.broadcast();
     StreamSubscription? sub;
+
+    // Immediately emit warm cached bookings if available
+    if (_cachedBookings != null && _cachedBookings!.isNotEmpty) {
+      scheduleMicrotask(() {
+        if (!controller.isClosed && _cachedBookings != null) {
+          controller.add(_cachedBookings!);
+        }
+      });
+    }
 
     UserRoleCache.getRole(currentUid)
         .then((currentRole) {
@@ -534,29 +596,40 @@ class BookingService {
             (event) {
               if (controller.isClosed) return;
               List<BookingModel> bookings = [];
-              if (event.snapshot.exists) {
+              if (event.snapshot.exists && event.snapshot.value != null) {
                 final Map<dynamic, dynamic> data =
                     event.snapshot.value as Map<dynamic, dynamic>;
                 data.forEach((key, value) {
-                  bookings.add(
-                    BookingModel.fromMap(
-                      key.toString(),
-                      value as Map<dynamic, dynamic>,
-                    ),
-                  );
+                  if (value is Map) {
+                    bookings.add(
+                      BookingModel.fromMap(
+                        key.toString(),
+                        value,
+                      ),
+                    );
+                  }
                 });
               }
+              _cachedBookings = bookings;
               controller.add(bookings);
             },
             onError: (e) {
               debugPrint('[BookingService] getBookingsStream error: $e');
-              if (!controller.isClosed) controller.add([]);
+              if (!controller.isClosed && _cachedBookings != null) {
+                controller.add(_cachedBookings!);
+              } else if (!controller.isClosed) {
+                controller.add([]);
+              }
             },
           );
         })
         .catchError((e) {
           debugPrint('[BookingService] getBookingsStream role fetch error: $e');
-          if (!controller.isClosed) controller.add([]);
+          if (!controller.isClosed && _cachedBookings != null) {
+            controller.add(_cachedBookings!);
+          } else if (!controller.isClosed) {
+            controller.add([]);
+          }
         });
 
     controller.onCancel = () => sub?.cancel();
@@ -630,16 +703,39 @@ class BookingService {
 
       if (statusLower == 'completed') {
         updates['isReturned'] = true;
+        final returnTime = DateTime.now();
         updates['actualReturnTime'] = DateFormat(
           'hh:mm a',
-        ).format(DateTime.now());
+        ).format(returnTime);
         updates['actualReturnDate'] = DateFormat(
           'yyyy-MM-dd',
-        ).format(DateTime.now());
-        updates['actualReturnTimestamp'] = DateTime.now().toIso8601String();
+        ).format(returnTime);
+        updates['actualReturnTimestamp'] = returnTime.toIso8601String();
         if (employeeId != null) updates['receivedByEmployeeId'] = employeeId;
         if (employeeName != null) updates['receivedByEmployeeName'] = employeeName;
         if (returnInspection != null) updates['returnInspection'] = returnInspection;
+
+        try {
+          final bSnap = await _db.child(bookingId).get();
+          if (bSnap.exists && bSnap.value is Map) {
+            final bData = Map<dynamic, dynamic>.from(bSnap.value as Map);
+            final bool isOpen = bData['isOpenRental'] ?? false;
+            final double pricePerDay = (bData['pricePerDay'] ?? bData['vehiclePricePerDay'] ?? 100.0).toDouble();
+            final pickupStr = bData['actualPickupTimestamp'] ?? bData['pickUpDate'];
+            if (isOpen && pickupStr != null) {
+              final start = DateTime.parse(pickupStr.toString());
+              final hrs = returnTime.difference(start).inHours;
+              final days = (hrs / 24).ceil().clamp(1, 9999);
+              final gross = days * pricePerDay;
+              final discount = (bData['discountAmount'] ?? 0.0).toDouble() + (bData['promotionDiscountAmount'] ?? 0.0).toDouble();
+              final lateFees = (bData['lateFees'] ?? 0.0).toDouble();
+              final calculatedFinal = (gross - discount + lateFees).clamp(0.0, 999999.0);
+              updates['finalAmount'] = calculatedFinal;
+            }
+          }
+        } catch (calcErr) {
+          debugPrint('Error calculating final amount on return: $calcErr');
+        }
       }
 
       await _db
@@ -952,7 +1048,9 @@ class BookingService {
                   booking.returnDate!.month,
                   booking.returnDate!.day,
                 )
-              : start;
+              : (booking.isOpenRental
+                  ? DateTime.now().add(const Duration(days: 365))
+                  : start);
 
           DateTime cur = start;
           while (!cur.isAfter(end)) {
@@ -1027,7 +1125,9 @@ class BookingService {
                 booking.returnDate!.month,
                 booking.returnDate!.day,
               )
-            : bStart;
+            : (booking.isOpenRental
+                ? DateTime.now().add(const Duration(days: 365))
+                : bStart);
 
         // Check range overlap: [reqStart, reqEnd] overlaps [bStart, bEnd]
         if (!reqEnd.isBefore(bStart) && !reqStart.isAfter(bEnd)) {

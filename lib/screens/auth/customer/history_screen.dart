@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../constants/colors.dart';
@@ -9,6 +10,7 @@ import '../../../services/payment_service.dart';
 import '../../../models/booking_model.dart';
 import '../../../models/payment_model.dart';
 import '../../../services/receipt_service.dart';
+import '../../../l10n/app_translations.dart';
 
 class HistoryScreen extends StatefulWidget {
   final int initialTabIndex;
@@ -176,7 +178,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text('Retry'),
+                child: Text('Retry'.tr(context)),
               ),
             ],
           ),
@@ -206,6 +208,10 @@ class _HistoryScreenState extends State<HistoryScreen>
 
   Widget _statusBadge(String status) {
     final color = _statusColor(status);
+    final translated = status.toLowerCase().tr(context);
+    final displayStatus = translated.substring(0, 1).toUpperCase() +
+        (translated.length > 1 ? translated.substring(1) : '');
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -214,7 +220,7 @@ class _HistoryScreenState extends State<HistoryScreen>
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
-        status,
+        displayStatus,
         style: TextStyle(
           color: color,
           fontSize: 11,
@@ -240,7 +246,7 @@ class _HistoryScreenState extends State<HistoryScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Receipt Options',
+                'Receipt Options'.tr(context),
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -248,15 +254,18 @@ class _HistoryScreenState extends State<HistoryScreen>
                 ),
               ),
               const SizedBox(height: 6),
-              Text(
-                'Booking ID: #${booking.id.toUpperCase()}',
-                style: TextStyle(fontSize: 11, color: _subColor),
+              Directionality(
+                textDirection: ui.TextDirection.ltr,
+                child: Text(
+                  'Booking ID: #${booking.id.toUpperCase()}',
+                  style: TextStyle(fontSize: 11, color: _subColor),
+                ),
               ),
               const SizedBox(height: 16),
               ListTile(
                 leading: Icon(Icons.visibility, color: _textColor),
                 title: Text(
-                  'View Receipt',
+                  'View Receipt'.tr(context),
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -274,7 +283,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                   color: AppColors.primaryOrange,
                 ),
                 title: Text(
-                  'Download PDF',
+                  'Download PDF'.tr(context),
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -297,8 +306,8 @@ class _HistoryScreenState extends State<HistoryScreen>
     if (_bookings.isEmpty) {
       return _buildEmptyState(
         icon: Icons.history_rounded,
-        title: 'No Past Bookings',
-        subtitle: 'Completed or cancelled bookings will appear here.',
+        title: 'No Past Bookings'.tr(context),
+        subtitle: 'Completed or cancelled bookings will appear here.'.tr(context),
       );
     }
     return ListView.builder(
@@ -373,9 +382,12 @@ class _HistoryScreenState extends State<HistoryScreen>
                             ),
                           ),
                           const SizedBox(height: 2),
-                          Text(
-                            'Booking #${b.id.substring(0, 8).toUpperCase()}',
-                            style: TextStyle(fontSize: 11, color: _subColor),
+                          Directionality(
+                            textDirection: ui.TextDirection.ltr,
+                            child: Text(
+                              '${'Booking'.tr(context)} #${b.id.substring(0, 8).toUpperCase()}',
+                              style: TextStyle(fontSize: 11, color: _subColor),
+                            ),
                           ),
                         ],
                       ),
@@ -391,28 +403,28 @@ class _HistoryScreenState extends State<HistoryScreen>
                     Expanded(
                       child: _infoTile(
                         Icons.calendar_today_outlined,
-                        'Pick Up',
+                        'Pick Up'.tr(context),
                         DateFormat('dd MMM yyyy').format(b.pickUpDate),
                       ),
                     ),
                     Expanded(
                       child: _infoTile(
                         Icons.event_rounded,
-                        'Return',
+                        'Return'.tr(context),
                         b.isOpenRental
-                            ? 'Open Rental'
+                            ? 'Open Rental'.tr(context)
                             : (b.returnDate != null
                                   ? DateFormat(
                                       'dd MMM yyyy',
                                     ).format(b.returnDate!)
-                                  : ""),
+                                  : "Open Rental".tr(context)),
                       ),
                     ),
                     Expanded(
                       child: _infoTile(
                         Icons.timer_outlined,
-                        'Duration',
-                        '$days Day${days == 1 ? '' : 's'}',
+                        'Duration'.tr(context),
+                        '$days ${(days == 1 ? 'Day' : 'Days').tr(context)}',
                       ),
                     ),
                   ],
@@ -428,19 +440,22 @@ class _HistoryScreenState extends State<HistoryScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Total Amount',
+                          'Total Amount'.tr(context),
                           style: TextStyle(
                             fontSize: 12,
                             color: _subColor,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
-                        Text(
-                          'RM ${b.totalPrice.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 16,
-                            color: AppColors.primaryOrange,
+                        Directionality(
+                          textDirection: ui.TextDirection.ltr,
+                          child: Text(
+                            'RM ${b.totalPrice.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                              color: AppColors.primaryOrange,
+                            ),
                           ),
                         ),
                       ],
@@ -472,9 +487,9 @@ class _HistoryScreenState extends State<HistoryScreen>
                               size: 12,
                               color: AppColors.primaryOrange,
                             ),
-                            label: const Text(
-                              'Receipt',
-                              style: TextStyle(
+                            label: Text(
+                              'Receipt'.tr(context),
+                              style: const TextStyle(
                                 color: AppColors.primaryOrange,
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
@@ -527,7 +542,7 @@ class _HistoryScreenState extends State<HistoryScreen>
   void _openReceiptLightbox(PaymentModel payment) {
     if (payment.receiptImage == null || payment.receiptImage!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No receipt file uploaded.')),
+        SnackBar(content: Text('No receipt file uploaded.'.tr(context))),
       );
       return;
     }
@@ -547,7 +562,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                 backgroundColor: Colors.black54,
                 elevation: 0,
                 title: Text(
-                  isPdf ? 'PDF Receipt' : 'Receipt Image',
+                  isPdf ? 'PDF Receipt'.tr(context) : 'Receipt Image'.tr(context),
                   style: const TextStyle(color: Colors.white),
                 ),
                 leading: IconButton(
@@ -569,9 +584,9 @@ class _HistoryScreenState extends State<HistoryScreen>
                               size: 80,
                             ),
                             const SizedBox(height: 16),
-                            const Text(
-                              'PDF Receipt Document Uploaded',
-                              style: TextStyle(color: Colors.white),
+                            Text(
+                              'PDF Receipt Document Uploaded'.tr(context),
+                              style: const TextStyle(color: Colors.white),
                             ),
                           ],
                         )
@@ -594,7 +609,7 @@ class _HistoryScreenState extends State<HistoryScreen>
     if (_paymentsError != null && _payments.isEmpty) {
       return _buildEmptyState(
         icon: Icons.lock_outline_rounded,
-        title: 'Unable to Load Payments',
+        title: 'Unable to Load Payments'.tr(context),
         subtitle: _paymentsError!,
       );
     }
@@ -602,8 +617,8 @@ class _HistoryScreenState extends State<HistoryScreen>
     if (_payments.isEmpty) {
       return _buildEmptyState(
         icon: Icons.receipt_long_rounded,
-        title: 'No Payment History',
-        subtitle: 'Your payment transactions will appear here.',
+        title: 'No Payment History'.tr(context),
+        subtitle: 'Your payment transactions will appear here.'.tr(context),
       );
     }
 
@@ -673,9 +688,12 @@ class _HistoryScreenState extends State<HistoryScreen>
                             ),
                           ),
                           const SizedBox(height: 2),
-                          Text(
-                            'Booking Reference: #${p.bookingId.substring(0, p.bookingId.length > 8 ? 8 : p.bookingId.length).toUpperCase()}',
-                            style: TextStyle(fontSize: 11, color: _subColor),
+                          Directionality(
+                            textDirection: ui.TextDirection.ltr,
+                            child: Text(
+                              '${'Booking Reference:'.tr(context)} #${p.bookingId.substring(0, p.bookingId.length > 8 ? 8 : p.bookingId.length).toUpperCase()}',
+                              style: TextStyle(fontSize: 11, color: _subColor),
+                            ),
                           ),
                         ],
                       ),
@@ -695,13 +713,13 @@ class _HistoryScreenState extends State<HistoryScreen>
                         children: [
                           _infoTile(
                             Icons.calendar_today_outlined,
-                            'Date',
+                            'Date'.tr(context),
                             DateFormat('dd MMM yyyy').format(p.paymentDate),
                           ),
                           const SizedBox(height: 12),
                           _infoTile(
                             Icons.access_time_rounded,
-                            'Time',
+                            'Time'.tr(context),
                             paymentTimeStr,
                           ),
                         ],
@@ -713,13 +731,13 @@ class _HistoryScreenState extends State<HistoryScreen>
                         children: [
                           _infoTile(
                             Icons.payment_outlined,
-                            'Method',
-                            p.paymentMethod,
+                            'Method'.tr(context),
+                            p.paymentMethod.tr(context),
                           ),
                           const SizedBox(height: 12),
                           _infoTile(
                             Icons.fingerprint_rounded,
-                            'Ref ID',
+                            'Ref ID'.tr(context),
                             p.transactionId ?? 'N/A',
                           ),
                         ],
@@ -777,19 +795,22 @@ class _HistoryScreenState extends State<HistoryScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Payment Amount',
+                          'Payment Amount'.tr(context),
                           style: TextStyle(
                             fontSize: 11,
                             color: _subColor,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        Text(
-                          'RM ${p.amount.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 16,
-                            color: AppColors.primaryOrange,
+                        Directionality(
+                          textDirection: ui.TextDirection.ltr,
+                          child: Text(
+                            'RM ${p.amount.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                              color: AppColors.primaryOrange,
+                            ),
                           ),
                         ),
                       ],
@@ -804,9 +825,9 @@ class _HistoryScreenState extends State<HistoryScreen>
                               size: 12,
                               color: AppColors.primaryOrange,
                             ),
-                            label: const Text(
-                              'View Uploaded Receipt',
-                              style: TextStyle(
+                            label: Text(
+                              'View Uploaded Receipt'.tr(context),
+                              style: const TextStyle(
                                 color: AppColors.primaryOrange,
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
@@ -902,12 +923,15 @@ class _HistoryScreenState extends State<HistoryScreen>
           ],
         ),
         const SizedBox(height: 3),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: _textColor,
+        Directionality(
+          textDirection: ui.TextDirection.ltr,
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: _textColor,
+            ),
           ),
         ),
       ],
@@ -983,10 +1007,10 @@ class _HistoryScreenState extends State<HistoryScreen>
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.history_rounded, size: 16),
+                    const Icon(Icons.receipt_long_rounded, size: 16),
                     const SizedBox(width: 6),
-                    const Text('Past Bookings'),
-                    if (_bookings.isNotEmpty) ...[
+                    Text('Payments'.tr(context)),
+                    if (_payments.isNotEmpty) ...[
                       const SizedBox(width: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -998,7 +1022,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
-                          '${_bookings.length}',
+                          '${_payments.length}',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 10,
@@ -1014,10 +1038,10 @@ class _HistoryScreenState extends State<HistoryScreen>
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.receipt_long_rounded, size: 16),
+                    const Icon(Icons.history_rounded, size: 16),
                     const SizedBox(width: 6),
-                    const Text('Payments'),
-                    if (_payments.isNotEmpty) ...[
+                    Text('Past Bookings'.tr(context)),
+                    if (_bookings.isNotEmpty) ...[
                       const SizedBox(width: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -1029,7 +1053,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
-                          '${_payments.length}',
+                          '${_bookings.length}',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 10,
@@ -1056,7 +1080,7 @@ class _HistoryScreenState extends State<HistoryScreen>
               ? _buildLoadErrorView(_error!)
               : TabBarView(
                   controller: _tabController,
-                  children: [_buildBookingsList(), _buildPaymentsList()],
+                  children: [_buildPaymentsList(), _buildBookingsList()],
                 ),
         ),
       ],

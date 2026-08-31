@@ -7,26 +7,20 @@ class BranchService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref().child('branches');
 
   List<BranchModel>? _cachedBranches;
-  DateTime? _branchesCacheTime;
-  static const Duration _cacheTtl = Duration(seconds: 60);
 
   void invalidateCache() {
     _cachedBranches = null;
-    _branchesCacheTime = null;
   }
 
   Future<List<BranchModel>> getBranches({bool forceRefresh = false}) async {
-    if (!forceRefresh &&
-        _cachedBranches != null &&
-        _branchesCacheTime != null &&
-        DateTime.now().difference(_branchesCacheTime!) < _cacheTtl) {
+    if (!forceRefresh && _cachedBranches != null && _cachedBranches!.isNotEmpty) {
       debugPrint('[BranchService] Returning warm cached branches (${_cachedBranches!.length} items)');
       return _cachedBranches!;
     }
 
     List<BranchModel> branches = [];
     try {
-      final snapshot = await _db.get().timeout(const Duration(seconds: 8));
+      final snapshot = await _db.get().timeout(const Duration(seconds: 10));
       if (snapshot.exists && snapshot.value != null) {
         final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
         data.forEach((key, value) {
@@ -36,9 +30,11 @@ class BranchService {
         });
       }
       _cachedBranches = branches;
-      _branchesCacheTime = DateTime.now();
     } catch (e) {
       debugPrint('Error getting branches from Realtime Database: $e');
+      if (_cachedBranches != null && _cachedBranches!.isNotEmpty) {
+        return _cachedBranches!;
+      }
     }
     return branches;
   }
@@ -46,12 +42,15 @@ class BranchService {
   Stream<List<BranchModel>> getBranchesStream() {
     return _db.onValue.map((event) {
       List<BranchModel> branches = [];
-      if (event.snapshot.exists) {
+      if (event.snapshot.exists && event.snapshot.value != null) {
         final Map<dynamic, dynamic> data = event.snapshot.value as Map<dynamic, dynamic>;
         data.forEach((key, value) {
-          branches.add(BranchModel.fromMap(key.toString(), value as Map<dynamic, dynamic>));
+          if (value is Map) {
+            branches.add(BranchModel.fromMap(key.toString(), value));
+          }
         });
       }
+      _cachedBranches = branches;
       return branches;
     });
   }

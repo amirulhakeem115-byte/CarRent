@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../constants/colors.dart';
 import '../../../models/vehicle_model.dart';
 import '../../../widgets/app_image.dart';
+import '../../../l10n/app_translations.dart';
 
 class AdminTrackingView extends StatefulWidget {
   final List<VehicleModel> vehicles;
@@ -55,9 +56,9 @@ class _AdminTrackingViewState extends State<AdminTrackingView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'FLEET TELEMATICS',
-                  style: TextStyle(
+                Text(
+                  'FLEET TELEMATICS'.tr(context),
+                  style: const TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
                     color: AppColors.primaryOrange,
@@ -66,7 +67,7 @@ class _AdminTrackingViewState extends State<AdminTrackingView> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Fleet GPS Center',
+                  'Fleet GPS Center'.tr(context),
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
@@ -82,7 +83,7 @@ class _AdminTrackingViewState extends State<AdminTrackingView> {
                   },
                   style: TextStyle(color: textPrimary),
                   decoration: InputDecoration(
-                    hintText: 'Search brand or plate...',
+                    hintText: 'Search brand or plate...'.tr(context),
                     hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.7)),
                     prefixIcon: Icon(Icons.search, size: 20, color: textSecondary),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -91,7 +92,7 @@ class _AdminTrackingViewState extends State<AdminTrackingView> {
                 const SizedBox(height: 16),
                 Expanded(
                   child: filtered.isEmpty
-                      ? Center(child: Text('No vehicles found', style: TextStyle(color: textSecondary)))
+                      ? Center(child: Text('No vehicles found'.tr(context), style: TextStyle(color: textSecondary)))
                       : ListView.separated(
                           itemCount: filtered.length,
                           separatorBuilder: (_, index) => Divider(height: 1, color: borderColor),
@@ -122,7 +123,7 @@ class _AdminTrackingViewState extends State<AdminTrackingView> {
                                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: textPrimary),
                               ),
                               subtitle: Text(
-                                '${vehicle.plateNumber} • ${speed.toStringAsFixed(0)} km/h',
+                                '${vehicle.plateNumber} • ${speed.toStringAsFixed(0)} ${"km/h".tr(context)}',
                                 style: TextStyle(fontSize: 11, color: isMoving ? Colors.green : textSecondary),
                               ),
                               onTap: () {
@@ -245,7 +246,7 @@ class _AdminTrackingViewState extends State<AdminTrackingView> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('Active Vehicle Detail', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary, fontSize: 13)),
+                            Text('Active Vehicle Detail'.tr(context), style: TextStyle(fontWeight: FontWeight.bold, color: textPrimary, fontSize: 13)),
                             IconButton(
                               icon: Icon(Icons.close, size: 16, color: textSecondary),
                               onPressed: () => setState(() => _selectedVehicle = null),
@@ -292,7 +293,7 @@ class _AdminTrackingViewState extends State<AdminTrackingView> {
                         const SizedBox(height: 12),
                         _buildOverlayDetailRow('GPS Latitude', _selectedVehicle!['latitude'].toStringAsFixed(6), textSecondary, textPrimary),
                         _buildOverlayDetailRow('GPS Longitude', _selectedVehicle!['longitude'].toStringAsFixed(6), textSecondary, textPrimary),
-                        _buildOverlayDetailRow('Current Speed', '${_selectedVehicle!['speed'].toStringAsFixed(0)} km/h', textSecondary, textPrimary),
+                        _buildOverlayDetailRow('Current Speed', '${_selectedVehicle!['speed'].toStringAsFixed(0)} ${"km/h".tr(context)}', textSecondary, textPrimary),
                         _buildOverlayDetailRow('Telematics Feed', 'Active (Teltonika GPS)', textSecondary, textPrimary),
                       ],
                     ),
@@ -311,8 +312,8 @@ class _AdminTrackingViewState extends State<AdminTrackingView> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: labelColor, fontSize: 11)),
-          Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: valColor)),
+          Text(label.tr(context), style: TextStyle(color: labelColor, fontSize: 11)),
+          Text(value.tr(context), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: valColor)),
         ],
       ),
     );

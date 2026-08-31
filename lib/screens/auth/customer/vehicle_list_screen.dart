@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../../../services/vehicle_service.dart';
 import '../../../services/branch_service.dart';
@@ -11,6 +12,7 @@ import '../../../widgets/app_image.dart';
 import '../../../services/payment_restriction_service.dart';
 import '../../../widgets/animated_widgets.dart';
 import '../../../widgets/skeleton_loaders.dart';
+import '../../../l10n/app_translations.dart';
 
 // DEV-ONLY PREVIEW TOGGLE
 // Chrome DevTools' device toolbar only changes viewport size — it does NOT
@@ -257,7 +259,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      _error!,
+                      _error!.tr(context),
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontSize: 16,
@@ -269,7 +271,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                     ElevatedButton.icon(
                       onPressed: _loadData,
                       icon: const Icon(Icons.refresh_rounded),
-                      label: const Text('Retry Loading'),
+                      label: Text('Retry Loading'.tr(context)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryOrange,
                         foregroundColor: Colors.white,
@@ -336,7 +338,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Explore Fleet',
+                'Explore Fleet'.tr(context),
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
@@ -346,7 +348,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
               ),
               const SizedBox(height: 2),
               Text(
-                'Choose from our premium registered cars and start your journey.',
+                'Choose from our premium registered cars and start your journey.'.tr(context),
                 style: TextStyle(fontSize: 12, color: _subColor),
               ),
             ],
@@ -366,7 +368,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
         controller: _searchController,
         style: TextStyle(color: _textColor, fontSize: 13),
         decoration: InputDecoration(
-          hintText: 'Search brand / model...',
+          hintText: 'Search brand / model...'.tr(context),
           hintStyle: TextStyle(
             color: _isDark ? Colors.white30 : Colors.grey,
             fontSize: 13,
@@ -374,7 +376,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
           prefixIcon: Icon(Icons.search, size: 20, color: _subColor),
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
-                  tooltip: 'Clear search',
+                  tooltip: 'Clear search'.tr(context),
                   onPressed: () {
                     _searchController.clear();
                     FocusScope.of(context).unfocus();
@@ -401,17 +403,17 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
         child: DropdownButton<String>(
           dropdownColor: Theme.of(context).cardColor,
           value: _sortBy,
-          items: const [
-            DropdownMenuItem(value: 'recommended', child: Text('Recommended')),
+          items: [
+            DropdownMenuItem(value: 'recommended', child: Text('Recommended'.tr(context))),
             DropdownMenuItem(
               value: 'price_asc',
-              child: Text('Price: Low to High'),
+              child: Text('Price: Low to High'.tr(context)),
             ),
             DropdownMenuItem(
               value: 'price_desc',
-              child: Text('Price: High to Low'),
+              child: Text('Price: High to Low'.tr(context)),
             ),
-            DropdownMenuItem(value: 'brand_asc', child: Text('Brand: A-Z')),
+            DropdownMenuItem(value: 'brand_asc', child: Text('Brand: A-Z'.tr(context))),
           ],
           onChanged: (val) {
             if (val != null) {
@@ -524,7 +526,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
         children: [
           // "Select Your Ride" - Now at the top of filters panel
           Text(
-            'Select Your Ride',
+            'Select Your Ride'.tr(context),
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w900,
@@ -538,9 +540,9 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Filters',
-                style: TextStyle(
+              Text(
+                'Filters'.tr(context),
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w900,
                   color: AppColors.secondaryBlue,
@@ -560,13 +562,13 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
           ),
           const SizedBox(height: 16),
           // Transmission
-          _buildDropdownSectionTitle('TRANSMISSION'),
+          _buildDropdownSectionTitle('TRANSMISSION'.tr(context)),
           _buildDropdownField(
             value: _selectedTransmission,
-            items: const [
-              DropdownMenuItem(value: null, child: Text('All Transmissions')),
-              DropdownMenuItem(value: 'Automatic', child: Text('Automatic')),
-              DropdownMenuItem(value: 'Manual', child: Text('Manual')),
+            items: [
+              DropdownMenuItem(value: null, child: Text('All Transmissions'.tr(context))),
+              DropdownMenuItem(value: 'Automatic', child: Text('Automatic'.tr(context))),
+              DropdownMenuItem(value: 'Manual', child: Text('Manual'.tr(context))),
             ],
             onChanged: (val) {
               setState(() => _selectedTransmission = val);
@@ -574,15 +576,15 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
           ),
           const SizedBox(height: 16),
           // Category
-          _buildDropdownSectionTitle('CATEGORY'),
+          _buildDropdownSectionTitle('CATEGORY'.tr(context)),
           _buildDropdownField(
             value: _selectedCategory,
-            items: const [
-              DropdownMenuItem(value: null, child: Text('All Categories')),
-              DropdownMenuItem(value: 'Economy', child: Text('Economy')),
-              DropdownMenuItem(value: 'Sedan', child: Text('Sedan')),
-              DropdownMenuItem(value: 'SUV', child: Text('SUV')),
-              DropdownMenuItem(value: 'MPV', child: Text('MPV')),
+            items: [
+              DropdownMenuItem(value: null, child: Text('All Categories'.tr(context))),
+              DropdownMenuItem(value: 'Economy', child: Text('Economy'.tr(context))),
+              DropdownMenuItem(value: 'Sedan', child: Text('Sedan'.tr(context))),
+              DropdownMenuItem(value: 'SUV', child: Text('SUV'.tr(context))),
+              DropdownMenuItem(value: 'MPV', child: Text('MPV'.tr(context))),
             ],
             onChanged: (val) {
               setState(() => _selectedCategory = val);
@@ -590,11 +592,11 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
           ),
           const SizedBox(height: 16),
           // Branch
-          _buildDropdownSectionTitle('BRANCH HUB'),
+          _buildDropdownSectionTitle('BRANCH HUB'.tr(context)),
           _buildDropdownField(
             value: _selectedBranch,
             items: [
-              const DropdownMenuItem(value: null, child: Text('All Branches')),
+              DropdownMenuItem(value: null, child: Text('All Branches'.tr(context))),
               ..._branches.map(
                 (b) => DropdownMenuItem(value: b, child: Text(b.name)),
               ),
@@ -605,16 +607,16 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
           ),
           const SizedBox(height: 16),
           // Availability
-          _buildDropdownSectionTitle('AVAILABILITY'),
+          _buildDropdownSectionTitle('AVAILABILITY'.tr(context)),
           _buildDropdownField(
             value: _selectedAvailability,
-            items: const [
-              DropdownMenuItem(value: null, child: Text('All Availability')),
-              DropdownMenuItem(value: 'available', child: Text('Available')),
-              DropdownMenuItem(value: 'booked', child: Text('Booked')),
+            items: [
+              DropdownMenuItem(value: null, child: Text('All Availability'.tr(context))),
+              DropdownMenuItem(value: 'available', child: Text('Available'.tr(context))),
+              DropdownMenuItem(value: 'booked', child: Text('Booked'.tr(context))),
               DropdownMenuItem(
                 value: 'maintenance',
-                child: Text('Under Maintenance'),
+                child: Text('Under Maintenance'.tr(context)),
               ),
             ],
             onChanged: (val) {
@@ -626,20 +628,23 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'DAILY BUDGET',
-                style: TextStyle(
+              Text(
+                'DAILY BUDGET'.tr(context),
+                style: const TextStyle(
                   fontSize: 9,
                   fontWeight: FontWeight.bold,
                   color: Colors.grey,
                 ),
               ),
-              Text(
-                'RM ${_priceBudget.toStringAsFixed(0)}',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.primaryOrange,
+              Directionality(
+                textDirection: ui.TextDirection.ltr,
+                child: Text(
+                  'RM ${_priceBudget.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.primaryOrange,
+                  ),
                 ),
               ),
             ],
@@ -691,7 +696,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                     children: [
                       // "Select Your Ride" at the top of mobile filters
                       Text(
-                        'Select Your Ride',
+                        'Select Your Ride'.tr(context),
                         style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.w900,
@@ -700,7 +705,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Choose from our premium registered cars and start your journey.',
+                        'Choose from our premium registered cars and start your journey.'.tr(context),
                         style: TextStyle(fontSize: 13, color: _subColor),
                       ),
                       const SizedBox(height: 20),
@@ -710,7 +715,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'Filters',
+                            'Filters'.tr(context),
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w900,
@@ -732,7 +737,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                           controller: _searchController,
                           style: TextStyle(color: _textColor, fontSize: 13),
                           decoration: InputDecoration(
-                            hintText: 'Search brand or model...',
+                            hintText: 'Search brand or model...'.tr(context),
                             hintStyle: TextStyle(
                               color: _isDark ? Colors.white30 : Colors.grey,
                               fontSize: 13,
@@ -744,7 +749,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                             ),
                             suffixIcon: _searchController.text.isNotEmpty
                                 ? IconButton(
-                                    tooltip: 'Clear search',
+                                    tooltip: 'Clear search'.tr(context),
                                     onPressed: () {
                                       _searchController.clear();
                                       setState(() {
@@ -775,21 +780,21 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      _buildDropdownSectionTitle('Transmission'),
+                      _buildDropdownSectionTitle('Transmission'.tr(context)),
                       _buildDropdownField(
                         value: _selectedTransmission,
-                        items: const [
+                        items: [
                           DropdownMenuItem(
                             value: null,
-                            child: Text('All Transmissions'),
+                            child: Text('All Transmissions'.tr(context)),
                           ),
                           DropdownMenuItem(
                             value: 'Automatic',
-                            child: Text('Automatic'),
+                            child: Text('Automatic'.tr(context)),
                           ),
                           DropdownMenuItem(
                             value: 'Manual',
-                            child: Text('Manual'),
+                            child: Text('Manual'.tr(context)),
                           ),
                         ],
                         onChanged: (val) {
@@ -798,24 +803,24 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      _buildDropdownSectionTitle('Category'),
+                      _buildDropdownSectionTitle('Category'.tr(context)),
                       _buildDropdownField(
                         value: _selectedCategory,
-                        items: const [
+                        items: [
                           DropdownMenuItem(
                             value: null,
-                            child: Text('All Categories'),
+                            child: Text('All Categories'.tr(context)),
                           ),
                           DropdownMenuItem(
                             value: 'Economy',
-                            child: Text('Economy'),
+                            child: Text('Economy'.tr(context)),
                           ),
                           DropdownMenuItem(
                             value: 'Sedan',
-                            child: Text('Sedan'),
+                            child: Text('Sedan'.tr(context)),
                           ),
-                          DropdownMenuItem(value: 'SUV', child: Text('SUV')),
-                          DropdownMenuItem(value: 'MPV', child: Text('MPV')),
+                          DropdownMenuItem(value: 'SUV', child: Text('SUV'.tr(context))),
+                          DropdownMenuItem(value: 'MPV', child: Text('MPV'.tr(context))),
                         ],
                         onChanged: (val) {
                           setState(() => _selectedCategory = val);
@@ -823,13 +828,13 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      _buildDropdownSectionTitle('Branch Hub'),
+                      _buildDropdownSectionTitle('Branch Hub'.tr(context)),
                       _buildDropdownField(
                         value: _selectedBranch,
                         items: [
-                          const DropdownMenuItem(
+                          DropdownMenuItem(
                             value: null,
-                            child: Text('All Branches'),
+                            child: Text('All Branches'.tr(context)),
                           ),
                           ..._branches.map(
                             (b) =>
@@ -842,25 +847,25 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      _buildDropdownSectionTitle('Availability'),
+                      _buildDropdownSectionTitle('Availability'.tr(context)),
                       _buildDropdownField(
                         value: _selectedAvailability,
-                        items: const [
+                        items: [
                           DropdownMenuItem(
                             value: null,
-                            child: Text('All Availability'),
+                            child: Text('All Availability'.tr(context)),
                           ),
                           DropdownMenuItem(
                             value: 'available',
-                            child: Text('Available'),
+                            child: Text('Available'.tr(context)),
                           ),
                           DropdownMenuItem(
                             value: 'booked',
-                            child: Text('Booked'),
+                            child: Text('Booked'.tr(context)),
                           ),
                           DropdownMenuItem(
                             value: 'maintenance',
-                            child: Text('Under Maintenance'),
+                            child: Text('Under Maintenance'.tr(context)),
                           ),
                         ],
                         onChanged: (val) {
@@ -873,18 +878,21 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'Daily Budget',
+                            'Daily Budget'.tr(context),
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 13,
                               color: _textColor,
                             ),
                           ),
-                          Text(
-                            'RM ${_priceBudget.toStringAsFixed(0)}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.primaryOrange,
+                          Directionality(
+                            textDirection: ui.TextDirection.ltr,
+                            child: Text(
+                              'RM ${_priceBudget.toStringAsFixed(0)}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.primaryOrange,
+                              ),
                             ),
                           ),
                         ],
@@ -919,9 +927,9 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: const Text(
-                          'Apply Filters',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                        child: Text(
+                          'Apply Filters'.tr(context),
+                          style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
                     ],
@@ -990,11 +998,11 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                 : Colors.grey[100]!,
           ),
         ),
-        child: const AnimatedEmptyState(
+        child: AnimatedEmptyState(
           icon: Icons.directions_car_filled_outlined,
-          title: 'No Matching Vehicles Found',
+          title: 'No Matching Vehicles Found'.tr(context),
           subtitle:
-              'Try adjusting your filters or clear search to view the full fleet again.',
+              'Try adjusting your filters or clear search to view the full fleet again.'.tr(context),
         ),
       );
     }
@@ -1138,9 +1146,9 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                       ),
                     ),
                     alignment: Alignment.center,
-                    child: const Text(
-                      'BOOKED',
-                      style: TextStyle(
+                    child: Text(
+                      'BOOKED'.tr(context),
+                      style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w900,
                         fontSize: 16,
@@ -1162,7 +1170,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    vehicle.status.toUpperCase(),
+                    vehicle.status.toUpperCase().tr(context),
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 8,
@@ -1201,21 +1209,24 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            const Text(
-                              'DAILY RATE',
-                              style: TextStyle(
+                            Text(
+                              'DAILY RATE'.tr(context),
+                              style: const TextStyle(
                                 fontSize: 8,
                                 color: Colors.grey,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             const SizedBox(height: 2),
-                            Text(
-                              'RM ${vehicle.pricePerDay.toStringAsFixed(0)}',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primaryOrange,
+                            Directionality(
+                              textDirection: ui.TextDirection.ltr,
+                              child: Text(
+                                'RM ${vehicle.pricePerDay.toStringAsFixed(0)}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primaryOrange,
+                                ),
                               ),
                             ),
                           ],
@@ -1237,7 +1248,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                       child: Text(
                         vehicle.branchName.isNotEmpty
                             ? vehicle.branchName
-                            : 'General Hub',
+                            : 'General Hub'.tr(context),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -1255,11 +1266,12 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                   children: [
                     _buildSpecTag(
                       Icons.airline_seat_recline_normal,
-                      '${vehicle.seats} Seats',
+                      '${vehicle.seats} ${'Seats'.tr(context)}',
+                      isLtr: true,
                     ),
                     _buildSpecTag(
                       Icons.settings_input_component,
-                      vehicle.transmission,
+                      vehicle.transmission.tr(context),
                     ),
                   ],
                 ),
@@ -1275,20 +1287,23 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'DAILY RATE',
-                            style: TextStyle(
+                          Text(
+                            'DAILY RATE'.tr(context),
+                            style: const TextStyle(
                               fontSize: 8,
                               color: Colors.grey,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          Text(
-                            'RM ${vehicle.pricePerDay.toStringAsFixed(0)}',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 14,
-                              color: _textColor,
+                          Directionality(
+                            textDirection: ui.TextDirection.ltr,
+                            child: Text(
+                              'RM ${vehicle.pricePerDay.toStringAsFixed(0)}',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 14,
+                                color: _textColor,
+                              ),
                             ),
                           ),
                         ],
@@ -1298,8 +1313,9 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                         onPressed: isAvailable
                             ? () {
                                 if (PaymentRestrictionService()
-                                    .checkRestriction(context))
+                                    .checkRestriction(context)) {
                                   return;
+                                }
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
@@ -1334,7 +1350,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                           ),
                         ),
                         child: Text(
-                          isAvailable ? 'Book Now' : 'Booked',
+                          (isAvailable ? 'Book Now' : 'Booked').tr(context),
                           style: const TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
@@ -1381,7 +1397,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                             padding: const EdgeInsets.symmetric(vertical: 2),
                           ),
                           child: Text(
-                            isAvailable ? 'Book Now' : 'Booked',
+                            (isAvailable ? 'Book Now' : 'Booked').tr(context),
                             style: const TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
@@ -1466,9 +1482,9 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                           ),
                         ),
                         alignment: Alignment.center,
-                        child: const Text(
-                          'BOOKED',
-                          style: TextStyle(
+                        child: Text(
+                          'BOOKED'.tr(context),
+                          style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w900,
                             fontSize: 16,
@@ -1490,7 +1506,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        vehicle.status.toUpperCase(),
+                        vehicle.status.toUpperCase().tr(context),
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 8,
@@ -1535,7 +1551,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                                   child: Text(
                                     vehicle.branchName.isNotEmpty
                                         ? vehicle.branchName
-                                        : 'General Hub',
+                                        : 'General Hub'.tr(context),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
@@ -1553,15 +1569,16 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                               children: [
                                 _buildSpecTag(
                                   Icons.airline_seat_recline_normal,
-                                  '${vehicle.seats} Seats',
+                                  '${vehicle.seats} ${'Seats'.tr(context)}',
+                                  isLtr: true,
                                 ),
                                 _buildSpecTag(
                                   Icons.settings_input_component,
-                                  vehicle.transmission,
+                                  vehicle.transmission.tr(context),
                                 ),
                                 _buildSpecTag(
                                   Icons.local_gas_station,
-                                  vehicle.fuelType,
+                                  vehicle.fuelType.tr(context),
                                 ),
                               ],
                             ),
@@ -1573,20 +1590,23 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Text(
-                            'DAILY RATE',
-                            style: TextStyle(
+                          Text(
+                            'DAILY RATE'.tr(context),
+                            style: const TextStyle(
                               fontSize: 8,
                               color: Colors.grey,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          Text(
-                            'RM ${vehicle.pricePerDay.toStringAsFixed(0)}',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 16,
-                              color: _textColor,
+                          Directionality(
+                            textDirection: ui.TextDirection.ltr,
+                            child: Text(
+                              'RM ${vehicle.pricePerDay.toStringAsFixed(0)}',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 16,
+                                color: _textColor,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 10),
@@ -1594,8 +1614,9 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                             onPressed: isAvailable
                                 ? () {
                                     if (PaymentRestrictionService()
-                                        .checkRestriction(context))
+                                        .checkRestriction(context)) {
                                       return;
+                                    }
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
@@ -1632,7 +1653,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                               ),
                             ),
                             child: Text(
-                              isAvailable ? 'Book Now' : 'Booked',
+                              (isAvailable ? 'Book Now' : 'Booked').tr(context),
                               style: const TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
@@ -1652,7 +1673,18 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
     );
   }
 
-  Widget _buildSpecTag(IconData icon, String text) {
+  Widget _buildSpecTag(IconData icon, String text, {bool isLtr = false}) {
+    final Widget labelWidget = Text(
+      text,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        fontSize: 9,
+        color: _subColor,
+        fontWeight: FontWeight.bold,
+      ),
+    );
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
@@ -1664,16 +1696,12 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
         children: [
           Icon(icon, size: 10, color: _subColor),
           const SizedBox(width: 4),
-          Text(
-            text,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 9,
-              color: _subColor,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          isLtr
+              ? Directionality(
+                  textDirection: ui.TextDirection.ltr,
+                  child: labelWidget,
+                )
+              : labelWidget,
         ],
       ),
     );

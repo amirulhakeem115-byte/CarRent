@@ -34,13 +34,40 @@ class UserModel {
   final String idRejectionReason;
   final String idReviewedBy;
   final String idReviewedDate;
+  // Passport/Driving License explicit fields
+  final String passportNumber;
+  final String drivingLicenseNumber;
 
   final String employeeId;
+  final String preferredLanguage;
+
+  String get effectivePassportNumber => passportNumber.isNotEmpty ? passportNumber : idNumber;
+  String get effectiveDrivingLicenseNumber => drivingLicenseNumber.isNotEmpty ? drivingLicenseNumber : (licenseNumber ?? '');
 
   String get normalizedRole => role.trim().toLowerCase();
   bool get isAdmin => normalizedRole == 'admin';
   bool get isEmployee => normalizedRole == 'employee';
   bool get isCustomer => normalizedRole == 'customer';
+
+  List<String> get missingProfileFields {
+    final missing = <String>[];
+    if (fullName.trim().isEmpty || fullName.trim().toLowerCase() == 'user') {
+      missing.add('Full Name');
+    }
+    if (phone.trim().isEmpty) {
+      missing.add('Phone Number');
+    }
+    if (idNumber.trim().isEmpty && idImage.trim().isEmpty) {
+      missing.add('Passport / IC Information');
+    }
+    if ((licenseNumber == null || licenseNumber!.trim().isEmpty) &&
+        licenseImage.trim().isEmpty) {
+      missing.add('Driving License Information');
+    }
+    return missing;
+  }
+
+  bool get isProfileCompleteForBooking => missingProfileFields.isEmpty;
 
   UserModel({
     required this.id,
@@ -72,7 +99,10 @@ class UserModel {
     this.idRejectionReason = '',
     this.idReviewedBy = '',
     this.idReviewedDate = '',
+    this.passportNumber = '',
+    this.drivingLicenseNumber = '',
     this.employeeId = '',
+    this.preferredLanguage = 'en',
   });
 
   factory UserModel.fromMap(String id, Map<dynamic, dynamic> data) {
@@ -122,7 +152,10 @@ class UserModel {
       idRejectionReason: data['idRejectionReason'] ?? '',
       idReviewedBy: data['idReviewedBy'] ?? '',
       idReviewedDate: data['idReviewedDate'] ?? '',
+      passportNumber: data['passportNumber'] ?? data['idNumber'] ?? '',
+      drivingLicenseNumber: data['drivingLicenseNumber'] ?? data['licenseNumber'] ?? '',
       employeeId: data['employeeId'] ?? '',
+      preferredLanguage: data['preferredLanguage'] ?? 'en',
     );
   }
 
@@ -156,7 +189,10 @@ class UserModel {
       'idRejectionReason': idRejectionReason,
       'idReviewedBy': idReviewedBy,
       'idReviewedDate': idReviewedDate,
+      'passportNumber': passportNumber,
+      'drivingLicenseNumber': drivingLicenseNumber,
       'employeeId': employeeId,
+      'preferredLanguage': preferredLanguage,
     };
   }
 }
